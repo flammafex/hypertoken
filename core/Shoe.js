@@ -40,7 +40,7 @@ export class Shoe extends Emitter {
     const idx = this._decks.indexOf(deck);
     if (idx < 0) return this;
     this._decks.splice(idx, 1);
-    // Rebuild stack without this deck’s tokens
+    // Rebuild stack without this deck's tokens
     const tokens = this._decks.flatMap(d => d.tokens ?? []);
     this._stack = tokens.slice();
     this._original = this._stack.slice();
