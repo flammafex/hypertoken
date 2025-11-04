@@ -95,7 +95,7 @@ HyperToken can serve as the backbone for:
 
 ### **Tokens**
 Tokens are the smallest interactive entities. They can represent cards, resources, characters, or abstract concepts.  
-Each token conforms to `token-set.schema.json` for consistent structure.
+Each token conforms to [`token-set.schema.json`](./schemas/token-set.schema.json) for consistent structure.
 
 ### **Events**
 The `EventBus` enables decoupled, event-driven communication among components (e.g., engine, players, interfaces).
@@ -208,7 +208,7 @@ To create your own token set or rule system:
 
 ## 🔌 Extending HyperToken
 
-Add a new plugin by placing it under `/src/engine/plugins/` or dynamically loading it:
+Add a new plugin by placing it under [`./engine/plugins/`](./engine/plugins/) or dynamically loading it:
 
 ```js
 import { registerPlugin } from './pluginLoader.js';
