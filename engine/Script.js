@@ -100,7 +100,7 @@ export class Script {
 
         const { type, payload = {}, delay = 0, reversible = true } = this.steps[this.index];
 
-        // Dispatch is synchronous from the script’s perspective; action handlers
+        // Dispatch is synchronous from the script's perspective; action handlers
         // may perform asynchronous work internally as dictated by the engine domain.
         engine.dispatch(type, payload, { reversible });
 
