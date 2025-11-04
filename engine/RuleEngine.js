@@ -131,7 +131,7 @@ export class RuleEngine {
   ───────────────────────────────────────────────*/
 
   /**
-   * Resolves and executes a rule’s sequence payload.
+   * Resolves and executes a rule's sequence payload.
    * Supports multiple sequence representations:
    *   - Script: high-level procedural block
    *   - Array<Action>: ordered multi-step behavior
