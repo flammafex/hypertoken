@@ -18,35 +18,77 @@
 
 export class Script {
   /**
+   * Represents an ordered sequence of engine actions executed with optional delays.
+   * Scripts are higher-level orchestration units used by RuleEngine or external
+   * controllers to express procedures as data.
+   *
+   * A script is defined by:
+   *  - name: identifier for diagnostics and event emission
+   *  - steps: array of { type, payload?, delay?, reversible? }
+   *
+   * Execution is linear and cooperative: the run() loop observes an AbortSignal
+   * for cancellation and emits lifecycle events without coupling to any UI.
+   */
+
+  /**
    * @param {string} name - script identifier
    * @param {Array<{type:string, payload?:object, delay?:number, reversible?:boolean}>} steps
    */
   constructor(name, steps = []) {
+    // Static metadata and immutable definition of intended procedure.
     this.name = name;
     this.steps = Array.isArray(steps) ? steps.slice() : [];
+
+    // Runtime state; separated from definition for reentrancy and introspection.
     this.running = false;
     this.index = 0;
   }
 
+  /**
+   * Appends a single step to the procedure. Mutates the definition in-place.
+   * Steps are executed in insertion order unless the consumer rebuilds the array.
+   */
   add(step) {
     this.steps.push(step);
     return this;
   }
 
+  /**
+   * Removes all steps and repositions the instruction pointer.
+   * Used when recycling a Script instance across scenarios.
+   */
   clear() {
     this.steps.length = 0;
     this.index = 0;
     return this;
   }
 
+  /**
+   * Serializes the script definition (excluding runtime state).
+   * Suitable for persistence or transmission across processes.
+   */
   toJSON() {
     return { name: this.name, steps: this.steps.slice() };
   }
 
+  /**
+   * Recreates a Script from serialized definition. Runtime fields are reset.
+   */
   static fromJSON(obj) {
     return new Script(obj?.name ?? "script", obj?.steps ?? []);
   }
 
+  /**
+   * Executes the script against the provided engine. Each step dispatches
+   * an engine action with optional delay. The loop is cooperative: callers
+   * can provide an AbortSignal to terminate early without exception flow.
+   *
+   * Events:
+   *  - script:start   { name, steps }
+   *  - script:complete{ name, completed }
+   *
+   * The reversible flag is forwarded to the engine to inform timeline controls.
+   */
   async run(engine, { signal } = {}) {
     if (this.running) return;
     this.running = true;
@@ -55,12 +97,14 @@ export class Script {
     try {
       for (this.index = 0; this.index < this.steps.length; this.index++) {
         if (signal?.aborted) break;
+
         const { type, payload = {}, delay = 0, reversible = true } = this.steps[this.index];
 
-        // Dispatch the action through the engine
+        // Dispatch is synchronous from the script’s perspective; action handlers
+        // may perform asynchronous work internally as dictated by the engine domain.
         engine.dispatch(type, payload, { reversible });
 
-        // Optional deterministic delay (consumer-controlled)
+        // Delay is consumer-controlled pacing; preserves deterministic ordering.
         if (delay && !signal?.aborted) {
           await new Promise(r => setTimeout(r, delay));
         }
@@ -72,9 +116,12 @@ export class Script {
     }
   }
 
+  /**
+   * Emits a semantic stop event. Cooperative cancellation is performed by
+   * providing an AbortSignal to run(); this method does not force termination.
+   * It exists to standardize external controller intent and telemetry.
+   */
   stop(engine) {
-    // Caller should pass an AbortController.signal into run() for cooperative stop.
-    // Provided as a semantic helper for external controllers.
     engine?.emit?.("script:stop", { payload: { name: this.name, at: this.index } });
   }
 }
