@@ -118,7 +118,7 @@ External modules can define new actions, AI agents, or rule sets through the `Pl
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/yourusername/hypertoken.git
+git clone https://git.carpocratian.org/sibyl/hypertoken.git
 cd hypertoken
 npm install
 ```
