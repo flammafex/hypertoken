@@ -1,0 +1,120 @@
+/*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+// ./interface/HumanInterface.js
+// Handles local human input → dispatches deterministic actions to the Engine.
+
+import { Emitter } from "../core/events.js";
+
+/**
+ * HumanInterface
+ * - Listens for UI or input events.
+ * - Dispatches valid actions to the Engine.
+ * - Updates subscribed UIs when state changes.
+ */
+export class HumanInterface extends Emitter {
+  /**
+   * @param {Engine} engine - the running engine instance
+   * @param {object} [options]
+   * @param {HTMLElement|Document} [options.dom] - optional root DOM for UI binding
+   * @param {(state:object)=>void} [options.onUpdate] - callback for UI updates
+   * @param {boolean} [options.verbose=false]
+   */
+  constructor(engine, { dom = null, onUpdate = null, verbose = false } = {}) {
+    super();
+    this.engine = engine;
+    this.dom = dom;
+    this.onUpdate = onUpdate;
+    this.verbose = verbose;
+
+    // Subscribe to engine events for reactive updates
+    engine.on("stateChange", e => this._update(e));
+    engine.on("engine:action", e => this._logAction(e));
+  }
+
+  /*───────────────────────────────────────────────
+    Core interaction methods
+  ───────────────────────────────────────────────*/
+  handleAction(type, payload = {}) {
+    try {
+      if (this.verbose) console.log("🎮 dispatch", type, payload);
+      this.engine.dispatch(type, payload);
+      this.emit("input:action", { payload: { type, payload } });
+    } catch (err) {
+      console.error("HumanInterface dispatch error:", err);
+      this.emit("input:error", { payload: { error: err } });
+    }
+  }
+
+  /** Shortcut helpers for common verbs **/
+  draw(count = 1) { this.handleAction("deck:draw", { count }); }
+  shuffle(seed = null) { this.handleAction("deck:shuffle", { seed }); }
+  resetDeck() { this.handleAction("deck:reset"); }
+  place(zone = "table") { this.handleAction("table:place", { zone }); }
+  clearTable() { this.handleAction("table:clear"); }
+
+  /*───────────────────────────────────────────────
+    UI bindings (optional)
+  ───────────────────────────────────────────────*/
+  bindDOM() {
+    if (!this.dom) return;
+    // Example: bind button IDs
+    const bind = (id, fn) => {
+      const el = this.dom.querySelector(`#${id}`);
+      if (el) el.addEventListener("click", fn);
+    };
+
+    bind("btnDraw", () => this.draw(1));
+    bind("btnShuffle", () => this.shuffle());
+    bind("btnReset", () => this.resetDeck());
+    bind("btnPlace", () => this.place());
+    bind("btnClearTable", () => this.clearTable());
+
+    this.emit("ui:bound");
+  }
+
+  /*───────────────────────────────────────────────
+    Engine state updates
+  ───────────────────────────────────────────────*/
+  _update(e) {
+    const state = this.engine.describe();
+    if (this.onUpdate) this.onUpdate(state);
+    this.emit("ui:update", { payload: { state } });
+  }
+
+  _logAction(e) {
+    if (this.verbose) {
+      console.log(`🧩 Action: ${e?.payload?.type ?? "(unknown)"}`);
+    }
+  }
+
+  /*───────────────────────────────────────────────
+    Lifecycle helpers
+  ───────────────────────────────────────────────*/
+  refresh() {
+    const state = this.engine.describe();
+    if (this.onUpdate) this.onUpdate(state);
+  }
+
+  detach() {
+    if (this.dom) {
+      this.dom.querySelectorAll("button").forEach(b => {
+        const clone = b.cloneNode(true);
+        b.parentNode.replaceChild(clone, b);
+      });
+    }
+    this.emit("ui:detached");
+  }
+}
