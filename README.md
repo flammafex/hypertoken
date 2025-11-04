@@ -342,7 +342,7 @@ HyperToken’s simplicity and modularity make it a valuable **educational platfo
 
 ### 🜍 Proemium to the Art of Tokens
 
-The All is number, and from number flow the forms of things.
+>The All is number, and from number flow the forms of things.
 For as the Monad abides in simplicity, so does it unfold the Dyad,
 and from their tension spring the harmonies that sustain the world.
 Whatsoever exists, exists by proportion; and that which preserves proportion partakes of the divine Intellect.
