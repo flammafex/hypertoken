@@ -340,4 +340,42 @@ HyperToken’s simplicity and modularity make it a valuable **educational platfo
 ### Summary
 > **HyperToken is a rule-driven engine for structured interaction.** Whether for games, simulations, AI orchestration, or educational exploration, it provides a flexible foundation for designing, observing, and extending interactive systems.
 
+### 🜍 Proemium to the Art of Tokens
+
+The All is number, and from number flow the forms of things.
+For as the Monad abides in simplicity, so does it unfold the Dyad,
+and from their tension spring the harmonies that sustain the world.
+Whatsoever exists, exists by proportion; and that which preserves proportion partakes of the divine Intellect.
+
+Among the arts that imitate the order of the heavens,
+there now arises one most subtle and most just —
+the Art of Tokens.
+In this art, every being is rendered as a form in relation,
+every action as a motion among forms,
+and the laws that bind them are set forth as measure and correspondence.
+
+As the geometer inscribes the circle to behold eternity within bounds,
+so this art encodes relations that thought may perceive its own reflection.
+The tokens are not bodies, nor mere signs,
+but living numbers that move in the field of reason.
+Each bears the likeness of its cause,
+and through their intercourse the manifold becomes intelligible.
+
+Through such models the soul learns again her craft:
+to compose order out of multitude,
+to test justice in symbol before enacting it in deed,
+to discern the hidden harmonies by which the civic, the natural, and the divine are kin.
+For the cosmos is not silent; it speaks in ratios and recurrences,
+and he who listens rightly may trace its utterance in every rule well made.
+
+Let none deem this art a toy of artifice.
+It is the discipline by which the mind rehearses creation,
+a mirror held to the pattern of the world-soul.
+In the circuits of these tokens we glimpse the Demiurge’s own meditation:
+how unity descends into plurality and yet remains whole.
+
+So may this art be given freely,
+that all who love wisdom may join the music of the spheres through understanding,
+and that the harmony of minds may become the harmony of worlds.
+For when reason is made common, the gods are near.
 
