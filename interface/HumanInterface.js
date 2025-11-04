@@ -32,17 +32,16 @@ export class HumanInterface extends Emitter {
    * @param {(state:object)=>void} [options.onUpdate] - callback for UI updates
    * @param {boolean} [options.verbose=false]
    */
-  constructor(engine, { dom = null, onUpdate = null, verbose = false } = {}) {
-    super();
-    this.engine = engine;
-    this.dom = dom;
-    this.onUpdate = onUpdate;
-    this.verbose = verbose;
+constructor(engine, { adapter = null, onUpdate = null, verbose = false } = {}) {
+  super();
+  this.engine = engine;
+  this.adapter = adapter; // could be a DOM adapter, CLI adapter, etc.
+  this.onUpdate = onUpdate;
+  this.verbose = verbose;
 
-    // Subscribe to engine events for reactive updates
-    engine.on("stateChange", e => this._update(e));
-    engine.on("engine:action", e => this._logAction(e));
-  }
+  engine.on("stateChange", e => this._update(e));
+  engine.on("engine:action", e => this._logAction(e));
+}
 
   /*───────────────────────────────────────────────
     Core interaction methods
@@ -66,26 +65,6 @@ export class HumanInterface extends Emitter {
   clearTable() { this.handleAction("table:clear"); }
 
   /*───────────────────────────────────────────────
-    UI bindings (optional)
-  ───────────────────────────────────────────────*/
-  bindDOM() {
-    if (!this.dom) return;
-    // Example: bind button IDs
-    const bind = (id, fn) => {
-      const el = this.dom.querySelector(`#${id}`);
-      if (el) el.addEventListener("click", fn);
-    };
-
-    bind("btnDraw", () => this.draw(1));
-    bind("btnShuffle", () => this.shuffle());
-    bind("btnReset", () => this.resetDeck());
-    bind("btnPlace", () => this.place());
-    bind("btnClearTable", () => this.clearTable());
-
-    this.emit("ui:bound");
-  }
-
-  /*───────────────────────────────────────────────
     Engine state updates
   ───────────────────────────────────────────────*/
   _update(e) {
@@ -105,16 +84,12 @@ export class HumanInterface extends Emitter {
   ───────────────────────────────────────────────*/
   refresh() {
     const state = this.engine.describe();
-    if (this.onUpdate) this.onUpdate(state);
+    this.emit("ui:refresh", { payload: { state } });
+    this.onUpdate?.(state);
   }
 
   detach() {
-    if (this.dom) {
-      this.dom.querySelectorAll("button").forEach(b => {
-        const clone = b.cloneNode(true);
-        b.parentNode.replaceChild(clone, b);
-      });
-    }
-    this.emit("ui:detached");
+    this.emit("ui:detach");
+    this.adapter?.cleanup?.();
   }
 }
