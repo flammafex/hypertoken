@@ -3,6 +3,7 @@
 [<div align=center><img src="church.png" width=72 height=72>](https://carpocratian.org/en/church/)
 
 _A mission of [The Carpocratian Church of Commonality and Equality](https://carpocratian.org/en/church/)_.</div>
+<div align=center><img src="mission.png" width=256 height=200></div>
 
 **HyperToken** is a modular, token-driven simulation and game engine designed for **AI-human interaction**, **multi-agent systems**, and **rule-based games**.
 It provides a flexible framework for creating simulations, turn-based or card-style games, narrative systems, or intelligent agents — all powered by an extensible plugin and event architecture.
