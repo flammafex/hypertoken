@@ -96,10 +96,10 @@ export class Engine extends Emitter {
    */
   dispatch(type, payload = {}, opts = {}) {
     const action = new Action(type, payload, opts);
-    if (this.debug) console.log("🧭 dispatch:", type, payload);
+    if (this.debug) console.log("ðŸ§­ dispatch:", type, payload);
 
     // Apply action synchronously; no deferred queueing.
-    this.apply(action);
+    const result = this.apply(action);
     this.history.push(action);
     this.emit("engine:action", { payload: action });
 
@@ -112,7 +112,7 @@ export class Engine extends Emitter {
       }
     }
 
-    return action;
+    return result; // Return the result from the action handler
   }
 
   /**
@@ -124,12 +124,16 @@ export class Engine extends Emitter {
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {
-        fn(this, action.payload);
+        const result = fn(this, action.payload);
+        action.result = result; // Store result in action for later retrieval
+        return result;
       } catch (err) {
         this.emit("engine:error", { payload: { action, err } });
+        return undefined;
       }
     } else {
       this.emit("engine:error", { payload: { action, msg: "Unknown action" } });
+      return undefined;
     }
   }
 
