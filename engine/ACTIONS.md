@@ -4,19 +4,20 @@ Complete documentation for all 45 built-in actions in the HyperToken engine.
 
 ---
 
-## Quick Reference
+## Action Registry
 
-### By Category
+**Total: 55 actions across 7 categories**
 
 | Category | Count | Actions |
 |----------|-------|---------|
 | **Deck** | 10 | shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse |
-| **Table** | 13 | place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone |
+| **Table** | 13 | place, clear, move, flip, remove, zone management, locking |
 | **Shoe** | 7 | draw, shuffle, burn, reset, addDeck, removeDeck, inspect |
 | **Player** | 9 | create, remove, setActive, giveResource, takeResource, drawCards, discardCards, get |
 | **Game** | 6 | start, end, pause, resume, nextPhase, setProperty |
-| **Total** | **45** | |
-
+| **Token** | 5 | transform, attach, detach, merge, split |
+| **Batch** | 5 | filter, forEach, collect, count, find |
+| **TOTAL** | **55** | **100% Complete** ✅ |
 ---
 
 ## Deck Actions
