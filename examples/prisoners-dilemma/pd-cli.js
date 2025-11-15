@@ -83,9 +83,9 @@ import { STRATEGIES } from './strategies.js';
  * Main CLI function
  */
 async function main() {
-  console.log('\n╔════════════════════════════════════════════╗');
-  console.log('║  PRISONER\'S DILEMMA TOURNAMENT SYSTEM     ║');
-  console.log('╚════════════════════════════════════════════╝\n');
+  console.log('\nâ•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—');
+  console.log('â•‘  PRISONER\'S DILEMMA TOURNAMENT SYSTEM     â•‘');
+  console.log('â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•\n');
   
   console.log('A game theory experiment using HyperToken\n');
   
@@ -100,7 +100,7 @@ async function main() {
   if (strategiesArg) {
     strategyKeys = strategiesArg.split('=')[1].split(',');
   } else {
-    // Default: run tournament with classic strategies
+    // Default: run tournament with all 14 strategies
     strategyKeys = [
       'titForTat',
       'alwaysCooperate',
@@ -109,6 +109,12 @@ async function main() {
       'pavlov',
       'titForTwoTats',
       'generousTitForTat',
+      'suspiciousTitForTat',
+      'adaptive',
+      'gradual',
+      'prober',
+      'softMajority',
+      'hardMajority',
       'random'
     ];
   }
@@ -128,10 +134,10 @@ async function main() {
     const strategy = STRATEGIES[key];
     if (strategy) {
       tournament.addStrategy(strategy.name, strategy.fn, strategy.description);
-      console.log(`  ✓ ${strategy.name}`);
+      console.log(`  âœ“ ${strategy.name}`);
       console.log(`    ${strategy.description}\n`);
     } else {
-      console.log(`  ✗ Unknown strategy: ${key}\n`);
+      console.log(`  âœ— Unknown strategy: ${key}\n`);
     }
   });
   
@@ -151,7 +157,7 @@ async function main() {
     const fs = await import('fs');
     const filename = `tournament-results-${Date.now()}.json`;
     fs.writeFileSync(filename, tournament.exportResults());
-    console.log(`\n✓ Results exported to ${filename}\n`);
+    console.log(`\nâœ“ Results exported to ${filename}\n`);
   }
 }
 
@@ -159,7 +165,7 @@ async function main() {
  * Quick demo function
  */
 export async function runDemo() {
-  console.log('\n🎮 Running Prisoner\'s Dilemma Demo\n');
+  console.log('\nðŸŽ® Running Prisoner\'s Dilemma Demo\n');
   
   const engine = new MockEngine();
   const tournament = new Tournament(engine, { rounds: 50, verbose: false });

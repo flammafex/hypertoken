@@ -1,0 +1,1427 @@
+{
+  "name": "Rider-Waite-Smith Tarot",
+  "kind": "tarot",
+  "description": "Complete 78-card tarot deck with Major Arcana (22 cards) and Minor Arcana (56 cards in four suits)",
+  "tokens": [
+    {
+      "id": "major-00-fool",
+      "group": "major-arcana",
+      "label": "0. The Fool",
+      "text": "New beginnings, innocence, spontaneity, free spirit. The Fool stands at the precipice of adventure, unburdened by past or future.",
+      "meta": {
+        "arcana": "major",
+        "number": 0,
+        "element": "air",
+        "astrological": "uranus",
+        "keywords": ["beginnings", "innocence", "adventure", "spontaneity", "faith"],
+        "upright": "New beginnings, innocence, free spirit, originality, adventure",
+        "reversed": "Recklessness, risk-taking, distraction, naivety, foolishness"
+      },
+      "char": "🃏",
+      "kind": "tarot",
+      "index": 0
+    },
+    {
+      "id": "major-01-magician",
+      "group": "major-arcana",
+      "label": "I. The Magician",
+      "text": "Manifestation, resourcefulness, power, inspired action. The Magician channels universal energy to manifest desires into reality.",
+      "meta": {
+        "arcana": "major",
+        "number": 1,
+        "element": "air",
+        "astrological": "mercury",
+        "keywords": ["manifestation", "power", "skill", "concentration", "action"],
+        "upright": "Manifestation, resourcefulness, power, inspired action, mastery",
+        "reversed": "Manipulation, poor planning, untapped talents, illusion, trickery"
+      },
+      "char": "🎩",
+      "kind": "tarot",
+      "index": 1
+    },
+    {
+      "id": "major-02-high-priestess",
+      "group": "major-arcana",
+      "label": "II. The High Priestess",
+      "text": "Intuition, sacred knowledge, divine feminine, the subconscious mind. She guards the threshold between the conscious and unconscious.",
+      "meta": {
+        "arcana": "major",
+        "number": 2,
+        "element": "water",
+        "astrological": "moon",
+        "keywords": ["intuition", "mystery", "subconscious", "wisdom", "inner-voice"],
+        "upright": "Intuition, sacred knowledge, divine feminine, the subconscious mind",
+        "reversed": "Secrets, disconnected from intuition, withdrawal, silence"
+      },
+      "char": "🌙",
+      "kind": "tarot",
+      "index": 2
+    },
+    {
+      "id": "major-03-empress",
+      "group": "major-arcana",
+      "label": "III. The Empress",
+      "text": "Femininity, beauty, nature, nurturing, abundance. The Empress embodies creation, fertility, and the flourishing of life.",
+      "meta": {
+        "arcana": "major",
+        "number": 3,
+        "element": "earth",
+        "astrological": "venus",
+        "keywords": ["femininity", "abundance", "nature", "nurturing", "creativity"],
+        "upright": "Femininity, beauty, nature, nurturing, abundance, creativity",
+        "reversed": "Creative block, dependence on others, smothering, emptiness"
+      },
+      "char": "👑",
+      "kind": "tarot",
+      "index": 3
+    },
+    {
+      "id": "major-04-emperor",
+      "group": "major-arcana",
+      "label": "IV. The Emperor",
+      "text": "Authority, establishment, structure, father figure. The Emperor represents order, stability, and the power of rational thought.",
+      "meta": {
+        "arcana": "major",
+        "number": 4,
+        "element": "fire",
+        "astrological": "aries",
+        "keywords": ["authority", "structure", "control", "fatherhood", "discipline"],
+        "upright": "Authority, establishment, structure, father figure, leadership",
+        "reversed": "Domination, excessive control, lack of discipline, inflexibility"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 4
+    },
+    {
+      "id": "major-05-hierophant",
+      "group": "major-arcana",
+      "label": "V. The Hierophant",
+      "text": "Spiritual wisdom, religious beliefs, conformity, tradition, institutions. The Hierophant is the keeper of sacred knowledge and tradition.",
+      "meta": {
+        "arcana": "major",
+        "number": 5,
+        "element": "earth",
+        "astrological": "taurus",
+        "keywords": ["tradition", "conformity", "religion", "institutions", "teaching"],
+        "upright": "Spiritual wisdom, religious beliefs, conformity, tradition, institutions",
+        "reversed": "Personal beliefs, freedom, challenging the status quo, unconventional"
+      },
+      "char": "🕊️",
+      "kind": "tarot",
+      "index": 5
+    },
+    {
+      "id": "major-06-lovers",
+      "group": "major-arcana",
+      "label": "VI. The Lovers",
+      "text": "Love, harmony, relationships, values alignment, choices. The Lovers represent union, connection, and important decisions of the heart.",
+      "meta": {
+        "arcana": "major",
+        "number": 6,
+        "element": "air",
+        "astrological": "gemini",
+        "keywords": ["love", "harmony", "relationships", "choice", "values"],
+        "upright": "Love, harmony, relationships, values alignment, choices, partnerships",
+        "reversed": "Self-love, disharmony, imbalance, misalignment of values"
+      },
+      "char": "💕",
+      "kind": "tarot",
+      "index": 6
+    },
+    {
+      "id": "major-07-chariot",
+      "group": "major-arcana",
+      "label": "VII. The Chariot",
+      "text": "Control, willpower, success, action, determination. The Chariot symbolizes triumph through discipline and focused intention.",
+      "meta": {
+        "arcana": "major",
+        "number": 7,
+        "element": "water",
+        "astrological": "cancer",
+        "keywords": ["control", "willpower", "victory", "determination", "direction"],
+        "upright": "Control, willpower, success, action, determination, victory",
+        "reversed": "Lack of control, lack of direction, aggression, opposition"
+      },
+      "char": "🏆",
+      "kind": "tarot",
+      "index": 7
+    },
+    {
+      "id": "major-08-strength",
+      "group": "major-arcana",
+      "label": "VIII. Strength",
+      "text": "Strength, courage, persuasion, influence, compassion. True strength lies in gentle influence and inner fortitude.",
+      "meta": {
+        "arcana": "major",
+        "number": 8,
+        "element": "fire",
+        "astrological": "leo",
+        "keywords": ["strength", "courage", "patience", "compassion", "self-control"],
+        "upright": "Strength, courage, persuasion, influence, compassion, inner power",
+        "reversed": "Inner strength, self-doubt, low energy, raw emotion, weakness"
+      },
+      "char": "🦁",
+      "kind": "tarot",
+      "index": 8
+    },
+    {
+      "id": "major-09-hermit",
+      "group": "major-arcana",
+      "label": "IX. The Hermit",
+      "text": "Soul searching, introspection, inner guidance, solitude. The Hermit walks the path of wisdom through quiet contemplation.",
+      "meta": {
+        "arcana": "major",
+        "number": 9,
+        "element": "earth",
+        "astrological": "virgo",
+        "keywords": ["introspection", "solitude", "wisdom", "guidance", "contemplation"],
+        "upright": "Soul searching, introspection, being alone, inner guidance, solitude",
+        "reversed": "Isolation, loneliness, withdrawal, paranoia, lack of guidance"
+      },
+      "char": "🕯️",
+      "kind": "tarot",
+      "index": 9
+    },
+    {
+      "id": "major-10-wheel-of-fortune",
+      "group": "major-arcana",
+      "label": "X. Wheel of Fortune",
+      "text": "Good luck, karma, life cycles, destiny, turning point. The Wheel turns eternally, bringing change and new opportunities.",
+      "meta": {
+        "arcana": "major",
+        "number": 10,
+        "element": "fire",
+        "astrological": "jupiter",
+        "keywords": ["change", "cycles", "fate", "turning-point", "luck"],
+        "upright": "Good luck, karma, life cycles, destiny, turning point, fortune",
+        "reversed": "Bad luck, resistance to change, breaking cycles, lack of control"
+      },
+      "char": "☸️",
+      "kind": "tarot",
+      "index": 10
+    },
+    {
+      "id": "major-11-justice",
+      "group": "major-arcana",
+      "label": "XI. Justice",
+      "text": "Justice, fairness, truth, cause and effect, law. Justice represents balance, accountability, and karmic consequence.",
+      "meta": {
+        "arcana": "major",
+        "number": 11,
+        "element": "air",
+        "astrological": "libra",
+        "keywords": ["justice", "fairness", "truth", "law", "accountability"],
+        "upright": "Justice, fairness, truth, cause and effect, law, karma",
+        "reversed": "Unfairness, lack of accountability, dishonesty, legal complications"
+      },
+      "char": "⚖️",
+      "kind": "tarot",
+      "index": 11
+    },
+    {
+      "id": "major-12-hanged-man",
+      "group": "major-arcana",
+      "label": "XII. The Hanged Man",
+      "text": "Pause, surrender, letting go, new perspectives. The Hanged Man sees the world differently through willing sacrifice.",
+      "meta": {
+        "arcana": "major",
+        "number": 12,
+        "element": "water",
+        "astrological": "neptune",
+        "keywords": ["pause", "surrender", "sacrifice", "perspective", "release"],
+        "upright": "Pause, surrender, letting go, new perspectives, sacrifice",
+        "reversed": "Delays, resistance, stalling, indecision, avoiding sacrifice"
+      },
+      "char": "🙃",
+      "kind": "tarot",
+      "index": 12
+    },
+    {
+      "id": "major-13-death",
+      "group": "major-arcana",
+      "label": "XIII. Death",
+      "text": "Endings, change, transformation, transition. Death marks profound transformation and the completion of cycles.",
+      "meta": {
+        "arcana": "major",
+        "number": 13,
+        "element": "water",
+        "astrological": "scorpio",
+        "keywords": ["endings", "transformation", "transition", "release", "renewal"],
+        "upright": "Endings, change, transformation, transition, letting go",
+        "reversed": "Resistance to change, personal transformation, inner purging"
+      },
+      "char": "💀",
+      "kind": "tarot",
+      "index": 13
+    },
+    {
+      "id": "major-14-temperance",
+      "group": "major-arcana",
+      "label": "XIV. Temperance",
+      "text": "Balance, moderation, patience, purpose, meaning. Temperance blends opposing forces into harmonious synthesis.",
+      "meta": {
+        "arcana": "major",
+        "number": 14,
+        "element": "fire",
+        "astrological": "sagittarius",
+        "keywords": ["balance", "moderation", "patience", "harmony", "alchemy"],
+        "upright": "Balance, moderation, patience, purpose, meaning, tranquility",
+        "reversed": "Imbalance, excess, self-healing, re-alignment, lack of patience"
+      },
+      "char": "🌊",
+      "kind": "tarot",
+      "index": 14
+    },
+    {
+      "id": "major-15-devil",
+      "group": "major-arcana",
+      "label": "XV. The Devil",
+      "text": "Shadow self, attachment, addiction, restriction, sexuality. The Devil represents bondage to material and illusory constraints.",
+      "meta": {
+        "arcana": "major",
+        "number": 15,
+        "element": "earth",
+        "astrological": "capricorn",
+        "keywords": ["bondage", "addiction", "materialism", "shadow", "restriction"],
+        "upright": "Shadow self, attachment, addiction, restriction, sexuality, materialism",
+        "reversed": "Releasing limiting beliefs, exploring dark thoughts, detachment"
+      },
+      "char": "😈",
+      "kind": "tarot",
+      "index": 15
+    },
+    {
+      "id": "major-16-tower",
+      "group": "major-arcana",
+      "label": "XVI. The Tower",
+      "text": "Sudden change, upheaval, chaos, revelation, awakening. The Tower brings sudden collapse of false structures.",
+      "meta": {
+        "arcana": "major",
+        "number": 16,
+        "element": "fire",
+        "astrological": "mars",
+        "keywords": ["upheaval", "chaos", "revelation", "awakening", "destruction"],
+        "upright": "Sudden change, upheaval, chaos, revelation, awakening, disruption",
+        "reversed": "Personal transformation, fear of change, averting disaster"
+      },
+      "char": "⚡",
+      "kind": "tarot",
+      "index": 16
+    },
+    {
+      "id": "major-17-star",
+      "group": "major-arcana",
+      "label": "XVII. The Star",
+      "text": "Hope, faith, purpose, renewal, spirituality. The Star offers healing light after the Tower's destruction.",
+      "meta": {
+        "arcana": "major",
+        "number": 17,
+        "element": "air",
+        "astrological": "aquarius",
+        "keywords": ["hope", "faith", "inspiration", "renewal", "serenity"],
+        "upright": "Hope, faith, purpose, renewal, spirituality, inspiration",
+        "reversed": "Lack of faith, despair, self-trust, disconnection, hopelessness"
+      },
+      "char": "⭐",
+      "kind": "tarot",
+      "index": 17
+    },
+    {
+      "id": "major-18-moon",
+      "group": "major-arcana",
+      "label": "XVIII. The Moon",
+      "text": "Illusion, fear, anxiety, subconscious, intuition. The Moon illuminates the hidden realms of dreams and shadow.",
+      "meta": {
+        "arcana": "major",
+        "number": 18,
+        "element": "water",
+        "astrological": "pisces",
+        "keywords": ["illusion", "intuition", "subconscious", "dreams", "fear"],
+        "upright": "Illusion, fear, anxiety, subconscious, intuition, mystery",
+        "reversed": "Release of fear, repressed emotion, inner confusion, unveiling secrets"
+      },
+      "char": "🌜",
+      "kind": "tarot",
+      "index": 18
+    },
+    {
+      "id": "major-19-sun",
+      "group": "major-arcana",
+      "label": "XIX. The Sun",
+      "text": "Positivity, fun, warmth, success, vitality. The Sun brings radiant joy, clarity, and celebration of life.",
+      "meta": {
+        "arcana": "major",
+        "number": 19,
+        "element": "fire",
+        "astrological": "sun",
+        "keywords": ["success", "joy", "celebration", "positivity", "vitality"],
+        "upright": "Positivity, fun, warmth, success, vitality, joy, enlightenment",
+        "reversed": "Inner child, feeling down, overly optimistic, temporary depression"
+      },
+      "char": "☀️",
+      "kind": "tarot",
+      "index": 19
+    },
+    {
+      "id": "major-20-judgement",
+      "group": "major-arcana",
+      "label": "XX. Judgement",
+      "text": "Judgement, rebirth, inner calling, absolution. Judgement calls for reflection, evaluation, and spiritual awakening.",
+      "meta": {
+        "arcana": "major",
+        "number": 20,
+        "element": "fire",
+        "astrological": "pluto",
+        "keywords": ["judgement", "rebirth", "reflection", "reckoning", "awakening"],
+        "upright": "Judgement, rebirth, inner calling, absolution, self-evaluation",
+        "reversed": "Self-doubt, inner critic, ignoring the call, self-loathing"
+      },
+      "char": "📯",
+      "kind": "tarot",
+      "index": 20
+    },
+    {
+      "id": "major-21-world",
+      "group": "major-arcana",
+      "label": "XXI. The World",
+      "text": "Completion, integration, accomplishment, travel. The World represents wholeness, fulfillment, and cosmic unity.",
+      "meta": {
+        "arcana": "major",
+        "number": 21,
+        "element": "earth",
+        "astrological": "saturn",
+        "keywords": ["completion", "accomplishment", "integration", "wholeness", "fulfillment"],
+        "upright": "Completion, integration, accomplishment, travel, unity, fulfillment",
+        "reversed": "Seeking personal closure, short-cuts, delays, lack of completion"
+      },
+      "char": "🌍",
+      "kind": "tarot",
+      "index": 21
+    },
+    {
+      "id": "wands-ace",
+      "group": "wands",
+      "label": "Ace of Wands",
+      "text": "Inspiration, new opportunities, growth, potential. The Ace of Wands ignites creative fire and passionate beginnings.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "ace",
+        "element": "fire",
+        "keywords": ["inspiration", "opportunity", "creativity", "enthusiasm", "potential"],
+        "upright": "Inspiration, new opportunities, growth, potential, creativity",
+        "reversed": "An emerging idea, lack of direction, distractions, delays"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 22
+    },
+    {
+      "id": "wands-02",
+      "group": "wands",
+      "label": "Two of Wands",
+      "text": "Future planning, progress, decisions, discovery. Standing at a crossroads, contemplating future possibilities.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "2",
+        "element": "fire",
+        "keywords": ["planning", "decisions", "progress", "discovery", "choices"],
+        "upright": "Future planning, progress, decisions, discovery, personal power",
+        "reversed": "Personal goals, inner alignment, fear of unknown, lack of planning"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 23
+    },
+    {
+      "id": "wands-03",
+      "group": "wands",
+      "label": "Three of Wands",
+      "text": "Progress, expansion, foresight, overseas opportunities. Looking ahead with optimism and expanding horizons.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "3",
+        "element": "fire",
+        "keywords": ["progress", "expansion", "foresight", "exploration", "enterprise"],
+        "upright": "Progress, expansion, foresight, overseas opportunities, growth",
+        "reversed": "Playing small, lack of foresight, unexpected delays, obstacles"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 24
+    },
+    {
+      "id": "wands-04",
+      "group": "wands",
+      "label": "Four of Wands",
+      "text": "Celebration, harmony, marriage, home, community. A joyful gathering marking achievement and stability.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "4",
+        "element": "fire",
+        "keywords": ["celebration", "harmony", "home", "community", "stability"],
+        "upright": "Celebration, joy, harmony, relaxation, homecoming, community",
+        "reversed": "Personal celebration, inner harmony, conflict with others, transition"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 25
+    },
+    {
+      "id": "wands-05",
+      "group": "wands",
+      "label": "Five of Wands",
+      "text": "Conflict, competition, tension, diversity. Navigating disagreement and competing interests with vigor.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "5",
+        "element": "fire",
+        "keywords": ["conflict", "competition", "tension", "disagreement", "struggle"],
+        "upright": "Conflict, disagreements, competition, tension, diversity of opinion",
+        "reversed": "Inner conflict, conflict avoidance, releasing tension, cooperation"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 26
+    },
+    {
+      "id": "wands-06",
+      "group": "wands",
+      "label": "Six of Wands",
+      "text": "Success, public recognition, progress, self-confidence. Victory and acknowledgment after overcoming challenges.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "6",
+        "element": "fire",
+        "keywords": ["success", "victory", "recognition", "confidence", "achievement"],
+        "upright": "Success, public recognition, progress, self-confidence, victory",
+        "reversed": "Private achievement, personal definition of success, fall from grace"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 27
+    },
+    {
+      "id": "wands-07",
+      "group": "wands",
+      "label": "Seven of Wands",
+      "text": "Challenge, competition, perseverance, defense. Standing your ground despite opposition and pressure.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "7",
+        "element": "fire",
+        "keywords": ["challenge", "competition", "perseverance", "defense", "courage"],
+        "upright": "Challenge, competition, protection, perseverance, courage",
+        "reversed": "Exhaustion, giving up, overwhelmed, lack of confidence"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 28
+    },
+    {
+      "id": "wands-08",
+      "group": "wands",
+      "label": "Eight of Wands",
+      "text": "Movement, fast paced change, action, alignment. Swift progress and things falling rapidly into place.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "8",
+        "element": "fire",
+        "keywords": ["movement", "speed", "action", "momentum", "alignment"],
+        "upright": "Movement, fast paced change, action, alignment, travel",
+        "reversed": "Delays, frustration, resisting change, internal alignment"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 29
+    },
+    {
+      "id": "wands-09",
+      "group": "wands",
+      "label": "Nine of Wands",
+      "text": "Resilience, courage, persistence, test of faith. Battle-worn but still standing, ready for the final challenge.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "9",
+        "element": "fire",
+        "keywords": ["resilience", "courage", "persistence", "boundaries", "endurance"],
+        "upright": "Resilience, courage, persistence, test of faith, boundaries",
+        "reversed": "Inner resources, struggle, overwhelm, defensive, paranoia"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 30
+    },
+    {
+      "id": "wands-10",
+      "group": "wands",
+      "label": "Ten of Wands",
+      "text": "Burden, extra responsibility, hard work, completion. Carrying a heavy load but nearing the end of a cycle.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "10",
+        "element": "fire",
+        "keywords": ["burden", "responsibility", "hard-work", "stress", "achievement"],
+        "upright": "Burden, extra responsibility, hard work, completion, overwhelm",
+        "reversed": "Doing it all, release, delegation, prioritization, lightening load"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 31
+    },
+    {
+      "id": "wands-page",
+      "group": "wands",
+      "label": "Page of Wands",
+      "text": "Exploration, excitement, freedom, discovery. The Page brings messages of adventure and creative inspiration.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "page",
+        "court": "page",
+        "element": "fire",
+        "keywords": ["exploration", "excitement", "freedom", "inspiration", "curiosity"],
+        "upright": "Exploration, excitement, freedom, discovery, new ideas",
+        "reversed": "Lack of direction, procrastination, creating conflict, setbacks"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 32
+    },
+    {
+      "id": "wands-knight",
+      "group": "wands",
+      "label": "Knight of Wands",
+      "text": "Energy, passion, inspired action, adventure, impulsiveness. Charging forward with fiery enthusiasm.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "knight",
+        "court": "knight",
+        "element": "fire",
+        "keywords": ["energy", "passion", "adventure", "action", "impulsiveness"],
+        "upright": "Energy, passion, inspired action, adventure, impulsiveness",
+        "reversed": "Passion project, haste, scattered energy, delays, frustration"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 33
+    },
+    {
+      "id": "wands-queen",
+      "group": "wands",
+      "label": "Queen of Wands",
+      "text": "Courage, confidence, independence, social butterfly, determination. She radiates warmth and magnetic charisma.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "queen",
+        "court": "queen",
+        "element": "fire",
+        "keywords": ["courage", "confidence", "independence", "determination", "charisma"],
+        "upright": "Courage, confidence, independence, social butterfly, determination",
+        "reversed": "Self-respect, self-confidence, introverted, re-establish sense of self"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 34
+    },
+    {
+      "id": "wands-king",
+      "group": "wands",
+      "label": "King of Wands",
+      "text": "Natural leader, vision, entrepreneur, honour. He commands with creative vision and dynamic leadership.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "wands",
+        "rank": "king",
+        "court": "king",
+        "element": "fire",
+        "keywords": ["leadership", "vision", "entrepreneur", "boldness", "honor"],
+        "upright": "Natural leader, vision, entrepreneur, honour, confidence",
+        "reversed": "Impulsiveness, haste, ruthless, high expectations, lack of direction"
+      },
+      "char": "🔥",
+      "kind": "tarot",
+      "index": 35
+    },
+    {
+      "id": "cups-ace",
+      "group": "cups",
+      "label": "Ace of Cups",
+      "text": "Love, new relationships, compassion, creativity. The Ace of Cups overflows with emotional and spiritual abundance.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "ace",
+        "element": "water",
+        "keywords": ["love", "compassion", "creativity", "intuition", "new-relationships"],
+        "upright": "Love, new relationships, compassion, creativity, emotional abundance",
+        "reversed": "Self-love, intuition, repressed emotions, creative block"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 36
+    },
+    {
+      "id": "cups-02",
+      "group": "cups",
+      "label": "Two of Cups",
+      "text": "Unified love, partnership, mutual attraction. A harmonious connection and balanced relationship.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "2",
+        "element": "water",
+        "keywords": ["partnership", "love", "harmony", "connection", "balance"],
+        "upright": "Unified love, partnership, mutual attraction, unity, connection",
+        "reversed": "Self-love, break-up, disharmony, distrust, imbalance"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 37
+    },
+    {
+      "id": "cups-03",
+      "group": "cups",
+      "label": "Three of Cups",
+      "text": "Celebration, friendship, creativity, collaborations. Joyful gathering and community support.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "3",
+        "element": "water",
+        "keywords": ["celebration", "friendship", "creativity", "community", "joy"],
+        "upright": "Celebration, friendship, creativity, collaborations, community",
+        "reversed": "Independence, alone time, hardcore partying, 'three's a crowd'"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 38
+    },
+    {
+      "id": "cups-04",
+      "group": "cups",
+      "label": "Four of Cups",
+      "text": "Meditation, contemplation, apathy, reevaluation. Withdrawing inward to reassess values and opportunities.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "4",
+        "element": "water",
+        "keywords": ["meditation", "contemplation", "apathy", "reevaluation", "introspection"],
+        "upright": "Meditation, contemplation, apathy, reevaluation, boredom",
+        "reversed": "Retreat, withdrawal, checking in for alignment, new perspectives"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 39
+    },
+    {
+      "id": "cups-05",
+      "group": "cups",
+      "label": "Five of Cups",
+      "text": "Regret, failure, disappointment, pessimism. Focusing on loss while failing to see remaining blessings.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "5",
+        "element": "water",
+        "keywords": ["regret", "loss", "disappointment", "pessimism", "grief"],
+        "upright": "Regret, failure, disappointment, pessimism, loss, grief",
+        "reversed": "Personal setbacks, self-forgiveness, moving on, acceptance"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 40
+    },
+    {
+      "id": "cups-06",
+      "group": "cups",
+      "label": "Six of Cups",
+      "text": "Revisiting the past, childhood memories, innocence, joy. Nostalgia and the sweetness of simpler times.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "6",
+        "element": "water",
+        "keywords": ["nostalgia", "memories", "innocence", "childhood", "reunion"],
+        "upright": "Revisiting the past, childhood memories, innocence, joy, nostalgia",
+        "reversed": "Living in the past, forgiveness, lacking playfulness, moving forward"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 41
+    },
+    {
+      "id": "cups-07",
+      "group": "cups",
+      "label": "Seven of Cups",
+      "text": "Opportunities, choices, wishful thinking, illusion. Many options but clarity is needed to discern truth.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "7",
+        "element": "water",
+        "keywords": ["choices", "opportunities", "illusion", "fantasy", "confusion"],
+        "upright": "Opportunities, choices, wishful thinking, illusion, fantasy",
+        "reversed": "Alignment, personal values, overwhelmed by choices, clarity"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 42
+    },
+    {
+      "id": "cups-08",
+      "group": "cups",
+      "label": "Eight of Cups",
+      "text": "Disappointment, abandonment, withdrawal, escapism. Walking away from what no longer serves the soul.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "8",
+        "element": "water",
+        "keywords": ["disappointment", "abandonment", "withdrawal", "journey", "seeking"],
+        "upright": "Disappointment, abandonment, withdrawal, escapism, seeking truth",
+        "reversed": "Trying one more time, indecision, aimless drifting, fear of change"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 43
+    },
+    {
+      "id": "cups-09",
+      "group": "cups",
+      "label": "Nine of Cups",
+      "text": "Contentment, satisfaction, gratitude, wish come true. Deep fulfillment and emotional satisfaction.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "9",
+        "element": "water",
+        "keywords": ["contentment", "satisfaction", "gratitude", "wish", "fulfillment"],
+        "upright": "Contentment, satisfaction, gratitude, wish come true, luxury",
+        "reversed": "Inner happiness, materialism, dissatisfaction, indulgence"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 44
+    },
+    {
+      "id": "cups-10",
+      "group": "cups",
+      "label": "Ten of Cups",
+      "text": "Divine love, blissful relationships, harmony, alignment. Perfect emotional fulfillment and family joy.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "10",
+        "element": "water",
+        "keywords": ["happiness", "harmony", "alignment", "family", "fulfillment"],
+        "upright": "Divine love, blissful relationships, harmony, alignment, family",
+        "reversed": "Disconnection, misaligned values, struggling relationships, disharmony"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 45
+    },
+    {
+      "id": "cups-page",
+      "group": "cups",
+      "label": "Page of Cups",
+      "text": "Creative opportunities, intuitive messages, curiosity, possibility. The Page brings emotional and creative news.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "page",
+        "court": "page",
+        "element": "water",
+        "keywords": ["creativity", "intuition", "curiosity", "messages", "possibility"],
+        "upright": "Creative opportunities, intuitive messages, curiosity, possibility",
+        "reversed": "New ideas, doubting intuition, creative blocks, emotional immaturity"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 46
+    },
+    {
+      "id": "cups-knight",
+      "group": "cups",
+      "label": "Knight of Cups",
+      "text": "Creativity, romance, charm, imagination, beauty. The Knight offers romantic proposals and artistic vision.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "knight",
+        "court": "knight",
+        "element": "water",
+        "keywords": ["romance", "charm", "creativity", "idealism", "beauty"],
+        "upright": "Creativity, romance, charm, imagination, beauty, idealism",
+        "reversed": "Overactive imagination, unrealistic, jealous, moody, disappointment"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 47
+    },
+    {
+      "id": "cups-queen",
+      "group": "cups",
+      "label": "Queen of Cups",
+      "text": "Compassionate, caring, emotionally stable, intuitive, in flow. She embodies emotional maturity and deep empathy.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "queen",
+        "court": "queen",
+        "element": "water",
+        "keywords": ["compassion", "caring", "intuition", "empathy", "emotional-security"],
+        "upright": "Compassionate, caring, emotionally stable, intuitive, in flow",
+        "reversed": "Inner feelings, self-care, self-love, co-dependency, emotional insecurity"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 48
+    },
+    {
+      "id": "cups-king",
+      "group": "cups",
+      "label": "King of Cups",
+      "text": "Emotionally balanced, compassionate, diplomatic. He masters emotions through wisdom and understanding.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "cups",
+        "rank": "king",
+        "court": "king",
+        "element": "water",
+        "keywords": ["emotional-balance", "compassion", "diplomacy", "wisdom", "calm"],
+        "upright": "Emotionally balanced, compassionate, diplomatic, caring, wise",
+        "reversed": "Self-compassion, inner feelings, moodiness, emotionally manipulative"
+      },
+      "char": "💧",
+      "kind": "tarot",
+      "index": 49
+    },
+    {
+      "id": "swords-ace",
+      "group": "swords",
+      "label": "Ace of Swords",
+      "text": "Breakthroughs, new ideas, mental clarity, success. The Ace of Swords cuts through confusion with truth.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "ace",
+        "element": "air",
+        "keywords": ["clarity", "breakthrough", "truth", "mental-power", "success"],
+        "upright": "Breakthroughs, new ideas, mental clarity, success, truth",
+        "reversed": "Inner clarity, re-thinking an idea, clouded judgement, confusion"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 50
+    },
+    {
+      "id": "swords-02",
+      "group": "swords",
+      "label": "Two of Swords",
+      "text": "Difficult decisions, weighing options, an impasse, avoidance. Blindfolded and balanced between two choices.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "2",
+        "element": "air",
+        "keywords": ["decisions", "choices", "stalemate", "avoidance", "balance"],
+        "upright": "Difficult decisions, weighing options, an impasse, avoidance",
+        "reversed": "Indecision, confusion, information overload, stalemate continues"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 51
+    },
+    {
+      "id": "swords-03",
+      "group": "swords",
+      "label": "Three of Swords",
+      "text": "Heartbreak, emotional pain, sorrow, grief, hurt. The piercing pain of betrayal or loss.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "3",
+        "element": "air",
+        "keywords": ["heartbreak", "pain", "sorrow", "grief", "betrayal"],
+        "upright": "Heartbreak, emotional pain, sorrow, grief, hurt, betrayal",
+        "reversed": "Negative self-talk, releasing pain, optimism, forgiveness, healing"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 52
+    },
+    {
+      "id": "swords-04",
+      "group": "swords",
+      "label": "Four of Swords",
+      "text": "Rest, relaxation, meditation, contemplation, recuperation. A necessary pause for healing and renewal.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "4",
+        "element": "air",
+        "keywords": ["rest", "relaxation", "meditation", "recuperation", "contemplation"],
+        "upright": "Rest, relaxation, meditation, contemplation, recuperation",
+        "reversed": "Exhaustion, burn-out, deep contemplation, stagnation, rest"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 53
+    },
+    {
+      "id": "swords-05",
+      "group": "swords",
+      "label": "Five of Swords",
+      "text": "Conflict, disagreements, competition, defeat, winning at all costs. Victory that feels hollow or cruel.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "5",
+        "element": "air",
+        "keywords": ["conflict", "defeat", "competition", "winning", "dishonor"],
+        "upright": "Conflict, disagreements, competition, defeat, winning at all costs",
+        "reversed": "Reconciliation, making amends, past resentment, desire for peace"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 54
+    },
+    {
+      "id": "swords-06",
+      "group": "swords",
+      "label": "Six of Swords",
+      "text": "Transition, change, rite of passage, releasing baggage. Moving away from difficulty toward calmer waters.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "6",
+        "element": "air",
+        "keywords": ["transition", "change", "journey", "release", "moving-on"],
+        "upright": "Transition, change, rite of passage, releasing baggage, travel",
+        "reversed": "Personal transition, resistance to change, unfinished business"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 55
+    },
+    {
+      "id": "swords-07",
+      "group": "swords",
+      "label": "Seven of Swords",
+      "text": "Betrayal, deception, getting away with something, acting strategically. Cunning action and secret plans.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "7",
+        "element": "air",
+        "keywords": ["deception", "betrayal", "strategy", "cunning", "stealth"],
+        "upright": "Betrayal, deception, getting away with something, acting strategically",
+        "reversed": "Imposter syndrome, self-deceit, keeping secrets, coming clean"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 56
+    },
+    {
+      "id": "swords-08",
+      "group": "swords",
+      "label": "Eight of Swords",
+      "text": "Negative thoughts, self-imposed restriction, imprisonment, victim mentality. Feeling trapped by limiting beliefs.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "8",
+        "element": "air",
+        "keywords": ["restriction", "imprisonment", "victim-mentality", "self-limitation", "powerlessness"],
+        "upright": "Negative thoughts, self-imposed restriction, imprisonment, victim mentality",
+        "reversed": "Self-limiting beliefs, inner critic, releasing negative thoughts, freedom"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 57
+    },
+    {
+      "id": "swords-09",
+      "group": "swords",
+      "label": "Nine of Swords",
+      "text": "Anxiety, worry, fear, depression, nightmares. Mental anguish and sleepless nights filled with worry.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "9",
+        "element": "air",
+        "keywords": ["anxiety", "worry", "fear", "nightmares", "mental-anguish"],
+        "upright": "Anxiety, worry, fear, depression, nightmares, mental torment",
+        "reversed": "Inner turmoil, deep-seated fears, secrets, releasing worry, hope"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 58
+    },
+    {
+      "id": "swords-10",
+      "group": "swords",
+      "label": "Ten of Swords",
+      "text": "Painful endings, deep wounds, betrayal, loss, crisis. Rock bottom, but the only way forward is up.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "10",
+        "element": "air",
+        "keywords": ["endings", "betrayal", "crisis", "rock-bottom", "defeat"],
+        "upright": "Painful endings, deep wounds, betrayal, loss, crisis, rock bottom",
+        "reversed": "Recovery, regeneration, resisting an inevitable end, fear of ruin"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 59
+    },
+    {
+      "id": "swords-page",
+      "group": "swords",
+      "label": "Page of Swords",
+      "text": "New ideas, curiosity, thirst for knowledge, new ways of communicating. The Page brings mental agility and curiosity.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "page",
+        "court": "page",
+        "element": "air",
+        "keywords": ["curiosity", "ideas", "communication", "vigilance", "learning"],
+        "upright": "New ideas, curiosity, thirst for knowledge, new ways of communicating",
+        "reversed": "Self-expression, all talk and no action, haphazard action, haste"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 60
+    },
+    {
+      "id": "swords-knight",
+      "group": "swords",
+      "label": "Knight of Swords",
+      "text": "Ambitious, action-oriented, driven to succeed, fast-thinking. Charging forward with intellectual intensity.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "knight",
+        "court": "knight",
+        "element": "air",
+        "keywords": ["ambition", "action", "drive", "speed", "intensity"],
+        "upright": "Ambitious, action-oriented, driven to succeed, fast-thinking",
+        "reversed": "Restless, unfocused, impulsive, burn-out, high expectations"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 61
+    },
+    {
+      "id": "swords-queen",
+      "group": "swords",
+      "label": "Queen of Swords",
+      "text": "Independent, unbiased judgement, clear boundaries, direct communication. She speaks truth with clarity and precision.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "queen",
+        "court": "queen",
+        "element": "air",
+        "keywords": ["independence", "judgement", "boundaries", "clarity", "truth"],
+        "upright": "Independent, unbiased judgement, clear boundaries, direct communication",
+        "reversed": "Overly-emotional, easily influenced, bitchy, cold-hearted, cruel"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 62
+    },
+    {
+      "id": "swords-king",
+      "group": "swords",
+      "label": "King of Swords",
+      "text": "Mental clarity, intellectual power, authority, truth. He rules through logic, reason, and ethical judgment.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "swords",
+        "rank": "king",
+        "court": "king",
+        "element": "air",
+        "keywords": ["clarity", "authority", "truth", "logic", "ethics"],
+        "upright": "Mental clarity, intellectual power, authority, truth, reason",
+        "reversed": "Quiet power, inner truth, misuse of power, manipulation, tyranny"
+      },
+      "char": "⚔️",
+      "kind": "tarot",
+      "index": 63
+    },
+    {
+      "id": "pentacles-ace",
+      "group": "pentacles",
+      "label": "Ace of Pentacles",
+      "text": "A new financial or career opportunity, manifestation, abundance. The Ace of Pentacles brings material promise.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "ace",
+        "element": "earth",
+        "keywords": ["opportunity", "prosperity", "manifestation", "abundance", "new-venture"],
+        "upright": "A new financial or career opportunity, manifestation, abundance",
+        "reversed": "Lost opportunity, missed chance, bad investment, lack of planning"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 64
+    },
+    {
+      "id": "pentacles-02",
+      "group": "pentacles",
+      "label": "Two of Pentacles",
+      "text": "Multiple priorities, time management, prioritisation, adaptability. Juggling responsibilities with grace and flexibility.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "2",
+        "element": "earth",
+        "keywords": ["balance", "adaptability", "priorities", "flexibility", "juggling"],
+        "upright": "Multiple priorities, time management, prioritisation, adaptability",
+        "reversed": "Over-committed, disorganisation, reprioritisation, overwhelm"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 65
+    },
+    {
+      "id": "pentacles-03",
+      "group": "pentacles",
+      "label": "Three of Pentacles",
+      "text": "Teamwork, collaboration, learning, implementation. Building something of lasting value through skilled cooperation.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "3",
+        "element": "earth",
+        "keywords": ["teamwork", "collaboration", "learning", "mastery", "implementation"],
+        "upright": "Teamwork, collaboration, learning, implementation, skill",
+        "reversed": "Disharmony, misalignment, working alone, lack of accountability"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 66
+    },
+    {
+      "id": "pentacles-04",
+      "group": "pentacles",
+      "label": "Four of Pentacles",
+      "text": "Saving money, security, conservatism, scarcity, control. Holding tightly to material possessions and security.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "4",
+        "element": "earth",
+        "keywords": ["security", "control", "conservatism", "scarcity", "saving"],
+        "upright": "Saving money, security, conservatism, scarcity, control, greed",
+        "reversed": "Over-spending, greed, self-protection, financial insecurity"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 67
+    },
+    {
+      "id": "pentacles-05",
+      "group": "pentacles",
+      "label": "Five of Pentacles",
+      "text": "Financial loss, poverty, lack mindset, isolation, worry. Hardship and feeling left out in the cold.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "5",
+        "element": "earth",
+        "keywords": ["loss", "poverty", "hardship", "isolation", "worry"],
+        "upright": "Financial loss, poverty, lack mindset, isolation, worry, insecurity",
+        "reversed": "Recovery from financial loss, spiritual poverty, positive changes"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 68
+    },
+    {
+      "id": "pentacles-06",
+      "group": "pentacles",
+      "label": "Six of Pentacles",
+      "text": "Giving, receiving, sharing wealth, generosity, charity. The flow of abundance through giving and receiving.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "6",
+        "element": "earth",
+        "keywords": ["generosity", "charity", "sharing", "giving", "receiving"],
+        "upright": "Giving, receiving, sharing wealth, generosity, charity, fairness",
+        "reversed": "Self-care, unpaid debts, one-sided charity, strings attached"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 69
+    },
+    {
+      "id": "pentacles-07",
+      "group": "pentacles",
+      "label": "Seven of Pentacles",
+      "text": "Long-term view, sustainable results, perseverance, investment. Pausing to assess progress and future potential.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "7",
+        "element": "earth",
+        "keywords": ["investment", "perseverance", "patience", "assessment", "long-term"],
+        "upright": "Long-term view, sustainable results, perseverance, investment",
+        "reversed": "Lack of long-term vision, limited success, impatience, frustration"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 70
+    },
+    {
+      "id": "pentacles-08",
+      "group": "pentacles",
+      "label": "Eight of Pentacles",
+      "text": "Apprenticeship, repetitive tasks, mastery, skill development. Dedication to craft and continuous improvement.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "8",
+        "element": "earth",
+        "keywords": ["apprenticeship", "mastery", "skill", "dedication", "diligence"],
+        "upright": "Apprenticeship, repetitive tasks, mastery, skill development",
+        "reversed": "Self-development, perfectionism, misdirected activity, mediocrity"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 71
+    },
+    {
+      "id": "pentacles-09",
+      "group": "pentacles",
+      "label": "Nine of Pentacles",
+      "text": "Abundance, luxury, self-sufficiency, financial independence. Enjoying the fruits of one's labor in solitude.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "9",
+        "element": "earth",
+        "keywords": ["abundance", "luxury", "independence", "self-sufficiency", "reward"],
+        "upright": "Abundance, luxury, self-sufficiency, financial independence",
+        "reversed": "Self-worth, over-investment in work, hustling, setbacks"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 72
+    },
+    {
+      "id": "pentacles-10",
+      "group": "pentacles",
+      "label": "Ten of Pentacles",
+      "text": "Wealth, financial security, family, long-term success, contribution. Generational prosperity and lasting legacy.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "10",
+        "element": "earth",
+        "keywords": ["wealth", "security", "family", "legacy", "prosperity"],
+        "upright": "Wealth, financial security, family, long-term success, contribution",
+        "reversed": "The dark side of wealth, financial failure, loneliness, loss"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 73
+    },
+    {
+      "id": "pentacles-page",
+      "group": "pentacles",
+      "label": "Page of Pentacles",
+      "text": "Manifestation, financial opportunity, skill development. The Page brings news of practical opportunities.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "page",
+        "court": "page",
+        "element": "earth",
+        "keywords": ["manifestation", "opportunity", "learning", "practicality", "ambition"],
+        "upright": "Manifestation, financial opportunity, skill development, ambition",
+        "reversed": "Lack of progress, procrastination, learn from failure, bad investment"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 74
+    },
+    {
+      "id": "pentacles-knight",
+      "group": "pentacles",
+      "label": "Knight of Pentacles",
+      "text": "Hard work, productivity, routine, conservatism, perfection. The Knight approaches work methodically and reliably.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "knight",
+        "court": "knight",
+        "element": "earth",
+        "keywords": ["hard-work", "productivity", "routine", "reliability", "diligence"],
+        "upright": "Hard work, productivity, routine, conservatism, perfection",
+        "reversed": "Self-discipline, boredom, feeling 'stuck', perfectionism, laziness"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 75
+    },
+    {
+      "id": "pentacles-queen",
+      "group": "pentacles",
+      "label": "Queen of Pentacles",
+      "text": "Nurturing, practical, providing financially, a working parent. She creates abundance through grounded wisdom.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "queen",
+        "court": "queen",
+        "element": "earth",
+        "keywords": ["nurturing", "practical", "abundance", "security", "provider"],
+        "upright": "Nurturing, practical, providing financially, a working parent",
+        "reversed": "Financial independence, self-care, work-home conflict, smothering"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 76
+    },
+    {
+      "id": "pentacles-king",
+      "group": "pentacles",
+      "label": "King of Pentacles",
+      "text": "Wealth, business, leadership, security, discipline, abundance. He embodies mastery of the material world.",
+      "meta": {
+        "arcana": "minor",
+        "suit": "pentacles",
+        "rank": "king",
+        "court": "king",
+        "element": "earth",
+        "keywords": ["wealth", "business", "leadership", "security", "abundance"],
+        "upright": "Wealth, business, leadership, security, discipline, abundance",
+        "reversed": "Financially inept, obsessed with wealth, stubborn, greed, materialistic"
+      },
+      "char": "💰",
+      "kind": "tarot",
+      "index": 77
+    }
+  ]
+}
