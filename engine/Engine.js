@@ -217,7 +217,7 @@ export class Engine extends Emitter {
    * invoked with { detail: true }.
    */
   describe({ detail = false } = {}) {
-    const { deck, table, shoe } = this.state;
+    const { deck, table, shoe } = this;
     const players = this.state.players?.map(p => ({
       name: p.name,
       handCount: p.hand?.length ?? 0,
