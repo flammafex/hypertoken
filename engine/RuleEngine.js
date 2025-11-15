@@ -50,7 +50,7 @@ export class RuleEngine {
     this.debug = false;
 
     // Attach post-action evaluation hook.
-    this.engine?.on?.("engine:action", e => this.evaluate(e?.payload));
+    this.engine?.on?.("engine:action", e => this.evaluate(e?.payload?.payload || e?.payload));
   }
 
   /*───────────────────────────────────────────────
