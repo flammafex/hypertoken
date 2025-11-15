@@ -1845,7 +1845,7 @@ Object.assign(ActionRegistry, {
   "poker:showdown": (engine) => {
     // Game-specific logic
   },
-  
+   
   "poker:bet": (engine, { player, amount }) => {
     engine.dispatch("player:takeResource", { 
       name: player, 
