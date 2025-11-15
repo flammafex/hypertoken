@@ -8,7 +8,7 @@ _A mission of [The Carpocratian Church of Commonality and Equality](https://carp
 **HyperToken** is a modular, token-driven simulation and game engine designed for **AI-human interaction**, **multi-agent systems**, and **rule-based games**.
 It provides a flexible framework for creating simulations, turn-based or card-style games, narrative systems, or intelligent agents — all powered by an extensible plugin and event architecture.
 
-Inspired by the creative legacy of Apple’s _HyperCard_, **HyperToken** reimagines that spirit for the age of intelligent systems. Where _HyperCard_ made computers writable for artists and educators, **HyperToken** makes AI environments and logic systems writable for designers and philosophers.
+Inspired by the creative legacy of Apple's _HyperCard_, **HyperToken** reimagines that spirit for the age of intelligent systems. Where _HyperCard_ made computers writable for artists and educators, **HyperToken** makes AI environments and logic systems writable for designers and philosophers.
 
 This project is an original work and is not affiliated with or endorsed by Apple Inc. The reference to _HyperCard_ is made solely for historical and conceptual comparison.
 
@@ -21,15 +21,16 @@ These tokens live inside a fully modular simulation loop that can be driven by *
 
 The engine combines:
 - A **data-driven core** (tokens, decks, sessions, events)
-- A **rule-based logic engine** for actions and outcomes
-- A **plugin host** for custom behaviors
+- A **rule-based logic engine** with 45+ built-in actions
+- A **plugin host** for custom behaviors (analytics, logging, state management)
 - Built-in **AI integration** (e.g., via OpenAI models)
 - Multiple **interfaces** (CLI, human, network, AI)
+- **Reusable rule patterns** (turn order, win conditions, resource management)
 
 HyperToken can serve as the backbone for:
 - Games (card, board, RPG, or abstract)
 - Interactive and/or visual storytelling
-- Multi-agent research
+- Multi-agent research and game theory experiments
 - Reinforcement-learning environments
 - Simulation-driven narratives
 
@@ -38,13 +39,15 @@ HyperToken can serve as the backbone for:
 ## ✨ Features
 
 - 🧱 **Token-based world model** — every entity or resource is a token.
-- ⚙️ **Rule Engine** — define legal actions, policies, and system behaviors.
-- 🔌 **Plugin architecture** — extend with custom modules or AI agents.
+- ⚙️ **Rule Engine** — 45+ built-in actions covering deck, table, shoe, player, and game operations.
+- 🎨 **Rule Patterns** — reusable patterns for turn order, win conditions, and resource limits.
+- 🔌 **Plugin architecture** — analytics, logging, save/load state, and custom extensions.
 - 🔁 **Game loop + recorder** — deterministic simulation and replay support.
 - 🧠 **AI Integration** — out-of-the-box OpenAI agent interface.
 - 🧍 **Human & network interfaces** — CLI, relay server, and multiplayer.
 - 🧾 **Schema-driven data** — validated session and token schemas.
 - 🗃️ **Session management** — persistent game or simulation states.
+- 📊 **Built-in Analytics** — track actions, turns, performance, and game statistics.
 
 ---
 
@@ -74,7 +77,10 @@ HyperToken can serve as the backbone for:
 │   ├── Policy.js           # Decision or strategy logic
 │   ├── PluginHost.js       # External module integration
 │   ├── Recorder.js         # Records sessions for playback or analysis
-│   └── Script.js           # Narrative or event scripting
+│   ├── Script.js           # Narrative or event scripting
+│   ├── actions.js          # Core action registry (10 actions)
+│   ├── actions-extended.js # Extended actions (35+ actions)
+│   └── ACTIONS.md          # Complete action reference documentation
 │
 ├── interface/              # Input/output and external integration
 │   ├── CLIInterface.js     # Command-line interaction
@@ -84,6 +90,31 @@ HyperToken can serve as the backbone for:
 │   ├── OpenAIAgent.js      # AI-controlled agent interface
 │   ├── Interpreter.js      # Natural language or command parsing
 │   └── Narrator.js         # Descriptive storytelling layer
+│
+├── patterns/               # Reusable rule patterns
+│   ├── turn-order.js       # Round-robin, priority, and sequential turns
+│   ├── win-conditions.js   # Point-based, elimination, objective completion
+│   ├── resource-limits.js  # Hand limits, action budgets, resource caps
+│   └── testRulePatterns.js # Pattern validation tests
+│
+├── plugins/                # Built-in plugins
+│   ├── analytics-plugin.js # Game statistics and performance tracking
+│   ├── logging-plugin.js   # Structured event logging
+│   └── save-state-plugin.js# Session persistence and replay
+│
+├── examples/               # Complete working examples
+│   ├── blackjack/          # Full blackjack with AI agents
+│   ├── tarot-reading/      # Tarot divination system
+│   └── prisoners-dilemma/  # Game theory tournament system
+│
+├── test/                   # Core test suites
+│   ├── testCore.js
+│   ├── testEngine.js
+│   ├── testPluginLoader.js
+│   └── testExporters.js
+│
+├── testIntegration.js      # Integration tests
+├── testPlugins.js          # Plugin system tests
 │
 └── schemas/                # JSON Schemas for data validation
     ├── session-state-schema.json
@@ -98,18 +129,35 @@ HyperToken can serve as the backbone for:
 Tokens are the smallest interactive entities. They can represent cards, resources, characters, or abstract concepts.  
 Each token conforms to [`token-set.schema.json`](./schemas/token-set.schema.json) for consistent structure.
 
+### **Actions**
+The engine provides **45+ built-in actions** organized by category:
+- **Deck actions** (10): shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse
+- **Table actions** (13): place, clear, move, flip, remove, zone management, locking
+- **Shoe actions** (7): multi-deck container operations
+- **Player actions** (9): resource management, card operations, activation
+- **Game actions** (6): lifecycle, phases, properties
+
+See [`engine/ACTIONS.md`](./engine/ACTIONS.md) for complete documentation.
+
+### **Rule Patterns**
+Reusable patterns for common game mechanics:
+- **Turn Order**: Round-robin, priority-based, simultaneous, custom sequences
+- **Win Conditions**: Points, elimination, objectives, time limits
+- **Resource Limits**: Hand size, action budgets, resource caps, cooldowns
+
+Import and configure patterns to quickly build game logic.
+
 ### **Events**
 The `EventBus` enables decoupled, event-driven communication among components (e.g., engine, players, interfaces).
-
-### **Actions & Rules**
-Actions are possible moves; rules validate or transform them.  
-`RuleEngine` and `Policy` modules determine legal sequences and consequences.
 
 ### **Sessions**
 A `SessionManager` maintains game or simulation state, which can be saved, replayed, or exported.
 
 ### **Plugins**
-External modules can define new actions, AI agents, or rule sets through the `PluginHost`.
+External modules can define new actions, AI agents, or rule sets through the `PluginHost`. Three built-in plugins:
+- **Analytics**: Track actions, turns, errors, and performance metrics
+- **Logging**: Structured event logging with filtering and exporters
+- **Save State**: Session persistence with JSON export/import and replay
 
 ---
 
@@ -124,114 +172,212 @@ cd hypertoken
 npm install
 ```
 
-### **2. Run a basic simulation**
-Start a CLI session:
+### **2. Run the Examples**
+
+**Blackjack**: Play against the dealer or watch AI tournaments
+```bash
+# Interactive play
+node examples/blackjack/cli.js
+
+# AI tournament
+node examples/blackjack/agents/tournament.js
+```
+
+**Tarot Reading**: Get divination readings with 8 classic spreads
+```bash
+node examples/tarot-reading/tarot-cli.js
+```
+
+**Prisoner's Dilemma**: Explore 14 game theory strategies
+```bash
+node examples/prisoners-dilemma/pd-cli.js
+```
+
+### **3. Test the System**
 
 ```bash
-node ./interface/CLIInterface.js
+# Core tests
+node test/testCore.js
+node test/testEngine.js
+
+# Plugin tests
+node testPlugins.js
+
+# Integration tests
+node testIntegration.js
+
+# Pattern tests
+node patterns/testRulePatterns.js
 ```
 
-or launch an AI-driven demo (if configured):
+### **4. Build Your Own Game**
 
-```bash
-node ./interface/OpenAIAgent.js
+```javascript
+import { Engine } from './engine/Engine.js';
+import { Deck } from './core/Deck.js';
+import { RuleEngine } from './engine/RuleEngine.js';
+import { registerRoundRobinTurns } from './patterns/turn-order.js';
+import { registerPointBasedWin } from './patterns/win-conditions.js';
+
+// Create engine with deck
+const engine = new Engine();
+const deck = new Deck(myTokenSet);
+engine.attachDeck(deck);
+
+// Add rule patterns
+const ruleEngine = new RuleEngine();
+registerRoundRobinTurns(ruleEngine);
+registerPointBasedWin(ruleEngine, { targetScore: 100 });
+
+// Add players
+engine.addPlayer({ id: 'player1', name: 'Alice' });
+engine.addPlayer({ id: 'player2', name: 'Bob' });
+
+// Start game
+engine.start();
 ```
 
-### **3. Extend it**
-To create your own token set or rule system:
-1. Define tokens in `schemas/token-set.schema.json` (loaded via `core/loaders/tokenSetLoader.js`).
-2. Implement rules in `engine/RuleEngine.js`.
-3. Add plugins via `pluginLoader.js` or `PluginHost`.
+---
 
-### **4. Minimal single-token shape:**
-```json
-{
-  "id": "token-001",
-  "group": null,
-  "label": "Example Token",
-  "text": "Rules or descriptive text goes here.",
-  "meta": {},
-  "char": "□",
-  "kind": "default",
-  "index": 0
-}
-```
->Notes
-• ```id``` should be unique.
-• ```group```, ```label``` are optional (default ```null```); ```text``` defaults to ```""```; ```meta``` defaults to ```{}```.
-• ```char``` is useful for CLI/TTY renders.
-• Keep example names/mechanics generic; the **minimal token set** example below is **fictional** and not affiliated with any third-party game or publisher.
+## 📚 Examples
 
-```json
-{
-  "name": "Example Token Set",
-  "kind": "default",
-  "description": "Minimal example token set for HyperToken.",
-  "tokens": [
-    {
-      "id": "example-card-skywarden",
-      "group": "aurora",
-      "label": "Skywarden Colossus",
-      "text": "Aerial, steadfast. When this becomes blocked, you may exhaust it; if you do, it breaks through until end of turn.",
-      "meta": {
-        "type": "Guardian — Colossus",
-        "energy_cost": 6,
-        "power": 6,
-        "toughness": 6,
-        "rarity": "common",
-        "set": "First Light",
-        "collector_number": 22,
-        "artist": "Example Artist",
-        "flavor_text": "\"The sky is safest when it is watched.\"",
-        "faction": ["Aurora"],
-        "image": "https://example.com/skywarden_colossus.png",
-        "license": "CC0"
-      },
-      "char": "◆",
-      "kind": "default",
-      "index": 0
-    }
-  ]
-}
-```
+HyperToken includes three complete, documented examples:
+
+### 🃏 Blackjack
+Complete casino blackjack with:
+- Token-based 52-card deck
+- Full blackjack rules (dealer logic, splitting, doubling)
+- AI agents with different strategies
+- Tournament system for testing strategies
+- Deterministic simulation with seedable RNG
+
+**[View Blackjack Documentation →](./examples/blackjack/README.md)**
+
+### 🔮 Tarot Reading
+Philosophical divination system with:
+- Complete 78-card Rider-Waite-Smith deck
+- 8 classic spreads (Celtic Cross, Three Card, etc.)
+- Interpretive engine with position-specific meanings
+- Elemental analysis and pattern recognition
+- Reading history and export
+
+**[View Tarot Documentation →](./examples/tarot-reading/README.md)**
+
+### 🎲 Prisoner's Dilemma
+Game theory tournament system with:
+- 14 classic strategies (Tit for Tat, Grudger, Pavlov, etc.)
+- Round-robin tournament format
+- Detailed statistics and analysis
+- Strategy evolution tracking
+- Ecosystem simulation mode
+
+**[View Prisoner's Dilemma Documentation →](./examples/prisoners-dilemma/README.md)**
+
 ---
 
 ## 🧠 Example Use Cases
 
 | Type | Example |
 |------|----------|
-| 🎲 Game Simulation | A card game (any card game) with dynamic AI player(s) |
-| 🧬 Research | Multi-agent reinforcement learning environment |
+| 🎲 Game Simulation | Card games with dynamic AI players |
+| 🧬 Research | Multi-agent reinforcement learning |
 | 📖 Storytelling | Procedural narrative with scripted events |
-| 🛡️ Training | AI that learns strategic policy decisions |
+| 🛡️ Training | AI learning strategic policy decisions |
+| 🎓 Education | Teaching game theory and decision-making |
+| 🔬 Experimentation | Testing social dynamics and cooperation |
 
 ---
 
 ## 🔌 Extending HyperToken
 
-Add a new plugin by placing it under [`./engine/plugins/`](./engine/plugins/) or dynamically loading it:
+### Using Plugins
 
-```js
-import { registerPlugin } from './pluginLoader.js';
-registerPlugin('myCustomAI', './plugins/MyAIAgent.js');
+```javascript
+import analyticsPlugin from './analytics-plugin.js';
+import loggingPlugin from './logging-plugin.js';
+import saveStatePlugin from './save-state-plugin.js';
+
+// Load plugins
+engine.pluginHost.load('analytics', analyticsPlugin.init, {
+  trackActions: true,
+  trackTiming: true
+});
+
+engine.pluginHost.load('logging', loggingPlugin.init, {
+  level: 'info',
+  format: 'json'
+});
+
+engine.pluginHost.load('saveState', saveStatePlugin.init, {
+  autoSave: true,
+  interval: 5000
+});
+
+// Use plugin features
+const report = engine.analytics.getReport();
+engine.logging.info('Game started', { players: 4 });
+await engine.saveState.save('game-checkpoint-1');
 ```
 
-Plugins can register new:
-- Actions or rule sets  
-- Player types (human, AI, networked)  
-- Exporters (recorders, analytics)  
+### Creating Custom Plugins
+
+```javascript
+export function init(engine, config = {}) {
+  // Initialize plugin state
+  const pluginState = {};
+  
+  // Listen to events
+  engine.eventBus.on('action:dispatched', (action) => {
+    // React to actions
+  });
+  
+  // Expose plugin API
+  engine.myPlugin = {
+    doSomething() {
+      // Plugin functionality
+    }
+  };
+  
+  return {
+    name: 'myPlugin',
+    version: '1.0.0',
+    cleanup() {
+      // Cleanup on unload
+    }
+  };
+}
+```
 
 ---
 
 ## 🧰 Development
 
-To work on the engine:
+### Running Tests
+
 ```bash
-npm run build
+# Core functionality
 npm test
+
+# Specific test suites
+node test/testCore.js
+node test/testEngine.js
+node testPlugins.js
+node patterns/testRulePatterns.js
 ```
 
-Logging and debugging are handled through the `Recorder` and `EventBus` subsystems.
+### Documentation
+
+- **[ACTIONS.md](./engine/ACTIONS.md)**: Complete reference for all 45 built-in actions
+- **[Example READMEs](./examples/)**: Detailed documentation for each example
+- **[Code Comments](./core/)**: Inline documentation throughout the codebase
+
+### Debugging
+
+Logging and debugging are handled through:
+- `Recorder` subsystem for action replay
+- `EventBus` for event-driven debugging
+- Analytics plugin for performance metrics
+- Logging plugin for structured logs
 
 ---
 
@@ -251,8 +397,10 @@ See [NOTICE](./NOTICE) for details.
 
 ## 🧠 Philosophy
 
-> “Every player, every action, and every token tells a story.  
-> HyperToken lets those stories play themselves out.”
+> "Every player, every action, and every token tells a story.  
+> HyperToken lets those stories play themselves out."
+
+---
 
 # Practical Applications of HyperToken
 
@@ -269,7 +417,7 @@ HyperToken can serve as the logic layer for **turn-based or rule-based games**, 
 - Tabletop RPG logic where AI agents narrate or play roles.
 - Competitive AI simulations where players are automated agents.
 
-*Stop and think:* a programmable “Tabletop Simulator” without graphics—just logic, state, and plain text.
+*Stop and think:* a programmable "Tabletop Simulator" without graphics—just logic, state, and plain text.
 
 ---
 
@@ -293,7 +441,7 @@ HyperToken allows you to **prototype and test rule systems** before deploying th
 **Examples:**
 - Modeling governance or moderation systems.
 - Testing policy interactions for fairness or stability.
-- Exploring “what if” scenarios in regulatory or social design.
+- Exploring "what if" scenarios in regulatory or social design.
 
 *Stop and think:* I'm just a bill, but now I can show you what your future holds before I'm passed.
 
@@ -327,7 +475,7 @@ The inclusion of `RelayServer` and `NetworkInterface` makes it extendable for **
 
 ## 6. Education and Research
 
-HyperToken’s simplicity and modularity make it a valuable **educational platform** for teaching systems thinking, programming, and AI interaction.
+HyperToken's simplicity and modularity make it a valuable **educational platform** for teaching systems thinking, programming, and AI interaction.
 
 **Examples:**
 - Teaching logic, probability, and agent systems.
@@ -340,6 +488,8 @@ HyperToken’s simplicity and modularity make it a valuable **educational platfo
 
 ### Summary
 > **HyperToken is a rule-driven engine for structured interaction.** Whether for games, simulations, AI orchestration, or educational exploration, it provides a flexible foundation for designing, observing, and extending interactive systems.
+
+---
 
 ### 🜍 Proemium to the Art of Tokens
 
@@ -379,4 +529,3 @@ So may this art be given freely,
 that all who love wisdom may join the music of the spheres through understanding,  
 and that the harmony of minds may become the harmony of worlds.  
 For when reason is made common, the gods are near.
-
