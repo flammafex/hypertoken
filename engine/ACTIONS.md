@@ -993,6 +993,441 @@ engine.dispatch("game:setProperty", { key: "dealer", value: "Alice" });
 
 ---
 
+## Token Actions
+
+### `token:transform`
+
+Modify token properties in-place without moving them.
+
+**Use cases:** State changes, status effects, card flipping, buffs/debuffs
+
+```javascript
+// Simple property change
+engine.dispatch("token:transform", {
+  token: myCard,
+  properties: { label: "Tapped Card" }
+});
+
+// Merge metadata (preserves existing properties)
+engine.dispatch("token:transform", {
+  token: character,
+  properties: {
+    label: "Hero (Poisoned)",
+    meta: { status: "poisoned", hp: 50 } // Preserves other meta props
+  }
+});
+
+// Multiple properties at once
+engine.dispatch("token:transform", {
+  token: unit,
+  properties: {
+    label: "Veteran Warrior",
+    text: "Has seen many battles",
+    char: "⚔️",
+    meta: { level: 5, experience: 1000 }
+  }
+});
+```
+
+**Parameters:**
+- `token` (Token, required): Token to transform
+- `properties` (Object): Properties to change
+  - Special handling for `meta` - merges with existing metadata
+
+**Returns:** The transformed token
+
+---
+
+### `token:attach`
+
+Attach one token to another, creating relationships like equipment, enchantments, or status effects.
+
+**Use cases:** Equipment systems, enchantments, auras, passenger tokens
+
+```javascript
+// Equip a sword
+engine.dispatch("token:attach", {
+  host: characterToken,
+  attachment: swordToken,
+  attachmentType: "weapon"
+});
+
+// Attach an enchantment
+engine.dispatch("token:attach", {
+  host: creature,
+  attachment: flightEnchantment,
+  attachmentType: "enchantment"
+});
+
+// Apply a status effect
+engine.dispatch("token:attach", {
+  host: player,
+  attachment: poisonToken,
+  attachmentType: "status"
+});
+```
+
+**Parameters:**
+- `host` (Token, required): Token to attach to
+- `attachment` (Token, required): Token to attach
+- `attachmentType` (string, optional): Type of attachment (default: "default")
+
+**Returns:** The host token (now with `_attachments` array)
+
+**Data structure created:**
+```javascript
+host._attachments = [
+  {
+    token: attachmentToken,
+    type: "weapon",
+    attachedAt: 1234567890,
+    id: "sword-001"
+  }
+];
+
+attachment._attachedTo = "host-id";
+attachment._attachmentType = "weapon";
+```
+
+---
+
+### `token:detach`
+
+Remove an attachment from a host token.
+
+**Use cases:** Unequipping items, removing enchantments, expiring status effects
+
+```javascript
+// Detach by attachment ID
+engine.dispatch("token:detach", {
+  host: character,
+  attachmentId: "sword-001"
+});
+
+// Detach by reference
+engine.dispatch("token:detach", {
+  host: character,
+  attachment: swordToken
+});
+```
+
+**Parameters:**
+- `host` (Token, required): Token to detach from
+- `attachmentId` (string): ID of attachment to remove
+- `attachment` (Token): Reference to attachment token
+  - *(Provide either attachmentId or attachment)*
+
+**Returns:** The detached token (or null if not found)
+
+---
+
+### `token:merge`
+
+Combine multiple tokens into a single token.
+
+**Use cases:** Resource stacking, unit upgrades, crafting systems, combining items
+
+```javascript
+// Merge resources
+const woodStack = engine.dispatch("token:merge", {
+  tokens: [wood1, wood2, wood3],
+  resultProperties: {
+    label: "Wood Stack",
+    meta: { quantity: 15 }
+  }
+});
+
+// Auto-merge metadata
+const fusedGem = engine.dispatch("token:merge", {
+  tokens: [redGem, blueGem],
+  resultProperties: {
+    label: "Purple Gem"
+  }
+  // Automatically merges all meta properties from both gems
+});
+
+// Keep originals (for non-destructive merge)
+engine.dispatch("token:merge", {
+  tokens: [unit1, unit2],
+  resultProperties: { label: "Army" },
+  keepOriginals: true  // Don't mark originals as merged
+});
+```
+
+**Parameters:**
+- `tokens` (Array<Token>, required): Tokens to merge (minimum 2)
+- `resultProperties` (Object, optional): Properties for the merged token
+  - Uses first token as base if not specified
+  - Auto-merges metadata from all tokens unless `meta` is explicitly provided
+- `keepOriginals` (boolean, default: false): If false, marks originals as `_merged`
+
+**Returns:** New merged token with tracking metadata
+
+**Tracking metadata:**
+```javascript
+mergedToken._mergedFrom = ["token-1", "token-2"];
+mergedToken._mergedAt = 1234567890;
+
+// If keepOriginals is false:
+originalToken._merged = true;
+originalToken._mergedInto = "merged-token-id";
+```
+
+---
+
+### `token:split`
+
+Split one token into multiple tokens.
+
+**Use cases:** Breaking resource stacks, dividing armies, splitting cards
+
+```javascript
+// Simple split
+const [half1, half2] = engine.dispatch("token:split", {
+  token: stack,
+  count: 2
+});
+
+// Split with custom properties
+const pieces = engine.dispatch("token:split", {
+  token: goldPile,
+  count: 3,
+  properties: [
+    { label: "Gold Piece 1", meta: { value: 100 } },
+    { label: "Gold Piece 2", meta: { value: 100 } },
+    { label: "Gold Piece 3", meta: { value: 100 } }
+  ]
+});
+
+// Split with metadata preservation
+const months = engine.dispatch("token:split", {
+  token: yearToken,
+  count: 12,
+  properties: [
+    { label: "January", meta: { index: 0 } },
+    { label: "February", meta: { index: 1 } },
+    // ... properties merge with original token.meta
+  ]
+});
+```
+
+**Parameters:**
+- `token` (Token, required): Token to split
+- `count` (number, required): Number of tokens to create (minimum 2)
+- `properties` (Array<Object>, optional): Custom properties for each split
+  - Index corresponds to split token
+  - Metadata is **merged** with original, not replaced
+
+**Returns:** Array of new split tokens
+
+**Tracking metadata:**
+```javascript
+splitToken._splitFrom = "original-token-id";
+splitToken._splitIndex = 0;  // Position in split
+splitToken._splitAt = 1234567890;
+
+originalToken._split = true;
+originalToken._splitInto = ["token-split-0", "token-split-1"];
+```
+
+---
+
+## Batch Actions
+
+### `tokens:filter`
+
+Filter a collection of tokens based on a predicate function.
+
+**Use cases:** Finding all red cards, getting high-value items, selecting tokens by type
+
+```javascript
+// Filter tokens from an array
+const redCards = engine.dispatch("tokens:filter", {
+  tokens: deck.cards,
+  predicate: (token) => token.meta.color === "red"
+});
+
+// Filter from deck
+const highValue = engine.dispatch("tokens:filter", {
+  source: "deck",
+  predicate: (token) => token.meta.value >= 10
+});
+
+// Filter from table zone
+const activeUnits = engine.dispatch("tokens:filter", {
+  source: "battlefield",
+  predicate: (token) => !token.meta.tapped
+});
+```
+
+**Parameters:**
+- `tokens` (Array<Token>): Tokens to filter (if not using source)
+- `predicate` (Function, required): Function that returns true for matching tokens
+- `source` (string): Source to filter from ('deck', 'table', or zone name)
+
+**Returns:** Array of matching tokens
+
+---
+
+### `tokens:forEach`
+
+Apply an operation to each token in a collection. Returns array of operation results.
+
+**Use cases:** Buffing all units, damaging all creatures, transforming multiple tokens
+
+```javascript
+// Modify tokens
+engine.dispatch("tokens:forEach", {
+  tokens: playerHand,
+  operation: (token) => {
+    token.meta.buffed = true;
+    token.meta.power += 2;
+  }
+});
+
+// Collect computed values
+const totalPower = engine.dispatch("tokens:forEach", {
+  tokens: army,
+  operation: (token) => token.meta.power
+}).reduce((sum, power) => sum + power, 0);
+
+// Use index parameter
+engine.dispatch("tokens:forEach", {
+  source: "deck",
+  operation: (token, index) => {
+    token.meta.position = index;
+  }
+});
+```
+
+**Parameters:**
+- `tokens` (Array<Token>): Tokens to process (if not using source)
+- `operation` (Function, required): Function to apply to each token `(token, index) => result`
+- `source` (string): Source to process ('deck', 'table', or zone name)
+
+**Returns:** Array of operation return values
+
+---
+
+### `tokens:collect`
+
+Gather tokens from multiple sources into a single array.
+
+**Use cases:** Getting all tokens in play, collecting from multiple zones, inventory management
+
+```javascript
+// Collect from multiple standard sources
+const allTokens = engine.dispatch("tokens:collect", {
+  sources: ["deck", "table", "discard"]
+});
+
+// Collect from specific zones
+const cardsInPlay = engine.dispatch("tokens:collect", {
+  sources: ["hand", "battlefield", "graveyard"]
+});
+
+// Include attached tokens (equipment, enchantments, etc.)
+const allWithEquipment = engine.dispatch("tokens:collect", {
+  sources: ["battlefield"],
+  includeAttachments: true  // Also collects attached tokens
+});
+```
+
+**Parameters:**
+- `sources` (Array<string>, required): Sources to collect from
+  - Standard sources: `'deck'`, `'table'`, `'discard'`, `'shoe'`
+  - Or any table zone name
+- `includeAttachments` (boolean, default: false): Also collect attached tokens from hosts
+
+**Returns:** Array of all collected tokens
+
+**Source types:**
+- `'deck'` - All tokens in the deck
+- `'table'` - All tokens on the table (all zones)
+- `'discard'` - All discarded tokens
+- `'shoe'` - All tokens in all shoe decks
+- Zone name (e.g. `'hand'`, `'play'`) - Tokens in that specific zone
+
+---
+
+### `tokens:count`
+
+Count tokens, optionally filtering by predicate.
+
+**Use cases:** Checking hand size, counting resources, validating game state
+
+```javascript
+// Count all tokens
+const deckSize = engine.dispatch("tokens:count", {
+  source: "deck"
+});
+
+// Count matching tokens
+const redCount = engine.dispatch("tokens:count", {
+  tokens: allCards,
+  predicate: (token) => token.meta.color === "red"
+});
+
+// Count from source with predicate
+const expensiveCards = engine.dispatch("tokens:count", {
+  source: "hand",
+  predicate: (token) => token.meta.cost > 5
+});
+```
+
+**Parameters:**
+- `tokens` (Array<Token>): Tokens to count (if not using source)
+- `predicate` (Function, optional): Filter function - only counts matching tokens
+- `source` (string): Source to count from ('deck', 'table', or zone name)
+
+**Returns:** Number of tokens (matching if predicate provided)
+
+---
+
+### `tokens:find`
+
+Find the first token matching a predicate. Returns null if not found.
+
+**Use cases:** Finding specific cards, locating tokens by ID, searching for matches
+
+```javascript
+// Find by ID
+const aceOfSpades = engine.dispatch("tokens:find", {
+  tokens: deck.cards,
+  predicate: (token) => token.id === "spades-ace"
+});
+
+// Find by property
+const cheapestCard = engine.dispatch("tokens:find", {
+  source: "hand",
+  predicate: (token) => token.meta.cost === 1
+});
+
+// Find complex match
+const legendaryCreature = engine.dispatch("tokens:find", {
+  source: "battlefield",
+  predicate: (token) => 
+    token.meta.type === "creature" && 
+    token.meta.rarity === "legendary"
+});
+
+// Check if found
+if (legendaryCreature) {
+  console.log("Found:", legendaryCreature.label);
+} else {
+  console.log("No legendary creatures in play");
+}
+```
+
+**Parameters:**
+- `tokens` (Array<Token>): Tokens to search (if not using source)
+- `predicate` (Function, required): Function that returns true for desired token
+- `source` (string): Source to search ('deck', 'table', or zone name)
+
+**Returns:** First matching token, or null if none found
+
+---
+
 ## Utility Functions
 
 Helper functions for working with actions.
@@ -1109,7 +1544,272 @@ for (const player of ["Alice", "Bob", "Charlie"]) {
   engine.dispatch("player:drawCards", { name: player, count: 2, source: "shoe" });
 }
 ```
+### Equipment System
 
+```javascript
+// Create character and weapon
+const hero = new Token({ id: "hero", label: "Hero", meta: { hp: 100 } });
+const sword = new Token({ id: "sword", label: "Iron Sword", meta: { damage: 10 } });
+
+// Equip weapon
+engine.dispatch("token:attach", {
+  host: hero,
+  attachment: sword,
+  attachmentType: "weapon"
+});
+
+// Check equipped items
+const weapons = hero._attachments?.filter(a => a.type === "weapon");
+
+// Unequip weapon
+engine.dispatch("token:detach", {
+  host: hero,
+  attachment: sword
+});
+```
+
+### Crafting System
+
+```javascript
+// Combine materials
+const ironOre = new Token({ id: "iron-ore", meta: { material: "iron", quality: 5 } });
+const coal = new Token({ id: "coal", meta: { material: "coal", quality: 3 } });
+
+const steel = engine.dispatch("token:merge", {
+  tokens: [ironOre, coal],
+  resultProperties: {
+    label: "Steel Ingot",
+    meta: { material: "steel", quality: 8 }
+  }
+});
+```
+
+### Resource Management
+
+```javascript
+// Stack resources
+const wood1 = new Token({ id: "w1", meta: { type: "wood", qty: 5 } });
+const wood2 = new Token({ id: "w2", meta: { type: "wood", qty: 3 } });
+
+const stack = engine.dispatch("token:merge", {
+  tokens: [wood1, wood2],
+  resultProperties: {
+    label: "Wood Stack",
+    meta: { type: "wood", qty: 8 }
+  }
+});
+
+// Later, split the stack
+const [pile1, pile2] = engine.dispatch("token:split", {
+  token: stack,
+  count: 2,
+  properties: [
+    { meta: { qty: 4 } },
+    { meta: { qty: 4 } }
+  ]
+});
+```
+
+### Status Effects
+
+```javascript
+// Apply poisoned status
+const poisonEffect = new Token({ 
+  id: "poison-1", 
+  label: "Poison",
+  meta: { damagePerTurn: 2, duration: 3 }
+});
+
+engine.dispatch("token:attach", {
+  host: creature,
+  attachment: poisonEffect,
+  attachmentType: "status"
+});
+
+// Transform creature to show poison
+engine.dispatch("token:transform", {
+  token: creature,
+  properties: {
+    char: "☠️",
+    meta: { isPoisoned: true }
+  }
+});
+
+// After duration expires
+engine.dispatch("token:detach", {
+  host: creature,
+  attachment: poisonEffect
+});
+```
+
+---
+
+## Events
+
+All token transformation actions emit events through the EventBus:
+
+- `token:transformed` - When a token is transformed
+- `token:attached` - When a token is attached
+- `token:detached` - When a token is detached
+- `token:merged` - When tokens are merged
+- `token:split` - When a token is split
+
+```javascript
+engine.eventBus.on("token:transformed", ({ token, properties }) => {
+  console.log(`${token.label} transformed with`, properties);
+});
+
+engine.eventBus.on("token:attached", ({ host, attachment, attachmentType }) => {
+  console.log(`${attachment.label} attached to ${host.label} as ${attachmentType}`);
+});
+```
+
+### Resource Management
+
+```javascript
+// Count total resources
+const woodCount = engine.dispatch("tokens:count", {
+  source: "inventory",
+  predicate: (token) => token.meta.type === "wood"
+});
+
+// Collect all resources
+const allResources = engine.dispatch("tokens:collect", {
+  sources: ["inventory", "storage", "chest"]
+});
+
+// Filter valuable items
+const valuables = engine.dispatch("tokens:filter", {
+  tokens: allResources,
+  predicate: (token) => token.meta.value >= 100
+});
+```
+
+### Card Game Queries
+
+```javascript
+// Find playable cards
+const playable = engine.dispatch("tokens:filter", {
+  source: "hand",
+  predicate: (token) => token.meta.cost <= currentMana
+});
+
+// Count creatures in play
+const creatureCount = engine.dispatch("tokens:count", {
+  source: "battlefield",
+  predicate: (token) => token.meta.type === "creature"
+});
+
+// Collect all cards
+const allMyCards = engine.dispatch("tokens:collect", {
+  sources: ["hand", "battlefield", "graveyard"]
+});
+```
+
+### Batch Operations
+
+```javascript
+// Damage all enemy units
+engine.dispatch("tokens:forEach", {
+  source: "enemy-field",
+  operation: (token) => {
+    token.meta.hp -= 2;
+    if (token.meta.hp <= 0) {
+      token.meta.destroyed = true;
+    }
+  }
+});
+
+// Buff all friendly units
+const friendlyUnits = engine.dispatch("tokens:filter", {
+  source: "battlefield",
+  predicate: (token) => token.meta.controller === "player"
+});
+
+engine.dispatch("tokens:forEach", {
+  tokens: friendlyUnits,
+  operation: (token) => {
+    token.meta.power += 1;
+    token.meta.defense += 1;
+  }
+});
+```
+
+### Complex Queries
+
+```javascript
+// Find most powerful unit
+const units = engine.dispatch("tokens:collect", {
+  sources: ["battlefield"]
+});
+
+let strongest = null;
+engine.dispatch("tokens:forEach", {
+  tokens: units,
+  operation: (token) => {
+    if (!strongest || token.meta.power > strongest.meta.power) {
+      strongest = token;
+    }
+  }
+});
+
+// Count tokens by type
+const typeMap = {};
+engine.dispatch("tokens:forEach", {
+  source: "deck",
+  operation: (token) => {
+    const type = token.meta.type || "other";
+    typeMap[type] = (typeMap[type] || 0) + 1;
+  }
+});
+```
+
+### Inventory System
+
+```javascript
+// Collect all equipped items
+const equipped = engine.dispatch("tokens:collect", {
+  sources: ["character"],
+  includeAttachments: true
+});
+
+// Find specific item
+const magicSword = engine.dispatch("tokens:find", {
+  tokens: equipped,
+  predicate: (token) => 
+    token.meta.itemType === "weapon" && 
+    token.meta.magical === true
+});
+
+// Count items by rarity
+const legendaryCount = engine.dispatch("tokens:count", {
+  tokens: equipped,
+  predicate: (token) => token.meta.rarity === "legendary"
+});
+```
+
+---
+
+## Events
+
+All batch/query operations emit events:
+
+- `tokens:filtered` - When filtering completes
+- `tokens:forEach:complete` - When forEach finishes
+- `tokens:forEach:error` - When forEach operation fails
+- `tokens:collected` - When collection completes
+- `tokens:counted` - When counting completes
+- `tokens:found` - When find completes
+
+```javascript
+engine.eventBus.on("tokens:filtered", ({ source, count, total }) => {
+  console.log(`Filtered ${count} of ${total} tokens from ${source}`);
+});
+
+engine.eventBus.on("tokens:collected", ({ sources, count }) => {
+  console.log(`Collected ${count} tokens from ${sources.join(", ")}`);
+});
+```
 ---
 
 ## Performance Notes
@@ -1159,6 +1859,7 @@ Object.assign(ActionRegistry, {
   }
 });
 ```
+
 
 **Best practice:** Use standard actions for common operations, only add custom actions for game-specific logic.
 

@@ -17,12 +17,14 @@
 /**
  * Extended ActionRegistry - Comprehensive game actions
  * 
- * This module provides 30+ fundamental actions covering:
+ * This module provides 50 fundamental actions covering:
  * - Deck operations (8 actions)
  * - Table operations (12 actions)
  * - Shoe operations (6 actions)
  * - Player operations (8 actions)
  * - Game state operations (6 actions)
+ * - Token transformation operations (5 actions)
+ * - Batch/query operations (5 actions)
  * 
  * Import and merge with base ActionRegistry for complete coverage.
  */
@@ -627,6 +629,404 @@ export const GameStateActions = {
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TOKEN TRANSFORMATION/MUTATION (5 actions)
+  Modify token properties without moving them - for state changes, attachments
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
+
+export const TokenActions = {
+  /**
+   * Transform token properties (modify metadata, label, text, etc.)
+   * Useful for: flipping cards, changing state, applying effects
+   * Usage: engine.dispatch("token:transform", { 
+   *   token: myToken, 
+   *   properties: { meta: { status: "tapped" }, label: "Tapped Card" }
+   * })
+   */
+  "token:transform": (engine, { token, properties = {} } = {}) => {
+    if (!token) throw new Error("No token provided to transform");
+    
+    // Handle meta separately to ensure proper merging
+    const { meta, ...otherProperties } = properties;
+    
+    // Apply non-meta properties
+    Object.assign(token, otherProperties);
+    
+    // Merge meta properties if provided
+    if (meta && typeof meta === 'object') {
+      token.meta = { ...token.meta, ...meta };
+    }
+    
+    // Emit event for tracking
+    engine.eventBus?.emit?.("token:transformed", { token, properties });
+    
+    return token;
+  },
+  
+  /**
+   * Attach one token to another (equipment, enchantments, status effects)
+   * Creates a relationship where the attached token modifies the host
+   * Usage: engine.dispatch("token:attach", { 
+   *   host: characterToken, 
+   *   attachment: swordToken,
+   *   attachmentType: "equipment"
+   * })
+   */
+  "token:attach": (engine, { host, attachment, attachmentType = "default" } = {}) => {
+    if (!host) throw new Error("No host token provided");
+    if (!attachment) throw new Error("No attachment token provided");
+    
+    // Initialize attachments array if it doesn't exist
+    if (!host._attachments) {
+      host._attachments = [];
+    }
+    
+    // Create attachment record
+    const attachmentRecord = {
+      token: attachment,
+      type: attachmentType,
+      attachedAt: Date.now(),
+      id: attachment.id
+    };
+    
+    host._attachments.push(attachmentRecord);
+    
+    // Mark the attachment token as attached
+    attachment._attachedTo = host.id;
+    attachment._attachmentType = attachmentType;
+    
+    engine.eventBus?.emit?.("token:attached", { host, attachment, attachmentType });
+    
+    return host;
+  },
+  
+  /**
+   * Detach a token from its host
+   * Usage: engine.dispatch("token:detach", { 
+   *   host: characterToken, 
+   *   attachmentId: "sword-001" 
+   * })
+   */
+  "token:detach": (engine, { host, attachmentId = null, attachment = null } = {}) => {
+    if (!host) throw new Error("No host token provided");
+    if (!host._attachments || host._attachments.length === 0) {
+      return null; // Nothing to detach
+    }
+    
+    // Find attachment by ID or by reference
+    const targetId = attachmentId || attachment?.id;
+    const index = host._attachments.findIndex(a => a.id === targetId || a.token === attachment);
+    
+    if (index === -1) {
+      return null; // Attachment not found
+    }
+    
+    // Remove attachment
+    const [detached] = host._attachments.splice(index, 1);
+    const detachedToken = detached.token;
+    
+    // Clean up attachment token metadata
+    delete detachedToken._attachedTo;
+    delete detachedToken._attachmentType;
+    
+    engine.eventBus?.emit?.("token:detached", { host, detachedToken, type: detached.type });
+    
+    return detachedToken;
+  },
+  
+  /**
+   * Merge multiple tokens into a single token
+   * Useful for: combining resources, upgrading units, crafting
+   * Usage: engine.dispatch("token:merge", { 
+   *   tokens: [token1, token2, token3],
+   *   resultProperties: { label: "Combined Token", meta: { power: 10 } },
+   *   keepOriginals: false
+   * })
+   */
+  "token:merge": (engine, { tokens = [], resultProperties = {}, keepOriginals = false } = {}) => {
+    if (!tokens || tokens.length < 2) {
+      throw new Error("At least 2 tokens required to merge");
+    }
+    
+    // Create merged token from first token as base
+    const baseToken = tokens[0];
+    const mergedToken = {
+      ...baseToken,
+      ...resultProperties,
+      _mergedFrom: tokens.map(t => t.id),
+      _mergedAt: Date.now()
+    };
+    
+    // Merge meta objects if not overridden
+    if (!resultProperties.meta) {
+      mergedToken.meta = tokens.reduce((acc, token) => {
+        return { ...acc, ...token.meta };
+      }, {});
+    }
+    
+    // Mark original tokens as merged (if not keeping them)
+    if (!keepOriginals) {
+      tokens.forEach(token => {
+        token._merged = true;
+        token._mergedInto = mergedToken.id;
+      });
+    }
+    
+    engine.eventBus?.emit?.("token:merged", { tokens, mergedToken, keepOriginals });
+    
+    return mergedToken;
+  },
+  
+  /**
+   * Split a token into multiple tokens
+   * Useful for: breaking combined resources, dividing stacks
+   * Usage: engine.dispatch("token:split", { 
+   *   token: stackToken,
+   *   count: 3,
+   *   properties: [{ label: "Part 1" }, { label: "Part 2" }, { label: "Part 3" }]
+   * })
+   */
+  "token:split": (engine, { token, count = 2, properties = [] } = {}) => {
+    if (!token) throw new Error("No token provided to split");
+    if (count < 2) throw new Error("Split count must be at least 2");
+    
+    const splitTokens = [];
+    
+    for (let i = 0; i < count; i++) {
+      const customProps = properties[i] || {};
+      const { meta: customMeta, ...otherCustomProps } = customProps;
+      
+      const splitToken = {
+        ...token,
+        id: `${token.id}-split-${i}`,
+        ...otherCustomProps,
+        meta: { ...token.meta, ...(customMeta || {}) }, // Merge meta properly
+        _splitFrom: token.id,
+        _splitIndex: i,
+        _splitAt: Date.now()
+      };
+      
+      splitTokens.push(splitToken);
+    }
+    
+    // Mark original token as split
+    token._split = true;
+    token._splitInto = splitTokens.map(t => t.id);
+    
+    engine.eventBus?.emit?.("token:split", { originalToken: token, splitTokens, count });
+    
+    return splitTokens;
+  }
+};
+
+/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BATCH/QUERY OPERATIONS (5 actions)
+  Operate on collections of tokens - filtering, searching, counting, batch operations
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
+
+export const BatchActions = {
+  /**
+   * Filter tokens by criteria
+   * Returns all tokens matching the predicate function
+   * Usage: const redCards = engine.dispatch("tokens:filter", {
+   *   tokens: deck.cards,
+   *   predicate: (token) => token.meta.color === "red"
+   * })
+   */
+  "tokens:filter": (engine, { tokens = [], predicate, source = null } = {}) => {
+    if (!predicate || typeof predicate !== 'function') {
+      throw new Error("Predicate function required for tokens:filter");
+    }
+    
+    // If source is provided, get tokens from there
+    let tokensToFilter = tokens;
+    if (source === 'deck' && engine.deck) {
+      tokensToFilter = engine.deck._stack || [];
+    } else if (source === 'table' && engine.table) {
+      tokensToFilter = engine.table.allCards() || [];
+    } else if (source && engine.table) {
+      // Try as zone name
+      tokensToFilter = engine.table.zone(source).map(p => p.token || p.card) || [];
+    }
+    
+    const filtered = tokensToFilter.filter(predicate);
+    
+    engine.eventBus?.emit?.("tokens:filtered", { 
+      source: source || 'provided', 
+      count: filtered.length,
+      total: tokensToFilter.length 
+    });
+    
+    return filtered;
+  },
+  
+  /**
+   * Apply an operation to each token in a collection
+   * Usage: engine.dispatch("tokens:forEach", {
+   *   tokens: playerHand,
+   *   operation: (token) => token.meta.buffed = true
+   * })
+   */
+  "tokens:forEach": (engine, { tokens = [], operation, source = null } = {}) => {
+    if (!operation || typeof operation !== 'function') {
+      throw new Error("Operation function required for tokens:forEach");
+    }
+    
+    // If source is provided, get tokens from there
+    let tokensToProcess = tokens;
+    if (source === 'deck' && engine.deck) {
+      tokensToProcess = engine.deck._stack || [];
+    } else if (source === 'table' && engine.table) {
+      tokensToProcess = engine.table.allCards() || [];
+    } else if (source && engine.table) {
+      // Try as zone name
+      tokensToProcess = engine.table.zone(source).map(p => p.token || p.card) || [];
+    }
+    
+    const results = [];
+    tokensToProcess.forEach((token, index) => {
+      try {
+        const result = operation(token, index);
+        results.push(result);
+      } catch (error) {
+        engine.eventBus?.emit?.("tokens:forEach:error", { token, error });
+      }
+    });
+    
+    engine.eventBus?.emit?.("tokens:forEach:complete", { 
+      count: tokensToProcess.length 
+    });
+    
+    return results;
+  },
+  
+  /**
+   * Collect tokens from multiple sources into a single array
+   * Usage: const allTokens = engine.dispatch("tokens:collect", {
+   *   sources: ['deck', 'table', 'discard']
+   * })
+   */
+  "tokens:collect": (engine, { sources = [], includeAttachments = false } = {}) => {
+    if (!Array.isArray(sources) || sources.length === 0) {
+      throw new Error("Sources array required for tokens:collect");
+    }
+    
+    const collected = [];
+    
+    sources.forEach(source => {
+      let tokensFromSource = [];
+      
+      if (source === 'deck' && engine.deck) {
+        tokensFromSource = engine.deck._stack || [];
+      } else if (source === 'table' && engine.table) {
+        tokensFromSource = engine.table.allCards();
+      } else if (source === 'discard' && engine.deck) {
+        tokensFromSource = engine.deck._discards || [];
+      } else if (source === 'shoe' && engine.shoe) {
+        // Collect from shoe's decks
+        if (engine.shoe._decks) {
+          engine.shoe._decks.forEach(deck => {
+            tokensFromSource.push(...(deck._stack || []));
+          });
+        }
+      } else if (engine.table) {
+        // Try as zone name
+        const zone = engine.table.zone(source);
+        tokensFromSource = zone.map(p => p.token || p.card);
+      }
+      
+      // Add tokens from this source
+      collected.push(...tokensFromSource);
+      
+      // Optionally include attachments from all collected tokens
+      if (includeAttachments) {
+        tokensFromSource.forEach(token => {
+          if (token && token._attachments) {
+            token._attachments.forEach(att => collected.push(att.token));
+          }
+        });
+      }
+    });
+    
+    engine.eventBus?.emit?.("tokens:collected", { 
+      sources, 
+      count: collected.length 
+    });
+    
+    return collected;
+  },
+  
+  /**
+   * Count tokens matching criteria
+   * Usage: const redCount = engine.dispatch("tokens:count", {
+   *   tokens: deck.cards,
+   *   predicate: (token) => token.meta.color === "red"
+   * })
+   */
+  "tokens:count": (engine, { tokens = [], predicate = null, source = null } = {}) => {
+    // If source is provided, get tokens from there
+    let tokensToCount = tokens;
+    if (source === 'deck' && engine.deck) {
+      tokensToCount = engine.deck._stack || [];
+    } else if (source === 'table' && engine.table) {
+      tokensToCount = engine.table.allCards() || [];
+    } else if (source && engine.table) {
+      // Try as zone name
+      tokensToCount = engine.table.zone(source).map(p => p.token || p.card) || [];
+    }
+    
+    // If no predicate, return total count
+    if (!predicate) {
+      return tokensToCount.length;
+    }
+    
+    // Count matching tokens
+    const count = tokensToCount.filter(predicate).length;
+    
+    engine.eventBus?.emit?.("tokens:counted", { 
+      source: source || 'provided',
+      count,
+      total: tokensToCount.length 
+    });
+    
+    return count;
+  },
+  
+  /**
+   * Find first token matching criteria
+   * Returns the first token that matches the predicate, or null
+   * Usage: const aceOfSpades = engine.dispatch("tokens:find", {
+   *   tokens: deck.cards,
+   *   predicate: (token) => token.id === "spades-ace"
+   * })
+   */
+  "tokens:find": (engine, { tokens = [], predicate, source = null } = {}) => {
+    if (!predicate || typeof predicate !== 'function') {
+      throw new Error("Predicate function required for tokens:find");
+    }
+    
+    // If source is provided, get tokens from there
+    let tokensToSearch = tokens;
+    if (source === 'deck' && engine.deck) {
+      tokensToSearch = engine.deck._stack || [];
+    } else if (source === 'table' && engine.table) {
+      tokensToSearch = engine.table.allCards() || [];
+    } else if (source && engine.table) {
+      // Try as zone name
+      tokensToSearch = engine.table.zone(source).map(p => p.token || p.card) || [];
+    }
+    
+    const found = tokensToSearch.find(predicate);
+    
+    engine.eventBus?.emit?.("tokens:found", { 
+      source: source || 'provided',
+      found: !!found 
+    });
+    
+    return found || null;
+  }
+};
+
+/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   COMBINED EXPORT
   All action categories merged into single object
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
@@ -636,12 +1036,16 @@ export const ExtendedActions = {
   ...TableActions,
   ...ShoeActions,
   ...PlayerActions,
-  ...GameStateActions
+  ...GameStateActions,
+  ...TokenActions,
+  ...BatchActions
 };
 
-// Total: 40 actions
+// Total: 50 actions
 // - Deck: 8
 // - Table: 12
 // - Shoe: 6
 // - Player: 8
 // - GameState: 6
+// - Token: 5
+// - Batch: 5
