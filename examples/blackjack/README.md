@@ -1,5 +1,5 @@
 <div align=center><img src="fine.png" width=256 height=200></div>
-# HyperToken Blackjack
+## HyperToken Blackjack
 
 A complete implementation of Blackjack using the HyperToken engine, demonstrating:
 - Token-based card representation
