@@ -1,0 +1,28 @@
+{
+  "name": "hypertoken-network-tictactoe",
+  "version": "1.0.0",
+  "description": "Network multiplayer tic-tac-toe demonstrating HyperToken's real-time capabilities",
+  "type": "module",
+  "main": "game.js",
+  "scripts": {
+    "server": "node server.js",
+    "client": "node client.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "hypertoken",
+    "multiplayer",
+    "websocket",
+    "tic-tac-toe",
+    "game",
+    "network"
+  ],
+  "author": "The Carpocratian Church of Commonality and Equality, Inc.",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
