@@ -17,18 +17,18 @@
 /**
  * Extended ActionRegistry - Comprehensive game actions
  * 
- * This module provides 50 fundamental actions covering:
+ * This module provides 58 fundamental actions covering:
  * - Deck operations (8 actions)
  * - Table operations (12 actions)
  * - Shoe operations (6 actions)
- * - Player operations (8 actions)
+ * - Player operations (12 actions: 9 base + 3 transfer)
  * - Game state operations (6 actions)
  * - Token transformation operations (5 actions)
  * - Batch/query operations (5 actions)
  * 
  * Import and merge with base ActionRegistry for complete coverage.
  */
- 
+
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   DECK OPERATIONS (8 actions)
   Core card deck manipulation: reset, burn, peek, cut, insert, remove
@@ -521,6 +521,299 @@ export const PlayerActions = {
     const player = engine._players?.find(p => p.name === name);
     if (!player) throw new Error(`Player ${name} not found`);
     return player;
+  },
+  
+  /**
+   * Transfer resource from one player to another
+   * Usage: engine.dispatch("player:transfer", {
+   *   from: "Alice",
+   *   to: "Bob", 
+   *   resource: "gold",
+   *   amount: 50
+   * })
+   */
+  "player:transfer": (engine, { from, to, resource, amount = 1, token = null } = {}) => {
+    if (!from) throw new Error("Source player (from) required");
+    if (!to) throw new Error("Target player (to) required");
+    if (!resource && !token) throw new Error("Resource type or token required");
+    
+    const sourcePlayer = engine._players?.find(p => p.name === from);
+    const targetPlayer = engine._players?.find(p => p.name === to);
+    
+    if (!sourcePlayer) throw new Error(`Player ${from} not found`);
+    if (!targetPlayer) throw new Error(`Player ${to} not found`);
+    
+    // If transferring a specific token
+    if (token) {
+      if (!sourcePlayer.hand) sourcePlayer.hand = [];
+      if (!targetPlayer.hand) targetPlayer.hand = [];
+      
+      const tokenIndex = sourcePlayer.hand.indexOf(token);
+      if (tokenIndex === -1) {
+        throw new Error(`Player ${from} does not have this token`);
+      }
+      
+      // Transfer token
+      sourcePlayer.hand.splice(tokenIndex, 1);
+      targetPlayer.hand.push(token);
+      
+      // Track transaction
+      if (!engine._transactions) engine._transactions = [];
+      engine._transactions.push({
+        type: 'token_transfer',
+        from,
+        to,
+        token: token.id,
+        timestamp: Date.now()
+      });
+      
+      engine.eventBus?.emit?.("player:transfer", { 
+        from, 
+        to, 
+        token: token.id,
+        type: 'token'
+      });
+      
+      return { success: true, token };
+    }
+    
+    // Otherwise transferring resource amount
+    if (!sourcePlayer.resources) sourcePlayer.resources = {};
+    if (!targetPlayer.resources) targetPlayer.resources = {};
+    
+    const available = sourcePlayer.resources[resource] || 0;
+    if (available < amount) {
+      throw new Error(`Player ${from} only has ${available} ${resource}, cannot transfer ${amount}`);
+    }
+    
+    // Transfer resource
+    sourcePlayer.resources[resource] = available - amount;
+    targetPlayer.resources[resource] = (targetPlayer.resources[resource] || 0) + amount;
+    
+    // Track transaction
+    if (!engine._transactions) engine._transactions = [];
+    engine._transactions.push({
+      type: 'resource_transfer',
+      from,
+      to,
+      resource,
+      amount,
+      timestamp: Date.now()
+    });
+    
+    engine.eventBus?.emit?.("player:transfer", { 
+      from, 
+      to, 
+      resource, 
+      amount,
+      type: 'resource'
+    });
+    
+    return { 
+      success: true, 
+      from: { player: from, remaining: sourcePlayer.resources[resource] },
+      to: { player: to, total: targetPlayer.resources[resource] }
+    };
+  },
+  
+  /**
+   * Trade resources/tokens between two players (bidirectional exchange)
+   * Usage: engine.dispatch("player:trade", {
+   *   player1: { name: "Alice", offer: { resource: "gold", amount: 50 } },
+   *   player2: { name: "Bob", offer: { resource: "wood", amount: 100 } }
+   * })
+   */
+  "player:trade": (engine, { player1, player2 } = {}) => {
+    if (!player1 || !player2) throw new Error("Both player1 and player2 required");
+    if (!player1.name || !player2.name) throw new Error("Player names required");
+    if (!player1.offer || !player2.offer) throw new Error("Both players must provide offers");
+    
+    const p1 = engine._players?.find(p => p.name === player1.name);
+    const p2 = engine._players?.find(p => p.name === player2.name);
+    
+    if (!p1) throw new Error(`Player ${player1.name} not found`);
+    if (!p2) throw new Error(`Player ${player2.name} not found`);
+    
+    // Validate both players have what they're offering
+    const offer1 = player1.offer;
+    const offer2 = player2.offer;
+    
+    // Check player1's offer
+    if (offer1.token) {
+      if (!p1.hand || !p1.hand.includes(offer1.token)) {
+        throw new Error(`${player1.name} does not have offered token`);
+      }
+    } else if (offer1.resource) {
+      if (!p1.resources) p1.resources = {};
+      const available = p1.resources[offer1.resource] || 0;
+      if (available < offer1.amount) {
+        throw new Error(`${player1.name} only has ${available} ${offer1.resource}`);
+      }
+    }
+    
+    // Check player2's offer
+    if (offer2.token) {
+      if (!p2.hand || !p2.hand.includes(offer2.token)) {
+        throw new Error(`${player2.name} does not have offered token`);
+      }
+    } else if (offer2.resource) {
+      if (!p2.resources) p2.resources = {};
+      const available = p2.resources[offer2.resource] || 0;
+      if (available < offer2.amount) {
+        throw new Error(`${player2.name} only has ${available} ${offer2.resource}`);
+      }
+    }
+    
+    // Execute the trade atomically
+    
+    // Player1 gives to Player2
+    if (offer1.token) {
+      const idx = p1.hand.indexOf(offer1.token);
+      p1.hand.splice(idx, 1);
+      if (!p2.hand) p2.hand = [];
+      p2.hand.push(offer1.token);
+    } else if (offer1.resource) {
+      p1.resources[offer1.resource] -= offer1.amount;
+      p2.resources[offer1.resource] = (p2.resources[offer1.resource] || 0) + offer1.amount;
+    }
+    
+    // Player2 gives to Player1
+    if (offer2.token) {
+      const idx = p2.hand.indexOf(offer2.token);
+      p2.hand.splice(idx, 1);
+      if (!p1.hand) p1.hand = [];
+      p1.hand.push(offer2.token);
+    } else if (offer2.resource) {
+      p2.resources[offer2.resource] -= offer2.amount;
+      p1.resources[offer2.resource] = (p1.resources[offer2.resource] || 0) + offer2.amount;
+    }
+    
+    // Track transaction
+    if (!engine._transactions) engine._transactions = [];
+    engine._transactions.push({
+      type: 'trade',
+      player1: player1.name,
+      player2: player2.name,
+      offer1: offer1.token ? { token: offer1.token.id } : { resource: offer1.resource, amount: offer1.amount },
+      offer2: offer2.token ? { token: offer2.token.id } : { resource: offer2.resource, amount: offer2.amount },
+      timestamp: Date.now()
+    });
+    
+    engine.eventBus?.emit?.("player:trade", { 
+      player1: player1.name,
+      player2: player2.name,
+      offer1,
+      offer2
+    });
+    
+    return { success: true, transaction: engine._transactions[engine._transactions.length - 1] };
+  },
+  
+  /**
+   * Steal resource/token from another player (with optional validation)
+   * Usage: engine.dispatch("player:steal", {
+   *   from: "Alice",
+   *   to: "Bob",
+   *   resource: "gold",
+   *   amount: 25,
+   *   validate: (stealer, victim) => stealer.meta.hasThiefAbility
+   * })
+   */
+  "player:steal": (engine, { from, to, resource, amount = 1, token = null, validate = null } = {}) => {
+    if (!from) throw new Error("Victim player (from) required");
+    if (!to) throw new Error("Thief player (to) required");
+    if (!resource && !token) throw new Error("Resource type or token required");
+    
+    const victimPlayer = engine._players?.find(p => p.name === from);
+    const thiefPlayer = engine._players?.find(p => p.name === to);
+    
+    if (!victimPlayer) throw new Error(`Player ${from} not found`);
+    if (!thiefPlayer) throw new Error(`Player ${to} not found`);
+    
+    // Optional validation function
+    if (validate && typeof validate === 'function') {
+      const isValid = validate(thiefPlayer, victimPlayer, engine);
+      if (!isValid) {
+        throw new Error(`Steal validation failed: ${to} cannot steal from ${from}`);
+      }
+    }
+    
+    // If stealing a specific token
+    if (token) {
+      if (!victimPlayer.hand) victimPlayer.hand = [];
+      if (!thiefPlayer.hand) thiefPlayer.hand = [];
+      
+      const tokenIndex = victimPlayer.hand.indexOf(token);
+      if (tokenIndex === -1) {
+        throw new Error(`Player ${from} does not have this token`);
+      }
+      
+      // Steal token
+      victimPlayer.hand.splice(tokenIndex, 1);
+      thiefPlayer.hand.push(token);
+      
+      // Track transaction
+      if (!engine._transactions) engine._transactions = [];
+      engine._transactions.push({
+        type: 'steal_token',
+        from,
+        to,
+        token: token.id,
+        timestamp: Date.now()
+      });
+      
+      engine.eventBus?.emit?.("player:steal", { 
+        from, 
+        to, 
+        token: token.id,
+        type: 'token'
+      });
+      
+      return { success: true, token };
+    }
+    
+    // Otherwise stealing resource amount
+    if (!victimPlayer.resources) victimPlayer.resources = {};
+    if (!thiefPlayer.resources) thiefPlayer.resources = {};
+    
+    const available = victimPlayer.resources[resource] || 0;
+    
+    // Steal as much as possible (up to requested amount)
+    const stolen = Math.min(available, amount);
+    
+    if (stolen === 0) {
+      throw new Error(`Player ${from} has no ${resource} to steal`);
+    }
+    
+    // Transfer stolen resource
+    victimPlayer.resources[resource] = available - stolen;
+    thiefPlayer.resources[resource] = (thiefPlayer.resources[resource] || 0) + stolen;
+    
+    // Track transaction
+    if (!engine._transactions) engine._transactions = [];
+    engine._transactions.push({
+      type: 'steal_resource',
+      from,
+      to,
+      resource,
+      amount: stolen,
+      timestamp: Date.now()
+    });
+    
+    engine.eventBus?.emit?.("player:steal", { 
+      from, 
+      to, 
+      resource, 
+      amount: stolen,
+      type: 'resource'
+    });
+    
+    return { 
+      success: true, 
+      stolen,
+      from: { player: from, remaining: victimPlayer.resources[resource] },
+      to: { player: to, total: thiefPlayer.resources[resource] }
+    };
   }
 };
 
@@ -1041,11 +1334,11 @@ export const ExtendedActions = {
   ...BatchActions
 };
 
-// Total: 50 actions
+// Total: 58 actions
 // - Deck: 8
 // - Table: 12
 // - Shoe: 6
-// - Player: 8
+// - Player: 12 (9 base + 3 transfer)
 // - GameState: 6
 // - Token: 5
 // - Batch: 5
