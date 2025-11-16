@@ -614,38 +614,6 @@ This includes:
 > "Every player, every action, and every token tells a story.  
 > HyperToken lets those stories play themselves out."
 
-HyperToken embodies several philosophical commitments:
-
-**Commons-Based Development**
-- Released as a public good
-- Apache 2.0 license
-- Fully documented
-- Community extensible
-
-**Emergent Complexity**
-- Simple primitives (58 actions)
-- Complex behaviors emerge
-- No prescriptive game logic
-- Designer freedom
-
-**Deterministic Simulation**
-- Seeded randomness
-- Reproducible results
-- Debuggable systems
-- Scientific validity
-
-**Event-Driven Architecture**
-- Observable state changes
-- Loosely coupled components
-- Plugin extensibility
-- Analytics support
-
-**Human-AI Collaboration**
-- Humans and AI play together
-- AI learns from simulations
-- AI assists human players
-- Hybrid intelligence
-
 ---
 
 ## 🜍 Proemium to the Art of Tokens
