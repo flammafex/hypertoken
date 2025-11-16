@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 //./test/testPluginLoader.js
-import { loadPlugins } from "../pluginLoader.js";
+import { loadPlugins } from "../plugins/pluginLoader.js";
 import { Emitter } from "../core/events.js";
 
 
