@@ -46,7 +46,7 @@ HyperToken provides the primitives to model **any discrete system where entities
 - Rummy variants (Gin, Canasta)
 - Solitaire (Klondike, FreeCell, Spider)
 - Collectible card games
-- Poker, Blackjack, and casino games
+- Poker, [Blackjack](./examples/blackjack/README.md), and casino games
 
 **Board Games**
 - Chess, Checkers, Go
