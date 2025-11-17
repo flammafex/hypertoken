@@ -2,7 +2,7 @@
 /**
  * CLI Blackjack Game
  * Play blackjack in your terminal using HyperToken
- */
+ */ 
 
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
