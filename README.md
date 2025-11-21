@@ -5,9 +5,9 @@
 _A mission of [The Carpocratian Church of Commonality and Equality](https://carpocratian.org/en/church/)_.</div>
 <div align=center><img src="mission.png" width=256 height=200></div>
 
-**HyperToken** is a discrete event simulation engine for modeling systems where **meaning emerges from relationships**.
+**HyperToken** is a **Local-First Multiplayer Engine** and **AI Research Platform**.
 
-It provides a complete framework for creating games, simulations, multi-agent systems, and interactive narratives — all powered by 58 battle-tested actions, an extensible plugin architecture, and event-driven coordination.
+It combines **CRDTs (Automerge)** for state synchronization, **OpenAI Gym** for agent training, and a **Host-Authoritative** architecture to create permissionless, persistent worlds without a blockchain.
 
 Inspired by the creative legacy of Apple's _HyperCard_, **HyperToken** reimagines that spirit for the age of intelligent systems. Where _HyperCard_ made computers writable for artists and educators, **HyperToken** makes complex simulations and game logic writable for designers, researchers, and philosophers.
 
@@ -17,7 +17,7 @@ This project is an original work and is not affiliated with or endorsed by Apple
 
 ## 🌟 What Is HyperToken?
 
-At its heart, HyperToken is a **relationship engine**.
+At its heart, HyperToken is a **relationship engine** that lives in the network.
 
 A token isn't valuable because of what it IS — it's valuable because of:
 - **Who owns it** (players, agents)
@@ -26,103 +26,40 @@ A token isn't valuable because of what it IS — it's valuable because of:
 - **What rules govern it** (policies, validators, game logic)
 - **Who wants it** (competing interests, economies, goals)
 
-This philosophy applies equally to:
-- Cards in a player's hand
-- Items in an RPG inventory
-- Shares in an economic model
-- Votes in a governance system
-- Agents in a social simulation
-
-HyperToken provides the primitives to model **any discrete system where entities have state, relationships, and location**.
+This philosophy applies equally to cards in a blackjack shoe, shares in an economic model, or agents in a social simulation. HyperToken provides the primitives to model **any discrete system where entities have state, relationships, and location**, automatically synchronizing that truth between peers.
 
 ---
 
-## 🚀 What Can You Build?
+## 🌍 Use Cases
 
-### 🎮 Games
+HyperToken is designed for two distinct audiences: creators building games and researchers modeling systems.
 
-**Card Games**
-- Trick-taking (Hearts, Spades, Bridge)
-- Rummy variants (Gin, Canasta)
-- Solitaire (Klondike, FreeCell, Spider)
-- Collectible card games
-- Poker, [Blackjack](./examples/blackjack/README.md), and casino games
-
-**Board Games**
-- Chess, Checkers, Go
-- Territory control (Risk-like)
-- Abstract strategy games
-- Mancala and pit games
-
-**RPGs & Roguelikes**
-- Character progression systems
-- Equipment and inventory
-- Combat and status effects
-- Dungeon crawling
-- Quest systems
-
-**Puzzle Games**
-- Sokoban, Match-3
-- Logic puzzles
-- Tower defense
-
-### 🧪 Simulations & Research
-
-**Economics**
-- Market simulations
-- Trading economies
-- Auction systems
-- Resource allocation
-- Price discovery
-
-**Social Systems**
-- Trust games (Prisoner's Dilemma, Ultimatum Game)
-- Reputation systems
-- Cooperation emergence
-- Social network dynamics
-
-**Multi-Agent Research**
-- Reinforcement learning environments
-- Evolutionary algorithms
-- Game theory experiments
-- Agent competition and cooperation
-
-**Governance Models**
-- Voting systems
-- Policy simulation
-- Resource distribution
-- Collective decision-making
-
-### 📖 Interactive Narratives
-
-- Branching story systems
-- Quest management
-- Character relationships
-- Inventory-based puzzles
-- Procedural story generation
-
-### 🎲 And More...
-
-- Sports simulations
-- Stock market games
-- Educational tools
-- Probability experiments
-- Generative art systems
-- Music/rhythm abstractions
+| **For Creators & Communities** | **For Researchers & Enterprise** |
+| :--- | :--- |
+| **[👉 Read Community Use Cases](./COMMUNITY_USE_CASES.md)** | **[👉 Read Enterprise Use Cases](./ENTERPRISE_USE_CASES.md)** |
+| • **Serverless Multiplayer Games**<br>Host games on your own device; zero infrastructure costs. | • **Reinforcement Learning Environments**<br>Train AlphaZero-style agents using the standardized Gym interface. |
+| • **"Headless" Autonomous Worlds**<br>Persistent game states that live in the swarm, not on a server. | • **Market & Economic Simulations**<br>Model complex trading economies to test incentive structures. |
+| • **Anti-Cheat P2P Gaming**<br>Host-authoritative logic ensures fair play without a central authority. | • **Rapid Mechanic Prototyping**<br>Script complex mechanics in text/CLI before committing to Unity/Unreal. |
+| • **Emergent Narrative Systems**<br>Items and NPCs that carry their own history across sessions. | • **Supply Chain & Logistics Logic**<br>Distinct tracking of assets moving through zones with strict rules. |
 
 ---
 
 ## ✨ Core Features
 
-### Complete Action Registry (58 Actions)
+### The Distributed Engine
+- **State Kernel:** Built on **Automerge CRDTs**. History is preserved, merges are atomic, and the "truth" is mathematically guaranteed across peers.
+- **Networking:** Native **P2P Synchronization**. Clients exchange state deltas, not just message events.
+- **Time:** Distributed **GameLoop**. Turns, phases, and active player states are synchronized alongside data.
+- **AI Training:** Built-in **OpenAI Gym** interface. Connect your game logic directly to TensorFlow or PyTorch.
 
-- 🎴 **Deck Operations (10)** — shuffle, draw, burn, peek, cut, advanced manipulation
-- 🎯 **Table Operations (13)** — zones, placement, movement, locking, layouts
-- 👟 **Shoe Operations (7)** — multi-deck containers, controlled randomness
-- 👥 **Player Operations (12)** — create, resources, transfers, trades, theft
-- 🎮 **Game Operations (6)** — lifecycle, phases, state management
-- 🔄 **Token Operations (5)** — transform, attach, detach, merge, split
-- 📊 **Batch Operations (5)** — filter, forEach, collect, count, find
+### Complete Action Registry (58 Actions)
+- 🎴 **Deck Operations (10)** — Atomic draw queues, cryptographic shuffling, burn/peek operations.
+- 🎯 **Table Operations (13)** — Spatial zones, layout management, locking/unlocking.
+- 👟 **Shoe Operations (7)** — Multi-deck containers for weighted randomness.
+- 👥 **Player Operations (12)** — Resource pools, atomic transfers, secure trading, theft mechanics.
+- 🎮 **Game Operations (6)** — Lifecycle, phase transitions, property management.
+- 🔄 **Token Operations (5)** — Transform, attach/detach, merge/split entities.
+- 📊 **Batch Operations (5)** — High-performance filtering and querying.
 
 **Every action is:**
 - ✅ Fully implemented
@@ -130,101 +67,10 @@ HyperToken provides the primitives to model **any discrete system where entities
 - ✅ Documented with examples
 - ✅ Event-driven
 
-### Powerful Abstractions
-
-**Tokens** — The universal building block
-- Represent cards, items, characters, resources, concepts
-- Rich metadata system
-- Validation via JSON schemas
-
-**Relationships** — Attachment system
-- Equipment to characters
-- Enchantments to cards
-- Status effects to units
-- Passengers to vehicles
-
-**Ownership** — Multi-player economics
-- Resource pools per player
-- Atomic transfers and trades
-- Validation and permissions
-- Transaction audit trails
-
-**Spatial Reasoning** — Zone-based locations
-- Table zones for game boards
-- Hierarchical organization
-- Lock/unlock mechanics
-- Position-based rules
-
-**Probability** — Controlled randomness
-- Deterministic shuffling (seeded)
-- Shoes for weighted distributions
-- Reproducible simulations
-
-**Events** — Observer pattern throughout
-- Every action emits events
-- Plugin-friendly architecture
-- Analytics and logging support
-
 ### Reusable Rule Patterns
-
-**Turn Order** (patterns/turn-order.js)
-- Round-robin turns
-- Priority-based ordering
-- Simultaneous actions
-- Custom sequences
-
-**Win Conditions** (patterns/win-conditions.js)
-- Point thresholds
-- Elimination
-- Objective completion
-- Time limits
-
-**Resource Management** (patterns/resource-limits.js)
-- Hand size limits
-- Action budgets
-- Resource caps
-- Cooldowns
-
-### Built-in Plugins
-
-**Analytics** (analytics-plugin.js)
-- Track actions, turns, errors
-- Performance metrics
-- Custom statistics
-- Detailed reports
-
-**Logging** (logging-plugin.js)
-- Structured event logging
-- Filtering and levels
-- Export capabilities
-
-**State Management** (save-state-plugin.js)
-- Save/load sessions
-- JSON export/import
-- Replay functionality
-- Deterministic reproduction
-
-### AI Integration
-
-**OpenAI Agent Interface** (interface/OpenAIAgent.js)
-- LLM-powered decision making
-- Natural language actions
-- Strategic planning
-- Adaptive opponents
-
-**Agent Framework**
-- Custom agent plugins
-- Think/act cycle
-- Async decision making
-- Multiple agent types
-
-### Multiple Interfaces
-
-- **CLI** — Command-line interaction
-- **Human** — Interactive player interface
-- **Network** — Multiplayer via relay server
-- **AI** — Autonomous agents
-- **Narrator** — Descriptive storytelling layer
+- **Turn Order** (patterns/turn-order.js): Round-robin, priority, simultaneous.
+- **Win Conditions** (patterns/win-conditions.js): Thresholds, elimination, objectives.
+- **Resource Management** (patterns/resource-limits.js): Hand limits, budgets, caps.
 
 ---
 
@@ -286,17 +132,18 @@ HyperToken provides the primitives to model **any discrete system where entities
 ### Installation
 
 ```bash
-git clone https://git.carpocratian.org/sibyl/hypertoken.git
+git clone [https://git.carpocratian.org/sibyl/hypertoken.git](https://git.carpocratian.org/sibyl/hypertoken.git)
 cd hypertoken
 npm install
-```
+npx tsc
 
 ### Run the Examples
 
 **Blackjack** — Play against the dealer or watch AI tournaments
 ```bash
-node examples/blackjack/cli.js
-node examples/blackjack/agents/tournament.js
+node dist/examples/blackjack/server.js
+node dist/examples/blackjack/client.js Alice
+node dist/examples/blackjack/client.js Bob
 ```
 
 **Tarot Reading** — Get divination readings with 8 classic spreads
