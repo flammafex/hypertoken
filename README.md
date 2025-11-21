@@ -82,17 +82,17 @@ HyperToken is designed for two distinct audiences: creators building games and r
 ./
 ├── core/                   # Foundation
 │   ├── Token.ts            # Universal entity representation
-│   ├── stack.ts             # Atomic CRDT-backed collections
-│   ├── Source.ts             # Multi-stack randomness
+│   ├── Stack.ts            # Atomic CRDT-backed collections
+│   ├── Source.ts           # Multi-stack randomness
 │   ├── Space.ts            # Spatial zones and placement
-│   ├── Chronicle.ts   # Automerge State Kernel
-│   └── ConsensusCore.ts      # P2P Synchronization Logic
+│   ├── Chronicle.ts        # Automerge State Kernel
+│   └── ConsensusCore.ts    # P2P Synchronization Logic
 │
 ├── engine/                 # Simulation Logic
 │   ├── Engine.ts           # Core coordinator
 │   ├── GameLoop.ts         # Distributed time/turn control
 │   ├── RuleEngine.ts       # Global law enforcement
-│   ├── Agent.ts           # Agent/participant wrapper
+│   ├── Agent.ts            # Agent/participant wrapper
 │   └── actions-extended.ts # Complete 58-action registry
 │
 ├── interface/              # I/O & Integration
@@ -102,6 +102,8 @@ HyperToken is designed for two distinct audiences: creators building games and r
 │   └── OpenAIAgent.js      # LLM Integration
 │
 ├── examples/               # Working Implementations
+│   ├── accordian/          # A Solitaire Game for AI
+│   ├── network-tictactoe/  # Bare minimum networked example
 │   ├── blackjack/          # Multiplayer Casino Game & AI Gym
 │   ├── tarot-reading/      # Divination system
 │   └── prisoners-dilemma/  # Game theory
