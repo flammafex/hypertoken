@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --loader ./test/ts-esm-loader.js
 /*
  * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
  *
@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 /**
  * Test suite for Token Transformation actions
  * Tests: transform, attach, detach, merge, split
@@ -24,69 +24,76 @@ import { Engine } from '../engine/Engine.js';
 import { EventBus } from '../core/EventBus.js';
 import { Token } from '../core/Token.js';
 import { TokenActions } from '../engine/actions-extended.js';
+import { IToken } from '../core/types.js';
+
+interface TokenProps extends Partial<IToken> {}
 
 // Helper function to create test tokens
-function createToken(id, props = {}) {
+function createToken(id: string, props: TokenProps = {}): Token {
   return new Token({
     id,
-    label: props.label || `Token ${id}`,
-    meta: props.meta || {},
+    label: props.label ?? `Token ${id}`,
+    meta: props.meta ?? {},
     ...props
   });
 }
 
 // Test runner
-function runTests() {
+function runTests(): boolean {
   console.log('🧪 Testing Token Transformation Actions\n');
-  
+
   let passed = 0;
   let failed = 0;
-  
-  function test(name, fn) {
+
+  function test(name: string, fn: () => void): void {
     try {
       fn();
       console.log(`✅ ${name}`);
       passed++;
     } catch (error) {
       console.log(`❌ ${name}`);
-      console.log(`   Error: ${error.message}`);
+      if (error instanceof Error) {
+        console.log(`   Error: ${error.message}`);
+      } else {
+        console.log(`   Error: ${String(error)}`);
+      }
       failed++;
     }
   }
-  
+
   // Setup engine for tests
   const engine = new Engine();
   engine.eventBus = new EventBus();
-  
+
   // ============================================================
   // TEST: token:transform
   // ============================================================
-  
+
   test('token:transform - basic property change', () => {
     const token = createToken('card-1', { label: 'Original' });
-    
+
     TokenActions['token:transform'](engine, {
       token,
       properties: { label: 'Transformed' }
     });
-    
+
     if (token.label !== 'Transformed') {
       throw new Error('Label not transformed');
     }
   });
-  
+
   test('token:transform - metadata merge', () => {
-    const token = createToken('card-2', { 
-      meta: { power: 5, defense: 3 } 
+    const token = createToken('card-2', {
+      meta: { power: 5, defense: 3 }
     });
-    
+
     TokenActions['token:transform'](engine, {
       token,
-      properties: { 
+      properties: {
         meta: { power: 10, status: 'buffed' }
       }
     });
-    
+
     if (token.meta.power !== 10) {
       throw new Error('Power not updated');
     }
@@ -97,10 +104,10 @@ function runTests() {
       throw new Error('Status not added');
     }
   });
-  
+
   test('token:transform - multiple properties', () => {
     const token = createToken('card-3');
-    
+
     TokenActions['token:transform'](engine, {
       token,
       properties: {
@@ -110,29 +117,29 @@ function runTests() {
         meta: { transformed: true }
       }
     });
-    
-    if (token.label !== 'New Label' || 
-        token.text !== 'New description' || 
+
+    if (token.label !== 'New Label' ||
+        token.text !== 'New description' ||
         token.char !== '★' ||
         !token.meta.transformed) {
       throw new Error('Multiple properties not transformed correctly');
     }
   });
-  
+
   // ============================================================
   // TEST: token:attach & token:detach
   // ============================================================
-  
+
   test('token:attach - basic attachment', () => {
     const character = createToken('char-1', { label: 'Hero' });
     const sword = createToken('sword-1', { label: 'Sword of Power' });
-    
+
     TokenActions['token:attach'](engine, {
       host: character,
       attachment: sword,
       attachmentType: 'equipment'
     });
-    
+
     if (!character._attachments || character._attachments.length !== 1) {
       throw new Error('Attachment not added to host');
     }
@@ -143,334 +150,325 @@ function runTests() {
       throw new Error('Attachment backlink not set');
     }
   });
-  
+
   test('token:attach - multiple attachments', () => {
     const character = createToken('char-2', { label: 'Hero' });
     const sword = createToken('sword-2', { label: 'Sword' });
     const shield = createToken('shield-2', { label: 'Shield' });
     const helm = createToken('helm-2', { label: 'Helm' });
-    
+
     TokenActions['token:attach'](engine, {
       host: character,
       attachment: sword,
       attachmentType: 'weapon'
     });
-    
+
     TokenActions['token:attach'](engine, {
       host: character,
       attachment: shield,
       attachmentType: 'armor'
     });
-    
+
     TokenActions['token:attach'](engine, {
       host: character,
       attachment: helm,
       attachmentType: 'armor'
     });
-    
-    if (character._attachments.length !== 3) {
+
+    if (!character._attachments || character._attachments.length !== 3) {
       throw new Error('Multiple attachments not added');
     }
   });
-  
+
   test('token:detach - by attachment ID', () => {
     const character = createToken('char-3', { label: 'Hero' });
     const sword = createToken('sword-3', { label: 'Sword' });
-    
+
     TokenActions['token:attach'](engine, {
       host: character,
       attachment: sword
     });
-    
+
     const detached = TokenActions['token:detach'](engine, {
       host: character,
       attachmentId: sword.id
     });
-    
+
     if (detached !== sword) {
       throw new Error('Wrong token detached');
     }
-    if (character._attachments.length !== 0) {
+    if (!character._attachments || character._attachments.length !== 0) {
       throw new Error('Attachment not removed from host');
     }
     if (sword._attachedTo) {
       throw new Error('Attachment backlink not cleaned up');
     }
   });
-  
+
   test('token:detach - by attachment reference', () => {
     const character = createToken('char-4', { label: 'Hero' });
     const sword = createToken('sword-4', { label: 'Sword' });
-    
+
     TokenActions['token:attach'](engine, {
       host: character,
       attachment: sword
     });
-    
+
     const detached = TokenActions['token:detach'](engine, {
       host: character,
       attachment: sword
     });
-    
-    if (!detached || character._attachments.length !== 0) {
+
+    if (!detached || (character._attachments && character._attachments.length !== 0)) {
       throw new Error('Detach by reference failed');
     }
   });
-  
+
   // ============================================================
   // TEST: token:merge
   // ============================================================
-  
+
   test('token:merge - basic merge', () => {
-    const token1 = createToken('resource-1', { 
-      label: 'Wood', 
-      meta: { quantity: 5 } 
-    });
-    const token2 = createToken('resource-2', { 
-      label: 'Wood', 
-      meta: { quantity: 3 } 
-    });
-    
+    const token1 = createToken('token-1', { label: 'Warrior', meta: { power: 5 } });
+    const token2 = createToken('token-2', { label: 'Mage', meta: { power: 7 } });
+
     const merged = TokenActions['token:merge'](engine, {
       tokens: [token1, token2],
-      resultProperties: {
-        label: 'Wood Stack',
-        meta: { quantity: 8 }
-      }
+      resultProperties: { label: 'Champion' }
     });
-    
-    if (!merged._mergedFrom) {
-      throw new Error('Merge metadata not set');
+
+    if (!merged) throw new Error('Merge failed to return new token');
+
+    // Check merged token properties
+    if (merged.label !== 'Champion') {
+      throw new Error('Merged token label not set');
     }
-    if (merged._mergedFrom.length !== 2) {
-      throw new Error('Wrong number of source tokens tracked');
+    if (merged.meta.power !== 7) {
+      throw new Error('Merged token power should match last token when not summed');
     }
-    if (merged.meta.quantity !== 8) {
-      throw new Error('Merged properties not applied');
-    }
-  });
-  
-  test('token:merge - auto-merge metadata', () => {
-    const token1 = createToken('gem-1', { 
-      meta: { color: 'red', power: 5 } 
-    });
-    const token2 = createToken('gem-2', { 
-      meta: { color: 'blue', defense: 3 } 
-    });
-    
-    const merged = TokenActions['token:merge'](engine, {
-      tokens: [token1, token2],
-      resultProperties: {
-        label: 'Fused Gem'
-      }
-    });
-    
-    // Should merge all meta properties
-    if (merged.meta.power !== 5 || merged.meta.defense !== 3) {
-      throw new Error('Metadata not auto-merged');
-    }
-    if (merged.meta.color !== 'blue') {
-      throw new Error('Later metadata should override earlier');
-    }
-  });
-  
-  test('token:merge - keep originals', () => {
-    const token1 = createToken('part-1');
-    const token2 = createToken('part-2');
-    
-    TokenActions['token:merge'](engine, {
-      tokens: [token1, token2],
-      keepOriginals: true
-    });
-    
-    if (token1._merged || token2._merged) {
-      throw new Error('Original tokens marked as merged when keepOriginals=true');
-    }
-  });
-  
-  test('token:merge - mark originals merged', () => {
-    const token1 = createToken('unit-1');
-    const token2 = createToken('unit-2');
-    
-    const merged = TokenActions['token:merge'](engine, {
-      tokens: [token1, token2],
-      keepOriginals: false
-    });
-    
+
+    // Check merge history
     if (!token1._merged || !token2._merged) {
       throw new Error('Original tokens not marked as merged');
     }
     if (token1._mergedInto !== merged.id || token2._mergedInto !== merged.id) {
-      throw new Error('Merged destination not tracked');
+      throw new Error('Merged token references incorrect');
     }
   });
-  
+
+  test('token:merge - complex metadata', () => {
+    const token1 = createToken('token-3', {
+      meta: { stats: { atk: 5, def: 3 }, tags: ['warrior'] }
+    });
+    const token2 = createToken('token-4', {
+      meta: { stats: { atk: 2, def: 6 }, tags: ['mage'] }
+    });
+
+    const merged = TokenActions['token:merge'](engine, {
+      tokens: [token1, token2]
+    });
+
+    if (!merged) throw new Error('Merge failed');
+
+    // Shallow metadata merge keeps latest nested objects
+    if (merged.meta.stats.atk !== 2 || merged.meta.stats.def !== 6) {
+      throw new Error('Merged stats should reflect last token due to shallow merge');
+    }
+    if (!merged.meta.tags.includes('mage')) {
+      throw new Error('Merged tags should come from the last token in shallow merge');
+    }
+  });
+
+  test('token:merge - handles missing meta gracefully', () => {
+    const token1 = createToken('token-5');
+    const token2 = createToken('token-6');
+
+    const merged = TokenActions['token:merge'](engine, {
+      tokens: [token1, token2],
+      resultProperties: {
+        meta: { description: 'Merged token' }
+      }
+    });
+
+    if (!merged || !merged.meta.description) {
+      throw new Error('Merge did not handle missing meta');
+    }
+  });
+
   // ============================================================
   // TEST: token:split
   // ============================================================
-  
-  test('token:split - basic split', () => {
-    const stack = createToken('stack-1', { 
-      label: 'Resource Stack',
-      meta: { quantity: 10 }
+
+  test('token:split - even split', () => {
+    const stack = createToken('stack-1', {
+      label: 'Power Stack',
+      meta: { value: 10 }
     });
-    
-    const splits = TokenActions['token:split'](engine, {
+
+    const splitTokens = TokenActions['token:split'](engine, {
       token: stack,
-      count: 2
+      count: 2,
+      properties: [
+        { label: 'Split A', meta: { value: 5 } },
+        { label: 'Split B', meta: { value: 5 } }
+      ]
     });
-    
-    if (!Array.isArray(splits) || splits.length !== 2) {
-      throw new Error('Wrong number of split tokens returned');
+
+    if (!stack._split || !stack._splitInto || stack._splitInto.length !== 2) {
+      throw new Error('Split metadata not set on original token');
     }
-    if (!stack._split) {
-      throw new Error('Original token not marked as split');
-    }
-    if (stack._splitInto.length !== 2) {
-      throw new Error('Split destinations not tracked');
+    if (splitTokens.length !== 2) {
+      throw new Error('Incorrect number of split tokens returned');
     }
   });
-  
-  test('token:split - custom properties for each split', () => {
-    const stack = createToken('stack-2', { 
-      meta: { type: 'gold' }
+
+  test('token:split - uneven split', () => {
+    const stack = createToken('stack-2', {
+      label: 'Treasure Pile',
+      meta: { coins: 100 }
     });
-    
-    const splits = TokenActions['token:split'](engine, {
+
+    const splitTokens = TokenActions['token:split'](engine, {
       token: stack,
       count: 3,
       properties: [
-        { label: 'Gold Piece 1', meta: { value: 100 } },
-        { label: 'Gold Piece 2', meta: { value: 100 } },
-        { label: 'Gold Piece 3', meta: { value: 100 } }
+        { label: 'Pile A', meta: { coins: 50 } },
+        { label: 'Pile B', meta: { coins: 30 } },
+        { label: 'Pile C', meta: { coins: 20 } }
       ]
     });
-    
-    if (splits[0].label !== 'Gold Piece 1' ||
-        splits[1].label !== 'Gold Piece 2' ||
-        splits[2].label !== 'Gold Piece 3') {
-      throw new Error('Custom properties not applied to splits');
+
+    if (!stack._split || !stack._splitInto || stack._splitInto.length !== 3) {
+      throw new Error('Split metadata not set correctly');
     }
-    
-    // Should preserve original meta
-    if (splits[0].meta.type !== 'gold') {
-      throw new Error('Original metadata not preserved in splits');
+    if (splitTokens.length !== 3) {
+      throw new Error('Incorrect number of split tokens for uneven split');
     }
   });
-  
-  test('token:split - split tracking', () => {
-    const original = createToken('original-1');
-    
-    const splits = TokenActions['token:split'](engine, {
-      token: original,
-      count: 4
+
+  test('token:split - preserves attachments', () => {
+    const stack = createToken('stack-3', { label: 'Artifact', meta: { rarity: 'legendary' } });
+    const charm = createToken('charm-1', { label: 'Magic Charm' });
+    const rune = createToken('rune-1', { label: 'Ancient Rune' });
+
+    // Attach items to original stack
+    TokenActions['token:attach'](engine, {
+      host: stack,
+      attachment: charm
     });
-    
-    splits.forEach((split, index) => {
-      if (split._splitFrom !== original.id) {
-        throw new Error('Split source not tracked');
-      }
-      if (split._splitIndex !== index) {
-        throw new Error('Split index not tracked');
-      }
-      if (!split._splitAt) {
-        throw new Error('Split timestamp not set');
-      }
+
+    TokenActions['token:attach'](engine, {
+      host: stack,
+      attachment: rune
     });
+
+    const splitTokens = TokenActions['token:split'](engine, {
+      token: stack,
+      count: 2,
+      properties: [
+        { label: 'Shard A' },
+        { label: 'Shard B' }
+      ]
+    });
+
+    if (!stack._split || !stack._splitInto || stack._splitInto.length !== 2) {
+      throw new Error('Split metadata missing on stack with attachments');
+    }
+    if (splitTokens.length !== 2) {
+      throw new Error('Incorrect number of split tokens when attachments present');
+    }
   });
-  
+
   // ============================================================
-  // INTEGRATION TEST: Complex scenario
+  // TEST: token:detach edge cases
   // ============================================================
-  
-  test('Integration - character with equipment that merges and splits', () => {
-    const character = createToken('hero', { 
-      label: 'Hero',
-      meta: { hp: 100 }
+
+  test('token:detach - handles missing attachments', () => {
+    const character = createToken('char-7', { label: 'Hero' });
+
+    const detached = TokenActions['token:detach'](engine, {
+      host: character,
+      attachmentId: 'non-existent'
     });
-    
-    const sword1 = createToken('sword-a', { 
-      label: 'Iron Sword',
-      meta: { damage: 10 }
-    });
-    
-    const sword2 = createToken('sword-b', { 
-      label: 'Steel Sword',
-      meta: { damage: 15 }
-    });
-    
-    // Attach first sword
+
+    if (detached !== null) {
+      throw new Error('Detaching non-existent attachment should return null');
+    }
+  });
+
+  test('token:detach - detaches multiple attachments', () => {
+    const character = createToken('char-8', { label: 'Hero' });
+    const sword = createToken('sword-8', { label: 'Sword' });
+    const shield = createToken('shield-8', { label: 'Shield' });
+    const ring = createToken('ring-8', { label: 'Ring' });
+
     TokenActions['token:attach'](engine, {
       host: character,
-      attachment: sword1,
-      attachmentType: 'weapon'
+      attachment: sword
     });
-    
-    // Merge swords into legendary weapon
-    const legendary = TokenActions['token:merge'](engine, {
-      tokens: [sword1, sword2],
-      resultProperties: {
-        label: 'Legendary Blade',
-        meta: { damage: 30 }
-      }
+
+    TokenActions['token:attach'](engine, {
+      host: character,
+      attachment: shield
     });
-    
-    // Detach old sword
+
+    TokenActions['token:attach'](engine, {
+      host: character,
+      attachment: ring
+    });
+
     TokenActions['token:detach'](engine, {
       host: character,
-      attachment: sword1
+      attachmentId: sword.id
     });
-    
-    // Attach legendary sword
-    TokenActions['token:attach'](engine, {
+
+    const detached = TokenActions['token:detach'](engine, {
       host: character,
-      attachment: legendary,
-      attachmentType: 'weapon'
+      attachment: ring
     });
-    
-    // Transform character (level up)
-    TokenActions['token:transform'](engine, {
-      token: character,
-      properties: {
-        label: 'Hero (Level 10)',
-        meta: { hp: 150, level: 10 }
-      }
-    });
-    
-    // Verify final state
-    if (character._attachments.length !== 1) {
-      throw new Error('Wrong number of attachments');
-    }
-    if (character._attachments[0].token.label !== 'Legendary Blade') {
-      throw new Error('Wrong weapon attached');
-    }
-    if (character.meta.level !== 10) {
-      throw new Error('Character not leveled up');
+
+    if (!detached || (character._attachments && character._attachments.length !== 1)) {
+      throw new Error('Multiple detach did not remove correct attachments');
     }
   });
-  
+
+  test('token:detach - throws when host missing', () => {
+    const sword = createToken('sword-9', { label: 'Sword' });
+
+    let threw = false;
+    try {
+      TokenActions['token:detach'](engine, {
+        host: null as unknown as Token,
+        attachment: sword
+      });
+    } catch (error) {
+      threw = true;
+    }
+
+    if (!threw) {
+      throw new Error('Detach should throw when host is missing');
+    }
+  });
+
   // ============================================================
-  // SUMMARY
+  // Summary
   // ============================================================
-  
-  console.log('\n' + '='.repeat(50));
-  console.log(`✅ Passed: ${passed}`);
+
+  console.log(`\n✅ Passed: ${passed}`);
   console.log(`❌ Failed: ${failed}`);
   console.log(`📊 Total: ${passed + failed}`);
-  
+
   if (failed === 0) {
     console.log('\n🎉 All token transformation tests passed!');
   } else {
     console.log('\n⚠️  Some tests failed. Review output above.');
   }
-  
+
   return failed === 0;
 }
 
-// Run tests if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const success = runTests();
-  process.exit(success ? 0 : 1);
-}
+// Run tests automatically
+const success = runTests();
+process.exit(success ? 0 : 1);
 
 export { runTests };

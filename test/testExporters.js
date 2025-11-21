@@ -1,26 +1,20 @@
 /*
- * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * test/testExporters.js
  */
-//./test/testExporters.js
 import { Space } from "../core/Space.js";
 import { Stack } from "../core/Stack.js";
 import { exportSpread, exportSpaceJSON } from "../exporters.js";
+import { Chronicle } from "../core/Chronicle.js"; 
+import { Token } from '../core/Token.js'; // FIX: Import Token
 
 // Setup
-const stack = new Stack([{ label: "Ace of Spades" }, { label: "Two of Hearts" }]);
-const space = new Space();
+const session = new Chronicle(); 
+const stack = new Stack(session, [
+    new Token({ id: "AS", label: "Ace of Spades" }), // FIX: Use Token
+    new Token({ id: "2H", label: "Two of Hearts" })
+]); 
+const space = new Space(session); 
+
 space.defineSpread("Test", [
   { id: "pos1", label: "Position 1" },
   { id: "pos2", label: "Position 2" }

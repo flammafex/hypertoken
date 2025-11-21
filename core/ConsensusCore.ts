@@ -6,6 +6,7 @@ import * as A from "@automerge/automerge";
 import { Chronicle } from "./Chronicle.js";
 import { NetworkInterface } from "../interface/NetworkInterface.js";
 import { Emitter } from "./events.js";
+import { Buffer } from "node:buffer";
 
 export class ConsensusCore extends Emitter {
   session: Chronicle;
@@ -118,7 +119,7 @@ export class ConsensusCore extends Emitter {
     }
   }
 
-  private arrayBufferToBase64(buffer: Uint8Array): string {
+private arrayBufferToBase64(buffer: Uint8Array): string {
     return Buffer.from(buffer).toString("base64");
   }
 

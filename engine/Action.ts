@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,8 @@
  * engine/Action.ts
  */
 import { IAction, IActionPayload } from "../core/types.js";
+// FIX 1: Explicitly import the crypto module for Node.js environments
+import * as crypto from "node:crypto";
 
 export interface ActionOptions {
   seed?: number | null;
@@ -37,7 +39,12 @@ export class Action implements IAction {
     payload: IActionPayload = {}, 
     { seed = null, reversible = true }: ActionOptions = {}
   ) {
-    this.id = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+    // FIX 2: Use the explicitly imported crypto module with a fallback.
+    const generateId = typeof crypto.randomUUID === 'function' 
+      ? crypto.randomUUID() 
+      : `${Date.now()}-${Math.random()}`;
+
+    this.id = generateId;
     this.type = type;
     this.payload = payload;
     this.seed = seed;

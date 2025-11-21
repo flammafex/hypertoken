@@ -7,5 +7,11 @@
     "@automerge/automerge": "^3.2.0",
     "@types/ws": "^8.18.1",
     "ws": "^8.18.3"
+  },
+  "scripts": {
+    "test:token": "node --loader ./test/ts-esm-loader.js test/testTokenActions.js",
+    "test:batch": "node --loader ./test/ts-esm-loader.js test/testBatchActions.js",
+    "test:player-transfers": "node --loader ./test/ts-esm-loader.js test/testPlayerTransfers.js",
+    "test": "npm run test:token && npm run test:batch && npm run test:player-transfers"
   }
 }

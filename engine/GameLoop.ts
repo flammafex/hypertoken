@@ -3,7 +3,7 @@
  */
 import { Emitter } from "../core/events.js";
 import { Engine } from "./Engine.js";
-import { Agent } from "./Agent.js";
+import { Agent } from "./Agent.js"; // This import is necessary for activeAgent's type
 import { Chronicle } from "../core/Chronicle.js";
 import { IGameLoopState } from "../core/types.js";
 
@@ -68,15 +68,13 @@ export class GameLoop extends Emitter {
     // 2. Detect Start
     if (!this._lastState.running && current.running) {
       this.emit("loop:start", { payload: { turn: current.turn } });
-      // In auto-mode, we'd trigger _runCycle here. 
-      // In manual-mode (blackjack), we just emit the event.
     }
 
     // 3. Detect Turn/Agent Change
     if (current.turn !== this._lastState.turn || 
         current.activeAgentIndex !== this._lastState.activeAgentIndex) {
        
-       const agent = this.activeAgent;
+       const agent = this.activeAgent; // This line needs the getter defined below
        this.emit("turn:changed", { 
         payload: { 
           turn: current.turn, 
@@ -100,7 +98,8 @@ export class GameLoop extends Emitter {
         doc.gameLoop.activeAgentIndex = 0; 
       }
     });
-    // _syncState will catch this and emit loop:start
+    // FIX 1: Explicitly emit start events now
+    this._syncState();
   }
 
   stop(reason = "manual") {
@@ -110,7 +109,8 @@ export class GameLoop extends Emitter {
         doc.gameLoop.phase = "stopped";
       }
     });
-    // _syncState will catch this and emit loop:stop
+    // FIX 2: Explicitly emit stop events now
+    this._syncState();
   }
 
   nextTurn() {
@@ -119,10 +119,14 @@ export class GameLoop extends Emitter {
       doc.gameLoop.turn++;
       doc.gameLoop.activeAgentIndex = (doc.gameLoop.activeAgentIndex + 1) % this.engine._agents.length;
     });
+    // FIX 3: Explicitly emit turn change events now
+    this._syncState();
   }
 
+  // FIX 4: This entire getter must be present for compilation to pass
   get activeAgent(): Agent | null {
     const idx = this.activeAgentIndex;
+    // Check Agent import is resolved here, otherwise the Agent type won't work
     if (idx >= 0 && idx < this.engine._agents.length) {
       return this.engine._agents[idx];
     }

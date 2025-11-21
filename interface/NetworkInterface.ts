@@ -4,7 +4,7 @@
  */
 import { Emitter } from "../core/events.js";
 import { Engine } from "../engine/Engine.js";
-import WebSocket from "ws";
+import * as Ws from "ws";
 
 // Message Types
 export interface NetworkMessage {
@@ -31,19 +31,21 @@ export class NetworkInterface extends Emitter {
     this.connected = false;
   }
 
-  connect(): void {
-    // Use 'ws' in Node, native WebSocket in browser
-    const WS = typeof WebSocket !== 'undefined' ? WebSocket : (global as any).WebSocket;
+   connect(): void {
+    // FIX 2: Check for Node's 'ws' constructor (Ws.WebSocket) first, otherwise fall back to browser global
+    const WS = typeof Ws.WebSocket !== 'undefined' ? Ws.WebSocket : (global as any).WebSocket;
+    
     this.socket = new WS(this.url);
 
     if (!this.socket) return;
 
-    // Use standard 'on' pattern if available (Node/ws), fall back to addEventListener (Browser)
-    if (typeof this.socket.on === 'function') {
-      this.socket.on('open', () => this._onOpen());
-      this.socket.on('message', (data: any) => this._handleMessageData(data));
-      this.socket.on('close', () => this._onClose());
-      this.socket.on('error', (err: any) => this._onError(err));
+// Use standard 'on' pattern if available (Node/ws), fall back to addEventListener (Browser)
+    // FIX: Use type assertion to silence the TypeScript error while keeping runtime check
+    if (typeof (this.socket as any).on === 'function') {
+      (this.socket as any).on('open', () => this._onOpen());
+      (this.socket as any).on('message', (data: any) => this._handleMessageData(data));
+      (this.socket as any).on('close', () => this._onClose());
+      (this.socket as any).on('error', (err: any) => this._onError(err));
     } else {
       this.socket.addEventListener("open", () => this._onOpen());
       this.socket.addEventListener("message", (ev: any) => this._handleMessageEvent(ev));

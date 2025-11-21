@@ -235,6 +235,20 @@ export const SourceActions = {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 export const AgentActions = {
+  // Normalize how we access token inventories across agents
+  _getInventory(agent: any, createIfMissing: boolean = false): any[] | null {
+    if (!agent) return null;
+    if (agent.inventory) return agent.inventory;
+    if (agent.hand) return agent.hand;
+
+    if (createIfMissing) {
+      agent.inventory = [];
+      return agent.inventory;
+    }
+
+    return null;
+  },
+
   "agent:create": (engine: Engine, { name, controllerLogic = null, meta = {} }: AgentPayload = {}) => {
     if (!name) throw new Error("Agent name required");
     if (!engine._agents) engine._agents = [];
@@ -352,18 +366,22 @@ export const AgentActions = {
     
     if (!sourceAgent) throw new Error(`Agent ${from} not found`);
     if (!targetAgent) throw new Error(`Agent ${to} not found`);
-    
+
     if (token) {
-      if (!sourceAgent.inventory) sourceAgent.inventory = [];
-      if (!targetAgent.inventory) targetAgent.inventory = [];
-      
-      const tokenIndex = sourceAgent.inventory.indexOf(token);
+      const sourceTokens = AgentActions._getInventory(sourceAgent);
+      const targetTokens = AgentActions._getInventory(targetAgent, true);
+
+      if (!sourceTokens || !sourceTokens.includes(token)) {
+        throw new Error(`Agent ${from} does not have this token`);
+      }
+
+      const tokenIndex = sourceTokens.indexOf(token);
       if (tokenIndex === -1) {
         throw new Error(`Agent ${from} does not have this token`);
       }
-      
-      sourceAgent.inventory.splice(tokenIndex, 1);
-      targetAgent.inventory.push(token);
+
+      sourceTokens.splice(tokenIndex, 1);
+      targetTokens!.push(token);
       
       if (!engine._transactions) engine._transactions = [];
       engine._transactions.push({
@@ -423,8 +441,11 @@ export const AgentActions = {
     const offer2 = agent2.offer;
     
     // Check agent1's offer
+    const p1Inventory = AgentActions._getInventory(p1);
+    const p2Inventory = AgentActions._getInventory(p2);
+
     if (offer1.token) {
-      if (!p1.inventory || !p1.inventory.includes(offer1.token)) {
+      if (!p1Inventory || !p1Inventory.includes(offer1.token)) {
         throw new Error(`${agent1.name} does not have offered token`);
       }
     } else if (offer1.resource) {
@@ -434,10 +455,10 @@ export const AgentActions = {
         throw new Error(`${agent1.name} only has ${available} ${offer1.resource}`);
       }
     }
-    
+
     // Check agent2's offer
     if (offer2.token) {
-      if (!p2.inventory || !p2.inventory.includes(offer2.token)) {
+      if (!p2Inventory || !p2Inventory.includes(offer2.token)) {
         throw new Error(`${agent2.name} does not have offered token`);
       }
     } else if (offer2.resource) {
@@ -450,20 +471,20 @@ export const AgentActions = {
     
   // Execution
     if (offer1.token) {
-      const idx = p1.inventory.indexOf(offer1.token);
-      p1.inventory.splice(idx, 1);
-      if (!p2.inventory) p2.inventory = [];
-      p2.inventory.push(offer1.token);
+      const idx = p1Inventory!.indexOf(offer1.token);
+      p1Inventory!.splice(idx, 1);
+      const targetInventory = AgentActions._getInventory(p2, true)!;
+      targetInventory.push(offer1.token);
     } else if (offer1.resource) {
       p1.resources[offer1.resource] -= offer1.amount;
       p2.resources[offer1.resource] = (p2.resources[offer1.resource] || 0) + offer1.amount;
     }
-    
+
     if (offer2.token) {
-      const idx = p2.inventory.indexOf(offer2.token);
-      p2.inventory.splice(idx, 1);
-      if (!p1.inventory) p1.inventory = [];
-      p1.inventory.push(offer2.token);
+      const idx = p2Inventory!.indexOf(offer2.token);
+      p2Inventory!.splice(idx, 1);
+      const targetInventory = AgentActions._getInventory(p1, true)!;
+      targetInventory.push(offer2.token);
     } else if (offer2.resource) {
       p2.resources[offer2.resource] -= offer2.amount;
       p1.resources[offer2.resource] = (p1.resources[offer2.resource] || 0) + offer2.amount;
@@ -502,14 +523,16 @@ export const AgentActions = {
     }
     
     if (token) {
-      if (!victimAgent.inventory) victimAgent.inventory = [];
-      if (!thiefAgent.inventory) thiefAgent.inventory = [];
-      
-      const tokenIndex = victimAgent.inventory.indexOf(token);
+      const victimInventory = AgentActions._getInventory(victimAgent);
+      const thiefInventory = AgentActions._getInventory(thiefAgent, true);
+
+      if (!victimInventory) throw new Error(`Agent ${from} does not have this token`);
+
+      const tokenIndex = victimInventory.indexOf(token);
       if (tokenIndex === -1) throw new Error(`Agent ${from} does not have this token`);
-      
-      victimAgent.inventory.splice(tokenIndex, 1);
-      thiefAgent.inventory.push(token);
+
+      victimInventory.splice(tokenIndex, 1);
+      thiefInventory!.push(token);
       
       if (!engine._transactions) engine._transactions = [];
       engine._transactions.push({ type: 'steal_token', from, to, token: token.id, timestamp: Date.now() });
@@ -688,19 +711,25 @@ export const TokenActions = {
   BATCH/QUERY OPERATIONS (5 actions)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
+const extractTokens = (placements: readonly any[] = []): IToken[] => {
+  return placements
+    .map((p: any) => p?.tokenSnapshot || p?.token || p?.card || p)
+    .filter(Boolean);
+};
+
 export const BatchActions = {
   "tokens:filter": (engine: Engine, { tokens = [], predicate, source = null }: BatchPayload = {}) => {
     if (!predicate || typeof predicate !== 'function') throw new Error("Predicate function required");
-    
+
     let tokensToFilter = tokens;
     if (source === 'stack' && engine.stack) {
       tokensToFilter = engine.stack.tokens || [];
     } else if (source === 'space' && engine.space) {
       // @ts-ignore - Engine.space is typed but methods might not be fully typed yet
-      tokensToFilter = engine.space.allCards() || [];
+      tokensToFilter = extractTokens(engine.space.cards());
     } else if (source && engine.space) {
       // @ts-ignore
-      tokensToFilter = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToFilter = extractTokens(engine.space.zone(source));
     }
     
     const filtered = tokensToFilter.filter(predicate);
@@ -716,10 +745,10 @@ export const BatchActions = {
       tokensToProcess = engine.stack.tokens || [];
     } else if (source === 'space' && engine.space) {
       // @ts-ignore
-      tokensToProcess = engine.space.allCards() || [];
+      tokensToProcess = extractTokens(engine.space.cards());
     } else if (source && engine.space) {
       // @ts-ignore
-      tokensToProcess = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToProcess = extractTokens(engine.space.zone(source));
     }
     
     const results: any[] = [];
@@ -742,15 +771,15 @@ export const BatchActions = {
     
     sources.forEach(source => {
       let tokensFromSource: IToken[] = [];
-      
+
       if (source === 'stack' && engine.stack) {
         tokensFromSource = engine.stack.tokens || [];
       } else if (source === 'space' && engine.space) {
         // @ts-ignore
-        tokensFromSource = engine.space.allCards();
+        tokensFromSource = extractTokens(engine.space.cards());
       } else if (source === 'discard' && engine.stack) {
         tokensFromSource = engine.stack.discards || [];
-      } else if (source === 'source; && engine.source') {
+      } else if (source === 'source' && engine.source) {
         // @ts-ignore
         if (engine.source._stacks) {
           // @ts-ignore
@@ -761,8 +790,7 @@ export const BatchActions = {
       } else if (engine.space) {
         // @ts-ignore
         const zone = engine.space.zone(source);
-        // @ts-ignore
-        tokensFromSource = zone.map((p: any) => p.token || p.card);
+        tokensFromSource = extractTokens(zone);
       }
       
       collected.push(...tokensFromSource);
@@ -786,10 +814,10 @@ export const BatchActions = {
       tokensToCount = engine.stack.tokens || [];
     } else if (source === 'space' && engine.space) {
       // @ts-ignore
-      tokensToCount = engine.space.allCards() || [];
+      tokensToCount = extractTokens(engine.space.cards());
     } else if (source && engine.space) {
       // @ts-ignore
-      tokensToCount = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToCount = extractTokens(engine.space.zone(source));
     }
     
     if (!predicate) return tokensToCount.length;
@@ -807,10 +835,10 @@ export const BatchActions = {
       tokensToSearch = engine.stack.tokens || [];
     } else if (source === 'space' && engine.space) {
       // @ts-ignore
-      tokensToSearch = engine.space.allCards() || [];
+      tokensToSearch = extractTokens(engine.space.cards());
     } else if (source && engine.space) {
       // @ts-ignore
-      tokensToSearch = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToSearch = extractTokens(engine.space.zone(source));
     }
     
     const found = tokensToSearch.find(predicate);

@@ -4,6 +4,7 @@
 import * as A from "@automerge/automerge";
 import { Emitter } from "./events.js";
 import { HyperTokenState } from "./types.js";
+import { Buffer } from "node:buffer";
 
 export class Chronicle extends Emitter {
   private _doc: A.Doc<HyperTokenState>;
@@ -46,7 +47,7 @@ export class Chronicle extends Emitter {
     this.emit("state:changed", { doc: this._doc, source: "load" });
   }
 
-  saveToBase64(): string {
+saveToBase64(): string {
     const bytes = this.save();
     return Buffer.from(bytes).toString('base64');
   }
