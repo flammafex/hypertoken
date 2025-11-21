@@ -117,7 +117,7 @@ HyperToken is designed for two distinct audiences: creators building games and r
 ### Installation
 
 ```bash
-git clone [https://git.carpocratian.org/sibyl/hypertoken.git](https://git.carpocratian.org/sibyl/hypertoken.git)
+git clone https://git.carpocratian.org/sibyl/hypertoken.git
 cd hypertoken
 npm install
 npx tsc
