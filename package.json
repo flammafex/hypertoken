@@ -9,8 +9,8 @@
     "ws": "^8.18.3"
   },
   "scripts": {
-    "test:token": "node --loader ./test/ts-esm-loader.js test/testTokenActions.js",
-    "test:batch": "node --loader ./test/ts-esm-loader.js test/testBatchActions.js",
+    "test:token": "node --loader ./test/ts-esm-loader.js test/testTokenActions.ts",
+    "test:batch": "node --loader ./test/ts-esm-loader.js test/testBatchActions.ts",
     "test:player-transfers": "node --loader ./test/ts-esm-loader.js test/testPlayerTransfers.js",
     "test": "npm run test:token && npm run test:batch && npm run test:player-transfers"
   }

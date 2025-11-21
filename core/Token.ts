@@ -33,6 +33,18 @@ export class Token implements IToken {
   _tags?: Set<string>;
   _attachments?: any[];
   _attachedTo?: string;
+  _attachmentType?: string;
+
+  // Merge/split bookkeeping
+  _merged?: boolean;
+  _mergedInto?: string;
+  _mergedFrom?: string[];
+  _mergedAt?: number;
+  _split?: boolean;
+  _splitInto?: string[];
+  _splitFrom?: string;
+  _splitIndex?: number;
+  _splitAt?: number;
 
   constructor({ 
     id, 

@@ -711,7 +711,7 @@ export const TokenActions = {
   BATCH/QUERY OPERATIONS (5 actions)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-const extractTokens = (placements: any[] = []): IToken[] => {
+const extractTokens = (placements: readonly any[] = []): IToken[] => {
   return placements
     .map((p: any) => p?.tokenSnapshot || p?.token || p?.card || p)
     .filter(Boolean);
@@ -779,7 +779,7 @@ export const BatchActions = {
         tokensFromSource = extractTokens(engine.space.cards());
       } else if (source === 'discard' && engine.stack) {
         tokensFromSource = engine.stack.discards || [];
-      } else if (source === 'source; && engine.source') {
+      } else if (source === 'source' && engine.source) {
         // @ts-ignore
         if (engine.source._stacks) {
           // @ts-ignore
