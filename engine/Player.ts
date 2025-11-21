@@ -41,7 +41,7 @@ import { Table } from "../core/Table.js";
 import { Shoe } from "../core/Shoe.js";
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
-
+import { SessionManager } from "../core/SessionManager.js";
 export interface IAgent {
   think: (engine: Engine, player: Player) => Promise<any>;
 }
@@ -70,7 +70,7 @@ export class Player extends Emitter {
   turns: number;
   resources: Record<string, number> = {}; // Added this based on your action usage
 
-  constructor(name: string, { deck = null, table = null, shoe = null, meta = {}, agent = null }: PlayerOptions = {}) {
+constructor(name: string, { deck = null, table = null, shoe = null, meta = {}, agent = null }: PlayerOptions = {}) {
     super();
 
     this.name = name;
@@ -84,7 +84,17 @@ export class Player extends Emitter {
       this.deck = deck;
     }
 
-    this.table = table ?? new Table(`${name}-table`);
+    // Fix: Instantiate a local SessionManager for the player's private table
+    if (table) {
+      this.table = table;
+    } else {
+      // We need to import SessionManager here or pass it in options.
+      // Assuming we imported it at top of file: import { SessionManager } from "../core/SessionManager.js";
+      const session = new SessionManager();
+      this.table = new Table(session, `${name}-table`);
+    }
+    
+    this.shoe = shoe;
     this.shoe = shoe;
 
     this.hand = [];

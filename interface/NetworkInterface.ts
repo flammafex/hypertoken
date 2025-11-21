@@ -1,36 +1,27 @@
 /*
- * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// ./interface/NetworkInterface.js
-// Deterministic socket bridge for ad-hoc LAN or remote multiplayer.
-//
-// This module defines both the client-side interface (NetworkInterface)
-// and an optional minimal host/relay (RelayServer).
-
-/*
  * interface/NetworkInterface.ts
+ * Robust handling for both Node (ws) and Browser (WebSocket) environments.
  */
-// @ts-ignore
 import { Emitter } from "../core/events.js";
 import { Engine } from "../engine/Engine.js";
+import WebSocket from "ws";
+
+// Message Types
+export interface NetworkMessage {
+  type: string;
+  payload?: any;
+  targetPeerId?: string;
+  fromPeerId?: string;
+}
 
 export class NetworkInterface extends Emitter {
   url: string;
   engine: Engine | null;
   socket: WebSocket | null;
   connected: boolean;
+  
+  peerId: string | null = null;
+  peers: Set<string> = new Set();
 
   constructor(url: string, engine: Engine | null = null) {
     super();
@@ -41,146 +32,109 @@ export class NetworkInterface extends Emitter {
   }
 
   connect(): void {
-    this.socket = new WebSocket(this.url);
+    // Use 'ws' in Node, native WebSocket in browser
+    const WS = typeof WebSocket !== 'undefined' ? WebSocket : (global as any).WebSocket;
+    this.socket = new WS(this.url);
 
-    this.socket.addEventListener("open", () => {
-      this.connected = true;
-      this.emit("net:connected");
-      if (this.engine) this.syncDescribe(); // pull initial state
-    });
+    if (!this.socket) return;
 
-    this.socket.addEventListener("message", (ev) => this._handleMessage(ev));
-    this.socket.addEventListener("close", () => {
-      this.connected = false;
-      this.emit("net:disconnected");
-    });
-
-    this.socket.addEventListener("error", (err) => {
-      this.emit("net:error", { payload: { error: err } });
-    });
+    // Use standard 'on' pattern if available (Node/ws), fall back to addEventListener (Browser)
+    if (typeof this.socket.on === 'function') {
+      this.socket.on('open', () => this._onOpen());
+      this.socket.on('message', (data: any) => this._handleMessageData(data));
+      this.socket.on('close', () => this._onClose());
+      this.socket.on('error', (err: any) => this._onError(err));
+    } else {
+      this.socket.addEventListener("open", () => this._onOpen());
+      this.socket.addEventListener("message", (ev: any) => this._handleMessageEvent(ev));
+      this.socket.addEventListener("close", () => this._onClose());
+      this.socket.addEventListener("error", (err: any) => this._onError(err));
+    }
   }
 
   disconnect(): void {
-    if (this.socket && this.connected) this.socket.close();
+    if (this.socket) this.socket.close();
   }
 
-  describe(): void {
-    this._send({ cmd: "describe" });
+  sendToPeer(targetPeerId: string, payload: any): void {
+    this._send({ type: "p2p", targetPeerId, payload });
   }
 
-  dispatch(type: string, payload: any = {}): void {
-    this._send({ cmd: "dispatch", type, payload });
+  broadcast(type: string, payload: any = {}): void {
+    this._send({ type, payload });
   }
 
-  syncDescribe(): void {
-    this.describe();
-  }
-
-  private _send(msg: any): void {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+  private _send(msg: Partial<NetworkMessage>): void {
+    if (!this.socket || this.socket.readyState !== 1) return;
     this.socket.send(JSON.stringify(msg));
   }
 
-  private _handleMessage(ev: MessageEvent): void {
-    try {
-      const data = JSON.parse(ev.data);
+  // --- Event Handlers ---
 
-      switch (data.cmd) {
-        case "describe":
-          this.emit("engine:state", { payload: data.state });
-          // @ts-ignore - applySnapshot is dynamic/optional on Engine
-          if (this.engine && this.engine.applySnapshot)
-            // @ts-ignore
-            this.engine.applySnapshot(data.state);
+  private _onOpen() {
+    this.connected = true;
+    this.emit("net:connected");
+  }
+
+  private _onClose() {
+    this.connected = false;
+    this.peers.clear();
+    this.emit("net:disconnected");
+  }
+
+  private _onError(err: any) {
+    this.emit("net:error", { payload: { error: err } });
+  }
+
+  // Browser-style event wrapper
+  private _handleMessageEvent(ev: any) {
+    this._handleMessageData(ev.data);
+  }
+
+  // Core logic handling raw data string/buffer
+  private _handleMessageData(data: any) {
+    try {
+      const str = data.toString(); // Convert buffer to string if necessary
+      const msg = JSON.parse(str);
+
+      // DEBUG LOG: Uncomment if needed to trace raw traffic
+      // if (msg.type !== 'p2p') console.log(`[Net In] ${msg.type}`); 
+
+      switch (msg.type) {
+        case "welcome":
+          this.peerId = msg.peerId;
+          this.emit("net:ready", { peerId: this.peerId });
           break;
 
-        case "dispatch":
-          this.emit("engine:action", { payload: data });
+        case "peer:joined":
+          if (msg.peerId !== this.peerId) {
+            this.peers.add(msg.peerId);
+            this.emit("net:peer:connected", { peerId: msg.peerId });
+          }
+          break;
+
+        case "peer:left":
+          this.peers.delete(msg.peerId);
+          this.emit("net:peer:disconnected", { peerId: msg.peerId });
+          break;
+
+        case "p2p":
+          this.emit("net:message", { 
+            ...msg.payload, 
+            fromPeerId: msg.fromPeerId 
+          });
           break;
 
         case "error":
-          this.emit("net:error", { payload: data });
+          this.emit("net:error", msg);
           break;
 
         default:
-          this.emit("net:message", { payload: data });
+          this.emit("net:message", msg);
           break;
       }
     } catch (err) {
-      this.emit("net:error", { payload: { error: err } });
-    }
-  }
-}
-
-/*───────────────────────────────────────────────────────────────
-  RelayServer (host)
-───────────────────────────────────────────────────────────────*/
-export class RelayServer extends Emitter {
-  engine: Engine;
-  port: number;
-  verbose: boolean;
-  clients: Set<any>; // WebSocket objects
-  wss: any;
-
-  constructor(engine: Engine, { port = 8080, verbose = false } = {}) {
-    super();
-    this.engine = engine;
-    this.port = port;
-    this.verbose = verbose;
-    this.clients = new Set();
-  }
-
-  start(): void {
-    // Use dynamic import so this file works in both browser and Node
-    // @ts-ignore
-    import("ws").then(({ WebSocketServer }) => {
-      const wss = new WebSocketServer({ port: this.port });
-      if (this.verbose) console.log(`🌐 RelayServer running on ws://localhost:${this.port}`);
-
-      wss.on("connection", (ws: any) => {
-        this.clients.add(ws);
-        if (this.verbose) console.log("Client connected");
-
-        ws.on("message", (msg: any) => this._handle(ws, msg));
-        ws.on("close", () => this.clients.delete(ws));
-      });
-
-      this.wss = wss;
-    });
-  }
-
-  stop(): void {
-    if (this.wss) this.wss.close();
-    this.clients.clear();
-  }
-
-  private _broadcast(cmd: string, payload: any): void {
-    const msg = JSON.stringify({ cmd, ...payload });
-    for (const c of this.clients) c.send(msg);
-  }
-
-  private _handle(ws: any, msg: any): void {
-    try {
-      const data = JSON.parse(msg);
-      const { cmd, type, payload } = data;
-
-      if (cmd === "describe") {
-        const state = this.engine.describe();
-        ws.send(JSON.stringify({ cmd: "describe", state }));
-        return;
-      }
-
-      if (cmd === "dispatch") {
-        this.engine.dispatch(type, payload);
-        // Re-broadcast state or action to all clients
-        const state = this.engine.describe();
-        this._broadcast("describe", { state });
-        return;
-      }
-
-      ws.send(JSON.stringify({ cmd: "error", message: "Unknown command" }));
-    } catch (err: any) {
-      ws.send(JSON.stringify({ cmd: "error", message: err.message }));
+      console.error("Network parse error", err);
     }
   }
 }

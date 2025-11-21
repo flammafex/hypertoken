@@ -12,33 +12,15 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+/*
+ * core/Table.ts
  */
-
-// @ts-ignore
 import { Emitter } from "./events.js";
-// @ts-ignore
-import { shuffleArray } from "./random.js";
-import { IToken } from "./types.js";
+import { SessionManager } from "./SessionManager.js";
+import { IPlacementCRDT, IToken } from "./types.js";
 import { Deck } from "./Deck.js";
-import { Shoe } from "./Shoe.js"; 
+import { Shoe } from "./Shoe.js";
 
-// Interface for objects stored in Table zones
-export interface IPlacement {
-  id: string;
-  token: IToken;
-  card: IToken; // alias for backward compatibility
-  x: number | null;
-  y: number | null;
-  faceUp: boolean;
-  label: string | null;
-  ts: number;
-  reversed: boolean;
-  // Optional properties added by specific layout methods
-  offset?: number;
-  _tags?: Set<string>;
-}
-
-// Interface for Spread definitions
 export interface SpreadZone {
   id: string;
   x?: number;
@@ -47,500 +29,402 @@ export interface SpreadZone {
 }
 
 export class Table extends Emitter {
+  private session: SessionManager;
   name: string;
-  zones: Map<string, IPlacement[]>;
-  log: any[];
   spreads: Record<string, SpreadZone[]> = {};
-  _lockedZones?: Set<string>;
+  _lockedZones: Set<string> = new Set();
+  log: any[] = [];
 
-  constructor(name: string = "session") {
+  constructor(session: SessionManager, name: string = "table") {
     super();
+    this.session = session;
     this.name = name;
-    this.zones = new Map();
-    this.log = [];
   }
 
-  // Always ensure a valid zone array exists and return it
-  zone(name: string): IPlacement[] {
-    if (!this.zones.has(name)) this.zones.set(name, []);
-    return this.zones.get(name)!;
+  // --- HELPERS ---
+
+  // Helper to sanitize token data for CRDT
+  private _sanitizeToken(token: IToken): any {
+    // 1. Convert Class instance to Plain Object
+    const plain = { ...token };
+    
+    // 2. Handle Sets (Automerge doesn't support Set)
+    if (plain._tags instanceof Set) {
+      // @ts-ignore
+      plain._tags = Array.from(plain._tags);
+    }
+    
+    // 3. Remove any other non-serializable fields if necessary
+    // A quick way to ensure CRDT safety is JSON cycle:
+    return JSON.parse(JSON.stringify(plain));
+  }
+
+  get zones(): string[] {
+    // Fix: Check if zones exists
+    return this.session.state.zones ? Object.keys(this.session.state.zones) : [];
+  }
+
+  toJSON(): any {
+    return {
+      name: this.name,
+      zones: this.session.state.zones || {},
+      log: this.log
+    };
+  }
+
+  snapshot(): any {
+    return this.toJSON();
+  }
+
+  // --- READ METHODS ---
+
+  zone(name: string): readonly IPlacementCRDT[] {
+    // Fix: Check if zones exists
+    return this.session.state.zones?.[name] || [];
+  }
+
+  zoneCount(name: string): number {
+    return this.zone(name).length;
+  }
+
+  cards(zoneName?: string): readonly IPlacementCRDT[] {
+    if (zoneName) return this.zone(zoneName);
+    // Fix: Handle missing zones object
+    if (!this.session.state.zones) return [];
+    return Object.values(this.session.state.zones).flat();
+  }
+
+  findCard(idOrFn: string | ((p: IPlacementCRDT) => boolean)): IPlacementCRDT | null {
+    const all = this.cards();
+    if (typeof idOrFn === "function") {
+      return all.find(idOrFn) || null;
+    }
+    return all.find(p => p.id === idOrFn) || null;
   }
 
   _isLocked(name: string): boolean {
-    return !!this._lockedZones?.has(name);
+    return this._lockedZones.has(name);
   }
 
-  place(zoneName: string, token: IToken, { x = null, y = null, faceUp = true, label = null }: Partial<IPlacement> = {}): IPlacement | null {
+  // --- WRITE METHODS ---
+
+place(zoneName: string, token: IToken, opts: Partial<IPlacementCRDT> = {}): IPlacementCRDT | null {
     if (this._isLocked(zoneName)) return null;
 
-    const placement: IPlacement = {
-      id: crypto?.randomUUID?.() || String(Date.now() + Math.random()),
-      token,                // new neutral property
-      card: token,          // backward-compat alias
-      x, y, faceUp,
-      label,
+    // SANITIZE: Convert Token instance to pure JSON data for Automerge
+    const safeToken = this._sanitizeToken(token);
+
+    const placement: IPlacementCRDT = {
+      id: crypto.randomUUID(),
+      tokenId: token.id,
+      tokenSnapshot: safeToken, // Use the sanitized version
+      x: opts.x ?? 0,
+      y: opts.y ?? 0,
+      faceUp: opts.faceUp ?? true,
+      label: opts.label ?? null,
       ts: Date.now(),
-      reversed: !!token._rev
+      reversed: !!token._rev,
+      tags: []
     };
-    this.zone(zoneName).push(placement);
+
+    this.session.change(`place card in ${zoneName}`, (doc) => {
+      if (!doc.zones) doc.zones = {};
+      if (!doc.zones[zoneName]) doc.zones[zoneName] = [];
+      doc.zones[zoneName].push(placement);
+    });
+
     this.log.push({ t: "place", zoneName, placementId: placement.id });
     this.emit("place", placement);
     return placement;
   }
 
-  move(fromZone: string, toZone: string, placement: IPlacement, { x = placement.x, y = placement.y }: { x?: number | null; y?: number | null } = {}): IPlacement {
-    if (this._isLocked(fromZone) || this._isLocked(toZone)) return placement;
-    const from = this.zone(fromZone);
-    const idx = from.indexOf(placement);
-    if (idx >= 0) from.splice(idx, 1);
-    
-    placement.x = x; 
-    placement.y = y;
-    
-    this.zone(toZone).push(placement);
-    this.log.push({ t: "move", fromZone, toZone, placementId: placement.id });
-    this.emit("move", { from, to: this.zone(toZone), placement });
-    return placement;
-  }
+  move(fromZone: string, toZone: string, placementId: string, opts: { x?: number; y?: number } = {}): void {
+    if (this._isLocked(fromZone) || this._isLocked(toZone)) return;
 
-  flip(zoneName: string, placement: IPlacement, faceUp: boolean = !placement.faceUp): IPlacement {
-    if (this._isLocked(zoneName)) return placement;
-    placement.faceUp = faceUp;
-    this.log.push({ t: "flip", zoneName, placementId: placement.id, faceUp });
-    this.emit("flip", placement);
-    return placement;
-  }
+    this.session.change(`move card from ${fromZone} to ${toZone}`, (doc) => {
+      if (!doc.zones) return; // Cannot move if no zones exist
+      const from = doc.zones[fromZone];
+      if (!from) return;
 
-  remove(zoneName: string, placement: IPlacement): IPlacement | null {
-    if (this._isLocked(zoneName)) return null;
-    const arr = this.zone(zoneName);
-    if (!arr) return null;
-    const i = arr.indexOf(placement);
-    if (i >= 0) arr.splice(i, 1);
-    this.log.push({ t: "remove", zoneName, placementId: placement.id });
-    this.emit("remove", placement);
-    return placement;
-  }
+      const idx = from.findIndex(p => p.id === placementId);
+      if (idx === -1) return;
 
-  snapshot(): any {
-    return JSON.parse(JSON.stringify({
-      name: this.name,
-      zones: [...this.zones.entries()],
-      log: this.log,
-    }));
-  }
+      const [placement] = from.splice(idx, 1);
+      
+      if (opts.x !== undefined) placement.x = opts.x;
+      if (opts.y !== undefined) placement.y = opts.y;
 
-  toJSON(): any {
-    return this.snapshot();
-  }
-
-  clear(): void { 
-    this.zones.clear(); 
-    this.log = []; 
-    this.emit("clear"); 
-  }
-
-  /** Return all placement objects (optionally from a specific zone). */
-  cards(zoneName: string | null = null): IPlacement[] {
-    if (zoneName) return (this.zones.get(zoneName) || []).slice();
-    return Array.from(this.zones.values()).flat();
-  }
-
-  /** Return all card objects (stripped of placement wrappers). */
-  allCards(): IToken[] {
-    return this.cards().map(p => p.card);
-  }
-
-  /** Find a placement by ID or by predicate function. */
-  findCard(idOrFn: string | ((p: IPlacement) => boolean)): IPlacement | null {
-    for (const [, arr] of this.zones) {
-      for (const p of arr) {
-        if (typeof idOrFn === "function") {
-          if (idOrFn(p)) return p;
-        } else {
-          if (p.id === idOrFn) return p;
-        }
-      }
-    }
-    return null;
-  }
-
-  /** Return an array of placements matching a predicate. */
-  where(fn: (p: IPlacement) => boolean): IPlacement[] {
-    return this.cards().filter(fn);
-  }
-
-  /** Count how many cards in a zone. */
-  zoneCount(name: string): number {
-    return (this.zones.get(name) || []).length;
-  }
-
-  /** Rename a zone while preserving its contents. */
-  renameZone(oldName: string, newName: string): void {
-    if (!this.zones.has(oldName)) return;
-    const cards = this.zones.get(oldName)!;
-    this.zones.set(newName, cards);
-    this.zones.delete(oldName);
-    this.log.push({ t: "renameZone", oldName, newName, ts: Date.now() });
-    this.emit("renameZone", { oldName, newName });
-  }
-
-  /** Merge zones into a new or existing zone. */
-  mergeZones(zoneA: string, zoneB: string, dest: string): void {
-    const a = this.zones.get(zoneA) || [];
-    const b = this.zones.get(zoneB) || [];
-    this.zones.set(dest, [...(this.zones.get(dest) || []), ...a, ...b]);
-    this.zones.delete(zoneA);
-    this.zones.delete(zoneB);
-    this.log.push({ t: "mergeZones", zoneA, zoneB, dest, ts: Date.now() });
-  }
-
-  /** Clear a single zone. */
-  clearZone(name: string): this {
-    if (this._isLocked(name)) return this;
-    if (this.zones.has(name)) this.zones.set(name, []);
-    this.log.push({ t: "clearZone", name, ts: Date.now() });
-    this.emit("clearZone", { name });
-    return this;
-  }
-
-  /** Return the last N actions from the table log. */
-  history({ last = null }: { last?: number | null } = {}): any[] {
-    return last ? this.log.slice(-last) : this.log.slice();
-  }
-
-  /** Return the most recent action of a given type (e.g., "place"). */
-  lastActionOf(type: string): any {
-    for (let i = this.log.length - 1; i >= 0; i--) {
-      if (this.log[i].t === type) return this.log[i];
-    }
-    return null;
-  }
-
-  /** Undo the most recent placement / movement (very basic). */
-  undoLast(): any {
-    const last = this.log.pop();
-    if (!last) return null;
-
-    if (last.t === "place") {
-      const arr = this.zones.get(last.zoneName);
-      if (arr) {
-        const idx = arr.findIndex(p => p.id === last.placementId);
-        if (idx >= 0) arr.splice(idx, 1);
-      }
-    } else if (last.t === "move") {
-      const toArr = this.zones.get(last.toZone);
-      if (toArr) {
-        const placement = toArr.find(p => p.id === last.placementId);
-        if (placement) {
-          toArr.splice(toArr.indexOf(placement), 1);
-          this.zone(last.fromZone).push(placement);
-        }
-      }
-    }
-    return last;
-  }
-
-  /** Shuffle cards within a zone (useful for piles). */
-  shuffleZone(name: string, seed: number | null = null): this {
-    if (this._isLocked(name)) return this;
-    const arr = this.zones.get(name);
-    if (!arr) return this;
-    // @ts-ignore - random.js untyped
-    shuffleArray(arr, seed);
-    this.log.push({ t: "shuffleZone", name, ts: Date.now() });
-    return this;
-  }
-
-  /** Fan cards within a zone (assigns x,y in simple arc pattern). */
-  fan(zoneName: string, { radius = 100, angleStep = 15, startAngle = 0 } = {}): this {
-    if (this._isLocked(zoneName)) return this;
-    const arr = this.zones.get(zoneName);
-    if (!arr) return this;
-    arr.forEach((p, i) => {
-      const angle = (startAngle + i * angleStep) * Math.PI / 180;
-      p.x = Math.cos(angle) * radius;
-      p.y = Math.sin(angle) * radius;
+      if (!doc.zones[toZone]) doc.zones[toZone] = [];
+      doc.zones[toZone].push(placement);
     });
-    this.log.push({ t: "fan", zoneName, ts: Date.now() });
-    return this;
+
+    this.log.push({ t: "move", fromZone, toZone, placementId });
+    this.emit("move", { fromZone, toZone, placementId });
   }
 
-  // ─── Spreads ─────────────────────────────────────────────────
-  defineSpread(name: string, zones: SpreadZone[]): this {
-    if (!this.spreads) this.spreads = {};
-    this.spreads[name] = zones;
-    return this;
-  }
+  flip(zoneName: string, placementId: string, faceUp?: boolean): void {
+    if (this._isLocked(zoneName)) return;
 
-  /** Return defined spread names */
-  listSpreads(): string[] {
-    return Object.keys(this.spreads || {});
-  }
-
-  /** Delete a spread definition */
-  removeSpread(name: string): void {
-    if (this.spreads) delete this.spreads[name];
-  }
-
-  /**
-   * Deal cards into a spread from a Deck or Shoe.
-   */
-  dealSpread(name: string, source: Deck | Shoe, { faceUp = true } = {}): IPlacement[] {
-    const pattern = this.spreads?.[name];
-    if (!pattern) throw new Error(`Spread "${name}" not defined.`);
-    const placed: IPlacement[] = [];
-
-    for (const zone of pattern) {
-      const card = source.draw() as IToken | undefined; // Cast because Shoe might return Token[]
-      if (!card) break;
-      const p = this.place(zone.id, card, {
-        x: zone.x ?? null,
-        y: zone.y ?? null,
-        faceUp,
-        label: zone.label ?? zone.id
-      });
-      if (p) placed.push(p);
-    }
-
-    this.emit?.("dealSpread", { name, placed });
-    return placed;
-  }
-
-  clearSpread(name: string): this {
-    const pattern = this.spreads?.[name];
-    if (!pattern) return this;
-    const ids = new Set(pattern.map(z => z.id));
-    for (const [zone] of this.zones) {
-      if (ids.has(zone)) this.zones.set(zone, []);
-    }
-    this.emit?.("clearSpread", { name });
-    return this;
-  }
-
-  /*───────────────────────────────────────────────────────────────
-    TABLE PILE + RETURN UTILITIES
-  ───────────────────────────────────────────────────────────────*/
-
-  /** Always return a valid pile array for a zone. */
-  pile(name: string): IPlacement[] {
-    return this.zone(name);
-  }
-
-  /** Peek at top card(s) of a zone pile. */
-  peekZone(name: string, n: number = 1): IPlacement | IPlacement[] | null {
-    const pile = this.pile(name);
-    if (n === 1) return pile[pile.length - 1] || null;
-    return pile.slice(-n).reverse();
-  }
-
-  /** Draw (remove) top card(s) from a zone pile. */
-  drawFromZone(name: string, n: number = 1): IPlacement[] {
-    const pile = this.pile(name);
-    const drawn: IPlacement[] = [];
-    for (let i = 0; i < n && pile.length; i++) {
-      const p = pile.pop();
-      if (p) drawn.push(p);
-    }
-    this.emit?.("drawFromZone", { zone: name, count: drawn.length, cards: drawn });
-    return drawn;
-  }
-
-  /** Push card(s) onto a zone pile (acts like a mini deck). */
-  pushToZone(name: string, cards: IPlacement | IPlacement[]): IPlacement[] {
-    const pile = this.pile(name);
-    const arr = Array.isArray(cards) ? cards : [cards];
-    for (const c of arr) pile.push(c);
-    this.emit?.("pushToZone", { zone: name, count: arr.length });
-    return pile;
-  }
-
-  /** Return specific card(s) from a zone back onto the deck top or bottom. */
-  returnToDeck(deck: Deck, zoneName: string, n: number = 1, { toTop = true } = {}): IToken[] {
-    const pile = this.pile(zoneName);
-    const moved: IToken[] = [];
-    for (let i = 0; i < n && pile.length; i++) {
-      const placement = pile.pop();
-      if (!placement) break;
-      
-      // @ts-ignore - Deck helpers (pushTop/pushBottom) are added in extended versions or mixins
-      if (toTop && deck.pushTop) deck.pushTop(placement.card);
-      // @ts-ignore
-      else if (!toTop && deck.pushBottom) deck.pushBottom(placement.card);
-      else if (toTop) deck._stack.push(placement.card);
-      else deck._stack.unshift(placement.card);
-      
-      moved.push(placement.card);
-      
-      // @ts-ignore - Helper methods
-      if (deck.removeFromDrawn) deck.removeFromDrawn(placement.card);
-      // @ts-ignore
-      if (deck.removeFromDiscards) deck.removeFromDiscards(placement.card);
-    }
-    this.emit?.("returnToDeck", { zone: zoneName, count: moved.length });
-    return moved;
-  }
-
-  /** Shuffle all cards from a zone back into the deck. */
-  shuffleZoneIntoDeck(deck: Deck, zoneName: string): number {
-    const pile = this.pile(zoneName);
-    const cards = pile.splice(0, pile.length).map(p => p.card);
-    deck._stack.push(...cards);
-    deck.shuffle();
-    this.emit?.("shuffleZoneIntoDeck", { zone: zoneName, count: cards.length });
-    return cards.length;
-  }
-
-  /** Move all cards from one zone to another (table→table). */
-  transferZone(fromZone: string, toZone: string): number {
-    const drawn = this.drawFromZone(fromZone, this.pile(fromZone).length);
-    const cards = drawn.map(p => p.card);
-    // Re-wrap cards into placements
-    const placements: IPlacement[] = cards.map(card => ({
-      id: crypto?.randomUUID?.() || String(Date.now() + Math.random()),
-      token: card,
-      card: card,
-      x: null,
-      y: null,
-      faceUp: true,
-      label: toZone,
-      ts: Date.now(),
-      reversed: !!card._rev
-    }));
-    this.pushToZone(toZone, placements);
-    this.emit?.("transferZone", { fromZone, toZone, count: cards.length });
-    return cards.length;
-  }
-
-  /** Collect all cards from all zones back into a deck and shuffle. */
-  collectAllInto(deck: Deck, { includeEmpty = false } = {}): number {
-    let total = 0;
-    for (const [, arr] of this.zones) {
-      if (!includeEmpty && !arr.length) continue;
-      for (const p of arr) {
-        deck._stack.push(p.card);
-        // @ts-ignore
-        if (deck.removeFromDrawn) deck.removeFromDrawn(p.card);
-        // @ts-ignore
-        if (deck.removeFromDiscards) deck.removeFromDiscards(p.card);
+    this.session.change(`flip card in ${zoneName}`, (doc) => {
+      if (!doc.zones) return;
+      const zone = doc.zones[zoneName];
+      if (!zone) return;
+      const placement = zone.find(p => p.id === placementId);
+      if (placement) {
+        placement.faceUp = faceUp !== undefined ? faceUp : !placement.faceUp;
       }
-      arr.length = 0;
-      total++;
-    }
-    deck.shuffle();
-    this.emit?.("collectAllInto", { zones: total });
-    return total;
+    });
+
+    this.log.push({ t: "flip", zoneName, placementId, faceUp });
+    this.emit("flip", { id: placementId, faceUp });
   }
 
-  static fromSnapshot(snap: any): Table {
-    const t = new Table(snap?.name ?? "session");
-    t.log = Array.isArray(snap?.log) ? snap.log.slice() : [];
-    t.zones = new Map(snap?.zones?.map(([name, arr]: [string, any[]]) => [name, arr.map(p => ({ ...p }))]) ?? []);
-    return t;
+  remove(zoneName: string, placementId: string): void {
+    if (this._isLocked(zoneName)) return;
+
+    this.session.change(`remove card from ${zoneName}`, (doc) => {
+      if (!doc.zones) return;
+      const zone = doc.zones[zoneName];
+      if (zone) {
+        const idx = zone.findIndex(p => p.id === placementId);
+        if (idx >= 0) zone.splice(idx, 1);
+      }
+    });
+
+    this.log.push({ t: "remove", zoneName, placementId });
+    this.emit("remove", { id: placementId });
   }
 
-  // Methods required by ActionRegistry (createZone, deleteZone, etc.)
-  // These were added in your actions-extended but existed on Table instances in JS.
+  clear(): void {
+    this.session.change("clear table", (doc) => {
+      doc.zones = {};
+    });
+    this.log = [];
+    this.emit("clear");
+  }
 
   createZone(id: string, { label = id, x = 0, y = 0 } = {}): this {
-    if (!id) return this;
-    if (this.zones.has(id)) return this;
-    this.zones.set(id, []);
+    this.session.change(`create zone ${id}`, (doc) => {
+      if (!doc.zones) doc.zones = {};
+      if (!doc.zones[id]) doc.zones[id] = [];
+    });
     this.emit("zone:created", { payload: { id, label, x, y } });
     return this;
   }
 
   deleteZone(id: string): this {
-    if (!this.zones.has(id)) return this;
-    this.zones.delete(id);
+    this.session.change(`delete zone ${id}`, (doc) => {
+      if (doc.zones) delete doc.zones[id];
+    });
     this.emit("zone:deleted", { payload: { id } });
     return this;
   }
 
-  moveMany(fromZone: string, toZone: string, count: number, { preserveOrder = true } = {}): IPlacement[] {
-    const from = this.zone(fromZone);
-    const to = this.zone(toZone);
-    if (!from.length || count <= 0) return [];
-
-    const moved = from.splice(-count, count);
-    if (preserveOrder) moved.reverse();
-    to.push(...moved);
-
-    this.emit("placements:moved", {
-      payload: { fromZone, toZone, count: moved.length, preserveOrder }
+  clearZone(name: string): this {
+    if (this._isLocked(name)) return this;
+    this.session.change(`clear zone ${name}`, (doc) => {
+      if (doc.zones) doc.zones[name] = [];
     });
-    return moved;
-  }
-
-  swapZones(a: string, b: string): this {
-    if (!this.zones.has(a) || !this.zones.has(b)) return this;
-    const tmp = this.zones.get(a)!;
-    this.zones.set(a, this.zones.get(b)!);
-    this.zones.set(b, tmp);
-    this.emit("zones:swapped", { payload: { a, b } });
-    return this;
-  }
-
-  stackZone(id: string): this {
-    const arr = this.zone(id);
-    arr.forEach((p, i) => { p.x = 0; p.y = 0; p.offset = i; });
-    this.emit("zone:stacked", { payload: { id, count: arr.length } });
-    return this;
-  }
-
-  spreadZone(id: string, { pattern = "linear", angleStep = 15, radius = 100 } = {}): this {
-    const arr = this.zone(id);
-    if (!arr.length) return this;
-
-    if (pattern === "arc") {
-      arr.forEach((p, i) => {
-        const a = (i - arr.length / 2) * angleStep * Math.PI / 180;
-        p.x = Math.cos(a) * radius;
-        p.y = Math.sin(a) * radius;
-      });
-    } else {
-      arr.forEach((p, i) => { p.x = i * angleStep; p.y = 0; });
-    }
-
-    this.emit("zone:spread", {
-      payload: { id, pattern, count: arr.length, angleStep, radius }
-    });
+    this.emit("clearZone", { name });
     return this;
   }
 
   lockZone(id: string, locked = true): this {
-    const zone = this.zone(id);
-    if (!zone) return this;
     if (!this._lockedZones) this._lockedZones = new Set();
     locked ? this._lockedZones.add(id) : this._lockedZones.delete(id);
     this.emit("zone:locked", { payload: { id, locked } });
     return this;
   }
 
-  query(fn: (p: IPlacement, zone: string) => boolean): IPlacement[] {
-    const results: IPlacement[] = [];
-    for (const [zone, arr] of this.zones) {
-      for (const p of arr) if (fn(p, zone)) results.push(p);
-    }
-    this.emit("table:query", { payload: { results: results.length } });
-    return results;
+  transferZone(fromZone: string, toZone: string): number {
+    if (this._isLocked(fromZone) || this._isLocked(toZone)) return 0;
+    let count = 0;
+    this.session.change(`transfer ${fromZone} to ${toZone}`, (doc) => {
+      if (!doc.zones) return;
+      const from = doc.zones[fromZone];
+      if (!from || from.length === 0) return;
+      
+      if (!doc.zones[toZone]) doc.zones[toZone] = [];
+      
+      const items = from.splice(0, from.length);
+      doc.zones[toZone].push(...items);
+      count = items.length;
+    });
+    this.emit("transferZone", { fromZone, toZone, count });
+    return count;
   }
 
-  tagPlacement(idOrPlacement: string | IPlacement, tags: string | string[]): this {
-    const placement = typeof idOrPlacement === "string"
-      ? this.findCard(idOrPlacement)
-      : idOrPlacement;
-    if (!placement) return this;
-    const arr = Array.isArray(tags) ? tags : [tags];
-    if (!placement._tags) placement._tags = new Set();
-    arr.forEach(t => placement._tags!.add(t));
-    this.emit("placement:tagged", { payload: { id: placement.id, tags: arr } });
+  fan(zoneName: string, opts: any = {}): void {
+    this.spreadZone(zoneName, { pattern: "arc", ...opts });
+  }
+
+  stackZone(id: string): this {
+    if (this._isLocked(id)) return this;
+    this.session.change(`stack zone ${id}`, (doc) => {
+      if (!doc.zones) return;
+      const arr = doc.zones[id];
+      if (arr) {
+        arr.forEach(p => { p.x = 0; p.y = 0; });
+      }
+    });
+    this.emit("zone:stacked", { payload: { id } });
     return this;
   }
 
-  findPlacementByTag(tag: string): IPlacement[] {
-    const results = this.query(p => !!p._tags?.has(tag));
-    this.emit("placement:findByTag", { payload: { tag, count: results.length } });
-    return results;
+  spreadZone(id: string, { pattern = "linear", angleStep = 15, radius = 100 } = {}): this {
+    if (this._isLocked(id)) return this;
+    this.session.change(`spread zone ${id}`, (doc) => {
+      if (!doc.zones) return;
+      const arr = doc.zones[id];
+      if (!arr) return;
+      
+      if (pattern === "arc") {
+        arr.forEach((p, i) => {
+          const a = (i - arr.length / 2) * angleStep * Math.PI / 180;
+          p.x = Math.cos(a) * radius;
+          p.y = Math.sin(a) * radius;
+        });
+      } else {
+        arr.forEach((p, i) => { 
+          p.x = i * angleStep; 
+          p.y = 0; 
+        });
+      }
+    });
+    this.emit("zone:spread", { payload: { id, pattern } });
+    return this;
+  }
+
+  shuffleZone(name: string, seed?: number | null): void {
+    if (this._isLocked(name)) return;
+    const items = [...this.zone(name)];
+    if (!items.length) return;
+    
+    items.sort(() => Math.random() - 0.5);
+
+    this.session.change(`shuffle zone ${name}`, (doc) => {
+      if (!doc.zones) doc.zones = {};
+      doc.zones[name] = items;
+    });
+    this.log.push({ t: "shuffleZone", name, ts: Date.now() });
+  }
+
+  pile(name: string): readonly IPlacementCRDT[] {
+    return this.zone(name);
+  }
+
+  peekZone(name: string, n: number = 1): IPlacementCRDT | IPlacementCRDT[] | null {
+    const pile = this.zone(name);
+    if (pile.length === 0) return null;
+    if (n === 1) return pile[pile.length - 1];
+    return pile.slice(-n).reverse();
+  }
+
+  drawFromZone(name: string, n: number = 1): IPlacementCRDT[] {
+    if (this._isLocked(name)) return [];
+    let drawn: IPlacementCRDT[] = [];
+    this.session.change(`draw ${n} from ${name}`, (doc) => {
+      if (!doc.zones) return;
+      const zone = doc.zones[name];
+      if (zone && zone.length > 0) {
+        const amount = Math.min(n, zone.length);
+        drawn = zone.splice(zone.length - amount, amount);
+      }
+    });
+    drawn.reverse();
+    this.emit("drawFromZone", { zone: name, count: drawn.length });
+    return drawn;
+  }
+
+  pushToZone(name: string, cards: IPlacementCRDT | IPlacementCRDT[]): void {
+    if (this._isLocked(name)) return;
+    const arr = Array.isArray(cards) ? cards : [cards];
+    if (arr.length === 0) return;
+
+    this.session.change(`push ${arr.length} to ${name}`, (doc) => {
+      if (!doc.zones) doc.zones = {};
+      if (!doc.zones[name]) doc.zones[name] = [];
+      doc.zones[name].push(...arr);
+    });
+    this.emit("pushToZone", { zone: name, count: arr.length });
+  }
+
+  returnToDeck(deck: Deck, zoneName: string, n: number = 1, { toTop = true } = {}): IToken[] {
+    const removedPlacements = this.drawFromZone(zoneName, n);
+    const tokens = removedPlacements.map(p => p.tokenSnapshot);
+    if (toTop) {
+        // @ts-ignore
+        tokens.forEach(t => deck._stack.push(t)); 
+    } else {
+        // @ts-ignore
+        tokens.forEach(t => deck._stack.unshift(t));
+    }
+    this.emit("returnToDeck", { zone: zoneName, count: tokens.length });
+    return tokens;
+  }
+
+  collectAllInto(deck: Deck, { includeEmpty = false } = {}): number {
+    let total = 0;
+    const zonesToClear: string[] = [];
+    
+    for (const zoneName of this.zones) {
+      const pile = this.zone(zoneName);
+      if (!includeEmpty && pile.length === 0) continue;
+      
+      pile.forEach(p => {
+        // @ts-ignore
+        deck._stack.push(p.tokenSnapshot);
+        total++;
+      });
+      zonesToClear.push(zoneName);
+    }
+
+    if (zonesToClear.length > 0) {
+      this.session.change("collect all to deck", (doc) => {
+        if (!doc.zones) return;
+        zonesToClear.forEach(z => doc.zones![z] = []);
+      });
+    }
+
+    deck.shuffle();
+    this.emit("collectAllInto", { zones: total });
+    return total;
+  }
+
+  defineSpread(name: string, zones: SpreadZone[]): this {
+    this.spreads[name] = zones;
+    return this;
+  }
+
+  dealSpread(name: string, source: Deck | Shoe, { faceUp = true } = {}): void {
+    const pattern = this.spreads[name];
+    if (!pattern) throw new Error(`Spread "${name}" not defined.`);
+    
+    for (const zone of pattern) {
+      const card = source.draw() as IToken | undefined;
+      if (!card) break;
+      this.place(zone.id, card, {
+        x: zone.x ?? null,
+        y: zone.y ?? null,
+        faceUp,
+        label: zone.label ?? zone.id
+      });
+    }
+    this.emit("dealSpread", { name });
+  }
+
+  clearSpread(name: string): this {
+    const pattern = this.spreads?.[name];
+    if (!pattern) return this;
+    const ids = new Set(pattern.map(z => z.id));
+    
+    this.session.change(`clear spread ${name}`, (doc) => {
+      if (!doc.zones) return;
+      Object.keys(doc.zones).forEach(zone => {
+        if (ids.has(zone)) doc.zones![zone] = [];
+      });
+    });
+    this.emit("clearSpread", { name });
+    return this;
   }
 }

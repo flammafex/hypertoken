@@ -1,3 +1,7 @@
+/*
+ * core/types.ts
+ */
+
 export type TokenId = string;
 
 export interface TokenMeta {
@@ -14,14 +18,12 @@ export interface IToken {
   kind: string;
   index: number;
   
-  // Runtime properties
   _rev?: boolean;
   _tags?: Set<string>;
   _attachments?: any[]; 
   _attachedTo?: string;
   _attachmentType?: string;
 
-  // Merge/Split tracking (Added for future action compatibility)
   _merged?: boolean;
   _mergedInto?: string;
   _mergedFrom?: string[];
@@ -33,7 +35,6 @@ export interface IToken {
   _splitAt?: number;
 }
 
-// Added: Needed for Deck.ts
 export interface ReversalPolicy {
   enabled: boolean;
   chance: number;
@@ -50,4 +51,27 @@ export interface IAction {
   seed?: number | null;
   reversible?: boolean;
   timestamp?: number;
+}
+
+export interface IPlacementCRDT {
+  id: string;
+  tokenId: string;
+  tokenSnapshot: IToken;
+  x: number | null;
+  y: number | null;
+  faceUp: boolean;
+  label: string | null;
+  ts: number;
+  reversed: boolean;
+  tags: string[];
+}
+
+// Fix: Make properties optional for lazy initialization
+export interface HyperTokenState {
+  zones?: Record<string, IPlacementCRDT[]>;
+  deck?: IToken[];
+  players?: Record<string, any>;
+  version?: string;
+  
+  [key: string]: any;
 }

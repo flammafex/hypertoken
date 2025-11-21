@@ -104,7 +104,7 @@ export const TableActions = {
     const placement = engine.table.findCard(placementId);
     if (!placement) throw new Error(`Placement ${placementId} not found`);
     
-    engine.table.move(fromZone, toZone, placement);
+    engine.table.move(fromZone, toZone, placement.id);
   },
   
   "table:flip": (engine: Engine, { zone, placementId, faceUp = null }: TablePayload = {}) => {
@@ -127,7 +127,7 @@ export const TableActions = {
     const placement = engine.table.findCard(placementId);
     if (!placement) throw new Error(`Placement ${placementId} not found`);
     
-    engine.table.remove(zone, placement);
+    engine.table.remove(zone, placement.id);
   },
   
   "table:createZone": (engine: Engine, { id, label, x = 0, y = 0 }: TablePayload = {}) => {
