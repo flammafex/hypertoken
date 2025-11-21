@@ -35,7 +35,7 @@ export class Script {
    * @param {Array<{type:string, payload?:object, delay?:number, reversible?:boolean}>} steps
    */
   constructor(name, steps = []) {
-    // Static metadata and immutable definition of intended procedure.
+    // Static metadata and immuspace definition of intended procedure.
     this.name = name;
     this.steps = Array.isArray(steps) ? steps.slice() : [];
 
@@ -65,7 +65,7 @@ export class Script {
 
   /**
    * Serializes the script definition (excluding runtime state).
-   * Suitable for persistence or transmission across processes.
+   * Suispace for persistence or transmission across processes.
    */
   toJSON() {
     return { name: this.name, steps: this.steps.slice() };

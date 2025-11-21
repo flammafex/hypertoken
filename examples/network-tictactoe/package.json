@@ -1,7 +1,7 @@
 {
   "name": "hypertoken-network-tictactoe",
   "version": "1.0.0",
-  "description": "Network multiplayer tic-tac-toe demonstrating HyperToken's real-time capabilities",
+  "description": "Network multiagent tic-tac-toe demonstrating HyperToken's real-time capabilities",
   "type": "module",
   "main": "game.js",
   "scripts": {
@@ -11,7 +11,7 @@
   },
   "keywords": [
     "hypertoken",
-    "multiplayer",
+    "multiagent",
     "websocket",
     "tic-tac-toe",
     "game",

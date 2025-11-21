@@ -23,7 +23,7 @@ function printBanner() {
 function printGameState(state) {
   console.log('\n' + '─'.repeat(50));
   console.log(`\n🎴 DEALER: ${state.dealerHand.display}`);
-  console.log(`\n🎴 PLAYER: ${state.playerHand.display}`);
+  console.log(`\n🎴 PLAYER: ${state.agentHand.display}`);
   console.log('\n' + '─'.repeat(50));
 }
 
@@ -36,12 +36,12 @@ async function playRound(game) {
   printGameState(state);
   
   // Check for immediate blackjack
-  if (state.playerHand.blackjack) {
+  if (state.agentHand.blackjack) {
     console.log('\n' + game.getResultMessage());
     return;
   }
   
-  // Player's turn
+  // Agent's turn
   while (state.canHit || state.canStand) {
     console.log('\nWhat would you like to do?');
     
@@ -60,7 +60,7 @@ async function playRound(game) {
       printBanner();
       printGameState(state);
       
-      if (state.playerHand.busted) {
+      if (state.agentHand.busted) {
         console.log('\n💥 BUST! You went over 21.');
         console.log(game.getResultMessage());
         return;
@@ -94,7 +94,7 @@ async function main() {
   const seedAnswer = await rl.question('Enter a seed for deterministic play (or press Enter for random): ');
   const seed = seedAnswer.trim() ? parseInt(seedAnswer) : null;
   
-  const game = new BlackjackGame({ numDecks: 6, seed });
+  const game = new BlackjackGame({ numStacks: 6, seed });
   
   let playing = true;
   

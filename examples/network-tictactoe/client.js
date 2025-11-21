@@ -96,9 +96,9 @@ function handleMessage(msg) {
     
     // Auto-register if not registered yet
     if (!mySymbol && gameState) {
-      if (!gameState.players.X) {
+      if (!gameState.agents.X) {
         registerAs('X');
-      } else if (!gameState.players.O) {
+      } else if (!gameState.agents.O) {
         registerAs('O');
       } else {
         console.log('⚠️  Game is full. Spectator mode.\n');
@@ -114,7 +114,7 @@ function handleMessage(msg) {
 }
 
 /**
- * Register as a player
+ * Register as a agent
  */
 function registerAs(symbol) {
   mySymbol = symbol;
@@ -136,7 +136,7 @@ function makeMove(position) {
   }
   
   if (!mySymbol) {
-    console.log('⚠️  You are not registered as a player');
+    console.log('⚠️  You are not registered as a agent');
     return;
   }
   
@@ -145,7 +145,7 @@ function makeMove(position) {
     return;
   }
   
-  if (gameState.currentPlayer !== mySymbol) {
+  if (gameState.currentAgent !== mySymbol) {
     console.log('⚠️  Not your turn!');
     return;
   }
@@ -194,7 +194,7 @@ function updateDisplay() {
 function showPrompt() {
   if (!connected) return;
   
-  if (gameState && !gameState.gameOver && gameState.currentPlayer === mySymbol) {
+  if (gameState && !gameState.gameOver && gameState.currentAgent === mySymbol) {
     rl.question('Your move (0-8, or "help"): ', handleInput);
   } else {
     rl.question('(type "help" for commands): ', handleInput);

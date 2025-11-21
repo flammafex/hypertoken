@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 /*
- * core/Shoe.ts
+ * core/Source.ts
  */
 // @ts-ignore
 import { Emitter } from "./events.js";
 // @ts-ignore
 import { mulberry32, shuffleArray } from "./random.js";
-import { Deck } from "./Deck.js";
+import { Stack } from "./Stack.js";
 import { IToken } from "./types.js";
 
 export interface ReshufflePolicy {
@@ -28,49 +28,49 @@ export interface ReshufflePolicy {
   mode: "auto" | "manual";
 }
 
-export class Shoe extends Emitter {
-  _decks: Deck[];
+export class Source extends Emitter {
+  _stacks: Stack[];
   _stack: IToken[];
   _original: IToken[];
   _burned: IToken[];
   _reshufflePolicy: ReshufflePolicy;
   _seed: number | null = null;
 
-  constructor(...decks: Deck[]) {
+  constructor(...stacks: Stack[]) {
     super();
-    this._decks = decks;
-    this._stack = decks.flatMap(d => d.tokens ?? []);
+    this._stacks = stacks;
+    this._stack = stacks.flatMap(d => d.tokens ?? []);
     this._original = [...this._stack];
     this._burned = [];
     this._reshufflePolicy = { threshold: null, mode: "auto" };
   }
 
-  addDeck(deck: Deck): this {
-    if (!deck) return this;
-    this._decks.push(deck);
-    this._stack.push(...(deck.tokens ?? []));
+  addStack(stack: Stack): this {
+    if (!stack) return this;
+    this._stacks.push(stack);
+    this._stack.push(...(stack.tokens ?? []));
     this._original = [...this._stack];
-    // @ts-ignore - assuming Deck has name property (it might not in strict types yet)
-    this.emit("shoe:addDeck", { payload: { name: (deck as any).name ?? "(unnamed)" } });
+    // @ts-ignore - assuming Stack has name property (it might not in strict types yet)
+    this.emit("source:addStack", { payload: { name: (stack as any).name ?? "(unnamed)" } });
     return this;
   }
 
-  removeDeck(deck: Deck): this {
-    const idx = this._decks.indexOf(deck);
+  removeStack(stack: Stack): this {
+    const idx = this._stacks.indexOf(stack);
     if (idx < 0) return this;
-    this._decks.splice(idx, 1);
-    // Rebuild stack without this deck's tokens
-    const tokens = this._decks.flatMap(d => d.tokens ?? []);
+    this._stacks.splice(idx, 1);
+    // Rebuild stack without this stack's tokens
+    const tokens = this._stacks.flatMap(d => d.tokens ?? []);
     this._stack = [...tokens];
     this._original = [...this._stack];
-    this.emit("shoe:removeDeck", { payload: { name: (deck as any).name ?? "(unnamed)" } });
+    this.emit("source:removeStack", { payload: { name: (stack as any).name ?? "(unnamed)" } });
     return this;
   }
 
   burn(n: number = 1): IToken[] {
     const burned = this._stack.splice(-n, n);
     this._burned.push(...burned);
-    this.emit("shoe:burn", { payload: { count: burned.length } });
+    this.emit("source:burn", { payload: { count: burned.length } });
     return burned;
   }
 
@@ -83,7 +83,7 @@ export class Shoe extends Emitter {
 
   reshuffleWhen(threshold: number, { mode = "auto" }: { mode?: "auto"|"manual" } = {}): this {
     this._reshufflePolicy = { threshold, mode };
-    this.emit("shoe:policy", { payload: { threshold, mode } });
+    this.emit("source:policy", { payload: { threshold, mode } });
     return this;
   }
 
@@ -93,23 +93,23 @@ export class Shoe extends Emitter {
     if (this._reshufflePolicy.threshold != null &&
         this._stack.length <= this._reshufflePolicy.threshold) {
       this.shuffle();
-      this.emit("shoe:reshuffled", { payload: { reason: "threshold" } });
+      this.emit("source:reshuffled", { payload: { reason: "threshold" } });
     }
     
-    this.emit("shoe:draw", { payload: { count: drawn.length } });
+    this.emit("source:draw", { payload: { count: drawn.length } });
     return n === 1 ? drawn[0] : drawn;
   }
 
   reset(): this {
     this._stack = [...this._original];
     this._burned = [];
-    this.emit("shoe:reset", { payload: { size: this._stack.length } });
+    this.emit("source:reset", { payload: { size: this._stack.length } });
     return this;
   }
 
   inspect(): any {
     return {
-      decks: this._decks?.length ?? 0,
+      stacks: this._stacks?.length ?? 0,
       remaining: this._stack.length,
       burned: this._burned.length,
       seed: this._seed ?? null,
@@ -119,17 +119,17 @@ export class Shoe extends Emitter {
 
   toJSON(): any {
     return {
-      type: "Shoe",
+      type: "Source",
       seed: this._seed ?? null,
-      decks: this._decks.map(d => (d as any).name ?? "(unnamed)"),
+      stacks: this._stacks.map(d => (d as any).name ?? "(unnamed)"),
       stackSize: this._stack.length,
       burned: this._burned.length,
       policy: this._reshufflePolicy
     };
   }
 
-  static fromJSON(obj: any): Shoe {
-    const s = new Shoe();
+  static fromJSON(obj: any): Source {
+    const s = new Source();
     s._seed = obj?.seed ?? null;
     s._stack = new Array(obj?.stackSize ?? 0);
     s._burned = new Array(obj?.burned ?? 0);

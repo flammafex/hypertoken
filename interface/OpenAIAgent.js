@@ -26,10 +26,10 @@ export class OpenAIAgent {
     this.temperature = temperature;
   }
 
-  async think(engine, player) {
+  async think(engine, agent) {
     const snapshot = engine.describe();
     const actions = engine.availableActions?.() ?? [];
-    const payload = { state: snapshot, availableActions: actions, player: player.name };
+    const payload = { state: snapshot, availableActions: actions, agent: agent.name };
 
     const messages = [
       { role: "system", content: this.systemPrompt },
@@ -46,7 +46,7 @@ export class OpenAIAgent {
             type: "function",
             function: {
               name: "dispatchAction",
-              description: "Choose a valid action for the player to execute on the engine.",
+              description: "Choose a valid action for the agent to execute on the engine.",
               parameters: {
                 type: "object",
                 properties: {

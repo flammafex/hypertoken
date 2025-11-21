@@ -6,7 +6,7 @@ A philosophical and interpretive divination system built on the HyperToken frame
 
 The Tarot Reading System transforms the ancient practice of tarot divination into a modern, programmatic interface while preserving the depth and symbolism of traditional readings. It includes:
 
-- **Complete 78-card Rider-Waite-Smith deck** with full Major and Minor Arcana
+- **Complete 78-card Rider-Waite-Smith stack** with full Major and Minor Arcana
 - **8 classic tarot spreads** from simple single-card readings to comprehensive layouts
 - **Interpretive engine** that generates insights based on card positions and patterns
 - **Interactive CLI** for conducting readings
@@ -20,7 +20,7 @@ The system does not claim to predict a fixed future, but rather to illuminate pr
 
 ## Features
 
-### The Deck
+### The Stack
 
 **Major Arcana (22 cards)**: The Fool's Journey through life's great initiations
 - 0. The Fool → XXI. The World
@@ -62,11 +62,11 @@ The system generates multi-layered interpretations:
 ```bash
 # Ensure you have the HyperToken framework
 # Place these files in your HyperToken directory:
-# - tarot-deck.json
+# - tarot-stack.json
 # - tarot-reader.js
 # - tarot-cli.js
 
-# Make the CLI executable
+# Make the CLI execuspace
 chmod +x tarot-cli.js
 
 # Run the interactive CLI
@@ -95,7 +95,7 @@ The CLI provides:
 import { TarotReader } from './tarot-reader.js';
 
 // Initialize the reader
-const reader = new TarotReader('./tarot-deck.json');
+const reader = new TarotReader('./tarot-stack.json');
 await reader.initialize();
 
 // Perform a reading
@@ -199,7 +199,7 @@ Each card is defined with rich metadata:
 Spreads are defined as coordinate-based layouts:
 
 ```javascript
-table.defineSpread('three-card', [
+space.defineSpread('three-card', [
   { id: 'past', x: -150, y: 0, label: 'Past' },
   { id: 'present', x: 0, y: 0, label: 'Present' },
   { id: 'future', x: 150, y: 0, label: 'Future' }
@@ -212,12 +212,12 @@ table.defineSpread('three-card', [
 
 **Constructor**
 ```javascript
-new TarotReader(deckPath = './tarot-deck.json')
+new TarotReader(stackPath = './tarot-stack.json')
 ```
 
 **Methods**
 
-- `async initialize()` - Load and initialize the tarot deck
+- `async initialize()` - Load and initialize the tarot stack
 - `performReading(spreadName, question, options)` - Conduct a reading
   - `spreadName`: String - Name of the spread to use
   - `question`: String|null - Optional question or intention
@@ -265,7 +265,7 @@ The cards do not tell you what will happen. They tell you what **is**—the ener
 
 ```javascript
 // Define your own spread
-table.defineSpread('custom-spread', [
+space.defineSpread('custom-spread', [
   { id: 'pos1', x: 0, y: 0, label: 'Core Issue' },
   { id: 'pos2', x: -100, y: 100, label: 'Hidden Factor' },
   { id: 'pos3', x: 100, y: 100, label: 'Path Forward' }
@@ -301,8 +301,8 @@ The tarot reader is built on HyperToken's modular architecture and can be integr
 ### Dependencies
 
 - HyperToken framework components:
-  - `Table.js` - Card layout and spread management
-  - `Deck.js` - Card collection and shuffling
+  - `Space.js` - Card layout and spread management
+  - `stack.js` - Card collection and shuffling
   - `EventBus.js` - Event-driven architecture
   - `tokenSetLoader.js` - JSON token set loading
 
@@ -326,7 +326,7 @@ All cards comply with the `token-set.schema.json`:
 
 Potential additions to the system:
 
-- [ ] Multiple deck support (Thoth, Marseille, custom decks)
+- [ ] Multiple stack support (Thoth, Marseille, custom stacks)
 - [ ] Visualization/rendering of spreads
 - [ ] Journal and reading tracker
 - [ ] Statistical analysis of reading history

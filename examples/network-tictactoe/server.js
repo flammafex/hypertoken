@@ -19,7 +19,7 @@
  * Tic-Tac-Toe Server
  * 
  * Authoritative game server that manages game state and validates moves.
- * Players connect via WebSocket and send commands.
+ * Agents connect via WebSocket and send commands.
  */
 
 import { Engine } from '../../engine/Engine.js';
@@ -45,13 +45,13 @@ engine.describe = function() {
 engine.dispatch('tictactoe:init');
 
 // Add event listeners for game events
-engine.on('player:registered', (evt) => {
+engine.on('agent:registered', (evt) => {
   const { symbol, clientId } = evt.payload || evt;
-  console.log(`✓ Player ${symbol} registered (${clientId})`);
+  console.log(`✓ Agent ${symbol} registered (${clientId})`);
 });
 
 engine.on('game:started', () => {
-  console.log('\n🎮 Game started! Both players connected.\n');
+  console.log('\n🎮 Game started! Both agents connected.\n');
 });
 
 engine.on('move:made', (evt) => {
@@ -60,8 +60,8 @@ engine.on('move:made', (evt) => {
 });
 
 engine.on('turn:changed', (evt) => {
-  const { currentPlayer } = evt.payload || evt;
-  console.log(`  Current turn: ${currentPlayer}`);
+  const { currentAgent } = evt.payload || evt;
+  console.log(`  Current turn: ${currentAgent}`);
 });
 
 engine.on('game:won', (evt) => {
@@ -74,7 +74,7 @@ engine.on('game:draw', () => {
 });
 
 engine.on('game:reset', () => {
-  console.log('\n🔄 Game reset. Ready for new players.\n');
+  console.log('\n🔄 Game reset. Ready for new agents.\n');
 });
 
 // Create and start relay server
@@ -86,7 +86,7 @@ const server = new RelayServer(engine, {
 
 await server.start();
 
-console.log('Server ready! Players can connect to:');
+console.log('Server ready! Agents can connect to:');
 console.log('  ws://localhost:8080\n');
 console.log('Press Ctrl+C to stop the server.\n');
 

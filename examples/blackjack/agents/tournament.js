@@ -70,7 +70,7 @@ class Tournament {
       console.log(`\n▶️  Testing ${agent.name}...`);
       
       const game = new BlackjackGame({ 
-        numDecks: 6, 
+        numStacks: 6, 
         seed: this.seed 
       });
       
@@ -82,20 +82,20 @@ class Tournament {
         // Record results
         const result = state.result;
         
-        if (state.playerHand.blackjack) {
+        if (state.agentHand.blackjack) {
           stats.blackjacks++;
         }
         
-        if (state.playerHand.busted) {
+        if (state.agentHand.busted) {
           stats.busts++;
         }
         
         switch (result) {
-          case "player":
+          case "agent":
             stats.wins++;
             stats.totalWinnings += 1;
             break;
-          case "player-blackjack":
+          case "agent-blackjack":
             stats.wins++;
             stats.totalWinnings += 1.5; // 3:2 payout
             break;

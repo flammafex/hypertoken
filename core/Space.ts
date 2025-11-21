@@ -1,11 +1,11 @@
 /*
- * core/Table.ts
+ * core/Space.ts
  */
 import { Emitter } from "./events.js";
-import { SessionManager } from "./SessionManager.js";
+import { Chronicle } from "./Chronicle.js";
 import { IPlacementCRDT, IToken } from "./types.js";
-import { Deck } from "./Deck.js";
-import { Shoe } from "./Shoe.js";
+import { Stack } from "./Stack.js";
+import { Source } from "./Source.js";
 
 export interface SpreadZone {
   id: string;
@@ -14,16 +14,16 @@ export interface SpreadZone {
   label?: string;
 }
 
-export class Table extends Emitter {
-  // CHANGED: Made public readonly to allow sharing with Deck/Player
-  public readonly session: SessionManager;
+export class Space extends Emitter {
+  // CHANGED: Made public readonly to allow sharing with Stack/Agent
+  public readonly session: Chronicle;
   
   name: string;
   spreads: Record<string, SpreadZone[]> = {};
   _lockedZones: Set<string> = new Set();
   log: any[] = [];
 
-  constructor(session: SessionManager, name: string = "table") {
+  constructor(session: Chronicle, name: string = "space") {
     super();
     this.session = session;
     this.name = name;
@@ -172,7 +172,7 @@ export class Table extends Emitter {
   }
 
   clear(): void {
-    this.session.change("clear table", (doc) => {
+    this.session.change("clear space", (doc) => {
       doc.zones = {};
     });
     this.log = [];
@@ -325,23 +325,23 @@ export class Table extends Emitter {
     this.emit("pushToZone", { zone: name, count: arr.length });
   }
 
-  returnToDeck(deck: Deck, zoneName: string, n: number = 1, { toTop = true } = {}): IToken[] {
+  returnToStack(stack: Stack, zoneName: string, n: number = 1, { toTop = true } = {}): IToken[] {
     const removedPlacements = this.drawFromZone(zoneName, n);
     const tokens = removedPlacements.map(p => p.tokenSnapshot);
-    // Deck is now CRDT aware, we need to handle insertion via deck methods
-    // But here we are accessing deck directly. 
-    // Since Deck is refactored, we should use deck.insertAt or create a bulk insert method.
+    // Stack is now CRDT aware, we need to handle insertion via stack methods
+    // But here we are accessing stack directly. 
+    // Since Stack is refactored, we should use stack.insertAt or create a bulk insert method.
     // For now, we can iterate:
     if (toTop) {
-        tokens.forEach(t => deck.insertAt(t, deck.size));
+        tokens.forEach(t => stack.insertAt(t, stack.size));
     } else {
-        tokens.forEach(t => deck.insertAt(t, 0));
+        tokens.forEach(t => stack.insertAt(t, 0));
     }
-    this.emit("returnToDeck", { zone: zoneName, count: tokens.length });
+    this.emit("returnToStack", { zone: zoneName, count: tokens.length });
     return tokens;
   }
 
-  collectAllInto(deck: Deck, { includeEmpty = false } = {}): number {
+  collectAllInto(stack: Stack, { includeEmpty = false } = {}): number {
     let total = 0;
     const tokensToReturn: IToken[] = [];
     const zonesToClear: string[] = [];
@@ -356,24 +356,24 @@ export class Table extends Emitter {
     }
 
     // Write phase (Atomic)
-    this.session.change("collect all to deck", (doc) => {
+    this.session.change("collect all to stack", (doc) => {
       // Clear zones
       if (doc.zones) {
         zonesToClear.forEach(z => doc.zones![z] = []);
       }
-      // Add to deck (assuming Deck uses same session)
-      // Ideally we call deck methods, but we are inside a change callback here if we want atomicity.
-      // Since Deck logic is wrapped in session.change, calling deck.insert() here would nest transactions?
+      // Add to stack (assuming Stack uses same session)
+      // Ideally we call stack methods, but we are inside a change callback here if we want atomicity.
+      // Since Stack logic is wrapped in session.change, calling stack.insert() here would nest transactions?
       // Automerge handles nesting fine usually, or we can just do it sequentially.
     });
 
-    // We add tokens back to deck. 
-    // Since we are outside the change block above, we can call deck methods.
+    // We add tokens back to stack. 
+    // Since we are outside the change block above, we can call stack methods.
     // Ideally this should be one atomic move, but for now:
-    tokensToReturn.forEach(t => deck.insertAt(t, deck.size));
+    tokensToReturn.forEach(t => stack.insertAt(t, stack.size));
     total = tokensToReturn.length;
 
-    deck.shuffle();
+    stack.shuffle();
     this.emit("collectAllInto", { zones: total });
     return total;
   }
@@ -383,7 +383,7 @@ export class Table extends Emitter {
     return this;
   }
 
-  dealSpread(name: string, source: Deck | Shoe, { faceUp = true } = {}): void {
+  dealSpread(name: string, source: Stack | Source, { faceUp = true } = {}): void {
     const pattern = this.spreads[name];
     if (!pattern) throw new Error(`Spread "${name}" not defined.`);
     

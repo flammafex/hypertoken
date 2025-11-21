@@ -71,7 +71,7 @@ class MockCard {
   }
 }
 
-class MockDeck {
+class MockStack {
   constructor(cards = []) {
     this._stack = cards.slice();
     this._original = cards.slice();
@@ -114,13 +114,13 @@ class MockDeck {
   }
   
   static fromJSON(obj) {
-    const deck = new MockDeck();
-    deck.size = obj.size;
-    return deck;
+    const stack = new MockStack();
+    stack.size = obj.size;
+    return stack;
   }
 }
 
-class MockTable {
+class MockSpace {
   constructor() {
     this.zones = new Map();
   }
@@ -166,9 +166,9 @@ class MockTable {
   }
 }
 
-class MockShoe {
-  constructor(deck) {
-    this._stack = deck ? deck._stack.slice() : [];
+class MockSource {
+  constructor(stack) {
+    this._stack = stack ? stack._stack.slice() : [];
   }
   
   draw() {
@@ -191,14 +191,14 @@ class MockShoe {
 }
 
 class MockEngine {
-  constructor({ deck = null, table = null, shoe = null } = {}) {
-    this.deck = deck;
-    this.table = table;
-    this.shoe = shoe;
+  constructor({ stack = null, space = null, source = null } = {}) {
+    this.stack = stack;
+    this.space = space;
+    this.source = source;
     this.history = [];
     this.future = [];
     this._policies = new Map();
-    this._players = [];
+    this._agents = [];
     this._gameState = {};
     this.listeners = new Map();
   }
@@ -225,47 +225,47 @@ class MockEngine {
     // Simulate action execution
     const { type, payload } = action;
     
-    // Deck actions
-    if (type === 'deck:shuffle') {
-      this.deck?.shuffle();
-    } else if (type === 'deck:draw') {
-      return this.deck?.drawMany(payload.count || 1);
-    } else if (type === 'deck:reset') {
-      this.deck?.reset();
+    // Stack actions
+    if (type === 'stack:shuffle') {
+      this.stack?.shuffle();
+    } else if (type === 'stack:draw') {
+      return this.stack?.drawMany(payload.count || 1);
+    } else if (type === 'stack:reset') {
+      this.stack?.reset();
     }
     
-    // Table actions
-    else if (type === 'table:place') {
-      return this.table?.place(payload.zone, payload.card, payload.opts);
-    } else if (type === 'table:clear') {
-      this.table?.clear();
-    } else if (type === 'table:clearZone') {
-      this.table?.clearZone(payload.zone);
+    // Space actions
+    else if (type === 'space:place') {
+      return this.space?.place(payload.zone, payload.card, payload.opts);
+    } else if (type === 'space:clear') {
+      this.space?.clear();
+    } else if (type === 'space:clearZone') {
+      this.space?.clearZone(payload.zone);
     }
     
-    // Shoe actions
-    else if (type === 'shoe:draw') {
-      return this.shoe?.draw();
-    } else if (type === 'shoe:inspect') {
-      return this.shoe?.inspect();
+    // Source actions
+    else if (type === 'source:draw') {
+      return this.source?.draw();
+    } else if (type === 'source:inspect') {
+      return this.source?.inspect();
     }
     
-    // Player actions
-    else if (type === 'player:create') {
-      const player = {
+    // Agent actions
+    else if (type === 'agent:create') {
+      const agent = {
         id: `p-${Date.now()}`,
         name: payload.name,
         active: true,
         resources: {},
         hand: []
       };
-      this._players.push(player);
-      return player;
-    } else if (type === 'player:giveResource') {
-      const player = this._players.find(p => p.name === payload.name);
-      if (player) {
-        player.resources[payload.resource] = 
-          (player.resources[payload.resource] || 0) + payload.amount;
+      this._agents.push(agent);
+      return agent;
+    } else if (type === 'agent:giveResource') {
+      const agent = this._agents.find(p => p.name === payload.name);
+      if (agent) {
+        agent.resources[payload.resource] = 
+          (agent.resources[payload.resource] || 0) + payload.amount;
       }
     }
     
@@ -312,10 +312,10 @@ class MockEngine {
   
   snapshot() {
     return {
-      deck: this.deck?.toJSON(),
-      table: this.table?.toJSON(),
+      stack: this.stack?.toJSON(),
+      space: this.space?.toJSON(),
       gameState: this._gameState,
-      players: this._players.map(p => ({
+      agents: this._agents.map(p => ({
         name: p.name,
         resources: p.resources,
         handSize: p.hand?.length || 0
@@ -326,7 +326,7 @@ class MockEngine {
   
   restore(snapshot) {
     this._gameState = snapshot.gameState || {};
-    // In real implementation, would fully restore deck/table
+    // In real implementation, would fully restore stack/space
   }
 }
 
@@ -388,12 +388,12 @@ test('Engine dispatches actions and tracks history', () => {
   const engine = new MockEngine();
   
   engine.dispatch('game:start');
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:create', { name: 'Bob' });
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Bob' });
   
   assertEquals(engine.history.length, 3, 'Should track 3 actions');
   assert(engine._gameState.started === true, 'Game should be started');
-  assertEquals(engine._players.length, 2, 'Should have 2 players');
+  assertEquals(engine._agents.length, 2, 'Should have 2 agents');
 });
 
 test('Actions modify engine state correctly', () => {
@@ -402,24 +402,24 @@ test('Actions modify engine state correctly', () => {
     new MockCard(2, 'hearts', '2'),
     new MockCard(3, 'hearts', '3')
   ];
-  const deck = new MockDeck(cards);
-  const table = new MockTable();
-  const engine = new MockEngine({ deck, table });
+  const stack = new MockStack(cards);
+  const space = new MockSpace();
+  const engine = new MockEngine({ stack, space });
   
   // Draw cards
-  const drawn = engine.dispatch('deck:draw', { count: 2 });
+  const drawn = engine.dispatch('stack:draw', { count: 2 });
   
   assertEquals(drawn.length, 2, 'Should draw 2 cards');
-  assertEquals(deck.size, 1, 'Deck should have 1 card left');
+  assertEquals(stack.size, 1, 'Stack should have 1 card left');
   
-  // Place card on table
-  engine.dispatch('table:place', { 
+  // Place card on space
+  engine.dispatch('space:place', { 
     zone: 'field', 
     card: drawn[0],
     opts: { faceUp: true }
   });
   
-  assertEquals(table.zoneCount('field'), 1, 'Table should have 1 card');
+  assertEquals(space.zoneCount('field'), 1, 'Space should have 1 card');
 });
 
 // ============================================================================
@@ -489,21 +489,21 @@ test('Rules can dispatch additional actions', () => {
   
   ruleEngine.addRule(
     'cascade-rule',
-    (engine, lastAction) => lastAction.type === 'player:create',
+    (engine, lastAction) => lastAction.type === 'agent:create',
     (engine) => {
       // Rule dispatches another action
-      engine.dispatch('player:giveResource', {
-        name: engine._players[0].name,
+      engine.dispatch('agent:giveResource', {
+        name: engine._agents[0].name,
         resource: 'gold',
         amount: 100
       });
     }
   );
   
-  engine.dispatch('player:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Alice' });
   
-  const player = engine._players[0];
-  assertEquals(player.resources.gold, 100, 'Rule should give starting gold');
+  const agent = engine._agents[0];
+  assertEquals(agent.resources.gold, 100, 'Rule should give starting gold');
   assert(engine.history.length >= 2, 'Should have multiple actions');
 });
 
@@ -535,7 +535,7 @@ test('Policy can trigger game end', () => {
   const engine = new MockEngine();
   
   const winPolicy = new MockPolicy('win-check', (engine) => {
-    const winner = engine._players.find(p => (p.resources.score || 0) >= 100);
+    const winner = engine._agents.find(p => (p.resources.score || 0) >= 100);
     if (winner && !engine._gameState.ended) {
       engine.dispatch('game:end', { 
         winner: winner.name,
@@ -546,8 +546,8 @@ test('Policy can trigger game end', () => {
   
   engine.registerPolicy('win-check', winPolicy);
   
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:giveResource', {
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:giveResource', {
     name: 'Alice',
     resource: 'score',
     amount: 100
@@ -568,20 +568,20 @@ test('Full card game round with rules and policies', () => {
   const cards = Array.from({ length: 52 }, (_, i) => 
     new MockCard(i, ['hearts', 'diamonds', 'clubs', 'spades'][i % 4], (i % 13) + 1)
   );
-  const deck = new MockDeck(cards);
-  const table = new MockTable();
-  const engine = new MockEngine({ deck, table });
+  const stack = new MockStack(cards);
+  const space = new MockSpace();
+  const engine = new MockEngine({ stack, space });
   const ruleEngine = new MockRuleEngine(engine);
   
-  // Rule: Players draw 5 cards when created
+  // Rule: Agents draw 5 cards when created
   ruleEngine.addRule(
     'deal-starting-hand',
-    (engine, lastAction) => lastAction.type === 'player:create',
+    (engine, lastAction) => lastAction.type === 'agent:create',
     (engine, lastAction) => {
-      const cards = engine.dispatch('deck:draw', { count: 5 });
-      const player = engine._players.find(p => p.name === lastAction.payload.name);
-      if (player) {
-        player.hand = cards;
+      const cards = engine.dispatch('stack:draw', { count: 5 });
+      const agent = engine._agents.find(p => p.name === lastAction.payload.name);
+      if (agent) {
+        agent.hand = cards;
       }
     },
     { priority: 100 }
@@ -591,11 +591,11 @@ test('Full card game round with rules and policies', () => {
   ruleEngine.addRule(
     'check-winner',
     (engine) => {
-      const winner = engine._players.find(p => (p.resources.score || 0) >= 50);
+      const winner = engine._agents.find(p => (p.resources.score || 0) >= 50);
       return !!winner && !engine._gameState.ended;
     },
     (engine) => {
-      const winner = engine._players.find(p => p.resources.score >= 50);
+      const winner = engine._agents.find(p => p.resources.score >= 50);
       engine.dispatch('game:end', { winner: winner.name });
     },
     { priority: 90 }
@@ -604,21 +604,21 @@ test('Full card game round with rules and policies', () => {
   // Start game
   engine.dispatch('game:start');
   
-  // Create players
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:create', { name: 'Bob' });
+  // Create agents
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Bob' });
   
-  // Both players should have hands
-  assertEquals(engine._players[0].hand.length, 5, 'Alice should have 5 cards');
-  assertEquals(engine._players[1].hand.length, 5, 'Bob should have 5 cards');
+  // Both agents should have hands
+  assertEquals(engine._agents[0].hand.length, 5, 'Alice should have 5 cards');
+  assertEquals(engine._agents[1].hand.length, 5, 'Bob should have 5 cards');
   
   // Simulate gameplay
-  engine.dispatch('player:giveResource', { name: 'Alice', resource: 'score', amount: 25 });
-  engine.dispatch('player:giveResource', { name: 'Bob', resource: 'score', amount: 30 });
-  engine.dispatch('player:giveResource', { name: 'Alice', resource: 'score', amount: 30 });
+  engine.dispatch('agent:giveResource', { name: 'Alice', resource: 'score', amount: 25 });
+  engine.dispatch('agent:giveResource', { name: 'Bob', resource: 'score', amount: 30 });
+  engine.dispatch('agent:giveResource', { name: 'Alice', resource: 'score', amount: 30 });
   
   // Game should end
-  assert(engine._gameState.ended === true, 'Game should end when player reaches 50');
+  assert(engine._gameState.ended === true, 'Game should end when agent reaches 50');
   assertEquals(engine._gameState.winner, 'Alice', 'Alice should win with 55 points');
 });
 
@@ -629,19 +629,19 @@ test('Turn-based game with round-robin mechanics', () => {
   // Rule: Advance turn
   ruleEngine.addRule(
     'advance-turn',
-    (engine, lastAction) => lastAction.type === 'player:endTurn',
+    (engine, lastAction) => lastAction.type === 'agent:endTurn',
     (engine) => {
-      const currentIdx = engine._players.findIndex(p => p.active);
-      engine._players[currentIdx].active = false;
-      const nextIdx = (currentIdx + 1) % engine._players.length;
-      engine._players[nextIdx].active = true;
+      const currentIdx = engine._agents.findIndex(p => p.active);
+      engine._agents[currentIdx].active = false;
+      const nextIdx = (currentIdx + 1) % engine._agents.length;
+      engine._agents[nextIdx].active = true;
       
       engine._gameState.turnCount = (engine._gameState.turnCount || 0) + 1;
       
       engine.emit('turn:changed', { 
         payload: { 
-          from: engine._players[currentIdx].name,
-          to: engine._players[nextIdx].name
+          from: engine._agents[currentIdx].name,
+          to: engine._agents[nextIdx].name
         } 
       });
     }
@@ -649,27 +649,27 @@ test('Turn-based game with round-robin mechanics', () => {
   
   // Create game
   engine.dispatch('game:start');
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:create', { name: 'Bob' });
-  engine.dispatch('player:create', { name: 'Carol' });
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Bob' });
+  engine.dispatch('agent:create', { name: 'Carol' });
   
-  // Set first player active
-  engine._players[0].active = true;
-  engine._players[1].active = false;
-  engine._players[2].active = false;
+  // Set first agent active
+  engine._agents[0].active = true;
+  engine._agents[1].active = false;
+  engine._agents[2].active = false;
   
   // Simulate turns
-  assert(engine._players[0].active === true, 'Alice should start');
+  assert(engine._agents[0].active === true, 'Alice should start');
   
-  engine.dispatch('player:endTurn');
-  assert(engine._players[1].active === true, 'Bob should be active');
-  assert(engine._players[0].active === false, 'Alice should not be active');
+  engine.dispatch('agent:endTurn');
+  assert(engine._agents[1].active === true, 'Bob should be active');
+  assert(engine._agents[0].active === false, 'Alice should not be active');
   
-  engine.dispatch('player:endTurn');
-  assert(engine._players[2].active === true, 'Carol should be active');
+  engine.dispatch('agent:endTurn');
+  assert(engine._agents[2].active === true, 'Carol should be active');
   
-  engine.dispatch('player:endTurn');
-  assert(engine._players[0].active === true, 'Should cycle back to Alice');
+  engine.dispatch('agent:endTurn');
+  assert(engine._agents[0].active === true, 'Should cycle back to Alice');
   
   assertEquals(engine._gameState.turnCount, 3, 'Should have 3 turns');
 });
@@ -682,24 +682,24 @@ console.log('\n💾 Serialization Integration Tests\n');
 
 test('Engine state can be saved and restored', () => {
   const cards = [new MockCard(1, 'hearts', 'A'), new MockCard(2, 'hearts', '2')];
-  const deck = new MockDeck(cards);
-  const table = new MockTable();
-  const engine = new MockEngine({ deck, table });
+  const stack = new MockStack(cards);
+  const space = new MockSpace();
+  const engine = new MockEngine({ stack, space });
   
   // Setup initial state
   engine.dispatch('game:start');
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:giveResource', { name: 'Alice', resource: 'gold', amount: 50 });
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:giveResource', { name: 'Alice', resource: 'gold', amount: 50 });
   
   // Take snapshot
   const snapshot = engine.snapshot();
   
   assert(snapshot.gameState.started === true, 'Snapshot should include game state');
-  assertEquals(snapshot.players.length, 1, 'Snapshot should include players');
+  assertEquals(snapshot.agents.length, 1, 'Snapshot should include agents');
   assertEquals(snapshot.historyLength, 3, 'Snapshot should track history');
   
   // Create new engine and restore
-  const engine2 = new MockEngine({ deck: new MockDeck(), table: new MockTable() });
+  const engine2 = new MockEngine({ stack: new MockStack(), space: new MockSpace() });
   engine2.restore(snapshot);
   
   assert(engine2._gameState.started === true, 'Restored state should match');
@@ -748,7 +748,7 @@ test('Plugins work with full game engine', () => {
   
   // Play game
   engine.dispatch('game:start');
-  engine.dispatch('player:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Alice' });
   engine.dispatch('game:end', { winner: 'Alice' });
   
   const pluginStats = engine.analytics.getStats();
@@ -757,7 +757,7 @@ test('Plugins work with full game engine', () => {
 });
 
 test('Multiple systems work together', () => {
-  const engine = new MockEngine({ deck: new MockDeck([new MockCard(1, 'hearts', 'A')]) });
+  const engine = new MockEngine({ stack: new MockStack([new MockCard(1, 'hearts', 'A')]) });
   const ruleEngine = new MockRuleEngine(engine);
   
   let eventLog = [];
@@ -781,14 +781,14 @@ test('Multiple systems work together', () => {
     'auto-deal',
     (engine, lastAction) => lastAction.type === 'game:start',
     (engine) => {
-      engine.dispatch('player:create', { name: 'Alice' });
+      engine.dispatch('agent:create', { name: 'Alice' });
     }
   );
   
   // Policy
   const validationPolicy = new MockPolicy('validate', (engine) => {
-    if (engine._players.length > 4) {
-      throw new Error('Too many players');
+    if (engine._agents.length > 4) {
+      throw new Error('Too many agents');
     }
   });
   
@@ -800,8 +800,8 @@ test('Multiple systems work together', () => {
   // Verify all systems interacted
   assert(eventLog.includes('game:start'), 'Plugin should log game start');
   assert(eventLog.includes('rule:auto-deal'), 'Plugin should log rule trigger');
-  assert(eventLog.includes('player:create'), 'Plugin should log action from rule');
-  assertEquals(engine._players.length, 1, 'Rule should create player');
+  assert(eventLog.includes('agent:create'), 'Plugin should log action from rule');
+  assertEquals(engine._agents.length, 1, 'Rule should create agent');
 });
 
 // ============================================================================

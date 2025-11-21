@@ -58,31 +58,31 @@ test('Game initializes with empty board', () => {
   const state = engine._gameState;
   assert(state.board.length === 9, 'Board should have 9 positions');
   assert(state.board.every(cell => cell === null), 'All cells should be null');
-  assert.strictEqual(state.currentPlayer, 'X', 'X should go first');
+  assert.strictEqual(state.currentAgent, 'X', 'X should go first');
   assert.strictEqual(state.gameOver, false, 'Game should not be over');
 });
 
-test('Players can register', () => {
+test('Agents can register', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
   
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   const state = engine._gameState;
-  assert.strictEqual(state.players.X, 'player1', 'X player should be registered');
-  assert.strictEqual(state.players.O, 'player2', 'O player should be registered');
+  assert.strictEqual(state.agents.X, 'agent1', 'X agent should be registered');
+  assert.strictEqual(state.agents.O, 'agent2', 'O agent should be registered');
 });
 
 test('Cannot register same symbol twice', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
   
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent2' });
   
   const state = engine._gameState;
-  assert.strictEqual(state.players.X, 'player1', 'First registration should stick');
+  assert.strictEqual(state.agents.X, 'agent1', 'First registration should stick');
 });
 
 // ============================================================================
@@ -94,10 +94,10 @@ console.log('\n🎯 Move Validation Tests\n');
 test('Valid move is accepted', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player1' });
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent1' });
   
   const state = engine._gameState;
   assert.strictEqual(state.board[4], 'X', 'X should be placed at position 4');
@@ -106,11 +106,11 @@ test('Valid move is accepted', () => {
 test('Cannot move out of turn', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   try {
-    engine.dispatch('tictactoe:move', { position: 4, clientId: 'player2' });
+    engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent2' });
     assert.fail('Should throw error for out of turn move');
   } catch (err) {
     assert(err.message.includes('Not your turn'), 'Should indicate wrong turn');
@@ -120,13 +120,13 @@ test('Cannot move out of turn', () => {
 test('Cannot move to occupied position', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player1' });
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent1' });
   
   try {
-    engine.dispatch('tictactoe:move', { position: 4, clientId: 'player2' });
+    engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent2' });
     assert.fail('Should throw error for occupied position');
   } catch (err) {
     assert(err.message.includes('already taken'), 'Should indicate position taken');
@@ -136,11 +136,11 @@ test('Cannot move to occupied position', () => {
 test('Cannot move to invalid position', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   try {
-    engine.dispatch('tictactoe:move', { position: 10, clientId: 'player1' });
+    engine.dispatch('tictactoe:move', { position: 10, clientId: 'agent1' });
     assert.fail('Should throw error for invalid position');
   } catch (err) {
     assert(err.message.includes('Invalid position'), 'Should indicate invalid position');
@@ -150,18 +150,18 @@ test('Cannot move to invalid position', () => {
 test('Cannot move after game over', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   // Play winning sequence for X
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player1' }); // X
-  engine.dispatch('tictactoe:move', { position: 3, clientId: 'player2' }); // O
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player1' }); // X
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player2' }); // O
-  engine.dispatch('tictactoe:move', { position: 2, clientId: 'player1' }); // X wins
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent1' }); // X
+  engine.dispatch('tictactoe:move', { position: 3, clientId: 'agent2' }); // O
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent1' }); // X
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent2' }); // O
+  engine.dispatch('tictactoe:move', { position: 2, clientId: 'agent1' }); // X wins
   
   try {
-    engine.dispatch('tictactoe:move', { position: 5, clientId: 'player2' });
+    engine.dispatch('tictactoe:move', { position: 5, clientId: 'agent2' });
     assert.fail('Should throw error for move after game over');
   } catch (err) {
     assert(err.message.includes('Game is over'), 'Should indicate game over');
@@ -177,16 +177,16 @@ console.log('\n🔄 Turn Switching Tests\n');
 test('Turns alternate correctly', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
-  assert.strictEqual(engine._gameState.currentPlayer, 'X', 'X starts');
+  assert.strictEqual(engine._gameState.currentAgent, 'X', 'X starts');
   
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player1' });
-  assert.strictEqual(engine._gameState.currentPlayer, 'O', 'O goes after X');
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent1' });
+  assert.strictEqual(engine._gameState.currentAgent, 'O', 'O goes after X');
   
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player2' });
-  assert.strictEqual(engine._gameState.currentPlayer, 'X', 'X goes after O');
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent2' });
+  assert.strictEqual(engine._gameState.currentAgent, 'X', 'X goes after O');
 });
 
 // ============================================================================
@@ -198,16 +198,16 @@ console.log('\n🏆 Win Detection Tests\n');
 test('Detects horizontal win (top row)', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   // X plays: 0, 1, 2 (top row)
   // O plays: 3, 4
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 3, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 2, clientId: 'player1' });
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 3, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 2, clientId: 'agent1' });
   
   const state = engine._gameState;
   assert.strictEqual(state.winner, 'X', 'X should win');
@@ -217,16 +217,16 @@ test('Detects horizontal win (top row)', () => {
 test('Detects vertical win (left column)', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   // X plays: 0, 3, 6 (left column)
   // O plays: 1, 2
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 3, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 2, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 6, clientId: 'player1' });
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 3, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 2, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 6, clientId: 'agent1' });
   
   const state = engine._gameState;
   assert.strictEqual(state.winner, 'X', 'X should win');
@@ -236,16 +236,16 @@ test('Detects vertical win (left column)', () => {
 test('Detects diagonal win (\\)', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   // X plays: 0, 4, 8 (diagonal)
   // O plays: 1, 2
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 2, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 8, clientId: 'player1' });
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 2, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 8, clientId: 'agent1' });
   
   const state = engine._gameState;
   assert.strictEqual(state.winner, 'X', 'X should win');
@@ -255,16 +255,16 @@ test('Detects diagonal win (\\)', () => {
 test('Detects diagonal win (/)', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   // X plays: 2, 4, 6 (diagonal)
   // O plays: 0, 1
-  engine.dispatch('tictactoe:move', { position: 2, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player2' });
-  engine.dispatch('tictactoe:move', { position: 6, clientId: 'player1' });
+  engine.dispatch('tictactoe:move', { position: 2, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent2' });
+  engine.dispatch('tictactoe:move', { position: 6, clientId: 'agent1' });
   
   const state = engine._gameState;
   assert.strictEqual(state.winner, 'X', 'X should win');
@@ -274,35 +274,35 @@ test('Detects diagonal win (/)', () => {
 test('Detects draw', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
   // Play draw game:
   // X O X
   // X O O
   // O X X
   const moves = [
-    { pos: 0, player: 'player1' }, // X
-    { pos: 1, player: 'player2' }, // O
-    { pos: 2, player: 'player1' }, // X
-    { pos: 3, player: 'player2' }, // O (mistake)
-    { pos: 4, player: 'player1' }, // X (mistake)
-    { pos: 5, player: 'player2' }, // O
-    { pos: 6, player: 'player1' }, // X (mistake)
-    { pos: 7, player: 'player2' }, // O
-    { pos: 8, player: 'player1' }  // X
+    { pos: 0, agent: 'agent1' }, // X
+    { pos: 1, agent: 'agent2' }, // O
+    { pos: 2, agent: 'agent1' }, // X
+    { pos: 3, agent: 'agent2' }, // O (mistake)
+    { pos: 4, agent: 'agent1' }, // X (mistake)
+    { pos: 5, agent: 'agent2' }, // O
+    { pos: 6, agent: 'agent1' }, // X (mistake)
+    { pos: 7, agent: 'agent2' }, // O
+    { pos: 8, agent: 'agent1' }  // X
   ];
   
   // Actually create a proper draw
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player1' }); // X center
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player2' }); // O
-  engine.dispatch('tictactoe:move', { position: 8, clientId: 'player1' }); // X
-  engine.dispatch('tictactoe:move', { position: 2, clientId: 'player2' }); // O
-  engine.dispatch('tictactoe:move', { position: 6, clientId: 'player1' }); // X
-  engine.dispatch('tictactoe:move', { position: 1, clientId: 'player2' }); // O
-  engine.dispatch('tictactoe:move', { position: 3, clientId: 'player1' }); // X
-  engine.dispatch('tictactoe:move', { position: 5, clientId: 'player2' }); // O
-  engine.dispatch('tictactoe:move', { position: 7, clientId: 'player1' }); // X
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent1' }); // X center
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent2' }); // O
+  engine.dispatch('tictactoe:move', { position: 8, clientId: 'agent1' }); // X
+  engine.dispatch('tictactoe:move', { position: 2, clientId: 'agent2' }); // O
+  engine.dispatch('tictactoe:move', { position: 6, clientId: 'agent1' }); // X
+  engine.dispatch('tictactoe:move', { position: 1, clientId: 'agent2' }); // O
+  engine.dispatch('tictactoe:move', { position: 3, clientId: 'agent1' }); // X
+  engine.dispatch('tictactoe:move', { position: 5, clientId: 'agent2' }); // O
+  engine.dispatch('tictactoe:move', { position: 7, clientId: 'agent1' }); // X
   
   const state = engine._gameState;
   assert.strictEqual(state.winner, null, 'No winner in draw');
@@ -318,17 +318,17 @@ console.log('\n🔄 Reset Tests\n');
 test('Reset clears board and state', () => {
   const engine = new Engine();
   engine.dispatch('tictactoe:init');
-  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'player1' });
-  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'player2' });
+  engine.dispatch('tictactoe:register', { symbol: 'X', clientId: 'agent1' });
+  engine.dispatch('tictactoe:register', { symbol: 'O', clientId: 'agent2' });
   
-  engine.dispatch('tictactoe:move', { position: 0, clientId: 'player1' });
-  engine.dispatch('tictactoe:move', { position: 4, clientId: 'player2' });
+  engine.dispatch('tictactoe:move', { position: 0, clientId: 'agent1' });
+  engine.dispatch('tictactoe:move', { position: 4, clientId: 'agent2' });
   
   engine.dispatch('tictactoe:reset');
   
   const state = engine._gameState;
   assert(state.board.every(cell => cell === null), 'Board should be empty');
-  assert.strictEqual(state.currentPlayer, 'X', 'X should go first again');
+  assert.strictEqual(state.currentAgent, 'X', 'X should go first again');
   assert.strictEqual(state.winner, null, 'Winner should be null');
   assert.strictEqual(state.gameOver, false, 'Game should not be over');
 });

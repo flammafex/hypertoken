@@ -23,7 +23,7 @@
 // Mock Engine for standalone testing
 class MockEngine {
   constructor() {
-    this._players = [];
+    this._agents = [];
     this._gameState = {};
     this.history = [];
     this.listeners = new Map();
@@ -35,20 +35,20 @@ class MockEngine {
     // Handle actions
     if (type === 'game:start') {
       this._gameState.started = true;
-    } else if (type === 'player:create') {
-      const player = {
+    } else if (type === 'agent:create') {
+      const agent = {
         id: `p-${Date.now()}-${Math.random()}`,
         name: payload.name,
         agent: payload.agent,
         resources: {}
       };
-      this._players.push(player);
-      return player;
-    } else if (type === 'player:giveResource') {
-      const player = this._players.find(p => p.name === payload.name);
-      if (player) {
-        player.resources[payload.resource] = 
-          (player.resources[payload.resource] || 0) + payload.amount;
+      this._agents.push(agent);
+      return agent;
+    } else if (type === 'agent:giveResource') {
+      const agent = this._agents.find(p => p.name === payload.name);
+      if (agent) {
+        agent.resources[payload.resource] = 
+          (agent.resources[payload.resource] || 0) + payload.amount;
       }
     } else if (type === 'game:end') {
       this._gameState.ended = true;
@@ -61,13 +61,13 @@ class MockEngine {
     return action;
   }
 
-  registerPlayer(player) {
-    this._players.push(player);
-    return player;
+  registerAgent(agent) {
+    this._agents.push(agent);
+    return agent;
   }
 
-  getPlayers() {
-    return this._players;
+  getAgents() {
+    return this._agents;
   }
 
   setGameState(key, value) {

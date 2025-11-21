@@ -16,9 +16,9 @@ export class BasicStrategyAgent {
    * @returns {string} - "hit" or "stand"
    */
   decide(gameState) {
-    const playerValue = gameState.playerHand.value;
-    const playerCards = gameState.playerHand.cards;
-    const isSoft = isSoftHand(playerCards);
+    const agentValue = gameState.agentHand.value;
+    const agentCards = gameState.agentHand.cards;
+    const isSoft = isSoftHand(agentCards);
     
     // Get dealer's up card value
     const dealerUpCard = gameState.dealerHand.cards[1]; // Second card is face up
@@ -27,33 +27,33 @@ export class BasicStrategyAgent {
     // Simplified basic strategy
     
     // Always stand on 17 or higher
-    if (playerValue >= 17) return "stand";
+    if (agentValue >= 17) return "stand";
     
     // Soft hands (hands with Ace counted as 11)
     if (isSoft) {
       // Soft 18: stand vs 2-8, hit vs 9-A
-      if (playerValue === 18) {
+      if (agentValue === 18) {
         return dealerUpValue >= 9 ? "hit" : "stand";
       }
       // Soft 19+: always stand
-      if (playerValue >= 19) return "stand";
+      if (agentValue >= 19) return "stand";
       // Soft 17 or less: always hit
       return "hit";
     }
     
     // Hard hands
-    if (playerValue <= 11) {
+    if (agentValue <= 11) {
       // Always hit on 11 or less (can't bust)
       return "hit";
     }
     
-    if (playerValue === 12) {
+    if (agentValue === 12) {
       // Hit vs 2-3, stand vs 4-6, hit vs 7+
       if (dealerUpValue <= 3 || dealerUpValue >= 7) return "hit";
       return "stand";
     }
     
-    if (playerValue >= 13 && playerValue <= 16) {
+    if (agentValue >= 13 && agentValue <= 16) {
       // Stand vs 2-6, hit vs 7+
       if (dealerUpValue >= 7) return "hit";
       return "stand";
@@ -86,7 +86,7 @@ export class ConservativeAgent {
   }
   
   decide(gameState) {
-    return gameState.playerHand.value >= 17 ? "stand" : "hit";
+    return gameState.agentHand.value >= 17 ? "stand" : "hit";
   }
 }
 
@@ -99,6 +99,6 @@ export class AggressiveAgent {
   }
   
   decide(gameState) {
-    return gameState.playerHand.value >= 19 ? "stand" : "hit";
+    return gameState.agentHand.value >= 19 ? "stand" : "hit";
   }
 }

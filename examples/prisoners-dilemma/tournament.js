@@ -150,8 +150,8 @@ export class Tournament {
     
     // Store match result
     this.results.push({
-      player1: strategy1.name,
-      player2: strategy2.name,
+      agent1: strategy1.name,
+      agent2: strategy2.name,
       score1: s1Score,
       score2: s2Score,
       winner: results.winner,

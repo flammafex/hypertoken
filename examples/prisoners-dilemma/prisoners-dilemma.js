@@ -18,13 +18,13 @@
  * Prisoner's Dilemma Game
  * 
  * Classic game theory scenario implemented with HyperToken engine.
- * Two players simultaneously choose to cooperate or defect.
+ * Two agents simultaneously choose to cooperate or defect.
  * 
  * Payoff Matrix (standard):
- *                Player 2
+ *                Agent 2
  *              C         D
  *         C  (3,3)     (0,5)
- * Player 1
+ * Agent 1
  *         D  (5,0)     (1,1)
  * 
  * Where:
@@ -63,40 +63,40 @@ export class PrisonersDilemmaGame {
     
     this.history = [];
     this.currentRound = 0;
-    this.player1Moves = [];
-    this.player2Moves = [];
+    this.agent1Moves = [];
+    this.agent2Moves = [];
   }
   
   /**
-   * Initialize game with two players
+   * Initialize game with two agents
    */
-  initialize(player1, player2) {
+  initialize(agent1, agent2) {
     this.engine.dispatch('game:start');
     
-    // Create players
-    const p1Result = this.engine.dispatch('player:create', {
-      name: player1.name || 'Player 1',
-      agent: player1.strategy
+    // Create agents
+    const p1Result = this.engine.dispatch('agent:create', {
+      name: agent1.name || 'Agent 1',
+      agent: agent1.strategy
     });
     
-    const p2Result = this.engine.dispatch('player:create', {
-      name: player2.name || 'Player 2',
-      agent: player2.strategy
+    const p2Result = this.engine.dispatch('agent:create', {
+      name: agent2.name || 'Agent 2',
+      agent: agent2.strategy
     });
     
-    // Store player references
-    this.player1 = this.engine._players.find(p => p.name === (player1.name || 'Player 1'));
-    this.player2 = this.engine._players.find(p => p.name === (player2.name || 'Player 2'));
+    // Store agent references
+    this.agent1 = this.engine._agents.find(p => p.name === (agent1.name || 'Agent 1'));
+    this.agent2 = this.engine._agents.find(p => p.name === (agent2.name || 'Agent 2'));
     
     // Initialize scores
-    this.engine.dispatch('player:giveResource', {
-      name: this.player1.name,
+    this.engine.dispatch('agent:giveResource', {
+      name: this.agent1.name,
       resource: 'score',
       amount: 0
     });
     
-    this.engine.dispatch('player:giveResource', {
-      name: this.player2.name,
+    this.engine.dispatch('agent:giveResource', {
+      name: this.agent2.name,
       resource: 'score',
       amount: 0
     });
@@ -113,26 +113,26 @@ export class PrisonersDilemmaGame {
   async playRound() {
     this.currentRound++;
     
-    // Get moves from both players
-    const p1Move = await this.getPlayerMove(this.player1, this.player1Moves, this.player2Moves);
-    const p2Move = await this.getPlayerMove(this.player2, this.player2Moves, this.player1Moves);
+    // Get moves from both agents
+    const p1Move = await this.getAgentMove(this.agent1, this.agent1Moves, this.agent2Moves);
+    const p2Move = await this.getAgentMove(this.agent2, this.agent2Moves, this.agent1Moves);
     
     // Store moves
-    this.player1Moves.push(p1Move);
-    this.player2Moves.push(p2Move);
+    this.agent1Moves.push(p1Move);
+    this.agent2Moves.push(p2Move);
     
     // Calculate payoffs
     const outcome = this.calculatePayoffs(p1Move, p2Move);
     
     // Update scores
-    this.engine.dispatch('player:giveResource', {
-      name: this.player1.name,
+    this.engine.dispatch('agent:giveResource', {
+      name: this.agent1.name,
       resource: 'score',
       amount: outcome.p1
     });
     
-    this.engine.dispatch('player:giveResource', {
-      name: this.player2.name,
+    this.engine.dispatch('agent:giveResource', {
+      name: this.agent2.name,
       resource: 'score',
       amount: outcome.p2
     });
@@ -144,8 +144,8 @@ export class PrisonersDilemmaGame {
       p2Move,
       p1Payoff: outcome.p1,
       p2Payoff: outcome.p2,
-      p1Score: this.player1.resources.score,
-      p2Score: this.player2.resources.score
+      p1Score: this.agent1.resources.score,
+      p2Score: this.agent2.resources.score
     };
     
     this.history.push(round);
@@ -156,15 +156,15 @@ export class PrisonersDilemmaGame {
   }
   
   /**
-   * Get move from a player's strategy
+   * Get move from a agent's strategy
    */
-  async getPlayerMove(player, ownHistory, opponentHistory) {
-    if (typeof player.agent === 'function') {
+  async getAgentMove(agent, ownHistory, opponentHistory) {
+    if (typeof agent.agent === 'function') {
       // Strategy is a function
-      return await player.agent(ownHistory, opponentHistory, this.currentRound);
-    } else if (player.agent && typeof player.agent.decide === 'function') {
+      return await agent.agent(ownHistory, opponentHistory, this.currentRound);
+    } else if (agent.agent && typeof agent.agent.decide === 'function') {
       // Strategy is an object with decide method
-      return await player.agent.decide(ownHistory, opponentHistory, this.currentRound);
+      return await agent.agent.decide(ownHistory, opponentHistory, this.currentRound);
     } else {
       // Default to random
       return Math.random() < 0.5 ? COOPERATE : DEFECT;
@@ -196,8 +196,8 @@ export class PrisonersDilemmaGame {
       winner: winner?.name || null,
       reason: 'rounds_complete',
       finalScores: {
-        [this.player1.name]: this.player1.resources.score,
-        [this.player2.name]: this.player2.resources.score
+        [this.agent1.name]: this.agent1.resources.score,
+        [this.agent2.name]: this.agent2.resources.score
       }
     });
     
@@ -208,11 +208,11 @@ export class PrisonersDilemmaGame {
    * Determine winner
    */
   determineWinner() {
-    const p1Score = this.player1.resources.score;
-    const p2Score = this.player2.resources.score;
+    const p1Score = this.agent1.resources.score;
+    const p2Score = this.agent2.resources.score;
     
-    if (p1Score > p2Score) return this.player1;
-    if (p2Score > p1Score) return this.player2;
+    if (p1Score > p2Score) return this.agent1;
+    if (p2Score > p1Score) return this.agent2;
     return null; // Tie
   }
   
@@ -220,12 +220,12 @@ export class PrisonersDilemmaGame {
    * Get game results and statistics
    */
   getResults() {
-    const p1Score = this.player1.resources.score;
-    const p2Score = this.player2.resources.score;
+    const p1Score = this.agent1.resources.score;
+    const p2Score = this.agent2.resources.score;
     
     // Calculate cooperation rates
-    const p1Cooperations = this.player1Moves.filter(m => m === COOPERATE).length;
-    const p2Cooperations = this.player2Moves.filter(m => m === COOPERATE).length;
+    const p1Cooperations = this.agent1Moves.filter(m => m === COOPERATE).length;
+    const p2Cooperations = this.agent2Moves.filter(m => m === COOPERATE).length;
     
     const p1CoopRate = p1Cooperations / this.currentRound;
     const p2CoopRate = p2Cooperations / this.currentRound;
@@ -247,16 +247,16 @@ export class PrisonersDilemmaGame {
       rounds: this.currentRound,
       winner: this.determineWinner()?.name || 'Tie',
       scores: {
-        [this.player1.name]: p1Score,
-        [this.player2.name]: p2Score
+        [this.agent1.name]: p1Score,
+        [this.agent2.name]: p2Score
       },
       avgScores: {
-        [this.player1.name]: (p1Score / this.currentRound).toFixed(2),
-        [this.player2.name]: (p2Score / this.currentRound).toFixed(2)
+        [this.agent1.name]: (p1Score / this.currentRound).toFixed(2),
+        [this.agent2.name]: (p2Score / this.currentRound).toFixed(2)
       },
       cooperationRates: {
-        [this.player1.name]: (p1CoopRate * 100).toFixed(1) + '%',
-        [this.player2.name]: (p2CoopRate * 100).toFixed(1) + '%'
+        [this.agent1.name]: (p1CoopRate * 100).toFixed(1) + '%',
+        [this.agent2.name]: (p2CoopRate * 100).toFixed(1) + '%'
       },
       outcomes: {
         mutualCooperation,

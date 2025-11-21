@@ -4,27 +4,27 @@
  * FIXED: Rendering stability and Prompt handling
  */
 import { Engine } from '../../engine/Engine.js';
-import { MultiplayerBlackjackGame } from './multiplayer-game.js';
+import { MultiagentBlackjackGame } from './multiagent-game.js';
 import readline from 'readline';
 
-const playerName = process.argv[2] || "Alice";
+const agentName = process.argv[2] || "Alice";
 
 async function main() {
   const engine = new Engine();
-  const game = new MultiplayerBlackjackGame(engine, { 
+  const game = new MultiagentBlackjackGame(engine, { 
       isHost: false,
-      numPlayers: 2, 
-      playerNames: ["Alice", "Bob"] 
+      numAgents: 2, 
+      agentNames: ["Alice", "Bob"] 
   });
 
-  console.log(`🔌 Connecting as [${playerName}]...`);
+  console.log(`🔌 Connecting as [${agentName}]...`);
   engine.connect("ws://localhost:9090");
 
   engine.on("state:updated", () => {
-    const remotePlayers = engine.session.state.players;
-    if (remotePlayers) {
-        engine._players.forEach(p => {
-            const remote = remotePlayers[p.name];
+    const remoteAgents = engine.session.state.agents;
+    if (remoteAgents) {
+        engine._agents.forEach(p => {
+            const remote = remoteAgents[p.name];
             if (remote) {
                 p.resources.bankroll = remote.bankroll;
                 p.resources.currentBet = remote.currentBet;
@@ -52,17 +52,17 @@ let waitingForInput = false; // Track if we are stuck at a prompt
 function render(engine, game) {
     // 1. Generate the View String
     let output = "";
-    output += `🃏 HYPERTOKEN BLACKJACK | Player: ${playerName}\n`;
+    output += `🃏 HYPERTOKEN BLACKJACK | Agent: ${agentName}\n`;
     output += `──────────────────────────────────────────────\n`;
 
-    const dealerCards = engine.table.zone("dealer-hand") || [];
+    const dealerCards = engine.space.zone("dealer-hand") || [];
     const dealerStr = dealerCards.map(c => c.faceUp ? `[${c.tokenSnapshot.label}]` : `[🂠]`).join(" ");
     output += `\n🤖 DEALER:\n   ${dealerStr || "(waiting)"}\n`;
 
-    engine._players.forEach(p => {
-        const cards = engine.table.zone(p.handZone) || [];
+    engine._agents.forEach(p => {
+        const cards = engine.space.zone(p.handZone) || [];
         const cardStr = cards.map(c => `[${c.tokenSnapshot.label}]`).join(" ");
-        const isActive = (engine.loop.activePlayer?.name === p.name && engine.loop.running);
+        const isActive = (engine.loop.activeAgent?.name === p.name && engine.loop.running);
         const activeMarker = isActive ? "👈 ACTIVE" : "";
         
         output += `\n👤 ${p.name} ($${p.resources.bankroll}) [Bet: $${p.resources.currentBet}] ${activeMarker}\n`;
@@ -87,10 +87,10 @@ function render(engine, game) {
 }
 
 function checkTurn(engine, game, rl) {
-    const active = engine.loop.activePlayer;
+    const active = engine.loop.activeAgent;
     
     // Check if it's our turn
-    if (engine.loop.running && active && active.name === playerName) {
+    if (engine.loop.running && active && active.name === agentName) {
         
         // If we are already waiting for input, don't spawn another listener
         if (waitingForInput) return;
@@ -112,7 +112,7 @@ function checkTurn(engine, game, rl) {
             }
             else if (verb === 'b') {
                 const amount = parseInt(arg) || 10;
-                const p = engine._players.find(p => p.name === playerName);
+                const p = engine._agents.find(p => p.name === agentName);
                 if (p) p.resources.currentBet = amount; 
                 console.log(`Placed bet: $${amount}`);
             }

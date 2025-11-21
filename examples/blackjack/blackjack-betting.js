@@ -66,16 +66,16 @@ export class BettingManager {
   
   /**
    * Calculate payout based on result
-   * @param {string} result - Game result ("player", "player-blackjack", "dealer", "push")
+   * @param {string} result - Game result ("agent", "agent-blackjack", "dealer", "push")
    * @returns {number} - Payout amount (including original bet if won/push)
    */
   calculatePayout(result) {
     switch (result) {
-      case "player-blackjack":
+      case "agent-blackjack":
         // Blackjack pays 3:2
         return this.currentBet + (this.currentBet * 1.5);
       
-      case "player":
+      case "agent":
         // Regular win pays 1:1
         return this.currentBet * 2;
       
@@ -105,14 +105,14 @@ export class BettingManager {
     // Update statistics
     this.stats.handsPlayed++;
     
-    if (result === "player-blackjack") {
+    if (result === "agent-blackjack") {
       this.stats.handsWon++;
       this.stats.blackjacks++;
       this.stats.totalWon += netGain;
       if (netGain > this.stats.biggestWin) {
         this.stats.biggestWin = netGain;
       }
-    } else if (result === "player") {
+    } else if (result === "agent") {
       this.stats.handsWon++;
       this.stats.totalWon += netGain;
       if (netGain > this.stats.biggestWin) {
@@ -151,7 +151,7 @@ export class BettingManager {
   }
   
   /**
-   * Check if player can afford a bet
+   * Check if agent can afford a bet
    * @param {number} amount - Bet amount to check
    * @returns {boolean}
    */
@@ -162,7 +162,7 @@ export class BettingManager {
   }
   
   /**
-   * Check if player is broke
+   * Check if agent is broke
    * @returns {boolean}
    */
   isBroke() {
@@ -275,11 +275,11 @@ export function getPayoutMessage(payoutDetails) {
   let message = '';
   
   switch (result) {
-    case "player-blackjack":
+    case "agent-blackjack":
       message = `🎰 BLACKJACK! You bet $${bet.toFixed(2)} and won $${netGain.toFixed(2)} (3:2 payout)`;
       break;
     
-    case "player":
+    case "agent":
       message = `🎉 YOU WIN! You bet $${bet.toFixed(2)} and won $${netGain.toFixed(2)}`;
       break;
     
@@ -388,7 +388,7 @@ export class MartingaleStrategy extends BettingStrategy {
         bettingManager.maxBet,
         bettingManager.bankroll
       );
-    } else if (lastResult.result === "player" || lastResult.result === "player-blackjack") {
+    } else if (lastResult.result === "agent" || lastResult.result === "agent-blackjack") {
       // Won - reset to base bet
       this.currentBet = this.baseBet;
     }
@@ -431,7 +431,7 @@ export class ProgressiveBettingStrategy extends BettingStrategy {
   getBetSize(gameState, bettingManager, lastResult) {
     if (lastResult === null) {
       this.currentBet = this.baseBet;
-    } else if (lastResult.result === "player" || lastResult.result === "player-blackjack") {
+    } else if (lastResult.result === "agent" || lastResult.result === "agent-blackjack") {
       // Won - increase bet
       this.currentBet = Math.min(
         this.currentBet + this.increaseAmount,

@@ -1,6 +1,6 @@
-# Shoe Actions
+# Source Actions
 
-Operations on multi-deck containers (shoes). Used for casino games and weighted randomness.
+Operations on multi-stack containers (sources). Used for casino games and weighted randomness.
 
 [← Back to Action Reference](../ACTIONS.md)
 
@@ -8,34 +8,34 @@ Operations on multi-deck containers (shoes). Used for casino games and weighted 
 
 ## Actions (7)
 
-1. `shoe:draw` - Draw card from shoe
-2. `shoe:shuffle` - Shuffle all decks in shoe
-3. `shoe:burn` - Burn N cards from shoe
-4. `shoe:reset` - Reset shoe to original state
-5. `shoe:addDeck` - Add deck to shoe
-6. `shoe:removeDeck` - Remove deck from shoe
-7. `shoe:inspect` - Get shoe information
+1. `source:draw` - Draw card from source
+2. `source:shuffle` - Shuffle all stacks in source
+3. `source:burn` - Burn N cards from source
+4. `source:reset` - Reset source to original state
+5. `source:addStack` - Add stack to source
+6. `source:removeStack` - Remove stack from source
+7. `source:inspect` - Get source information
 
 ---
 
 ## Quick Examples
 
 ```javascript
-// Create 6-deck shoe (blackjack)
-const shoe = new Shoe();
+// Create 6-stack source (blackjack)
+const source = new Source();
 for (let i = 0; i < 6; i++) {
-  shoe.addDeck(createStandardDeck());
+  source.addStack(createStandardStack());
 }
 
-engine.dispatch("shoe:shuffle");
+engine.dispatch("source:shuffle");
 
 // Deal cards
-engine.dispatch("shoe:draw");
-engine.dispatch("shoe:burn");  // Casino procedure
+engine.dispatch("source:draw");
+engine.dispatch("source:burn");  // Casino procedure
 ```
 
 ---
 
-See [complete ACTIONS.md documentation](../ACTIONS-COMPLETE.md) for full details on all shoe actions.
+See [complete ACTIONS.md documentation](../ACTIONS-COMPLETE.md) for full details on all source actions.
 
 [← Back to Action Reference](../ACTIONS.md)

@@ -34,14 +34,14 @@
  */
 
 import { Engine } from '../../engine/Engine.js';
-import { Deck } from '../../core/Deck.js';
+import { Stack } from '../../core/Stack.js';
 import { Token } from '../../core/Token.js';
 import { EventBus } from '../../core/EventBus.js';
 
 /**
- * Create a standard 52-card deck
+ * Create a standard 52-card stack
  */
-function createStandardDeck() {
+function createStandardStack() {
   const suits = ['♠', '♥', '♦', '♣'];
   const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const cards = [];
@@ -63,7 +63,7 @@ function createStandardDeck() {
     }
   }
   
-  return new Deck(cards);
+  return new Stack(cards);
 }
 
 /**
@@ -71,8 +71,8 @@ function createStandardDeck() {
  */
 class AccordionSolitaire {
   constructor(seed = null) {
-    this.deck = createStandardDeck();
-    this.engine = new Engine({ deck: this.deck });
+    this.stack = createStandardStack();
+    this.engine = new Engine({ stack: this.stack });
     this.engine.eventBus = new EventBus();
     
     // The "row" of cards - this is our game state
@@ -91,10 +91,10 @@ class AccordionSolitaire {
    */
   deal() {
     this.engine.dispatch("game:start");
-    this.engine.dispatch("deck:shuffle", { seed: this.seed });
+    this.engine.dispatch("stack:shuffle", { seed: this.seed });
     
     // Draw all 52 cards into our row
-    this.row = this.engine.dispatch("deck:draw", { count: 52 });
+    this.row = this.engine.dispatch("stack:draw", { count: 52 });
     
     console.log("\n🃏 Accordion Solitaire - Cards Dealt!\n");
     this.display();

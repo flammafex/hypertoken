@@ -8,7 +8,7 @@ export class HiLoCountingAgent {
     this.spreadMultiplier = spreadMultiplier;
     this.runningCount = 0;
     this.cardsDealt = 0;
-    this.decksRemaining = 6;
+    this.stacksRemaining = 6;
     this.trueCount = 0;
   }
   
@@ -20,12 +20,12 @@ export class HiLoCountingAgent {
       this.runningCount -= 1;
     }
     this.cardsDealt++;
-    this.decksRemaining = Math.max(1, (312 - this.cardsDealt) / 52);
-    this.trueCount = Math.floor(this.runningCount / this.decksRemaining);
+    this.stacksRemaining = Math.max(1, (312 - this.cardsDealt) / 52);
+    this.trueCount = Math.floor(this.runningCount / this.stacksRemaining);
   }
   
   updateFromGameState(gameState) {
-    for (const card of gameState.playerHand.cards) {
+    for (const card of gameState.agentHand.cards) {
       this.updateCount(card);
     }
     const dealerCards = gameState.dealerHand.cards;
@@ -55,24 +55,24 @@ export class HiLoCountingAgent {
   }
   
   decide(gameState) {
-    const playerValue = gameState.playerHand.value;
+    const agentValue = gameState.agentHand.value;
     const dealerUpCard = gameState.dealerHand.cards[1];
     const dealerValue = this.getCardValue(dealerUpCard);
     
     this.updateFromGameState(gameState);
     
-    if (playerValue >= 17) return "stand";
-    if (playerValue <= 11) return "hit";
+    if (agentValue >= 17) return "stand";
+    if (agentValue <= 11) return "hit";
     
-    if (playerValue === 16 && dealerValue === 10) {
+    if (agentValue === 16 && dealerValue === 10) {
       return this.trueCount >= 0 ? "stand" : "hit";
     }
     
-    if (playerValue >= 13 && playerValue <= 16 && dealerValue >= 2 && dealerValue <= 6) {
+    if (agentValue >= 13 && agentValue <= 16 && dealerValue >= 2 && dealerValue <= 6) {
       return "stand";
     }
     
-    if (playerValue === 12 && dealerValue >= 4 && dealerValue <= 6) {
+    if (agentValue === 12 && dealerValue >= 4 && dealerValue <= 6) {
       return "stand";
     }
     
@@ -89,7 +89,7 @@ export class HiLoCountingAgent {
   resetCount() {
     this.runningCount = 0;
     this.cardsDealt = 0;
-    this.decksRemaining = 6;
+    this.stacksRemaining = 6;
     this.trueCount = 0;
   }
   
@@ -98,7 +98,7 @@ export class HiLoCountingAgent {
       runningCount: this.runningCount,
       trueCount: this.trueCount,
       cardsDealt: this.cardsDealt,
-      decksRemaining: this.decksRemaining.toFixed(1)
+      stacksRemaining: this.stacksRemaining.toFixed(1)
     };
   }
 }

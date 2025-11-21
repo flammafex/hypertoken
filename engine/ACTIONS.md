@@ -10,10 +10,10 @@ Complete documentation for all 58 built-in actions in the HyperToken engine.
 
 | Category | Count | Documentation |
 |----------|-------|---------------|
-| **Deck** | 10 | [Deck Actions](./actions/DECK.md) |
-| **Table** | 13 | [Table Actions](./actions/TABLE.md) |
-| **Shoe** | 7 | [Shoe Actions](./actions/SHOE.md) |
-| **Player** | 12 | [Player Actions](./actions/PLAYER.md) |
+| **Stack** | 10 | [Stack Actions](./actions/stack.md) |
+| **Space** | 13 | [Space Actions](./actions/TABLE.md) |
+| **Source** | 7 | [Source Actions](./actions/SHOE.md) |
+| **Agent** | 12 | [Agent Actions](./actions/PLAYER.md) |
 | **Game** | 6 | [Game Actions](./actions/GAME.md) |
 | **Token** | 5 | [Token Actions](./actions/TOKEN.md) |
 | **Batch** | 5 | [Batch Actions](./actions/BATCH.md) |
@@ -23,17 +23,17 @@ Complete documentation for all 58 built-in actions in the HyperToken engine.
 
 ## Action Categories
 
-### 🎴 [Deck Actions](./actions/DECK.md) (10)
-Operations on the primary card deck.
+### 🎴 [Stack Actions](./actions/stack.md) (10)
+Operations on the primary card stack.
 
 **Actions:** shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse
 
-**Use cases:** Shuffling at game start, drawing cards, deck manipulation, dealer procedures
+**Use cases:** Shuffling at game start, drawing cards, stack manipulation, dealer procedures
 
 ---
 
-### 🎯 [Table Actions](./actions/TABLE.md) (13)
-Operations on the game table and zones.
+### 🎯 [Space Actions](./actions/TABLE.md) (13)
+Operations on the game space and zones.
 
 **Actions:** place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone
 
@@ -41,21 +41,21 @@ Operations on the game table and zones.
 
 ---
 
-### 👟 [Shoe Actions](./actions/SHOE.md) (7)
-Operations on multi-deck containers.
+### 👟 [Source Actions](./actions/SHOE.md) (7)
+Operations on multi-stack containers.
 
-**Actions:** draw, shuffle, burn, reset, addDeck, removeDeck, inspect
+**Actions:** draw, shuffle, burn, reset, addStack, removeStack, inspect
 
-**Use cases:** Casino games with multiple decks, blackjack, baccarat, weighted randomness
+**Use cases:** Casino games with multiple stacks, blackjack, baccarat, weighted randomness
 
 ---
 
-### 👥 [Player Actions](./actions/PLAYER.md) (12)
-Player management and player-to-player interactions.
+### 👥 [Agent Actions](./actions/PLAYER.md) (12)
+Agent management and agent-to-agent interactions.
 
 **Actions:** create, remove, setActive, giveResource, takeResource, drawCards, discardCards, get, transfer, trade, steal
 
-**Use cases:** Game setup, resource management, trading economies, theft mechanics, player state
+**Use cases:** Game setup, resource management, trading economies, theft mechanics, agent state
 
 ---
 
@@ -94,19 +94,19 @@ Collection operations and queries.
 ```javascript
 // 1. Setup
 engine.dispatch("game:start");
-engine.dispatch("player:create", { name: "Alice" });
-engine.dispatch("player:create", { name: "Bob" });
+engine.dispatch("agent:create", { name: "Alice" });
+engine.dispatch("agent:create", { name: "Bob" });
 
 // 2. Shuffle and deal
-engine.dispatch("deck:shuffle");
-engine.dispatch("player:drawCards", { name: "Alice", count: 5 });
-engine.dispatch("player:drawCards", { name: "Bob", count: 5 });
+engine.dispatch("stack:shuffle");
+engine.dispatch("agent:drawCards", { name: "Alice", count: 5 });
+engine.dispatch("agent:drawCards", { name: "Bob", count: 5 });
 ```
 
-**Player Trading**
+**Agent Trading**
 ```javascript
 // Direct transfer
-engine.dispatch("player:transfer", {
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   resource: "gold",
@@ -114,9 +114,9 @@ engine.dispatch("player:transfer", {
 });
 
 // Atomic trade
-engine.dispatch("player:trade", {
-  player1: { name: "Alice", offer: { resource: "gold", amount: 100 } },
-  player2: { name: "Bob", offer: { resource: "wood", amount: 200 } }
+engine.dispatch("agent:trade", {
+  agent1: { name: "Alice", offer: { resource: "gold", amount: 100 } },
+  agent2: { name: "Bob", offer: { resource: "wood", amount: 200 } }
 });
 ```
 
@@ -146,7 +146,7 @@ const redCards = engine.dispatch("tokens:filter", {
 
 // Count resources
 const goldCount = engine.dispatch("tokens:count", {
-  source: "player-inventory",
+  source: "agent-inventory",
   predicate: (token) => token.meta.type === "gold"
 });
 ```
@@ -159,7 +159,7 @@ All actions emit events through the EventBus. Listen for them:
 
 ```javascript
 // Listen to specific action
-engine.eventBus.on("player:transfer", (data) => {
+engine.eventBus.on("agent:transfer", (data) => {
   console.log(`${data.from} transferred to ${data.to}`);
 });
 
@@ -170,10 +170,10 @@ engine.eventBus.on("action:dispatched", (action) => {
 ```
 
 **Common events:**
-- `deck:shuffled`
-- `player:transfer`
-- `player:trade`
-- `player:steal`
+- `stack:shuffled`
+- `agent:transfer`
+- `agent:trade`
+- `agent:steal`
 - `token:transformed`
 - `token:attached`
 - `token:merged`
@@ -190,7 +190,7 @@ Actions throw descriptive errors:
 
 ```javascript
 try {
-  engine.dispatch("player:transfer", {
+  engine.dispatch("agent:transfer", {
     from: "Alice",
     to: "Bob",
     resource: "gold",
@@ -198,7 +198,7 @@ try {
   });
 } catch (error) {
   console.error(error.message);
-  // "Player Alice only has 100 gold, cannot transfer 1000"
+  // "Agent Alice only has 100 gold, cannot transfer 1000"
 }
 ```
 
@@ -234,7 +234,7 @@ npm test
 # Test specific categories
 node test/testTokenActions.js      # 15 tests
 node test/testBatchActions.js      # 19 tests
-node test/testPlayerTransfers.js   # 14 tests
+node test/testAgentTransfers.js   # 14 tests
 ```
 
 ---
@@ -244,16 +244,16 @@ node test/testPlayerTransfers.js   # 14 tests
 ### By Use Case
 
 **Card Games**
-- Deal: `player:drawCards`
-- Shuffle: `deck:shuffle`
-- Play: `table:place`
-- Discard: `player:discardCards`
+- Deal: `agent:drawCards`
+- Shuffle: `stack:shuffle`
+- Play: `space:place`
+- Discard: `agent:discardCards`
 
 **Resource Management**
-- Give: `player:giveResource`
-- Take: `player:takeResource`
-- Transfer: `player:transfer`
-- Trade: `player:trade`
+- Give: `agent:giveResource`
+- Take: `agent:takeResource`
+- Transfer: `agent:transfer`
+- Trade: `agent:trade`
 
 **Token Lifecycle**
 - Create: Use Token constructor
@@ -292,10 +292,10 @@ Each category file includes:
 ## Navigation
 
 📖 **Action Categories:**
-- [Deck Actions](./actions/DECK.md)
-- [Table Actions](./actions/TABLE.md)
-- [Shoe Actions](./actions/SHOE.md)
-- [Player Actions](./actions/PLAYER.md)
+- [Stack Actions](./actions/stack.md)
+- [Space Actions](./actions/TABLE.md)
+- [Source Actions](./actions/SHOE.md)
+- [Agent Actions](./actions/PLAYER.md)
 - [Game Actions](./actions/GAME.md)
 - [Token Actions](./actions/TOKEN.md)
 - [Batch Actions](./actions/BATCH.md)

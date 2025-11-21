@@ -23,7 +23,7 @@
 
 /**
  * Register "first to goal" win condition
- * Player wins when reaching a target score/resource amount
+ * Agent wins when reaching a target score/resource amount
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -41,12 +41,12 @@ export function registerFirstToGoal(ruleEngine, opts = {}) {
   ruleEngine.addRule(
     `first-to-${goal}-wins`,
     (engine) => {
-      const players = engine._players || [];
+      const agents = engine._agents || [];
       const gameEnded = engine._gameState?.ended;
       
       if (gameEnded) return false;
       
-      const winner = players.find(p => {
+      const winner = agents.find(p => {
         const value = resource === "score" ? p.score : p.resources?.[resource] || 0;
         
         switch (comparison) {
@@ -60,8 +60,8 @@ export function registerFirstToGoal(ruleEngine, opts = {}) {
       return !!winner;
     },
     (engine) => {
-      const players = engine._players || [];
-      const winner = players.find(p => {
+      const agents = engine._agents || [];
+      const winner = agents.find(p => {
         const value = resource === "score" ? p.score : p.resources?.[resource] || 0;
         
         switch (comparison) {
@@ -84,8 +84,8 @@ export function registerFirstToGoal(ruleEngine, opts = {}) {
 }
 
 /**
- * Register "last player standing" win condition
- * Player wins when all others are eliminated
+ * Register "last agent standing" win condition
+ * Agent wins when all others are eliminated
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -101,23 +101,23 @@ export function registerLastStanding(ruleEngine, opts = {}) {
   ruleEngine.addRule(
     "last-standing-wins",
     (engine) => {
-      const players = engine._players || [];
+      const agents = engine._agents || [];
       const gameEnded = engine._gameState?.ended;
       
-      if (gameEnded || players.length === 0) return false;
+      if (gameEnded || agents.length === 0) return false;
       
-      const alive = players.filter(p => p[statusField] !== eliminatedValue);
+      const alive = agents.filter(p => p[statusField] !== eliminatedValue);
       return alive.length === 1;
     },
     (engine) => {
-      const players = engine._players || [];
-      const winner = players.find(p => p[statusField] !== eliminatedValue);
+      const agents = engine._agents || [];
+      const winner = agents.find(p => p[statusField] !== eliminatedValue);
       
       engine.dispatch("game:end", {
         winner: winner.name,
         reason: "elimination",
         survivors: 1,
-        eliminated: players.length - 1
+        eliminated: agents.length - 1
       });
     },
     { priority: 100, once: true }
@@ -126,7 +126,7 @@ export function registerLastStanding(ruleEngine, opts = {}) {
 
 /**
  * Register "highest score" win condition
- * Player with highest score wins after time/rounds expire
+ * Agent with highest score wins after time/rounds expire
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -160,10 +160,10 @@ export function registerHighestScore(ruleEngine, opts = {}) {
       return false;
     },
     (engine) => {
-      const players = engine._players || [];
+      const agents = engine._agents || [];
       
       // Sort by score
-      const sorted = [...players].sort((a, b) => {
+      const sorted = [...agents].sort((a, b) => {
         const aScore = a[scoreField] || 0;
         const bScore = b[scoreField] || 0;
         return bScore - aScore;
@@ -178,7 +178,7 @@ export function registerHighestScore(ruleEngine, opts = {}) {
         engine.dispatch("game:end", {
           winner: null,
           reason: "tie",
-          tiedPlayers: sorted.filter(p => p[scoreField] === winner[scoreField]).map(p => p.name),
+          tiedAgents: sorted.filter(p => p[scoreField] === winner[scoreField]).map(p => p.name),
           finalScores: sorted.map(p => ({ name: p.name, score: p[scoreField] }))
         });
       } else {
@@ -196,7 +196,7 @@ export function registerHighestScore(ruleEngine, opts = {}) {
 
 /**
  * Register "objective complete" win condition
- * Player wins when completing specific objectives
+ * Agent wins when completing specific objectives
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -212,12 +212,12 @@ export function registerObjectiveWin(ruleEngine, opts = {}) {
   ruleEngine.addRule(
     "objective-complete-wins",
     (engine) => {
-      const players = engine._players || [];
+      const agents = engine._agents || [];
       const gameEnded = engine._gameState?.ended;
       
       if (gameEnded || objectives.length === 0) return false;
       
-      const winner = players.find(p => {
+      const winner = agents.find(p => {
         const completed = p.completedObjectives || [];
         
         if (requireAll) {
@@ -232,8 +232,8 @@ export function registerObjectiveWin(ruleEngine, opts = {}) {
       return !!winner;
     },
     (engine) => {
-      const players = engine._players || [];
-      const winner = players.find(p => {
+      const agents = engine._agents || [];
+      const winner = agents.find(p => {
         const completed = p.completedObjectives || [];
         
         if (requireAll) {
@@ -256,7 +256,7 @@ export function registerObjectiveWin(ruleEngine, opts = {}) {
 
 /**
  * Register "no moves available" draw condition
- * Game ends in draw when no player can make a legal move
+ * Game ends in draw when no agent can make a legal move
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -276,11 +276,11 @@ export function registerStalemate(ruleEngine, opts = {}) {
         return !checkMoves(engine);
       }
       
-      // Default: check if deck empty and no moves tracked
-      const deckEmpty = engine.deck?.size === 0;
+      // Default: check if stack empty and no moves tracked
+      const stackEmpty = engine.stack?.size === 0;
       const noMoves = engine._gameState?.availableMoves?.length === 0;
       
-      return deckEmpty && noMoves;
+      return stackEmpty && noMoves;
     },
     (engine) => {
       engine.dispatch("game:end", {
@@ -295,7 +295,7 @@ export function registerStalemate(ruleEngine, opts = {}) {
 
 /**
  * Register "territory control" win condition
- * Player wins by controlling majority of zones/territories
+ * Agent wins by controlling majority of zones/territories
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -312,18 +312,18 @@ export function registerTerritoryControl(ruleEngine, opts = {}) {
     "territory-control-wins",
     (engine) => {
       const gameEnded = engine._gameState?.ended;
-      if (gameEnded || !engine.table) return false;
+      if (gameEnded || !engine.space) return false;
       
-      const zonesToCheck = zones || Array.from(engine.table.zones.keys());
+      const zonesToCheck = zones || Array.from(engine.space.zones.keys());
       const totalZones = zonesToCheck.length;
       
       if (totalZones === 0) return false;
       
-      const players = engine._players || [];
+      const agents = engine._agents || [];
       
-      const winner = players.find(p => {
+      const winner = agents.find(p => {
         const controlled = zonesToCheck.filter(z => {
-          const owner = engine.table.zones.get(z)?._owner;
+          const owner = engine.space.zones.get(z)?._owner;
           return owner === p.name;
         }).length;
         
@@ -333,13 +333,13 @@ export function registerTerritoryControl(ruleEngine, opts = {}) {
       return !!winner;
     },
     (engine) => {
-      const zonesToCheck = zones || Array.from(engine.table.zones.keys());
+      const zonesToCheck = zones || Array.from(engine.space.zones.keys());
       const totalZones = zonesToCheck.length;
-      const players = engine._players || [];
+      const agents = engine._agents || [];
       
-      const winner = players.find(p => {
+      const winner = agents.find(p => {
         const controlled = zonesToCheck.filter(z => {
-          const owner = engine.table.zones.get(z)?._owner;
+          const owner = engine.space.zones.get(z)?._owner;
           return owner === p.name;
         }).length;
         
@@ -347,7 +347,7 @@ export function registerTerritoryControl(ruleEngine, opts = {}) {
       });
       
       const controlled = zonesToCheck.filter(z => {
-        const owner = engine.table.zones.get(z)?._owner;
+        const owner = engine.space.zones.get(z)?._owner;
         return owner === winner.name;
       }).length;
       
@@ -365,7 +365,7 @@ export function registerTerritoryControl(ruleEngine, opts = {}) {
 
 /**
  * Register cooperative win condition
- * All players win or lose together based on team objectives
+ * All agents win or lose together based on team objectives
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -386,11 +386,11 @@ export function registerCooperativeWin(ruleEngine, opts = {}) {
         return !gameEnded && winCondition(engine);
       },
       (engine) => {
-        const players = engine._players || [];
+        const agents = engine._agents || [];
         engine.dispatch("game:end", {
           winner: "all",
           reason: "team_victory",
-          players: players.map(p => p.name)
+          agents: agents.map(p => p.name)
         });
       },
       { priority: 100, once: true }
@@ -405,11 +405,11 @@ export function registerCooperativeWin(ruleEngine, opts = {}) {
         return !gameEnded && loseCondition(engine);
       },
       (engine) => {
-        const players = engine._players || [];
+        const agents = engine._agents || [];
         engine.dispatch("game:end", {
           winner: null,
           reason: "team_defeat",
-          players: players.map(p => p.name)
+          agents: agents.map(p => p.name)
         });
       },
       { priority: 100, once: true }

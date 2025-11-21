@@ -17,8 +17,8 @@
 /**
  * Network Tic-Tac-Toe Game
  * 
- * Demonstrates HyperToken's multiplayer capabilities with a simple turn-based game.
- * Two players connect to a relay server and compete in real-time.
+ * Demonstrates HyperToken's multiagent capabilities with a simple turn-based game.
+ * Two agents connect to a relay server and compete in real-time.
  */
 
 import { ActionRegistry } from '../../engine/actions.js';
@@ -31,10 +31,10 @@ Object.assign(ActionRegistry, {
   "tictactoe:init": (engine) => {
     engine._gameState = {
       board: Array(9).fill(null), // 0-8 positions
-      currentPlayer: 'X',
+      currentAgent: 'X',
       winner: null,
       gameOver: false,
-      players: {
+      agents: {
         X: null,
         O: null
       }
@@ -43,19 +43,19 @@ Object.assign(ActionRegistry, {
   },
   
   /**
-   * Register a player
+   * Register a agent
    */
   "tictactoe:register": (engine, { symbol, clientId } = {}) => {
     if (!symbol || !clientId) {
       throw new Error("symbol and clientId required");
     }
     
-    if (!engine._gameState.players[symbol]) {
-      engine._gameState.players[symbol] = clientId;
-      engine.emit("player:registered", { symbol, clientId });
+    if (!engine._gameState.agents[symbol]) {
+      engine._gameState.agents[symbol] = clientId;
+      engine.emit("agent:registered", { symbol, clientId });
       
-      // Start game if both players registered
-      if (engine._gameState.players.X && engine._gameState.players.O) {
+      // Start game if both agents registered
+      if (engine._gameState.agents.X && engine._gameState.agents.O) {
         engine.emit("game:started", engine._gameState);
       }
     }
@@ -80,9 +80,9 @@ Object.assign(ActionRegistry, {
       throw new Error("Position already taken");
     }
     
-    // Check if it's this player's turn
-    const currentSymbol = state.currentPlayer;
-    if (state.players[currentSymbol] !== clientId) {
+    // Check if it's this agent's turn
+    const currentSymbol = state.currentAgent;
+    if (state.agents[currentSymbol] !== clientId) {
       throw new Error("Not your turn");
     }
     
@@ -102,8 +102,8 @@ Object.assign(ActionRegistry, {
       engine.emit("game:draw", {});
     } else {
       // Switch turns
-      state.currentPlayer = currentSymbol === 'X' ? 'O' : 'X';
-      engine.emit("turn:changed", { currentPlayer: state.currentPlayer });
+      state.currentAgent = currentSymbol === 'X' ? 'O' : 'X';
+      engine.emit("turn:changed", { currentAgent: state.currentAgent });
     }
   },
   
@@ -112,7 +112,7 @@ Object.assign(ActionRegistry, {
    */
   "tictactoe:reset": (engine) => {
     engine._gameState.board = Array(9).fill(null);
-    engine._gameState.currentPlayer = 'X';
+    engine._gameState.currentAgent = 'X';
     engine._gameState.winner = null;
     engine._gameState.gameOver = false;
     engine.emit("game:reset", engine._gameState);
@@ -169,9 +169,9 @@ export function getStatusMessage(state) {
     }
   }
   
-  if (!state.players.X || !state.players.O) {
-    return `Waiting for players... (${state.players.X ? '1' : '0'}/2)`;
+  if (!state.agents.X || !state.agents.O) {
+    return `Waiting for agents... (${state.agents.X ? '1' : '0'}/2)`;
   }
   
-  return `${state.currentPlayer}'s turn`;
+  return `${state.currentAgent}'s turn`;
 }

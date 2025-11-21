@@ -53,7 +53,7 @@ engine._gameState = {
   ended: false,
   // Custom properties...
   round: 3,
-  currentPlayer: "Alice"
+  currentAgent: "Alice"
 }
 ```
 

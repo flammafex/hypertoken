@@ -22,8 +22,8 @@
 
 import { Engine } from '../engine/Engine.js';
 import { EventBus } from '../core/EventBus.js';
-import { Deck } from '../core/Deck.js';
-import { Table } from '../core/Table.js';
+import { Stack } from '../core/Stack.js';
+import { Space } from '../core/Space.js';
 import { Token } from '../core/Token.js';
 import { BatchActions } from '../engine/actions-extended.js';
 
@@ -37,8 +37,8 @@ function createToken(id, props = {}) {
   });
 }
 
-// Helper to create a deck of test cards
-function createTestDeck() {
+// Helper to create a stack of test cards
+function createTestStack() {
   const tokens = [
     createToken('card-1', { label: 'Red Card', meta: { color: 'red', value: 5 } }),
     createToken('card-2', { label: 'Blue Card', meta: { color: 'blue', value: 3 } }),
@@ -47,7 +47,7 @@ function createTestDeck() {
     createToken('card-5', { label: 'Blue Card', meta: { color: 'blue', value: 8 } }),
     createToken('card-6', { label: 'Red Card', meta: { color: 'red', value: 1 } }),
   ];
-  return new Deck(tokens);
+  return new Stack(tokens);
 }
 
 // Test runner
@@ -78,10 +78,10 @@ function runTests() {
   // ============================================================
   
   test('tokens:filter - filter by color', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const redCards = BatchActions['tokens:filter'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.meta.color === 'red'
     });
     
@@ -94,10 +94,10 @@ function runTests() {
   });
   
   test('tokens:filter - filter by value threshold', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const highValue = BatchActions['tokens:filter'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.meta.value >= 5
     });
     
@@ -106,11 +106,11 @@ function runTests() {
     }
   });
   
-  test('tokens:filter - from deck source', () => {
-    engine.deck = createTestDeck();
+  test('tokens:filter - from stack source', () => {
+    engine.stack = createTestStack();
     
     const blueCards = BatchActions['tokens:filter'](engine, {
-      source: 'deck',
+      source: 'stack',
       predicate: (token) => token.meta.color === 'blue'
     });
     
@@ -119,13 +119,13 @@ function runTests() {
     }
   });
   
-  test('tokens:filter - from table zone', () => {
-    engine.table = new Table('test');
-    const deck = createTestDeck();
+  test('tokens:filter - from space zone', () => {
+    engine.space = new Space('test');
+    const stack = createTestStack();
     
-    // Place some cards on table
-    deck._stack.slice(0, 4).forEach(token => {
-      engine.table.place('play', token);
+    // Place some cards on space
+    stack._stack.slice(0, 4).forEach(token => {
+      engine.space.place('play', token);
     });
     
     const redCards = BatchActions['tokens:filter'](engine, {
@@ -205,32 +205,32 @@ function runTests() {
   // ============================================================
   
   test('tokens:collect - from multiple sources', () => {
-    engine.deck = createTestDeck();
-    engine.table = new Table('test');
+    engine.stack = createTestStack();
+    engine.space = new Space('test');
     
-    // Draw some cards to table
-    const drawn = engine.deck.drawMany(3);
-    drawn.forEach(card => engine.table.place('hand', card));
+    // Draw some cards to space
+    const drawn = engine.stack.drawMany(3);
+    drawn.forEach(card => engine.space.place('hand', card));
     
     const allTokens = BatchActions['tokens:collect'](engine, {
-      sources: ['deck', 'table']
+      sources: ['stack', 'space']
     });
     
-    // Should have remaining deck cards + cards on table
+    // Should have remaining stack cards + cards on space
     if (allTokens.length !== 6) {
       throw new Error(`Expected 6 total tokens, got ${allTokens.length}`);
     }
   });
   
-  test('tokens:collect - from table zones', () => {
-    engine.table = new Table('test');
-    const deck = createTestDeck();
+  test('tokens:collect - from space zones', () => {
+    engine.space = new Space('test');
+    const stack = createTestStack();
     
     // Place cards in different zones
-    engine.table.place('zone1', deck._stack[0]);
-    engine.table.place('zone1', deck._stack[1]);
-    engine.table.place('zone2', deck._stack[2]);
-    engine.table.place('zone2', deck._stack[3]);
+    engine.space.place('zone1', stack._stack[0]);
+    engine.space.place('zone1', stack._stack[1]);
+    engine.space.place('zone2', stack._stack[2]);
+    engine.space.place('zone2', stack._stack[3]);
     
     const collected = BatchActions['tokens:collect'](engine, {
       sources: ['zone1', 'zone2']
@@ -242,7 +242,7 @@ function runTests() {
   });
   
   test('tokens:collect - include attachments', () => {
-    engine.table = new Table('test');
+    engine.space = new Space('test');
     
     const host = createToken('host');
     const attachment1 = createToken('att1');
@@ -254,7 +254,7 @@ function runTests() {
       { token: attachment2, type: 'armor', id: 'att2' }
     ];
     
-    engine.table.place('play', host);
+    engine.space.place('play', host);
     
     const withAttachments = BatchActions['tokens:collect'](engine, {
       sources: ['play'],
@@ -271,10 +271,10 @@ function runTests() {
   // ============================================================
   
   test('tokens:count - count all', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const count = BatchActions['tokens:count'](engine, {
-      tokens: deck._stack
+      tokens: stack._stack
     });
     
     if (count !== 6) {
@@ -283,10 +283,10 @@ function runTests() {
   });
   
   test('tokens:count - count with predicate', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const redCount = BatchActions['tokens:count'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.meta.color === 'red'
     });
     
@@ -296,23 +296,23 @@ function runTests() {
   });
   
   test('tokens:count - from source', () => {
-    engine.deck = createTestDeck();
+    engine.stack = createTestStack();
     
     const totalCount = BatchActions['tokens:count'](engine, {
-      source: 'deck'
+      source: 'stack'
     });
     
     if (totalCount !== 6) {
-      throw new Error(`Expected 6 cards in deck, got ${totalCount}`);
+      throw new Error(`Expected 6 cards in stack, got ${totalCount}`);
     }
   });
   
   test('tokens:count - from source with predicate', () => {
-    engine.table = new Table('test');
-    const deck = createTestDeck();
+    engine.space = new Space('test');
+    const stack = createTestStack();
     
     // Place cards
-    deck._stack.forEach(card => engine.table.place('field', card));
+    stack._stack.forEach(card => engine.space.place('field', card));
     
     const highValueCount = BatchActions['tokens:count'](engine, {
       source: 'field',
@@ -329,10 +329,10 @@ function runTests() {
   // ============================================================
   
   test('tokens:find - find by id', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const found = BatchActions['tokens:find'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.id === 'card-3'
     });
     
@@ -342,10 +342,10 @@ function runTests() {
   });
   
   test('tokens:find - find by property', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const found = BatchActions['tokens:find'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.meta.color === 'green'
     });
     
@@ -355,10 +355,10 @@ function runTests() {
   });
   
   test('tokens:find - return null when not found', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const found = BatchActions['tokens:find'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.meta.color === 'purple'
     });
     
@@ -368,10 +368,10 @@ function runTests() {
   });
   
   test('tokens:find - find first match', () => {
-    const deck = createTestDeck();
+    const stack = createTestStack();
     
     const found = BatchActions['tokens:find'](engine, {
-      tokens: deck._stack,
+      tokens: stack._stack,
       predicate: (token) => token.meta.color === 'red'
     });
     
@@ -386,16 +386,16 @@ function runTests() {
   // ============================================================
   
   test('Integration - complex filtering and batch operations', () => {
-    engine.deck = createTestDeck();
-    engine.table = new Table('test');
+    engine.stack = createTestStack();
+    engine.space = new Space('test');
     
     // Draw cards to hand
-    const drawn = engine.deck.drawMany(4);
-    drawn.forEach(card => engine.table.place('hand', card));
+    const drawn = engine.stack.drawMany(4);
+    drawn.forEach(card => engine.space.place('hand', card));
     
     // Collect all tokens
     const allTokens = BatchActions['tokens:collect'](engine, {
-      sources: ['deck', 'hand']
+      sources: ['stack', 'hand']
     });
     
     if (allTokens.length !== 6) {

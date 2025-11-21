@@ -27,7 +27,7 @@ function clean(str) {
 function normalizeTokens(data) {
   const kind = data.kind ?? "default";
   if (!Array.isArray(data.tokens))
-    throw new Error("Deck JSON must include tokens[]");
+    throw new Error("Stack JSON must include tokens[]");
 
   return data.tokens.map((t, i) => new Token({
     ...t,
@@ -38,9 +38,9 @@ function normalizeTokens(data) {
   }));
 }
 
-/** Parse an in-memory deck object into a normalized deck structure */
+/** Parse an in-memory stack object into a normalized stack structure */
 export function parseTokenSetObject(data) {
-  const deck = {
+  const stack = {
     name: clean(data.name) || "Untitled Set",
     kind: clean(data.kind) || "default",
     description: clean(data.description) || "",
@@ -48,24 +48,24 @@ export function parseTokenSetObject(data) {
   };
 
   // Ensure unique IDs for all tokens
-  const used = new Set(deck.tokens.map(t => t.id).filter(Boolean));
-  for (const tok of deck.tokens) {
+  const used = new Set(stack.tokens.map(t => t.id).filter(Boolean));
+  for (const tok of stack.tokens) {
     if (!tok.id) {
-      let base = `${deck.kind}-${tok.group ?? ""}-${tok.label ?? ""}`
+      let base = `${stack.kind}-${tok.group ?? ""}-${tok.label ?? ""}`
         .toLowerCase()
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9\-]/g, "");
-      if (!base) base = `${deck.kind}-token`;
+      if (!base) base = `${stack.kind}-token`;
       let id = base, n = 2;
       while (used.has(id)) id = `${base}-${n++}`;
       tok.id = id;
       used.add(id);
     }
   }
-  return deck;
+  return stack;
 }
 
-/** Fetch + parse a deck JSON file into { name, kind, description, tokens[] } */
+/** Fetch + parse a stack JSON file into { name, kind, description, tokens[] } */
 // loaders/tokenSetLoader.js
 export async function loadTokenSetJSON(url, fetchImpl = (typeof fetch !== "undefined" ? fetch : null)) {
   if (!fetchImpl) throw new Error("No fetch implementation available");

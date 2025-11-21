@@ -23,17 +23,17 @@ Select tokens matching a predicate function.
 ```javascript
 // Filter array
 const redCards = engine.dispatch("tokens:filter", {
-  tokens: deck.cards,
+  tokens: stack.cards,
   predicate: (token) => token.meta.color === "red"
 });
 
 // Filter from source
 const highValue = engine.dispatch("tokens:filter", {
-  source: "deck",
+  source: "stack",
   predicate: (token) => token.meta.value >= 10
 });
 
-// Filter from table zone
+// Filter from space zone
 const untapped = engine.dispatch("tokens:filter", {
   source: "battlefield",
   predicate: (token) => !token.meta.tapped
@@ -44,8 +44,8 @@ const untapped = engine.dispatch("tokens:filter", {
 - `tokens` (Array<Token>): Tokens to filter (if not using source)
 - `predicate` (function, required): `(token) => boolean`
 - `source` (string): Source to filter from
-  - Standard sources: `'deck'`, `'table'`, `'discard'`, `'shoe'`
-  - Or any table zone name
+  - Standard sources: `'stack'`, `'space'`, `'discard'`, `'source'`
+  - Or any space zone name
 
 **Returns:** Array of matching tokens
 
@@ -55,7 +55,7 @@ const untapped = engine.dispatch("tokens:filter", {
 - Finding specific cards
 - Selecting units by property
 - Legal move generation
-- Hand/deck queries
+- Hand/stack queries
 
 **Example:**
 ```javascript
@@ -66,10 +66,10 @@ const strong = engine.dispatch("tokens:filter", {
 });
 
 // Find cards you can afford
-const player = engine.dispatch("player:get", { name: "Alice" });
+const agent = engine.dispatch("agent:get", { name: "Alice" });
 const affordable = engine.dispatch("tokens:filter", {
-  tokens: player.hand,
-  predicate: (card) => card.meta.cost <= player.resources.mana
+  tokens: agent.hand,
+  predicate: (card) => card.meta.cost <= agent.resources.mana
 });
 
 // Find damaged units
@@ -88,7 +88,7 @@ Apply an operation to each token in a collection.
 ```javascript
 // Modify tokens
 engine.dispatch("tokens:forEach", {
-  tokens: playerHand,
+  tokens: agentHand,
   operation: (token) => {
     token.meta.buffed = true;
   }
@@ -102,9 +102,9 @@ const powers = engine.dispatch("tokens:forEach", {
 
 // Use index parameter
 engine.dispatch("tokens:forEach", {
-  tokens: deck.cards,
+  tokens: stack.cards,
   operation: (token, index) => {
-    token.meta.deckPosition = index;
+    token.meta.stackPosition = index;
   }
 });
 ```
@@ -164,7 +164,7 @@ Gather tokens from multiple sources into a single array.
 ```javascript
 // From multiple sources
 const allTokens = engine.dispatch("tokens:collect", {
-  sources: ["deck", "table", "discard"]
+  sources: ["stack", "space", "discard"]
 });
 
 // From specific zones
@@ -181,8 +181,8 @@ const withEquipment = engine.dispatch("tokens:collect", {
 
 **Parameters:**
 - `sources` (Array<string>, required): Sources to collect from
-  - Standard: `'deck'`, `'table'`, `'discard'`, `'shoe'`
-  - Or any table zone name
+  - Standard: `'stack'`, `'space'`, `'discard'`, `'source'`
+  - Or any space zone name
 - `includeAttachments` (boolean, default: false): Also collect attached tokens
 
 **Returns:** Array of all collected tokens (no duplicates)
@@ -199,13 +199,13 @@ const withEquipment = engine.dispatch("tokens:collect", {
 ```javascript
 // Get everything in play
 const everything = engine.dispatch("tokens:collect", {
-  sources: ["deck", "table", "discard", "exile"]
+  sources: ["stack", "space", "discard", "exile"]
 });
 
 console.log(`Total tokens in game: ${everything.length}`);
 
-// Get all player cards
-const player = engine.dispatch("player:get", { name: "Alice" });
+// Get all agent cards
+const agent = engine.dispatch("agent:get", { name: "Alice" });
 const allCards = engine.dispatch("tokens:collect", {
   sources: ["hand", "battlefield", "graveyard"]
 }).filter(token => token.meta.owner === "Alice");
@@ -226,8 +226,8 @@ Count tokens with optional filtering.
 
 ```javascript
 // Count all in source
-const deckSize = engine.dispatch("tokens:count", {
-  source: "deck"
+const stackSize = engine.dispatch("tokens:count", {
+  source: "stack"
 });
 
 // Count matching predicate
@@ -293,7 +293,7 @@ Find the first token matching a predicate.
 ```javascript
 // Find by ID
 const card = engine.dispatch("tokens:find", {
-  tokens: deck.cards,
+  tokens: stack.cards,
   predicate: (token) => token.id === "ace-spades"
 });
 
@@ -339,7 +339,7 @@ const strongest = engine.dispatch("tokens:find", {
   predicate: (t) => {
     if (t.meta.type !== "creature") return false;
     
-    const allCreatures = engine.table.zones.get("battlefield")
+    const allCreatures = engine.space.zones.get("battlefield")
       .filter(p => p.token.meta.type === "creature");
     
     return allCreatures.every(other => 
@@ -350,14 +350,14 @@ const strongest = engine.dispatch("tokens:find", {
 
 // Find card by name
 const aceOfSpades = engine.dispatch("tokens:find", {
-  source: "deck",
+  source: "stack",
   predicate: (card) => card.label === "Ace of Spades"
 });
 
-// Check if player has specific card
-const player = engine.dispatch("player:get", { name: "Alice" });
+// Check if agent has specific card
+const agent = engine.dispatch("agent:get", { name: "Alice" });
 const hasFireball = engine.dispatch("tokens:find", {
-  tokens: player.hand,
+  tokens: agent.hand,
   predicate: (card) => card.meta.name === "Fireball"
 }) !== null;
 ```
@@ -414,12 +414,12 @@ engine.dispatch("tokens:forEach", {
 ### Resource Management
 ```javascript
 // Count total resources
-function countAllResources(engine, playerName) {
-  const player = engine.dispatch("player:get", { name: playerName });
+function countAllResources(engine, agentName) {
+  const agent = engine.dispatch("agent:get", { name: agentName });
   
   const inventory = engine.dispatch("tokens:collect", {
-    sources: ["player-inventory"]
-  }).filter(t => t.meta.owner === playerName);
+    sources: ["agent-inventory"]
+  }).filter(t => t.meta.owner === agentName);
   
   const resources = {};
   
@@ -438,13 +438,13 @@ function countAllResources(engine, playerName) {
 
 ### Win Condition Check
 ```javascript
-// Check if player has won (collect all 5 artifacts)
-function checkVictory(engine, playerName) {
+// Check if agent has won (collect all 5 artifacts)
+function checkVictory(engine, agentName) {
   const artifacts = engine.dispatch("tokens:filter", {
     source: "battlefield",
     predicate: (t) => 
       t.meta.type === "artifact" &&
-      t.meta.controller === playerName
+      t.meta.controller === agentName
   });
   
   const uniqueArtifacts = new Set(artifacts.map(a => a.meta.artifactName));
@@ -456,12 +456,12 @@ function checkVictory(engine, playerName) {
 ### Card Selection UI
 ```javascript
 // Get cards grouped by cost
-function groupHandByCost(engine, playerName) {
-  const player = engine.dispatch("player:get", { name: playerName });
+function groupHandByCost(engine, agentName) {
+  const agent = engine.dispatch("agent:get", { name: agentName });
   const grouped = {};
   
   engine.dispatch("tokens:forEach", {
-    tokens: player.hand,
+    tokens: agent.hand,
     operation: (card) => {
       const cost = card.meta.cost || 0;
       if (!grouped[cost]) grouped[cost] = [];
@@ -475,10 +475,10 @@ function groupHandByCost(engine, playerName) {
 
 ### Statistics Collection
 ```javascript
-// Calculate deck statistics
-function analyzeDeck(engine) {
+// Calculate stack statistics
+function analyzeStack(engine) {
   const all = engine.dispatch("tokens:collect", {
-    sources: ["deck"]
+    sources: ["stack"]
   });
   
   return {

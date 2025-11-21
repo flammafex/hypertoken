@@ -3,7 +3,7 @@
   "title": "HyperToken Session State Schema v1.0",
   "description": "Serialized runtime state for a single HyperToken session.",
   "type": "object",
-  "required": ["version", "timestamp", "deck", "zones"],
+  "required": ["version", "timestamp", "stack", "zones"],
   "properties": {
     "version": {
       "type": "string",
@@ -18,9 +18,9 @@
       "type": ["string", "integer", "null"],
       "description": "Seed used for deterministic shuffles, if any."
     },
-    "deck": {
+    "stack": {
       "type": "object",
-      "description": "Metadata about the current deck.",
+      "description": "Metadata about the current stack.",
       "required": ["name", "kind", "remaining"],
       "properties": {
         "name": { "type": "string" },
@@ -35,7 +35,7 @@
     },
     "zones": {
       "type": "object",
-      "description": "Serialized table zones and placements.",
+      "description": "Serialized space zones and placements.",
       "patternProperties": {
         "^[a-zA-Z0-9_-]+$": {
           "type": "array",

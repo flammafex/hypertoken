@@ -363,10 +363,10 @@ const coins = engine.dispatch("token:split", {
   }))
 });
 
-// Distribute among players
+// Distribute among agents
 coins.forEach((coin, i) => {
-  const playerName = players[i % players.length];
-  // Give coin to player...
+  const agentName = agents[i % agents.length];
+  // Give coin to agent...
 });
 
 // Split damaged item

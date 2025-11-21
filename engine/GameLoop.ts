@@ -3,13 +3,13 @@
  */
 import { Emitter } from "../core/events.js";
 import { Engine } from "./Engine.js";
-import { Player } from "./Player.js";
-import { SessionManager } from "../core/SessionManager.js";
+import { Agent } from "./Agent.js";
+import { Chronicle } from "../core/Chronicle.js";
 import { IGameLoopState } from "../core/types.js";
 
 export class GameLoop extends Emitter {
   engine: Engine;
-  session: SessionManager;
+  session: Chronicle;
   delay: number;
   
   // Track previous state to detect changes
@@ -26,7 +26,7 @@ export class GameLoop extends Emitter {
         doc.gameLoop = {
           turn: 0,
           running: false,
-          activePlayerIndex: -1,
+          activeAgentIndex: -1,
           phase: "setup",
           maxTurns: maxTurns
         };
@@ -43,7 +43,7 @@ export class GameLoop extends Emitter {
   // --- STATE GETTERS ---
   get turn(): number { return this.session.state.gameLoop?.turn ?? 0; }
   get running(): boolean { return this.session.state.gameLoop?.running ?? false; }
-  get activePlayerIndex(): number { return this.session.state.gameLoop?.activePlayerIndex ?? -1; }
+  get activeAgentIndex(): number { return this.session.state.gameLoop?.activeAgentIndex ?? -1; }
   get phase(): string { return this.session.state.gameLoop?.phase ?? "setup"; }
   
   get maxTurns(): number { return this.session.state.gameLoop?.maxTurns ?? Infinity; }
@@ -72,15 +72,15 @@ export class GameLoop extends Emitter {
       // In manual-mode (blackjack), we just emit the event.
     }
 
-    // 3. Detect Turn/Player Change
+    // 3. Detect Turn/Agent Change
     if (current.turn !== this._lastState.turn || 
-        current.activePlayerIndex !== this._lastState.activePlayerIndex) {
+        current.activeAgentIndex !== this._lastState.activeAgentIndex) {
        
-       const player = this.activePlayer;
+       const agent = this.activeAgent;
        this.emit("turn:changed", { 
         payload: { 
           turn: current.turn, 
-          player: player?.name ?? "unknown" 
+          agent: agent?.name ?? "unknown" 
         } 
       });
     }
@@ -97,7 +97,7 @@ export class GameLoop extends Emitter {
         doc.gameLoop.running = true;
         doc.gameLoop.turn = 0;
         doc.gameLoop.phase = "play";
-        doc.gameLoop.activePlayerIndex = 0; 
+        doc.gameLoop.activeAgentIndex = 0; 
       }
     });
     // _syncState will catch this and emit loop:start
@@ -115,16 +115,16 @@ export class GameLoop extends Emitter {
 
   nextTurn() {
     this.session.change("next turn", (doc) => {
-      if (!doc.gameLoop || !this.engine._players.length) return;
+      if (!doc.gameLoop || !this.engine._agents.length) return;
       doc.gameLoop.turn++;
-      doc.gameLoop.activePlayerIndex = (doc.gameLoop.activePlayerIndex + 1) % this.engine._players.length;
+      doc.gameLoop.activeAgentIndex = (doc.gameLoop.activeAgentIndex + 1) % this.engine._agents.length;
     });
   }
 
-  get activePlayer(): Player | null {
-    const idx = this.activePlayerIndex;
-    if (idx >= 0 && idx < this.engine._players.length) {
-      return this.engine._players[idx];
+  get activeAgent(): Agent | null {
+    const idx = this.activeAgentIndex;
+    if (idx >= 0 && idx < this.engine._agents.length) {
+      return this.engine._agents[idx];
     }
     return null;
   }

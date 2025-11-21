@@ -66,7 +66,7 @@ export interface IPlacementCRDT {
   tags: string[];
 }
 
-export interface IDeckState {
+export interface IStackState {
   stack: IToken[];
   drawn: IToken[];
   discards: IToken[];
@@ -75,7 +75,7 @@ export interface IDeckState {
 export interface IGameLoopState {
   turn: number;
   running: boolean;
-  activePlayerIndex: number;
+  activeAgentIndex: number;
   phase: string; 
   maxTurns: number;
 }
@@ -87,10 +87,10 @@ export interface IRuleState {
 
 export interface HyperTokenState {
   zones?: Record<string, IPlacementCRDT[]>;
-  deck?: IDeckState;
+  stack?: IStackState;
   gameLoop?: IGameLoopState;
   rules?: IRuleState; // Added rules state
-  players?: Record<string, any>;
+  agents?: Record<string, any>;
   version?: string;
   
   [key: string]: any;

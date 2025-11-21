@@ -3,36 +3,36 @@
  */
 // @ts-ignore
 import { Emitter } from "../core/events.js";
-import { Deck } from "../core/Deck.js";
-import { Table } from "../core/Table.js";
-import { Shoe } from "../core/Shoe.js";
+import { Stack } from "../core/Stack.js";
+import { Space } from "../core/Space.js";
+import { Source } from "../core/Source.js";
 import { Action } from "./Action.js";
 // @ts-ignore
 import { ActionRegistry } from "./actions.js";
 import { IActionPayload } from "../core/types.js";
-import { SessionManager } from "../core/SessionManager.js";
+import { Chronicle } from "../core/Chronicle.js";
 // @ts-ignore
 import { NetworkInterface } from "../interface/NetworkInterface.js";
 // @ts-ignore
-import { SyncManager } from "../core/SyncManager.js";
+import { ConsensusCore } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
 
 export interface EngineOptions {
-  deck?: Deck | null;
-  table?: Table | null;
-  shoe?: Shoe | null;
+  stack?: Stack | null;
+  space?: Space | null;
+  source?: Source | null;
   autoConnect?: string; 
 }
 
 export class Engine extends Emitter {
-  deck: Deck | null;
-  table: Table;
-  shoe: Shoe | null;
+  stack: Stack | null;
+  space: Space;
+  source: Source | null;
   
-  session: SessionManager;
+  session: Chronicle;
   network?: NetworkInterface;
-  sync?: SyncManager;
+  sync?: ConsensusCore;
   loop: GameLoop;
   
   // Exposed RuleEngine
@@ -42,18 +42,18 @@ export class Engine extends Emitter {
   future: Action[];
   _policies: Map<string, any>;
   
-  _players: any[];
+  _agents: any[];
   _gameState: any;
   _transactions: any[];
   debug: boolean;
 
-  constructor({ deck = null, table = null, shoe = null, autoConnect }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect }: EngineOptions = {}) {
     super();
     
-    this.session = new SessionManager();
-    this.table = table ?? new Table(this.session, "main-table");
-    this.deck = deck;
-    this.shoe = shoe;
+    this.session = new Chronicle();
+    this.space = space ?? new Space(this.session, "main-space");
+    this.stack = stack;
+    this.source = source;
     this.loop = new GameLoop(this);
 
     this.history = [];
@@ -61,7 +61,7 @@ export class Engine extends Emitter {
     this._policies = new Map();
     this.debug = false;
 
-    this._players = [];
+    this._agents = [];
     this._gameState = {};
     this._transactions = [];
 
@@ -81,7 +81,7 @@ export class Engine extends Emitter {
     if (this.network) return;
     console.log(`[Engine] Connecting to ${url}...`);
     this.network = new NetworkInterface(url, this);
-    this.sync = new SyncManager(this.session, this.network);
+    this.sync = new ConsensusCore(this.session, this.network);
     this.network.connect();
     this.network.on("net:ready", (e) => this.emit("net:ready", e));
     this.network.on("net:peer:connected", (e) => this.emit("net:peer:connected", e));
@@ -166,9 +166,9 @@ export class Engine extends Emitter {
 
   snapshot(): any {
     return {
-      deck: this.deck?.toJSON?.() ?? null,
-      table: this.table.snapshot(),
-      shoe: this.shoe?.toJSON?.() ?? null,
+      stack: this.stack?.toJSON?.() ?? null,
+      space: this.space.snapshot(),
+      source: this.source?.toJSON?.() ?? null,
       history: this.history.map(a => a.toJSON()),
       policies: Array.from(this._policies.keys()),
       crdt: this.session.saveToBase64()
@@ -194,16 +194,16 @@ export class Engine extends Emitter {
     return {
       version: "2.0.0-crdt",
       turn: this._gameState.turn,
-      players: this._players,
-      deck: this.deck,
-      table: this.table,
-      shoe: this.shoe
+      agents: this._agents,
+      stack: this.stack,
+      space: this.space,
+      source: this.source
     };
   }
 
   describe({ detail = false } = {}): any {
-    const { deck, table, shoe } = this;
-    const players = this.state.players?.map((p: any) => ({
+    const { stack, space, source } = this;
+    const agents = this.state.agents?.map((p: any) => ({
       name: p.name,
       handCount: p.hand?.length ?? 0,
       discardCount: p.discard?.length ?? 0,
@@ -214,21 +214,21 @@ export class Engine extends Emitter {
     const summary = {
       version: this.state.version,
       turn: this.state.turn ?? null,
-      players,
-      deck: deck
-        ? { remaining: deck.size, drawn: deck.drawn?.length ?? 0 }
+      agents,
+      stack: stack
+        ? { remaining: stack.size, drawn: stack.drawn?.length ?? 0 }
         : null,
-      table: table
+      space: space
         ? {
-            zones: table.zones, 
-            totalPlacements: table.cards().length
+            zones: space.zones, 
+            totalPlacements: space.cards().length
           }
         : null,
-      shoe: shoe
+      source: source
         ? {
-            remaining: shoe._stack?.length ?? 0,
-            burned: shoe._burned?.length ?? 0,
-            policy: shoe._reshufflePolicy ?? null
+            remaining: source._stack?.length ?? 0,
+            burned: source._burned?.length ?? 0,
+            policy: source._reshufflePolicy ?? null
           }
         : null
     };
@@ -237,34 +237,34 @@ export class Engine extends Emitter {
 
     return {
       ...summary,
-      deckState: deck?.toJSON?.() ?? null,
-      tableState: table?.snapshot?.() ?? null,
-      shoeState: {
-        decks: shoe?._decks?.length ?? 0,
-        cards: shoe?._stack ?? []
+      stackState: stack?.toJSON?.() ?? null,
+      spaceState: space?.snapshot?.() ?? null,
+      sourceState: {
+        stacks: source?._stacks?.length ?? 0,
+        cards: source?._stack ?? []
       }
     };
   }
 
   availableActions(): any[] {
     const actions = [];
-    if (this.state.deck) {
+    if (this.state.stack) {
       actions.push(
-        { type: "deck:draw", payload: { count: 1 } },
-        { type: "deck:shuffle", payload: {} },
-        { type: "deck:reset", payload: {} }
+        { type: "stack:draw", payload: { count: 1 } },
+        { type: "stack:shuffle", payload: {} },
+        { type: "stack:reset", payload: {} }
       );
     }
-    if (this.state.table) {
+    if (this.state.space) {
       actions.push(
-        { type: "table:place", payload: { zone: "altar" } },
-        { type: "table:clear", payload: {} }
+        { type: "space:place", payload: { zone: "altar" } },
+        { type: "space:clear", payload: {} }
       );
     }
-    if (this.state.shoe) {
+    if (this.state.source) {
       actions.push(
-        { type: "shoe:draw", payload: { count: 1 } },
-        { type: "shoe:shuffle", payload: {} }
+        { type: "source:draw", payload: { count: 1 } },
+        { type: "source:shuffle", payload: {} }
       );
     }
     actions.push(

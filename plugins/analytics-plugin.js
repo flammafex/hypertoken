@@ -58,7 +58,7 @@ export function init(engine, config = {}) {
     },
     turns: {
       total: 0,
-      byPlayer: {},
+      byAgent: {},
       averageDuration: 0
     },
     errors: {
@@ -70,7 +70,7 @@ export function init(engine, config = {}) {
       triggered: 0,
       byRule: {}
     },
-    players: {
+    agents: {
       created: 0,
       eliminated: 0,
       active: []
@@ -110,10 +110,10 @@ export function init(engine, config = {}) {
     engine.on('turn:changed', (e) => {
       stats.turns.total++;
       
-      const player = e.payload?.to;
-      if (player) {
-        stats.turns.byPlayer[player] = 
-          (stats.turns.byPlayer[player] || 0) + 1;
+      const agent = e.payload?.to;
+      if (agent) {
+        stats.turns.byAgent[agent] = 
+          (stats.turns.byAgent[agent] || 0) + 1;
       }
       
       // Track turn duration
@@ -177,13 +177,13 @@ export function init(engine, config = {}) {
     }
   });
   
-  // Track players
-  engine.on('player:eliminated', (e) => {
-    stats.players.eliminated++;
-    const player = e.payload?.player;
+  // Track agents
+  engine.on('agent:eliminated', (e) => {
+    stats.agents.eliminated++;
+    const agent = e.payload?.agent;
     
-    if (player) {
-      stats.players.active = stats.players.active.filter(p => p !== player);
+    if (agent) {
+      stats.agents.active = stats.agents.active.filter(p => p !== agent);
     }
   });
   
@@ -262,10 +262,10 @@ export function init(engine, config = {}) {
       report.push(`  Total: ${stats.turns.total}`);
       report.push(`  Average Duration: ${stats.turns.averageDuration}ms`);
       
-      if (Object.keys(stats.turns.byPlayer).length > 0) {
-        report.push('  By Player:');
-        Object.entries(stats.turns.byPlayer).forEach(([player, count]) => {
-          report.push(`    ${player}: ${count}`);
+      if (Object.keys(stats.turns.byAgent).length > 0) {
+        report.push('  By Agent:');
+        Object.entries(stats.turns.byAgent).forEach(([agent, count]) => {
+          report.push(`    ${agent}: ${count}`);
         });
       }
       
@@ -332,7 +332,7 @@ export function init(engine, config = {}) {
       stats.actions.byType = {};
       stats.actions.timeline = [];
       stats.turns.total = 0;
-      stats.turns.byPlayer = {};
+      stats.turns.byAgent = {};
       stats.errors.total = 0;
       stats.errors.byType = {};
       stats.errors.list = [];

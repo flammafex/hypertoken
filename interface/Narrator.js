@@ -44,16 +44,16 @@ export class Narrator extends Emitter {
 
   _formatEvent(type, payload) {
     switch (type) {
-      case "deck:draw":
-        return `🎴 ${payload.player ?? "A player"} drew ${payload.count ?? 1} card(s).`;
-      case "deck:shuffle":
-        return `🔀 Deck shuffled${payload.seed ? ` (seed=${payload.seed})` : ""}.`;
-      case "table:place":
+      case "stack:draw":
+        return `🎴 ${payload.agent ?? "A agent"} drew ${payload.count ?? 1} card(s).`;
+      case "stack:shuffle":
+        return `🔀 Stack shuffled${payload.seed ? ` (seed=${payload.seed})` : ""}.`;
+      case "space:place":
         return `🧩 Card placed on zone "${payload.zone ?? "unknown"}".`;
       case "loop:turn:start":
-        return `▶️ Turn start → ${payload.player ?? "Unknown player"}`;
+        return `▶️ Turn start → ${payload.agent ?? "Unknown agent"}`;
       case "loop:turn:end":
-        return `⏹️ Turn end → ${payload.player ?? "Unknown player"}`;
+        return `⏹️ Turn end → ${payload.agent ?? "Unknown agent"}`;
       case "loop:end":
         return `🏁 Game over after ${payload.totalTurns ?? "?"} turns.`;
       default:

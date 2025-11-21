@@ -20,15 +20,14 @@
 
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
-import { Deck } from "../core/Deck.js";
-// @ts-ignore - Player class might still be JS or we use 'any' for players for now
-import { Player } from "./Player.js";
+import { Stack } from "../core/Stack.js";
+import { Agent } from "./Agent.js";
 
 // Helper types for payloads
-interface DeckPayload { count?: number; seed?: number | null; position?: number | null; topToBottom?: boolean; card?: IToken; start?: number; end?: number | null; i?: number; j?: number; }
-interface TablePayload { fromZone?: string; toZone?: string; placementId?: string; zone?: string; faceUp?: boolean | null; id?: string; label?: string; x?: number; y?: number; seed?: number | null; radius?: number; angleStep?: number; startAngle?: number; pattern?: string; locked?: boolean; }
-interface ShoePayload { seed?: number | null; count?: number; deck?: Deck; }
-interface PlayerPayload { name?: string; agent?: any; meta?: any; active?: boolean; resource?: string; amount?: number; source?: string; count?: number; cards?: IToken | IToken[]; from?: string; to?: string; token?: IToken | null; player1?: any; player2?: any; validate?: (thief: any, victim: any, engine: Engine) => boolean; }
+interface StackPayload { count?: number; seed?: number | null; position?: number | null; topToBottom?: boolean; card?: IToken; start?: number; end?: number | null; i?: number; j?: number; }
+interface SpacePayload { fromZone?: string; toZone?: string; placementId?: string; zone?: string; faceUp?: boolean | null; id?: string; label?: string; x?: number; y?: number; seed?: number | null; radius?: number; angleStep?: number; startAngle?: number; pattern?: string; locked?: boolean; }
+interface SourcePayload { seed?: number | null; count?: number; stack?: Stack; }
+interface AgentPayload { name?: string; controllerLogic?: any; meta?: any; active?: boolean; resource?: string; amount?: number; source?: string; count?: number; cards?: IToken | IToken[]; from?: string; to?: string; token?: IToken | null; agent1?: any; agent2?: any; validate?: (thief: any, victim: any, engine: Engine) => boolean; }
 interface GameStatePayload { winner?: string | null; reason?: string | null; phase?: string | null; key?: string; value?: any; }
 interface TokenPayload { token?: IToken; properties?: any; host?: IToken; attachment?: IToken | null; attachmentType?: string; attachmentId?: string | null; tokens?: IToken[]; resultProperties?: any; keepOriginals?: boolean; count?: number; }
 interface BatchPayload { tokens?: IToken[]; predicate?: (t: IToken) => boolean; source?: string | null; operation?: (t: IToken, i: number) => any; sources?: string[]; includeAttachments?: boolean; }
@@ -37,57 +36,57 @@ interface BatchPayload { tokens?: IToken[]; predicate?: (t: IToken) => boolean; 
   DECK OPERATIONS (8 actions)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-export const DeckActions = {
-  "deck:reset": (engine: Engine) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    engine.deck.reset();
+export const StackActions = {
+  "stack:reset": (engine: Engine) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    engine.stack.reset();
   },
   
-  "deck:burn": (engine: Engine, { count = 1 }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    engine.deck.burn(count);
+  "stack:burn": (engine: Engine, { count = 1 }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    engine.stack.burn(count);
   },
   
-  "deck:peek": (engine: Engine, { count = 1 }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
+  "stack:peek": (engine: Engine, { count = 1 }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
     const cards: IToken[] = [];
-    const stack = engine.deck.tokens || [];
+    const stack = engine.stack.tokens || [];
     for (let i = 0; i < (count!) && i < stack.length; i++) {
       cards.push(stack[stack.length - 1 - i]);
     }
     return cards;
   },
   
-  "deck:cut": (engine: Engine, { position = null, topToBottom = true }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    const n = position ?? Math.floor((engine.deck.size || 0) / 2);
-    engine.deck.cut(n, { topToBottom });
+  "stack:cut": (engine: Engine, { position = null, topToBottom = true }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    const n = position ?? Math.floor((engine.stack.size || 0) / 2);
+    engine.stack.cut(n, { topToBottom });
   },
   
-  "deck:insertAt": (engine: Engine, { card, position = 0 }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    // @ts-ignore - We assume the payload card is compatible with the Deck's Token type
+  "stack:insertAt": (engine: Engine, { card, position = 0 }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    // @ts-ignore - We assume the payload card is compatible with the Stack's Token type
     if (!card) throw new Error("No card provided to insert");
-    engine.deck.insertAt(card as any, position!);
+    engine.stack.insertAt(card as any, position!);
   },
   
-  "deck:removeAt": (engine: Engine, { position = 0 }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    return engine.deck.removeAt(position!);
+  "stack:removeAt": (engine: Engine, { position = 0 }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    return engine.stack.removeAt(position!);
   },
   
-  "deck:swap": (engine: Engine, { i, j }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
+  "stack:swap": (engine: Engine, { i, j }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
     if (i === undefined || j === undefined) {
       throw new Error("Both i and j positions required for swap");
     }
-    engine.deck.swap(i, j);
+    engine.stack.swap(i, j);
   },
   
-  "deck:reverse": (engine: Engine, { start = 0, end = null }: DeckPayload = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    const e = end ?? (engine.deck.size || 0) - 1;
-    engine.deck.reverseRange(start!, e);
+  "stack:reverse": (engine: Engine, { start = 0, end = null }: StackPayload = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    const e = end ?? (engine.stack.size || 0) - 1;
+    engine.stack.reverseRange(start!, e);
   }
 };
 
@@ -95,276 +94,276 @@ export const DeckActions = {
   TABLE OPERATIONS (12 actions)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-export const TableActions = {
-  "table:move": (engine: Engine, { fromZone, toZone, placementId }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+export const SpaceActions = {
+  "space:move": (engine: Engine, { fromZone, toZone, placementId }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!fromZone || !toZone) throw new Error("Both fromZone and toZone required");
     if (!placementId) throw new Error("placementId required");
     
-    const placement = engine.table.findCard(placementId);
+    const placement = engine.space.findCard(placementId);
     if (!placement) throw new Error(`Placement ${placementId} not found`);
     
-    engine.table.move(fromZone, toZone, placement.id);
+    engine.space.move(fromZone, toZone, placement.id);
   },
   
-  "table:flip": (engine: Engine, { zone, placementId, faceUp = null }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:flip": (engine: Engine, { zone, placementId, faceUp = null }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     if (!placementId) throw new Error("placementId required");
     
-    const placement = engine.table.findCard(placementId);
+    const placement = engine.space.findCard(placementId);
     if (!placement) throw new Error(`Placement ${placementId} not found`);
     
     // @ts-ignore - flip accepts boolean | undefined
-    engine.table.flip(zone, placement, faceUp === null ? undefined : faceUp);
+    engine.space.flip(zone, placement, faceUp === null ? undefined : faceUp);
   },
   
-  "table:remove": (engine: Engine, { zone, placementId }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:remove": (engine: Engine, { zone, placementId }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     if (!placementId) throw new Error("placementId required");
     
-    const placement = engine.table.findCard(placementId);
+    const placement = engine.space.findCard(placementId);
     if (!placement) throw new Error(`Placement ${placementId} not found`);
     
-    engine.table.remove(zone, placement.id);
+    engine.space.remove(zone, placement.id);
   },
   
-  "table:createZone": (engine: Engine, { id, label, x = 0, y = 0 }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:createZone": (engine: Engine, { id, label, x = 0, y = 0 }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!id) throw new Error("Zone id required");
     
-    engine.table.createZone(id, { label: label || id, x: x!, y: y! });
+    engine.space.createZone(id, { label: label || id, x: x!, y: y! });
   },
   
-  "table:deleteZone": (engine: Engine, { id }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:deleteZone": (engine: Engine, { id }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!id) throw new Error("Zone id required");
     
-    engine.table.deleteZone(id);
+    engine.space.deleteZone(id);
   },
   
-  "table:clearZone": (engine: Engine, { zone }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:clearZone": (engine: Engine, { zone }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     
-    engine.table.clearZone(zone);
+    engine.space.clearZone(zone);
   },
   
-  "table:shuffleZone": (engine: Engine, { zone, seed = null }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:shuffleZone": (engine: Engine, { zone, seed = null }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     
-    engine.table.shuffleZone(zone, seed as any);
+    engine.space.shuffleZone(zone, seed as any);
   },
   
-  "table:transferZone": (engine: Engine, { fromZone, toZone }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:transferZone": (engine: Engine, { fromZone, toZone }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!fromZone || !toZone) throw new Error("Both fromZone and toZone required");
     
-    engine.table.transferZone(fromZone, toZone);
+    engine.space.transferZone(fromZone, toZone);
   },
   
-  "table:fanZone": (engine: Engine, { zone, radius = 100, angleStep = 15, startAngle = 0 }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:fanZone": (engine: Engine, { zone, radius = 100, angleStep = 15, startAngle = 0 }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     
-    engine.table.fan(zone, { radius, angleStep, startAngle });
+    engine.space.fan(zone, { radius, angleStep, startAngle });
   },
   
-  "table:stackZone": (engine: Engine, { zone }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:stackZone": (engine: Engine, { zone }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     
-    engine.table.stackZone(zone);
+    engine.space.stackZone(zone);
   },
   
-  "table:spreadZone": (engine: Engine, { zone, pattern = "linear", angleStep = 15, radius = 100 }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:spreadZone": (engine: Engine, { zone, pattern = "linear", angleStep = 15, radius = 100 }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     
-    engine.table.spreadZone(zone, { pattern, angleStep, radius });
+    engine.space.spreadZone(zone, { pattern, angleStep, radius });
   },
   
-  "table:lockZone": (engine: Engine, { zone, locked = true }: TablePayload = {}) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:lockZone": (engine: Engine, { zone, locked = true }: SpacePayload = {}) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     
-    engine.table.lockZone(zone, locked);
+    engine.space.lockZone(zone, locked);
   }
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  SHOE OPERATIONS (6 actions)
+  SOURCE OPERATIONS (6 actions)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-export const ShoeActions = {
-  "shoe:shuffle": (engine: Engine, { seed = null }: ShoePayload = {}) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    engine.shoe.shuffle(seed ?? undefined);
+export const SourceActions = {
+  "source:shuffle": (engine: Engine, { seed = null }: SourcePayload = {}) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    engine.source.shuffle(seed ?? undefined);
   },
   
-  "shoe:burn": (engine: Engine, { count = 1 }: ShoePayload = {}) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    engine.shoe.burn(count);
+  "source:burn": (engine: Engine, { count = 1 }: SourcePayload = {}) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    engine.source.burn(count);
   },
   
-  "shoe:reset": (engine: Engine) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    engine.shoe.reset();
+  "source:reset": (engine: Engine) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    engine.source.reset();
   },
   
-  "shoe:addDeck": (engine: Engine, { deck }: ShoePayload = {}) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    if (!deck) throw new Error("deck required");
-    engine.shoe.addDeck(deck);
+  "source:addStack": (engine: Engine, { stack }: SourcePayload = {}) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    if (!stack) throw new Error("stack required");
+    engine.source.addStack(stack);
   },
   
-  "shoe:removeDeck": (engine: Engine, { deck }: ShoePayload = {}) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    if (!deck) throw new Error("deck required");
-    engine.shoe.removeDeck(deck);
+  "source:removeStack": (engine: Engine, { stack }: SourcePayload = {}) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    if (!stack) throw new Error("stack required");
+    engine.source.removeStack(stack);
   },
   
-  "shoe:inspect": (engine: Engine) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    return engine.shoe.inspect();
+  "source:inspect": (engine: Engine) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    return engine.source.inspect();
   }
 };
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  PLAYER OPERATIONS (8 actions)
+  AGENT OPERATIONS (8 actions)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-export const PlayerActions = {
-  "player:create": (engine: Engine, { name, agent = null, meta = {} }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
-    if (!engine._players) engine._players = [];
+export const AgentActions = {
+  "agent:create": (engine: Engine, { name, controllerLogic = null, meta = {} }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
+    if (!engine._agents) engine._agents = [];
     
-    if (engine._players.find((p: any) => p.name === name)) {
-      throw new Error(`Player ${name} already exists`);
+    if (engine._agents.find((p: any) => p.name === name)) {
+      throw new Error(`Agent ${name} already exists`);
     }
     
-    const player = { 
-      id: crypto?.randomUUID?.() || `player-${Date.now()}`,
+    const agent = { 
+      id: crypto?.randomUUID?.() || `agent-${Date.now()}`,
       name, 
-      agent,
+      controllerLogic,
       meta,
       active: true,
       resources: {},
-      hand: [],
+      inventory: [],
       zones: new Map()
     };
     
-    engine._players.push(player);
-    return player;
+    engine._agents.push(agent);
+    return agent;
   },
   
-  "player:remove": (engine: Engine, { name }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
-    if (!engine._players) return;
+  "agent:remove": (engine: Engine, { name }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
+    if (!engine._agents) return;
     
-    const index = engine._players.findIndex((p: any) => p.name === name);
-    if (index === -1) throw new Error(`Player ${name} not found`);
+    const index = engine._agents.findIndex((p: any) => p.name === name);
+    if (index === -1) throw new Error(`Agent ${name} not found`);
     
-    engine._players.splice(index, 1);
+    engine._agents.splice(index, 1);
   },
   
-  "player:setActive": (engine: Engine, { name, active = true }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
-    const player = engine._players?.find((p: any) => p.name === name);
-    if (!player) throw new Error(`Player ${name} not found`);
+  "agent:setActive": (engine: Engine, { name, active = true }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
+    const agent = engine._agents?.find((p: any) => p.name === name);
+    if (!agent) throw new Error(`Agent ${name} not found`);
     
-    player.active = active;
+    agent.active = active;
   },
   
-  "player:giveResource": (engine: Engine, { name, resource, amount = 1 }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
+  "agent:giveResource": (engine: Engine, { name, resource, amount = 1 }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
     if (!resource) throw new Error("Resource type required");
     
-    const player = engine._players?.find((p: any) => p.name === name);
-    if (!player) throw new Error(`Player ${name} not found`);
+    const agent = engine._agents?.find((p: any) => p.name === name);
+    if (!agent) throw new Error(`Agent ${name} not found`);
     
-    if (!player.resources) player.resources = {};
-    player.resources[resource] = (player.resources[resource] || 0) + amount!;
+    if (!agent.resources) agent.resources = {};
+    agent.resources[resource] = (agent.resources[resource] || 0) + amount!;
   },
   
-  "player:takeResource": (engine: Engine, { name, resource, amount = 1 }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
+  "agent:takeResource": (engine: Engine, { name, resource, amount = 1 }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
     if (!resource) throw new Error("Resource type required");
     
-    const player = engine._players?.find((p: any) => p.name === name);
-    if (!player) throw new Error(`Player ${name} not found`);
+    const agent = engine._agents?.find((p: any) => p.name === name);
+    if (!agent) throw new Error(`Agent ${name} not found`);
     
-    if (!player.resources) player.resources = {};
-    player.resources[resource] = Math.max(0, (player.resources[resource] || 0) - amount!);
+    if (!agent.resources) agent.resources = {};
+    agent.resources[resource] = Math.max(0, (agent.resources[resource] || 0) - amount!);
   },
   
-  "player:drawCards": (engine: Engine, { name, count = 1, source = "deck" }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
+  "agent:drawCards": (engine: Engine, { name, count = 1, source = "stack" }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
     
-    const player = engine._players?.find((p: any) => p.name === name);
-    if (!player) throw new Error(`Player ${name} not found`);
+    const agent = engine._agents?.find((p: any) => p.name === name);
+    if (!agent) throw new Error(`Agent ${name} not found`);
     
-    if (!player.hand) player.hand = [];
+    if (!agent.inventory) agent.inventory = [];
     
-    // @ts-ignore - shoe vs deck access
-    const drawSource = source === "shoe" ? engine.shoe : engine.deck;
+    // @ts-ignore - source vs stack access
+    const drawSource = source === "source" ? engine.source : engine.stack;
     if (!drawSource) throw new Error(`No ${source} attached to engine`);
     
     for (let i = 0; i < (count!); i++) {
       const card = drawSource.draw ? drawSource.draw() : null;
-      if (card) player.hand.push(card);
+      if (card) agent.inventory.push(card);
     }
   },
   
-  "player:discardCards": (engine: Engine, { name, cards }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
+  "agent:discardCards": (engine: Engine, { name, cards }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
     if (!cards) throw new Error("Cards required");
     
-    const player = engine._players?.find((p: any) => p.name === name);
-    if (!player) throw new Error(`Player ${name} not found`);
+    const agent = engine._agents?.find((p: any) => p.name === name);
+    if (!agent) throw new Error(`Agent ${name} not found`);
     
-    if (!player.hand) player.hand = [];
+    if (!agent.inventory) agent.inventory = [];
     
     const cardArray = Array.isArray(cards) ? cards : [cards];
     // @ts-ignore
-    player.hand = player.hand.filter(c => !cardArray.includes(c));
+    agent.inventory = agent.inventory.filter(c => !cardArray.includes(c));
     
-    if (engine.deck) {
+    if (engine.stack) {
       // @ts-ignore
-      cardArray.forEach(c => engine.deck!.discard(c));
+      cardArray.forEach(c => engine.stack!.discard(c));
     }
   },
   
-  "player:get": (engine: Engine, { name }: PlayerPayload = {}) => {
-    if (!name) throw new Error("Player name required");
-    const player = engine._players?.find((p: any) => p.name === name);
-    if (!player) throw new Error(`Player ${name} not found`);
-    return player;
+  "agent:get": (engine: Engine, { name }: AgentPayload = {}) => {
+    if (!name) throw new Error("Agent name required");
+    const agent = engine._agents?.find((p: any) => p.name === name);
+    if (!agent) throw new Error(`Agent ${name} not found`);
+    return agent;
   },
   
-  "player:transfer": (engine: Engine, { from, to, resource, amount = 1, token = null }: PlayerPayload = {}) => {
-    if (!from) throw new Error("Source player (from) required");
-    if (!to) throw new Error("Target player (to) required");
+  "agent:transfer": (engine: Engine, { from, to, resource, amount = 1, token = null }: AgentPayload = {}) => {
+    if (!from) throw new Error("Source agent (from) required");
+    if (!to) throw new Error("Target agent (to) required");
     if (!resource && !token) throw new Error("Resource type or token required");
     
-    const sourcePlayer = engine._players?.find((p: any) => p.name === from);
-    const targetPlayer = engine._players?.find((p: any) => p.name === to);
+    const sourceAgent = engine._agents?.find((p: any) => p.name === from);
+    const targetAgent = engine._agents?.find((p: any) => p.name === to);
     
-    if (!sourcePlayer) throw new Error(`Player ${from} not found`);
-    if (!targetPlayer) throw new Error(`Player ${to} not found`);
+    if (!sourceAgent) throw new Error(`Agent ${from} not found`);
+    if (!targetAgent) throw new Error(`Agent ${to} not found`);
     
     if (token) {
-      if (!sourcePlayer.hand) sourcePlayer.hand = [];
-      if (!targetPlayer.hand) targetPlayer.hand = [];
+      if (!sourceAgent.inventory) sourceAgent.inventory = [];
+      if (!targetAgent.inventory) targetAgent.inventory = [];
       
-      const tokenIndex = sourcePlayer.hand.indexOf(token);
+      const tokenIndex = sourceAgent.inventory.indexOf(token);
       if (tokenIndex === -1) {
-        throw new Error(`Player ${from} does not have this token`);
+        throw new Error(`Agent ${from} does not have this token`);
       }
       
-      sourcePlayer.hand.splice(tokenIndex, 1);
-      targetPlayer.hand.push(token);
+      sourceAgent.inventory.splice(tokenIndex, 1);
+      targetAgent.inventory.push(token);
       
       if (!engine._transactions) engine._transactions = [];
       engine._transactions.push({
@@ -375,20 +374,20 @@ export const PlayerActions = {
         timestamp: Date.now()
       });
       
-      engine.emit("player:transfer", { from, to, token: token.id, type: 'token' });
+      engine.emit("agent:transfer", { from, to, token: token.id, type: 'token' });
       return { success: true, token };
     }
     
-    if (!sourcePlayer.resources) sourcePlayer.resources = {};
-    if (!targetPlayer.resources) targetPlayer.resources = {};
+    if (!sourceAgent.resources) sourceAgent.resources = {};
+    if (!targetAgent.resources) targetAgent.resources = {};
     
-    const available = sourcePlayer.resources[resource!] || 0;
+    const available = sourceAgent.resources[resource!] || 0;
     if (available < amount!) {
-      throw new Error(`Player ${from} only has ${available} ${resource}, cannot transfer ${amount}`);
+      throw new Error(`Agent ${from} only has ${available} ${resource}, cannot transfer ${amount}`);
     }
     
-    sourcePlayer.resources[resource!] = available - amount!;
-    targetPlayer.resources[resource!] = (targetPlayer.resources[resource!] || 0) + amount!;
+    sourceAgent.resources[resource!] = available - amount!;
+    targetAgent.resources[resource!] = (targetAgent.resources[resource!] || 0) + amount!;
     
     if (!engine._transactions) engine._transactions = [];
     engine._transactions.push({
@@ -400,71 +399,71 @@ export const PlayerActions = {
       timestamp: Date.now()
     });
     
-    engine.emit("player:transfer", { from, to, resource, amount, type: 'resource' });
+    engine.emit("agent:transfer", { from, to, resource, amount, type: 'resource' });
     
     return { 
       success: true, 
-      from: { player: from, remaining: sourcePlayer.resources[resource!] },
-      to: { player: to, total: targetPlayer.resources[resource!] }
+      from: { agent: from, remaining: sourceAgent.resources[resource!] },
+      to: { agent: to, total: targetAgent.resources[resource!] }
     };
   },
   
-  "player:trade": (engine: Engine, { player1, player2 }: PlayerPayload = {}) => {
-    if (!player1 || !player2) throw new Error("Both player1 and player2 required");
-    if (!player1.name || !player2.name) throw new Error("Player names required");
-    if (!player1.offer || !player2.offer) throw new Error("Both players must provide offers");
+  "agent:trade": (engine: Engine, { agent1, agent2 }: AgentPayload = {}) => {
+    if (!agent1 || !agent2) throw new Error("Both agent1 and agent2 required");
+    if (!agent1.name || !agent2.name) throw new Error("Agent names required");
+    if (!agent1.offer || !agent2.offer) throw new Error("Both agents must provide offers");
     
-    const p1 = engine._players?.find((p: any) => p.name === player1.name);
-    const p2 = engine._players?.find((p: any) => p.name === player2.name);
+    const p1 = engine._agents?.find((p: any) => p.name === agent1.name);
+    const p2 = engine._agents?.find((p: any) => p.name === agent2.name);
     
-    if (!p1) throw new Error(`Player ${player1.name} not found`);
-    if (!p2) throw new Error(`Player ${player2.name} not found`);
+    if (!p1) throw new Error(`Agent ${agent1.name} not found`);
+    if (!p2) throw new Error(`Agent ${agent2.name} not found`);
     
-    const offer1 = player1.offer;
-    const offer2 = player2.offer;
+    const offer1 = agent1.offer;
+    const offer2 = agent2.offer;
     
-    // Check player1's offer
+    // Check agent1's offer
     if (offer1.token) {
-      if (!p1.hand || !p1.hand.includes(offer1.token)) {
-        throw new Error(`${player1.name} does not have offered token`);
+      if (!p1.inventory || !p1.inventory.includes(offer1.token)) {
+        throw new Error(`${agent1.name} does not have offered token`);
       }
     } else if (offer1.resource) {
       if (!p1.resources) p1.resources = {};
       const available = p1.resources[offer1.resource] || 0;
       if (available < offer1.amount) {
-        throw new Error(`${player1.name} only has ${available} ${offer1.resource}`);
+        throw new Error(`${agent1.name} only has ${available} ${offer1.resource}`);
       }
     }
     
-    // Check player2's offer
+    // Check agent2's offer
     if (offer2.token) {
-      if (!p2.hand || !p2.hand.includes(offer2.token)) {
-        throw new Error(`${player2.name} does not have offered token`);
+      if (!p2.inventory || !p2.inventory.includes(offer2.token)) {
+        throw new Error(`${agent2.name} does not have offered token`);
       }
     } else if (offer2.resource) {
       if (!p2.resources) p2.resources = {};
       const available = p2.resources[offer2.resource] || 0;
       if (available < offer2.amount) {
-        throw new Error(`${player2.name} only has ${available} ${offer2.resource}`);
+        throw new Error(`${agent2.name} only has ${available} ${offer2.resource}`);
       }
     }
     
   // Execution
     if (offer1.token) {
-      const idx = p1.hand.indexOf(offer1.token);
-      p1.hand.splice(idx, 1);
-      if (!p2.hand) p2.hand = [];
-      p2.hand.push(offer1.token);
+      const idx = p1.inventory.indexOf(offer1.token);
+      p1.inventory.splice(idx, 1);
+      if (!p2.inventory) p2.inventory = [];
+      p2.inventory.push(offer1.token);
     } else if (offer1.resource) {
       p1.resources[offer1.resource] -= offer1.amount;
       p2.resources[offer1.resource] = (p2.resources[offer1.resource] || 0) + offer1.amount;
     }
     
     if (offer2.token) {
-      const idx = p2.hand.indexOf(offer2.token);
-      p2.hand.splice(idx, 1);
-      if (!p1.hand) p1.hand = [];
-      p1.hand.push(offer2.token);
+      const idx = p2.inventory.indexOf(offer2.token);
+      p2.inventory.splice(idx, 1);
+      if (!p1.inventory) p1.inventory = [];
+      p1.inventory.push(offer2.token);
     } else if (offer2.resource) {
       p2.resources[offer2.resource] -= offer2.amount;
       p1.resources[offer2.resource] = (p1.resources[offer2.resource] || 0) + offer2.amount;
@@ -473,66 +472,66 @@ export const PlayerActions = {
     if (!engine._transactions) engine._transactions = [];
     engine._transactions.push({
       type: 'trade',
-      player1: player1.name,
-      player2: player2.name,
+      agent1: agent1.name,
+      agent2: agent2.name,
       offer1: offer1.token ? { token: offer1.token.id } : { resource: offer1.resource, amount: offer1.amount },
       offer2: offer2.token ? { token: offer2.token.id } : { resource: offer2.resource, amount: offer2.amount },
       timestamp: Date.now()
     });
     
-    engine.emit("player:trade", { player1: player1.name, player2: player2.name, offer1, offer2 });
+    engine.emit("agent:trade", { agent1: agent1.name, agent2: agent2.name, offer1, offer2 });
     return { success: true, transaction: engine._transactions[engine._transactions.length - 1] };
   },
   
-  "player:steal": (engine: Engine, { from, to, resource, amount = 1, token = null, validate }: PlayerPayload = {}) => {
-    if (!from) throw new Error("Victim player (from) required");
-    if (!to) throw new Error("Thief player (to) required");
+  "agent:steal": (engine: Engine, { from, to, resource, amount = 1, token = null, validate }: AgentPayload = {}) => {
+    if (!from) throw new Error("Victim agent (from) required");
+    if (!to) throw new Error("Thief agent (to) required");
     if (!resource && !token) throw new Error("Resource type or token required");
     
-    const victimPlayer = engine._players?.find((p: any) => p.name === from);
-    const thiefPlayer = engine._players?.find((p: any) => p.name === to);
+    const victimAgent = engine._agents?.find((p: any) => p.name === from);
+    const thiefAgent = engine._agents?.find((p: any) => p.name === to);
     
-    if (!victimPlayer) throw new Error(`Player ${from} not found`);
-    if (!thiefPlayer) throw new Error(`Player ${to} not found`);
+    if (!victimAgent) throw new Error(`Agent ${from} not found`);
+    if (!thiefAgent) throw new Error(`Agent ${to} not found`);
     
     if (validate) {
-      const isValid = validate(thiefPlayer, victimPlayer, engine);
+      const isValid = validate(thiefAgent, victimAgent, engine);
       if (!isValid) {
         throw new Error(`Steal validation failed: ${to} cannot steal from ${from}`);
       }
     }
     
     if (token) {
-      if (!victimPlayer.hand) victimPlayer.hand = [];
-      if (!thiefPlayer.hand) thiefPlayer.hand = [];
+      if (!victimAgent.inventory) victimAgent.inventory = [];
+      if (!thiefAgent.inventory) thiefAgent.inventory = [];
       
-      const tokenIndex = victimPlayer.hand.indexOf(token);
-      if (tokenIndex === -1) throw new Error(`Player ${from} does not have this token`);
+      const tokenIndex = victimAgent.inventory.indexOf(token);
+      if (tokenIndex === -1) throw new Error(`Agent ${from} does not have this token`);
       
-      victimPlayer.hand.splice(tokenIndex, 1);
-      thiefPlayer.hand.push(token);
+      victimAgent.inventory.splice(tokenIndex, 1);
+      thiefAgent.inventory.push(token);
       
       if (!engine._transactions) engine._transactions = [];
       engine._transactions.push({ type: 'steal_token', from, to, token: token.id, timestamp: Date.now() });
-      engine.emit("player:steal", { from, to, token: token.id, type: 'token' });
+      engine.emit("agent:steal", { from, to, token: token.id, type: 'token' });
       return { success: true, token };
     }
     
-    if (!victimPlayer.resources) victimPlayer.resources = {};
-    if (!thiefPlayer.resources) thiefPlayer.resources = {};
+    if (!victimAgent.resources) victimAgent.resources = {};
+    if (!thiefAgent.resources) thiefAgent.resources = {};
     
-    const available = victimPlayer.resources[resource!] || 0;
+    const available = victimAgent.resources[resource!] || 0;
     const stolen = Math.min(available, amount!);
     
-    if (stolen === 0) throw new Error(`Player ${from} has no ${resource} to steal`);
+    if (stolen === 0) throw new Error(`Agent ${from} has no ${resource} to steal`);
     
-    victimPlayer.resources[resource!] = available - stolen;
-    thiefPlayer.resources[resource!] = (thiefPlayer.resources[resource!] || 0) + stolen;
+    victimAgent.resources[resource!] = available - stolen;
+    thiefAgent.resources[resource!] = (thiefAgent.resources[resource!] || 0) + stolen;
     
     if (!engine._transactions) engine._transactions = [];
     engine._transactions.push({ type: 'steal_resource', from, to, resource, amount: stolen, timestamp: Date.now() });
-    engine.emit("player:steal", { from, to, resource, amount: stolen, type: 'resource' });
-    return { success: true, stolen, from: { player: from, remaining: victimPlayer.resources[resource!] }, to: { player: to, total: thiefPlayer.resources[resource!] } };
+    engine.emit("agent:steal", { from, to, resource, amount: stolen, type: 'resource' });
+    return { success: true, stolen, from: { agent: from, remaining: victimAgent.resources[resource!] }, to: { agent: to, total: thiefAgent.resources[resource!] } };
   }
 };
 
@@ -694,14 +693,14 @@ export const BatchActions = {
     if (!predicate || typeof predicate !== 'function') throw new Error("Predicate function required");
     
     let tokensToFilter = tokens;
-    if (source === 'deck' && engine.deck) {
-      tokensToFilter = engine.deck.tokens || [];
-    } else if (source === 'table' && engine.table) {
-      // @ts-ignore - Engine.table is typed but methods might not be fully typed yet
-      tokensToFilter = engine.table.allCards() || [];
-    } else if (source && engine.table) {
+    if (source === 'stack' && engine.stack) {
+      tokensToFilter = engine.stack.tokens || [];
+    } else if (source === 'space' && engine.space) {
+      // @ts-ignore - Engine.space is typed but methods might not be fully typed yet
+      tokensToFilter = engine.space.allCards() || [];
+    } else if (source && engine.space) {
       // @ts-ignore
-      tokensToFilter = engine.table.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToFilter = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
     }
     
     const filtered = tokensToFilter.filter(predicate);
@@ -713,14 +712,14 @@ export const BatchActions = {
     if (!operation || typeof operation !== 'function') throw new Error("Operation function required");
     
     let tokensToProcess = tokens;
-    if (source === 'deck' && engine.deck) {
-      tokensToProcess = engine.deck.tokens || [];
-    } else if (source === 'table' && engine.table) {
+    if (source === 'stack' && engine.stack) {
+      tokensToProcess = engine.stack.tokens || [];
+    } else if (source === 'space' && engine.space) {
       // @ts-ignore
-      tokensToProcess = engine.table.allCards() || [];
-    } else if (source && engine.table) {
+      tokensToProcess = engine.space.allCards() || [];
+    } else if (source && engine.space) {
       // @ts-ignore
-      tokensToProcess = engine.table.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToProcess = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
     }
     
     const results: any[] = [];
@@ -744,24 +743,24 @@ export const BatchActions = {
     sources.forEach(source => {
       let tokensFromSource: IToken[] = [];
       
-      if (source === 'deck' && engine.deck) {
-        tokensFromSource = engine.deck.tokens || [];
-      } else if (source === 'table' && engine.table) {
+      if (source === 'stack' && engine.stack) {
+        tokensFromSource = engine.stack.tokens || [];
+      } else if (source === 'space' && engine.space) {
         // @ts-ignore
-        tokensFromSource = engine.table.allCards();
-      } else if (source === 'discard' && engine.deck) {
-        tokensFromSource = engine.deck.discards || [];
-      } else if (source === 'shoe' && engine.shoe) {
+        tokensFromSource = engine.space.allCards();
+      } else if (source === 'discard' && engine.stack) {
+        tokensFromSource = engine.stack.discards || [];
+      } else if (source === 'source; && engine.source') {
         // @ts-ignore
-        if (engine.shoe._decks) {
+        if (engine.source._stacks) {
           // @ts-ignore
-          engine.shoe._decks.forEach((deck: any) => {
-            tokensFromSource.push(...(deck._stack || []));
+          engine.source._stacks.forEach((stack: any) => {
+            tokensFromSource.push(...(stack._stack || []));
           });
         }
-      } else if (engine.table) {
+      } else if (engine.space) {
         // @ts-ignore
-        const zone = engine.table.zone(source);
+        const zone = engine.space.zone(source);
         // @ts-ignore
         tokensFromSource = zone.map((p: any) => p.token || p.card);
       }
@@ -783,14 +782,14 @@ export const BatchActions = {
   
   "tokens:count": (engine: Engine, { tokens = [], predicate, source = null }: BatchPayload = {}) => {
     let tokensToCount = tokens;
-    if (source === 'deck' && engine.deck) {
-      tokensToCount = engine.deck.tokens || [];
-    } else if (source === 'table' && engine.table) {
+    if (source === 'stack' && engine.stack) {
+      tokensToCount = engine.stack.tokens || [];
+    } else if (source === 'space' && engine.space) {
       // @ts-ignore
-      tokensToCount = engine.table.allCards() || [];
-    } else if (source && engine.table) {
+      tokensToCount = engine.space.allCards() || [];
+    } else if (source && engine.space) {
       // @ts-ignore
-      tokensToCount = engine.table.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToCount = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
     }
     
     if (!predicate) return tokensToCount.length;
@@ -804,14 +803,14 @@ export const BatchActions = {
     if (!predicate || typeof predicate !== 'function') throw new Error("Predicate function required");
     
     let tokensToSearch = tokens;
-    if (source === 'deck' && engine.deck) {
-      tokensToSearch = engine.deck.tokens || [];
-    } else if (source === 'table' && engine.table) {
+    if (source === 'stack' && engine.stack) {
+      tokensToSearch = engine.stack.tokens || [];
+    } else if (source === 'space' && engine.space) {
       // @ts-ignore
-      tokensToSearch = engine.table.allCards() || [];
-    } else if (source && engine.table) {
+      tokensToSearch = engine.space.allCards() || [];
+    } else if (source && engine.space) {
       // @ts-ignore
-      tokensToSearch = engine.table.zone(source).map((p: any) => p.token || p.card) || [];
+      tokensToSearch = engine.space.zone(source).map((p: any) => p.token || p.card) || [];
     }
     
     const found = tokensToSearch.find(predicate);
@@ -821,20 +820,20 @@ export const BatchActions = {
 };
 
 export const ExtendedActions = {
-  ...DeckActions,
-  ...TableActions,
-  ...ShoeActions,
-  ...PlayerActions,
+  ...StackActions,
+  ...SpaceActions,
+  ...SourceActions,
+  ...AgentActions,
   ...GameStateActions,
   ...TokenActions,
   ...BatchActions
 };
 
 // Total: 58 actions
-// - Deck: 8
-// - Table: 12
-// - Shoe: 6
-// - Player: 12 (9 base + 3 transfer)
+// - stack: 8
+// - Space: 12
+// - Source: 6
+// - Agent: 12 (9 base + 3 transfer)
 // - GameState: 6
 // - Token: 5
 // - Batch: 5

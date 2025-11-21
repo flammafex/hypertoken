@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 //./test/testCore.js
-import { Deck } from "../core/Deck.js";
-import { Table } from "../core/Table.js";
-import { Shoe } from "../core/Shoe.js";
+import { Stack } from "../core/Stack.js";
+import { Space } from "../core/Space.js";
+import { Source } from "../core/Source.js";
 
-const deck = new Deck([{ label: "A" }, { label: "B" }, { label: "C" }]);
-deck.shuffle(123);
-console.log("Deck size:", deck.size);
+const stack = new Stack([{ label: "A" }, { label: "B" }, { label: "C" }]);
+stack.shuffle(123);
+console.log("Stack size:", stack.size);
 
-const c = deck.draw();
+const c = stack.draw();
 console.log("Drawn:", c.label);
 
-const table = new Table();
-table.place("altar", c);
-console.log("Table zones:", table.zoneCount("altar"));
+const space = new Space();
+space.place("altar", c);
+console.log("Space zones:", space.zoneCount("altar"));
 
-const shoe = new Shoe(deck);
-shoe.shuffle(123);
-console.log("Shoe remaining:", shoe.inspect().remaining);
+const source = new Source(stack);
+source.shuffle(123);
+console.log("Source remaining:", source.inspect().remaining);

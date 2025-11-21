@@ -17,22 +17,22 @@
 /**
  * Turn Order Rule Patterns
  * 
- * Common patterns for managing player turns, round progression,
+ * Common patterns for managing agent turns, round progression,
  * and sequential game flow.
  */
 
 /**
  * Register round-robin turn order rules
- * Players take turns in sequence, cycling back to the first player
+ * Agents take turns in sequence, cycling back to the first agent
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
- * @param {string} opts.triggerAction - Action type that ends a turn (default: "player:endTurn")
- * @param {boolean} opts.skipInactive - Skip eliminated/inactive players (default: true)
+ * @param {string} opts.triggerAction - Action type that ends a turn (default: "agent:endTurn")
+ * @param {boolean} opts.skipInactive - Skip eliminated/inactive agents (default: true)
  */
 export function registerRoundRobinTurns(ruleEngine, opts = {}) {
   const {
-    triggerAction = "player:endTurn",
+    triggerAction = "agent:endTurn",
     skipInactive = true
   } = opts;
   
@@ -40,43 +40,43 @@ export function registerRoundRobinTurns(ruleEngine, opts = {}) {
     "round-robin-advance",
     (engine, lastAction) => {
       if (!lastAction || lastAction.type !== triggerAction) return false;
-      const players = engine._players || [];
-      return players.length > 0;
+      const agents = engine._agents || [];
+      return agents.length > 0;
     },
     (engine) => {
-      const players = engine._players;
-      const currentIdx = players.findIndex(p => p.active);
+      const agents = engine._agents;
+      const currentIdx = agents.findIndex(p => p.active);
       
       if (currentIdx === -1) {
-        // No active player, start with first
-        players[0].active = true;
+        // No active agent, start with first
+        agents[0].active = true;
         return;
       }
       
-      // Deactivate current player
-      players[currentIdx].active = false;
+      // Deactivate current agent
+      agents[currentIdx].active = false;
       
-      // Find next player (skip inactive if configured)
-      let nextIdx = (currentIdx + 1) % players.length;
+      // Find next agent (skip inactive if configured)
+      let nextIdx = (currentIdx + 1) % agents.length;
       let attempts = 0;
       
-      while (skipInactive && attempts < players.length) {
-        if (players[nextIdx].status !== "eliminated" && 
-            players[nextIdx].status !== "inactive") {
+      while (skipInactive && attempts < agents.length) {
+        if (agents[nextIdx].status !== "eliminated" && 
+            agents[nextIdx].status !== "inactive") {
           break;
         }
-        nextIdx = (nextIdx + 1) % players.length;
+        nextIdx = (nextIdx + 1) % agents.length;
         attempts++;
       }
       
-      // Activate next player
-      players[nextIdx].active = true;
+      // Activate next agent
+      agents[nextIdx].active = true;
       
       // Emit turn change event
       engine.emit("turn:changed", {
         payload: {
-          from: players[currentIdx].name,
-          to: players[nextIdx].name,
+          from: agents[currentIdx].name,
+          to: agents[nextIdx].name,
           turnNumber: (engine._gameState?.turnNumber || 0) + 1
         }
       });
@@ -91,7 +91,7 @@ export function registerRoundRobinTurns(ruleEngine, opts = {}) {
 
 /**
  * Register round completion detection
- * Detects when all players have completed their turns in a round
+ * Detects when all agents have completed their turns in a round
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -107,11 +107,11 @@ export function registerRoundCompletion(ruleEngine, opts = {}) {
   ruleEngine.addRule(
     "detect-round-complete",
     (engine) => {
-      const players = engine._players || [];
-      if (players.length === 0) return false;
+      const agents = engine._agents || [];
+      if (agents.length === 0) return false;
       
-      // Check if all players have completed their turn
-      const allComplete = players.every(p => 
+      // Check if all agents have completed their turn
+      const allComplete = agents.every(p => 
         p.turnComplete === true || p.status === "eliminated"
       );
       
@@ -128,7 +128,7 @@ export function registerRoundCompletion(ruleEngine, opts = {}) {
       });
       
       // Reset turn flags
-      engine._players.forEach(p => {
+      engine._agents.forEach(p => {
         p.turnComplete = false;
       });
       
@@ -151,7 +151,7 @@ export function registerRoundCompletion(ruleEngine, opts = {}) {
 
 /**
  * Register turn time limit enforcement
- * Automatically skips turn if player doesn't act within time limit
+ * Automatically skips turn if agent doesn't act within time limit
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
@@ -168,99 +168,99 @@ export function registerTurnTimer(ruleEngine, opts = {}) {
     "enforce-turn-timer",
     (engine) => {
       const turnStart = engine._gameState?.turnStartTime;
-      const waitingForPlayer = engine._gameState?.waitingForPlayer;
+      const waitingForAgent = engine._gameState?.waitingForAgent;
       
-      if (!turnStart || !waitingForPlayer) return false;
+      if (!turnStart || !waitingForAgent) return false;
       
       const elapsed = Date.now() - turnStart;
       return elapsed > timeLimit;
     },
     (engine) => {
-      const activePlayer = engine._players?.find(p => p.active);
+      const activeAgent = engine._agents?.find(p => p.active);
       
       // Emit timeout event
       engine.emit("turn:timeout", {
         payload: { 
-          player: activePlayer?.name,
+          agent: activeAgent?.name,
           elapsed: Date.now() - engine._gameState.turnStartTime
         }
       });
       
       // Execute callback if provided
       if (onTimeout) {
-        onTimeout(engine, activePlayer);
+        onTimeout(engine, activeAgent);
       }
       
       // Force skip turn
-      engine.dispatch("player:endTurn", { forced: true });
+      engine.dispatch("agent:endTurn", { forced: true });
       
       // Clear timer state
       delete engine._gameState.turnStartTime;
-      delete engine._gameState.waitingForPlayer;
+      delete engine._gameState.waitingForAgent;
     },
     { priority: 95 }
   );
 }
 
 /**
- * Register first player selection rules
+ * Register first agent selection rules
  * Determines who goes first based on various criteria
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
  * @param {string} opts.method - Selection method: "random", "youngest", "oldest", "score"
  */
-export function registerFirstPlayerSelection(ruleEngine, opts = {}) {
+export function registerFirstAgentSelection(ruleEngine, opts = {}) {
   const { method = "random" } = opts;
   
   ruleEngine.addRule(
-    "select-first-player",
+    "select-first-agent",
     (engine) => {
       const gameStarted = engine._gameState?.started;
-      const noActivePlayer = !engine._players?.some(p => p.active);
-      return gameStarted && noActivePlayer;
+      const noActiveAgent = !engine._agents?.some(p => p.active);
+      return gameStarted && noActiveAgent;
     },
     (engine) => {
-      const players = engine._players || [];
-      if (players.length === 0) return;
+      const agents = engine._agents || [];
+      if (agents.length === 0) return;
       
-      let firstPlayer;
+      let firstAgent;
       
       switch (method) {
         case "random":
-          firstPlayer = players[Math.floor(Math.random() * players.length)];
+          firstAgent = agents[Math.floor(Math.random() * agents.length)];
           break;
           
         case "youngest":
-          firstPlayer = players.reduce((youngest, p) => 
+          firstAgent = agents.reduce((youngest, p) => 
             (!youngest || p.age < youngest.age) ? p : youngest
           );
           break;
           
         case "oldest":
-          firstPlayer = players.reduce((oldest, p) => 
+          firstAgent = agents.reduce((oldest, p) => 
             (!oldest || p.age > oldest.age) ? p : oldest
           );
           break;
           
         case "score":
-          firstPlayer = players.reduce((highest, p) => 
+          firstAgent = agents.reduce((highest, p) => 
             (!highest || p.score > highest.score) ? p : highest
           );
           break;
           
         default:
-          firstPlayer = players[0];
+          firstAgent = agents[0];
       }
       
-      // Set first player as active
-      players.forEach(p => p.active = false);
-      firstPlayer.active = true;
+      // Set first agent as active
+      agents.forEach(p => p.active = false);
+      firstAgent.active = true;
       
       // Emit event
-      engine.emit("turn:firstPlayer", {
+      engine.emit("turn:firstAgent", {
         payload: { 
-          player: firstPlayer.name,
+          agent: firstAgent.name,
           method 
         }
       });
@@ -276,22 +276,22 @@ export function registerFirstPlayerSelection(ruleEngine, opts = {}) {
 
 /**
  * Register simultaneous turn handling
- * All players act simultaneously rather than sequentially
+ * All agents act simultaneously rather than sequentially
  * 
  * @param {RuleEngine} ruleEngine
  * @param {Object} opts - Configuration options
- * @param {Function} opts.onAllReady - Callback when all players have acted
+ * @param {Function} opts.onAllReady - Callback when all agents have acted
  */
 export function registerSimultaneousTurns(ruleEngine, opts = {}) {
   const { onAllReady = null } = opts;
   
   ruleEngine.addRule(
-    "check-all-players-ready",
+    "check-all-agents-ready",
     (engine) => {
-      const players = engine._players || [];
-      if (players.length === 0) return false;
+      const agents = engine._agents || [];
+      if (agents.length === 0) return false;
       
-      const allReady = players.every(p => 
+      const allReady = agents.every(p => 
         p.actionSubmitted === true || p.status === "eliminated"
       );
       
@@ -303,7 +303,7 @@ export function registerSimultaneousTurns(ruleEngine, opts = {}) {
       // Emit all ready event
       engine.emit("turn:allReady", {
         payload: { 
-          players: engine._players.map(p => p.name)
+          agents: engine._agents.map(p => p.name)
         }
       });
       
@@ -313,7 +313,7 @@ export function registerSimultaneousTurns(ruleEngine, opts = {}) {
       }
       
       // Reset action flags
-      engine._players.forEach(p => {
+      engine._agents.forEach(p => {
         p.actionSubmitted = false;
       });
       
@@ -345,7 +345,7 @@ export function exampleUsage() {
   
   // Set up turn order
   registerRoundRobinTurns(ruleEngine, {
-    triggerAction: "player:endTurn",
+    triggerAction: "agent:endTurn",
     skipInactive: true
   });
   
@@ -360,8 +360,8 @@ export function exampleUsage() {
   // Add turn timer (optional)
   registerTurnTimer(ruleEngine, {
     timeLimit: 30000, // 30 seconds
-    onTimeout: (engine, player) => {
-      console.log(`${player.name} timed out!`);
+    onTimeout: (engine, agent) => {
+      console.log(`${agent.name} timed out!`);
     }
   });
   

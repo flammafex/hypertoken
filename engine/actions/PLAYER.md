@@ -1,6 +1,6 @@
-# Player Actions
+# Agent Actions
 
-Player management and player-to-player interactions. Includes creation, resource management, and economic transfers.
+Agent management and agent-to-agent interactions. Includes creation, resource management, and economic transfers.
 
 [← Back to Action Reference](../ACTIONS.md)
 
@@ -9,32 +9,32 @@ Player management and player-to-player interactions. Includes creation, resource
 ## Actions (12)
 
 **Management (4)**
-1. [player:create](#playercreate) - Create a new player
-2. [player:remove](#playerremove) - Remove a player
-3. [player:setActive](#playersetactive) - Set active/inactive state
-4. [player:get](#playerget) - Get player state
+1. [agent:create](#agentcreate) - Create a new agent
+2. [agent:remove](#agentremove) - Remove a agent
+3. [agent:setActive](#agentsetactive) - Set active/inactive state
+4. [agent:get](#agentget) - Get agent state
 
 **Resources (4)**
-5. [player:giveResource](#playergiveresource) - Give resources to player
-6. [player:takeResource](#playertakeresource) - Take resources from player
-7. [player:drawCards](#playerdrawcards) - Player draws cards
-8. [player:discardCards](#playerdiscardcards) - Player discards cards
+5. [agent:giveResource](#agentgiveresource) - Give resources to agent
+6. [agent:takeResource](#agenttakeresource) - Take resources from agent
+7. [agent:drawCards](#agentdrawcards) - Agent draws cards
+8. [agent:discardCards](#agentdiscardcards) - Agent discards cards
 
 **Transfers (3)** ⭐ New
-9. [player:transfer](#playertransfer) - Direct resource/token transfer
-10. [player:trade](#playertrade) - Bidirectional exchange (atomic)
-11. [player:steal](#playersteal) - Forcible taking (with validation)
+9. [agent:transfer](#agenttransfer) - Direct resource/token transfer
+10. [agent:trade](#agenttrade) - Bidirectional exchange (atomic)
+11. [agent:steal](#agentsteal) - Forcible taking (with validation)
 
 ---
 
-## Player Management
+## Agent Management
 
-### `player:create`
+### `agent:create`
 
-Create a new player and add to the game.
+Create a new agent and add to the game.
 
 ```javascript
-engine.dispatch("player:create", {
+engine.dispatch("agent:create", {
   name: "Alice",
   agent: myAIAgent,
   meta: { color: "blue", avatar: "knight" }
@@ -42,15 +42,15 @@ engine.dispatch("player:create", {
 ```
 
 **Parameters:**
-- `name` (string, required): Player name (must be unique)
+- `name` (string, required): Agent name (must be unique)
 - `agent` (object, optional): AI agent for autonomous play
 - `meta` (object, optional): Custom metadata
 
-**Returns:** Player object
+**Returns:** Agent object
 
-**Events:** `player:created`
+**Events:** `agent:created`
 
-**Player structure:**
+**Agent structure:**
 ```javascript
 {
   id: "uuid",
@@ -65,67 +65,67 @@ engine.dispatch("player:create", {
 
 **Example:**
 ```javascript
-// Human player
-engine.dispatch("player:create", { name: "Alice" });
+// Human agent
+engine.dispatch("agent:create", { name: "Alice" });
 
-// AI player
+// AI agent
 const agent = new MyAIAgent();
-engine.dispatch("player:create", { 
+engine.dispatch("agent:create", { 
   name: "Bot", 
   agent 
 });
 
 // With metadata
-engine.dispatch("player:create", {
-  name: "Player1",
+engine.dispatch("agent:create", {
+  name: "Agent1",
   meta: { color: "#FF0000", team: "red" }
 });
 ```
 
 ---
 
-### `player:remove`
+### `agent:remove`
 
-Remove a player from the game.
+Remove a agent from the game.
 
 ```javascript
-engine.dispatch("player:remove", {
+engine.dispatch("agent:remove", {
   name: "Alice"
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player to remove
+- `name` (string, required): Agent to remove
 
 **Returns:** void
 
-**Events:** `player:removed`
+**Events:** `agent:removed`
 
 **Use cases:**
-- Player elimination
+- Agent elimination
 - Leaving game
 - Disconnection
 
 ---
 
-### `player:setActive`
+### `agent:setActive`
 
-Set player active/inactive state.
+Set agent active/inactive state.
 
 ```javascript
-engine.dispatch("player:setActive", {
+engine.dispatch("agent:setActive", {
   name: "Alice",
   active: false
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `active` (boolean, default: true): Active state
 
 **Returns:** void
 
-**Events:** `player:activeChanged`
+**Events:** `agent:activeChanged`
 
 **Use cases:**
 - Folding in poker
@@ -135,14 +135,14 @@ engine.dispatch("player:setActive", {
 
 **Example:**
 ```javascript
-// Player folds
-engine.dispatch("player:setActive", { 
+// Agent folds
+engine.dispatch("agent:setActive", { 
   name: "Alice", 
   active: false 
 });
 
-// Player rejoins
-engine.dispatch("player:setActive", { 
+// Agent rejoins
+engine.dispatch("agent:setActive", { 
   name: "Alice", 
   active: true 
 });
@@ -150,20 +150,20 @@ engine.dispatch("player:setActive", {
 
 ---
 
-### `player:get`
+### `agent:get`
 
-Get player state.
+Get agent state.
 
 ```javascript
-const player = engine.dispatch("player:get", {
+const agent = engine.dispatch("agent:get", {
   name: "Alice"
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 
-**Returns:** Player object
+**Returns:** Agent object
 
 **Use cases:**
 - Querying state
@@ -173,21 +173,21 @@ const player = engine.dispatch("player:get", {
 
 **Example:**
 ```javascript
-const player = engine.dispatch("player:get", { name: "Alice" });
-console.log(`${player.name} has ${player.resources.gold} gold`);
-console.log(`Hand size: ${player.hand.length}`);
+const agent = engine.dispatch("agent:get", { name: "Alice" });
+console.log(`${agent.name} has ${agent.resources.gold} gold`);
+console.log(`Hand size: ${agent.hand.length}`);
 ```
 
 ---
 
 ## Resource Management
 
-### `player:giveResource`
+### `agent:giveResource`
 
-Give resources to a player.
+Give resources to a agent.
 
 ```javascript
-engine.dispatch("player:giveResource", {
+engine.dispatch("agent:giveResource", {
   name: "Alice",
   resource: "gold",
   amount: 100
@@ -195,13 +195,13 @@ engine.dispatch("player:giveResource", {
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `resource` (string, required): Resource type
 - `amount` (number, default: 1): Amount to give
 
 **Returns:** void
 
-**Events:** `player:resourceGiven`
+**Events:** `agent:resourceGiven`
 
 **Use cases:**
 - Earning money
@@ -212,14 +212,14 @@ engine.dispatch("player:giveResource", {
 **Example:**
 ```javascript
 // Award victory points
-engine.dispatch("player:giveResource", {
+engine.dispatch("agent:giveResource", {
   name: "Alice",
   resource: "points",
   amount: 10
 });
 
 // Give starting gold
-engine.dispatch("player:giveResource", {
+engine.dispatch("agent:giveResource", {
   name: "Alice",
   resource: "gold",
   amount: 500
@@ -228,12 +228,12 @@ engine.dispatch("player:giveResource", {
 
 ---
 
-### `player:takeResource`
+### `agent:takeResource`
 
-Take resources from a player.
+Take resources from a agent.
 
 ```javascript
-engine.dispatch("player:takeResource", {
+engine.dispatch("agent:takeResource", {
   name: "Alice",
   resource: "gold",
   amount: 50
@@ -241,13 +241,13 @@ engine.dispatch("player:takeResource", {
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `resource` (string, required): Resource type
 - `amount` (number, default: 1): Amount to take
 
 **Returns:** void
 
-**Events:** `player:resourceTaken`
+**Events:** `agent:resourceTaken`
 
 **Notes:** Won't go below 0
 
@@ -260,7 +260,7 @@ engine.dispatch("player:takeResource", {
 **Example:**
 ```javascript
 // Pay building cost
-engine.dispatch("player:takeResource", {
+engine.dispatch("agent:takeResource", {
   name: "Alice",
   resource: "gold",
   amount: 200
@@ -269,26 +269,26 @@ engine.dispatch("player:takeResource", {
 
 ---
 
-### `player:drawCards`
+### `agent:drawCards`
 
-Player draws cards from deck or shoe.
+Agent draws cards from stack or source.
 
 ```javascript
-engine.dispatch("player:drawCards", {
+engine.dispatch("agent:drawCards", {
   name: "Alice",
   count: 5,
-  source: "deck"
+  source: "stack"
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `count` (number, default: 1): Cards to draw
-- `source` (string, default: "deck"): Source ("deck" or "shoe")
+- `source` (string, default: "stack"): Source ("stack" or "source")
 
 **Returns:** void
 
-**Events:** `player:drew`
+**Events:** `agent:drew`
 
 **Use cases:**
 - Drawing cards
@@ -298,39 +298,39 @@ engine.dispatch("player:drawCards", {
 **Example:**
 ```javascript
 // Deal starting hand
-engine.dispatch("player:drawCards", { 
+engine.dispatch("agent:drawCards", { 
   name: "Alice", 
   count: 7 
 });
 
-// Draw from shoe (blackjack)
-engine.dispatch("player:drawCards", {
+// Draw from source (blackjack)
+engine.dispatch("agent:drawCards", {
   name: "Alice",
   count: 2,
-  source: "shoe"
+  source: "source"
 });
 ```
 
 ---
 
-### `player:discardCards`
+### `agent:discardCards`
 
-Player discards specific cards.
+Agent discards specific cards.
 
 ```javascript
-engine.dispatch("player:discardCards", {
+engine.dispatch("agent:discardCards", {
   name: "Alice",
   cards: [card1, card2]
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `cards` (Array<Token> or Token, required): Cards to discard
 
 **Returns:** void
 
-**Events:** `player:discarded`
+**Events:** `agent:discarded`
 
 **Use cases:**
 - Discarding
@@ -339,32 +339,32 @@ engine.dispatch("player:discardCards", {
 
 **Example:**
 ```javascript
-const player = engine.dispatch("player:get", { name: "Alice" });
+const agent = engine.dispatch("agent:get", { name: "Alice" });
 
 // Discard single card
-engine.dispatch("player:discardCards", {
+engine.dispatch("agent:discardCards", {
   name: "Alice",
-  cards: player.hand[0]
+  cards: agent.hand[0]
 });
 
 // Discard multiple
-engine.dispatch("player:discardCards", {
+engine.dispatch("agent:discardCards", {
   name: "Alice",
-  cards: player.hand.slice(0, 2)
+  cards: agent.hand.slice(0, 2)
 });
 ```
 
 ---
 
-## Player-to-Player Transfers
+## Agent-to-Agent Transfers
 
-### `player:transfer`
+### `agent:transfer`
 
-Transfer resources or tokens from one player to another (one-way).
+Transfer resources or tokens from one agent to another (one-way).
 
 ```javascript
 // Transfer resources
-engine.dispatch("player:transfer", {
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   resource: "gold",
@@ -372,7 +372,7 @@ engine.dispatch("player:transfer", {
 });
 
 // Transfer a specific token
-engine.dispatch("player:transfer", {
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   token: magicSwordToken
@@ -380,8 +380,8 @@ engine.dispatch("player:transfer", {
 ```
 
 **Parameters:**
-- `from` (string, required): Source player name
-- `to` (string, required): Target player name
+- `from` (string, required): Source agent name
+- `to` (string, required): Target agent name
 - `resource` (string): Resource type (if transferring resources)
 - `amount` (number, default: 1): Amount to transfer
 - `token` (Token): Specific token to transfer (alternative to resource)
@@ -390,8 +390,8 @@ engine.dispatch("player:transfer", {
 ```javascript
 {
   success: true,
-  from: { player: "Alice", remaining: 50 },
-  to: { player: "Bob", total: 100 }
+  from: { agent: "Alice", remaining: 50 },
+  to: { agent: "Bob", total: 100 }
 }
 // OR for token transfers:
 {
@@ -400,11 +400,11 @@ engine.dispatch("player:transfer", {
 }
 ```
 
-**Events:** `player:transfer`
+**Events:** `agent:transfer`
 
 **Validation:**
-- Source player must exist
-- Target player must exist
+- Source agent must exist
+- Target agent must exist
 - Source must have sufficient resources/token
 - Transaction is recorded in `engine._transactions`
 
@@ -416,8 +416,8 @@ engine.dispatch("player:transfer", {
 
 **Example:**
 ```javascript
-// Pay another player
-engine.dispatch("player:transfer", {
+// Pay another agent
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   resource: "gold",
@@ -425,7 +425,7 @@ engine.dispatch("player:transfer", {
 });
 
 // Give item to teammate
-engine.dispatch("player:transfer", {
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   token: healingPotion
@@ -437,42 +437,42 @@ console.log(engine._transactions);
 
 ---
 
-### `player:trade`
+### `agent:trade`
 
-Bidirectional exchange between two players (atomic).
+Bidirectional exchange between two agents (atomic).
 
 ```javascript
 // Resource for resource
-engine.dispatch("player:trade", {
-  player1: { 
+engine.dispatch("agent:trade", {
+  agent1: { 
     name: "Alice", 
     offer: { resource: "gold", amount: 100 }
   },
-  player2: { 
+  agent2: { 
     name: "Bob", 
     offer: { resource: "wood", amount: 200 }
   }
 });
 
 // Token for resource
-engine.dispatch("player:trade", {
-  player1: { 
+engine.dispatch("agent:trade", {
+  agent1: { 
     name: "Alice", 
     offer: { token: magicRing }
   },
-  player2: { 
+  agent2: { 
     name: "Bob", 
     offer: { resource: "gold", amount: 500 }
   }
 });
 
 // Token for token
-engine.dispatch("player:trade", {
-  player1: { 
+engine.dispatch("agent:trade", {
+  agent1: { 
     name: "Alice", 
     offer: { token: sword }
   },
-  player2: { 
+  agent2: { 
     name: "Bob", 
     offer: { token: shield }
   }
@@ -480,12 +480,12 @@ engine.dispatch("player:trade", {
 ```
 
 **Parameters:**
-- `player1` (object, required):
-  - `name` (string): Player name
+- `agent1` (object, required):
+  - `name` (string): Agent name
   - `offer` (object): What they're offering
     - `resource` (string) + `amount` (number), OR
     - `token` (Token)
-- `player2` (object, required): Same structure as player1
+- `agent2` (object, required): Same structure as agent1
 
 **Returns:**
 ```javascript
@@ -493,8 +493,8 @@ engine.dispatch("player:trade", {
   success: true,
   transaction: {
     type: 'trade',
-    player1: "Alice",
-    player2: "Bob",
+    agent1: "Alice",
+    agent2: "Bob",
     offer1: { ... },
     offer2: { ... },
     timestamp: 1234567890
@@ -502,11 +502,11 @@ engine.dispatch("player:trade", {
 }
 ```
 
-**Events:** `player:trade`
+**Events:** `agent:trade`
 
 **Validation:**
-- Both players must exist
-- Both players must have what they're offering
+- Both agents must exist
+- Both agents must have what they're offering
 - Trade is atomic - both transfers succeed or both fail
 - Transaction is recorded
 
@@ -518,13 +518,13 @@ engine.dispatch("player:trade", {
 
 **Example:**
 ```javascript
-// Multiplayer economy
-const tradeResult = engine.dispatch("player:trade", {
-  player1: { 
+// Multiagent economy
+const tradeResult = engine.dispatch("agent:trade", {
+  agent1: { 
     name: "Merchant", 
     offer: { resource: "food", amount: 50 }
   },
-  player2: { 
+  agent2: { 
     name: "Farmer", 
     offer: { resource: "gold", amount: 100 }
   }
@@ -537,13 +537,13 @@ if (tradeResult.success) {
 
 ---
 
-### `player:steal`
+### `agent:steal`
 
-Forcibly take resources/tokens from another player (with optional validation).
+Forcibly take resources/tokens from another agent (with optional validation).
 
 ```javascript
 // Basic steal
-engine.dispatch("player:steal", {
+engine.dispatch("agent:steal", {
   from: "Victim",
   to: "Thief",
   resource: "gold",
@@ -551,7 +551,7 @@ engine.dispatch("player:steal", {
 });
 
 // Steal with validation (ability check)
-engine.dispatch("player:steal", {
+engine.dispatch("agent:steal", {
   from: "Victim",
   to: "Thief",
   resource: "gold",
@@ -562,7 +562,7 @@ engine.dispatch("player:steal", {
 });
 
 // Steal a token
-engine.dispatch("player:steal", {
+engine.dispatch("agent:steal", {
   from: "Victim",
   to: "Thief",
   token: treasureChest
@@ -570,8 +570,8 @@ engine.dispatch("player:steal", {
 ```
 
 **Parameters:**
-- `from` (string, required): Victim player name
-- `to` (string, required): Thief player name
+- `from` (string, required): Victim agent name
+- `to` (string, required): Thief agent name
 - `resource` (string): Resource type to steal
 - `amount` (number, default: 1): Amount to steal
 - `token` (Token): Specific token to steal
@@ -582,12 +582,12 @@ engine.dispatch("player:steal", {
 {
   success: true,
   stolen: 30,  // Actual amount stolen (may be less than requested)
-  from: { player: "Victim", remaining: 20 },
-  to: { player: "Thief", total: 30 }
+  from: { agent: "Victim", remaining: 20 },
+  to: { agent: "Thief", total: 30 }
 }
 ```
 
-**Events:** `player:steal`
+**Events:** `agent:steal`
 
 **Behavior:**
 - Steals as much as possible (up to requested amount)
@@ -606,7 +606,7 @@ engine.dispatch("player:steal", {
 ```javascript
 // Simple theft
 try {
-  const result = engine.dispatch("player:steal", {
+  const result = engine.dispatch("agent:steal", {
     from: "Merchant",
     to: "Bandit",
     resource: "gold",
@@ -619,7 +619,7 @@ try {
 }
 
 // Theft with skill check
-const stealResult = engine.dispatch("player:steal", {
+const stealResult = engine.dispatch("agent:steal", {
   from: "Merchant",
   to: "Rogue",
   resource: "gold",
@@ -655,8 +655,8 @@ console.log(engine._transactions);
   },
   {
     type: 'trade',
-    player1: 'Alice',
-    player2: 'Bob',
+    agent1: 'Alice',
+    agent2: 'Bob',
     offer1: { resource: 'gold', amount: 100 },
     offer2: { resource: 'wood', amount: 200 },
     timestamp: 1234567891
@@ -685,10 +685,10 @@ console.log(engine._transactions);
 
 ### Game Setup
 ```javascript
-// Create players
+// Create agents
 ["Alice", "Bob", "Charlie"].forEach(name => {
-  engine.dispatch("player:create", { name });
-  engine.dispatch("player:giveResource", {
+  engine.dispatch("agent:create", { name });
+  engine.dispatch("agent:giveResource", {
     name,
     resource: "gold",
     amount: 1000
@@ -705,16 +705,16 @@ class Marketplace {
     this.offers = [];
   }
   
-  postOffer(playerName, gives, wants) {
-    this.offers.push({ player: playerName, gives, wants });
+  postOffer(agentName, gives, wants) {
+    this.offers.push({ agent: agentName, gives, wants });
   }
   
   acceptOffer(buyerName, offerId) {
     const offer = this.offers[offerId];
     
-    this.engine.dispatch("player:trade", {
-      player1: { name: buyerName, offer: offer.wants },
-      player2: { name: offer.player, offer: offer.gives }
+    this.engine.dispatch("agent:trade", {
+      agent1: { name: buyerName, offer: offer.wants },
+      agent2: { name: offer.agent, offer: offer.gives }
     });
     
     this.offers.splice(offerId, 1);
@@ -727,7 +727,7 @@ class Marketplace {
 // Vassals pay lords
 function collectTribute(engine, vassals, lord, amount) {
   vassals.forEach(vassal => {
-    engine.dispatch("player:transfer", {
+    engine.dispatch("agent:transfer", {
       from: vassal,
       to: lord,
       resource: "gold",
@@ -741,11 +741,11 @@ function collectTribute(engine, vassals, lord, amount) {
 ```javascript
 // Winner loots loser
 function combatLoot(engine, winner, loser) {
-  const loserPlayer = engine.dispatch("player:get", { name: loser });
-  const goldAmount = Math.floor((loserPlayer.resources.gold || 0) / 2);
+  const loserAgent = engine.dispatch("agent:get", { name: loser });
+  const goldAmount = Math.floor((loserAgent.resources.gold || 0) / 2);
   
   if (goldAmount > 0) {
-    engine.dispatch("player:steal", {
+    engine.dispatch("agent:steal", {
       from: loser,
       to: winner,
       resource: "gold",
@@ -754,12 +754,12 @@ function combatLoot(engine, winner, loser) {
   }
   
   // Steal random item
-  if (loserPlayer.hand.length > 0) {
-    const randomItem = loserPlayer.hand[
-      Math.floor(Math.random() * loserPlayer.hand.length)
+  if (loserAgent.hand.length > 0) {
+    const randomItem = loserAgent.hand[
+      Math.floor(Math.random() * loserAgent.hand.length)
     ];
     
-    engine.dispatch("player:steal", {
+    engine.dispatch("agent:steal", {
       from: loser,
       to: winner,
       token: randomItem

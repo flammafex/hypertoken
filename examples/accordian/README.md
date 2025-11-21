@@ -176,7 +176,7 @@ This is an **open question!** Ideas:
 - Deep reinforcement learning (DQN, PPO)
 - Monte Carlo tree search
 - Genetic algorithms
-- Exhaustive search on smaller decks
+- Exhaustive search on smaller stacks
 
 **Research opportunity:** Can you create an agent that wins >1%?
 
@@ -187,7 +187,7 @@ This is an **open question!** Ideas:
 ### HyperToken Integration
 
 This implementation uses HyperToken's:
-- **Deck** for standard 52-card deck
+- **Stack** for standard 52-card stack
 - **Token** for card representation
 - **Engine** for game state management
 - **Deterministic shuffling** (seeded RNG)
@@ -224,7 +224,7 @@ All processing is single-threaded JavaScript.
 
 1. **Can you beat 1% win rate?**
 2. **What's the minimum lookahead needed?**
-3. **Can transfer learning help?** (Train on smaller decks)
+3. **Can transfer learning help?** (Train on smaller stacks)
 4. **Is there a hidden strategy?**
 
 ### Statistical Analysis

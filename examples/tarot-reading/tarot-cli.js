@@ -15,7 +15,7 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-const reader = new TarotReader('./tarot-deck.json');
+const reader = new TarotReader('./tarot-stack.json');
 
 // ASCII Art banner
 const BANNER = `
@@ -188,9 +188,9 @@ async function main() {
   console.clear();
   console.log(BANNER);
   
-  console.log('Initializing tarot deck...\n');
+  console.log('Initializing tarot stack...\n');
   await reader.initialize();
-  console.log('✓ Tarot deck loaded (78 cards)\n');
+  console.log('✓ Tarot stack loaded (78 cards)\n');
 
   const showIntro = await ask('Would you like to read the philosophical introduction? (y/n): ');
   if (showIntro.toLowerCase() === 'y') {

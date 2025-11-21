@@ -1,7 +1,7 @@
 {
   "name": "Standard Playing Cards",
   "kind": "playing-cards",
-  "description": "Standard 52-card deck for poker, blackjack, and other card games",
+  "description": "Standard 52-card stack for poker, blackjack, and other card games",
   "tokens": [
     {"id": "hearts-ace", "group": "hearts", "label": "A", "text": "Ace of Hearts", "meta": {"suit": "hearts", "rank": "A", "value": [1, 11], "color": "red"}, "char": "🂱", "kind": "playing-cards", "index": 0},
     {"id": "hearts-2", "group": "hearts", "label": "2", "text": "Two of Hearts", "meta": {"suit": "hearts", "rank": "2", "value": [2], "color": "red"}, "char": "🂲", "kind": "playing-cards", "index": 1},

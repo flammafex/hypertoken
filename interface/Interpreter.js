@@ -28,18 +28,18 @@ export class Interpreter {
 
     if (t.startsWith("draw")) {
       const n = parseInt(t.split(/\s+/)[1] ?? "1", 10);
-      return { type: "deck:draw", payload: { count: n } };
+      return { type: "stack:draw", payload: { count: n } };
     }
 
-    if (t.startsWith("shuffle")) return { type: "deck:shuffle", payload: {} };
-    if (t.startsWith("reset")) return { type: "deck:reset", payload: {} };
+    if (t.startsWith("shuffle")) return { type: "stack:shuffle", payload: {} };
+    if (t.startsWith("reset")) return { type: "stack:reset", payload: {} };
 
     if (t.startsWith("place")) {
-      const zone = t.split(/\s+/)[1] ?? "table";
-      return { type: "table:place", payload: { zone } };
+      const zone = t.split(/\s+/)[1] ?? "space";
+      return { type: "space:place", payload: { zone } };
     }
 
-    if (t.startsWith("clear")) return { type: "table:clear", payload: {} };
+    if (t.startsWith("clear")) return { type: "space:clear", payload: {} };
     if (t.startsWith("end")) return { type: "loop:stop", payload: {} };
 
     return null; // unknown command

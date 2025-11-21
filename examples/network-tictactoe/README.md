@@ -1,11 +1,11 @@
 # Network Tic-Tac-Toe
 
-> **Real-time multiplayer game demonstrating HyperToken's network capabilities**
+> **Real-time multiagent game demonstrating HyperToken's network capabilities**
 
 A complete implementation of networked tic-tac-toe showcasing:
 - **Authoritative server** with game state validation
 - **WebSocket communication** for real-time updates
-- **Turn-based multiplayer** with 2 players
+- **Turn-based multiagent** with 2 agents
 - **Automatic state synchronization** across clients
 - **Spectator support** (watch games in progress)
 
@@ -21,11 +21,11 @@ node server.js
 
 The server will start on `ws://localhost:8080` and display:
 - Connection status
-- Player registrations
+- Agent registrations
 - Moves and turn changes
 - Game outcomes
 
-### 2. Connect First Player
+### 2. Connect First Agent
 
 Open a new terminal:
 
@@ -33,9 +33,9 @@ Open a new terminal:
 node client.js
 ```
 
-This player will be assigned **X** and go first.
+This agent will be assigned **X** and go first.
 
-### 3. Connect Second Player
+### 3. Connect Second Agent
 
 Open another terminal:
 
@@ -43,11 +43,11 @@ Open another terminal:
 node client.js
 ```
 
-This player will be assigned **O**.
+This agent will be assigned **O**.
 
 ### 4. Play!
 
-Players take turns entering positions (0-8) to place their mark:
+Agents take turns entering positions (0-8) to place their mark:
 
 ```
  0 │ 1 │ 2
@@ -73,7 +73,7 @@ Players take turns entering positions (0-8) to place their mark:
        │             │
   ┌────▼───┐   ┌────▼───┐
   │Client X│   │Client O│  ← Render state
-  │(Player)│   │(Player)│  ← Send moves
+  │(Agent)│   │(Agent)│  ← Send moves
   └────────┘   └────────┘  ← Receive updates
 ```
 
@@ -94,7 +94,7 @@ Players take turns entering positions (0-8) to place their mark:
 { "cmd": "describe" }
 ```
 
-**Register as player:**
+**Register as agent:**
 ```json
 {
   "cmd": "dispatch",
@@ -130,10 +130,10 @@ Players take turns entering positions (0-8) to place their mark:
   "state": {
     "_gameState": {
       "board": [null, "X", null, "O", "X", null, null, null, null],
-      "currentPlayer": "O",
+      "currentAgent": "O",
       "winner": null,
       "gameOver": false,
-      "players": { "X": "client-123", "O": "client-456" }
+      "agents": { "X": "client-123", "O": "client-456" }
     }
   }
 }
@@ -161,7 +161,7 @@ engine.dispatch('tictactoe:init');
 ```
 
 ### `tictactoe:register`
-Register a player (X or O).
+Register a agent (X or O).
 
 ```javascript
 engine.dispatch('tictactoe:register', { 
@@ -202,7 +202,7 @@ The server validates every move:
 1. **Game state check** - Is game over?
 2. **Position validation** - Valid position (0-8)?
 3. **Availability check** - Position empty?
-4. **Turn validation** - Is it this player's turn?
+4. **Turn validation** - Is it this agent's turn?
 5. **Win detection** - Check all 8 winning lines
 6. **Draw detection** - Board full with no winner?
 
@@ -330,7 +330,7 @@ This example demonstrates:
 - ✅ Win detection logic
 
 ### Events
-- ✅ `player:registered`
+- ✅ `agent:registered`
 - ✅ `game:started`
 - ✅ `move:made`
 - ✅ `turn:changed`
@@ -356,14 +356,14 @@ This example teaches:
 ## 🌟 Extension Ideas
 
 ### Easy
-- [ ] Add player names
+- [ ] Add agent names
 - [ ] Track win/loss statistics
 - [ ] Implement rematch functionality
 - [ ] Add move history/undo
 
 ### Medium
 - [ ] Implement timer per turn
-- [ ] Add chat between players
+- [ ] Add chat between agents
 - [ ] Create game lobby system
 - [ ] Support multiple concurrent games
 
@@ -388,7 +388,7 @@ This example teaches:
 - Wait for state update after opponent's move
 
 ### "Not your turn"
-- Turn indicator shows current player
+- Turn indicator shows current agent
 - Wait for your symbol's turn
 
 ### Client disconnect
@@ -405,9 +405,9 @@ This example teaches:
 - [Network Interface](../../interface/NetworkInterface.js)
 - [Relay Server](../../interface/RelayServer.js)
 
-**Multiplayer Game Design:**
+**Multiagent Game Design:**
 - [Networked Game Architecture](https://gafferongames.com/post/what_every_programmer_needs_to_know_about_game_networking/)
-- [Server-Authoritative Design](https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking)
+- [Server-Authoritative Design](https://developer.valvesoftware.com/wiki/Source_Multiagent_Networking)
 
 ---
 
@@ -429,4 +429,4 @@ Classic tic-tac-toe rules dating back to ancient Egypt (~1300 BCE).
 
 ---
 
-**Enjoy your multiplayer tic-tac-toe game!** 🎮✨
+**Enjoy your multiagent tic-tac-toe game!** 🎮✨

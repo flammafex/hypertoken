@@ -14,28 +14,28 @@
  * limitations under the License.
  */
 //./test/testExporters.js
-import { Table } from "../core/Table.js";
-import { Deck } from "../core/Deck.js";
-import { exportSpread, exportTableJSON } from "../exporters.js";
+import { Space } from "../core/Space.js";
+import { Stack } from "../core/Stack.js";
+import { exportSpread, exportSpaceJSON } from "../exporters.js";
 
 // Setup
-const deck = new Deck([{ label: "Ace of Spades" }, { label: "Two of Hearts" }]);
-const table = new Table();
-table.defineSpread("Test", [
+const stack = new Stack([{ label: "Ace of Spades" }, { label: "Two of Hearts" }]);
+const space = new Space();
+space.defineSpread("Test", [
   { id: "pos1", label: "Position 1" },
   { id: "pos2", label: "Position 2" }
 ]);
 
 // Simulate draw and placement
-const c1 = deck.draw();
-const c2 = deck.draw();
-table.place("pos1", c1);
-table.place("pos2", c2);
+const c1 = stack.draw();
+const c2 = stack.draw();
+space.place("pos1", c1);
+space.place("pos2", c2);
 
 // Test exportSpread
-const text = exportSpread(table, "Test");
+const text = exportSpread(space, "Test");
 console.log("Spread text:\n" + text);
 
 // Test JSON export
-const json = exportTableJSON(table);
+const json = exportSpaceJSON(space);
 console.log("JSON snapshot length:", json.length);

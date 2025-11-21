@@ -16,14 +16,14 @@
  */
 
 /**
- * Test suite for Player Transfer actions
+ * Test suite for Agent Transfer actions
  * Tests: transfer, trade, steal
  */
 
 import { Engine } from '../engine/Engine.js';
 import { EventBus } from '../core/EventBus.js';
 import { Token } from '../core/Token.js';
-import { PlayerActions } from '../engine/actions-extended.js';
+import { AgentActions } from '../engine/actions-extended.js';
 
 // Helper to create tokens
 function createToken(id, props = {}) {
@@ -37,7 +37,7 @@ function createToken(id, props = {}) {
 
 // Test runner
 function runTests() {
-  console.log('🧪 Testing Player Transfer Actions\n');
+  console.log('🧪 Testing Agent Transfer Actions\n');
   
   let passed = 0;
   let failed = 0;
@@ -59,13 +59,13 @@ function runTests() {
   engine.eventBus = new EventBus();
   
   // ============================================================
-  // TEST: player:transfer - resource transfers
+  // TEST: agent:transfer - resource transfers
   // ============================================================
   
-  test('player:transfer - basic resource transfer', () => {
-    engine._players = [];
+  test('agent:transfer - basic resource transfer', () => {
+    engine._agents = [];
     
-    // Create players with resources
+    // Create agents with resources
     const alice = { 
       name: 'Alice', 
       id: 'alice-1',
@@ -77,10 +77,10 @@ function runTests() {
       resources: { gold: 50 }
     };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
     // Transfer gold from Alice to Bob
-    const result = PlayerActions['player:transfer'](engine, {
+    const result = AgentActions['agent:transfer'](engine, {
       from: 'Alice',
       to: 'Bob',
       resource: 'gold',
@@ -98,16 +98,16 @@ function runTests() {
     }
   });
   
-  test('player:transfer - insufficient resources', () => {
-    engine._players = [];
+  test('agent:transfer - insufficient resources', () => {
+    engine._agents = [];
     
     const alice = { name: 'Alice', id: 'alice-2', resources: { gold: 10 } };
     const bob = { name: 'Bob', id: 'bob-2', resources: {} };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
     try {
-      PlayerActions['player:transfer'](engine, {
+      AgentActions['agent:transfer'](engine, {
         from: 'Alice',
         to: 'Bob',
         resource: 'gold',
@@ -121,8 +121,8 @@ function runTests() {
     }
   });
   
-  test('player:transfer - token transfer', () => {
-    engine._players = [];
+  test('agent:transfer - token transfer', () => {
+    engine._agents = [];
     
     const sword = createToken('sword-1', { label: 'Magic Sword' });
     
@@ -137,9 +137,9 @@ function runTests() {
       hand: []
     };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
-    const result = PlayerActions['player:transfer'](engine, {
+    const result = AgentActions['agent:transfer'](engine, {
       from: 'Alice',
       to: 'Bob',
       token: sword
@@ -156,16 +156,16 @@ function runTests() {
     }
   });
   
-  test('player:transfer - transaction tracking', () => {
-    engine._players = [];
+  test('agent:transfer - transaction tracking', () => {
+    engine._agents = [];
     engine._transactions = [];
     
     const alice = { name: 'Alice', id: 'alice-4', resources: { gems: 20 } };
     const bob = { name: 'Bob', id: 'bob-4', resources: {} };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
-    PlayerActions['player:transfer'](engine, {
+    AgentActions['agent:transfer'](engine, {
       from: 'Alice',
       to: 'Bob',
       resource: 'gems',
@@ -183,11 +183,11 @@ function runTests() {
   });
   
   // ============================================================
-  // TEST: player:trade - bidirectional exchanges
+  // TEST: agent:trade - bidirectional exchanges
   // ============================================================
   
-  test('player:trade - resource for resource', () => {
-    engine._players = [];
+  test('agent:trade - resource for resource', () => {
+    engine._agents = [];
     
     const alice = { 
       name: 'Alice', 
@@ -200,14 +200,14 @@ function runTests() {
       resources: { gold: 0, wood: 200 }
     };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
-    const result = PlayerActions['player:trade'](engine, {
-      player1: { 
+    const result = AgentActions['agent:trade'](engine, {
+      agent1: { 
         name: 'Alice', 
         offer: { resource: 'gold', amount: 50 }
       },
-      player2: { 
+      agent2: { 
         name: 'Bob', 
         offer: { resource: 'wood', amount: 100 }
       }
@@ -228,8 +228,8 @@ function runTests() {
     }
   });
   
-  test('player:trade - token for resource', () => {
-    engine._players = [];
+  test('agent:trade - token for resource', () => {
+    engine._agents = [];
     
     const magicRing = createToken('ring-1', { label: 'Magic Ring' });
     
@@ -246,14 +246,14 @@ function runTests() {
       resources: { gold: 500 }
     };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
-    const result = PlayerActions['player:trade'](engine, {
-      player1: { 
+    const result = AgentActions['agent:trade'](engine, {
+      agent1: { 
         name: 'Alice', 
         offer: { token: magicRing }
       },
-      player2: { 
+      agent2: { 
         name: 'Bob', 
         offer: { resource: 'gold', amount: 100 }
       }
@@ -280,21 +280,21 @@ function runTests() {
     }
   });
   
-  test('player:trade - insufficient resources validation', () => {
-    engine._players = [];
+  test('agent:trade - insufficient resources validation', () => {
+    engine._agents = [];
     
     const alice = { name: 'Alice', id: 'alice-7', resources: { gold: 10 } };
     const bob = { name: 'Bob', id: 'bob-7', resources: { wood: 100 } };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
     try {
-      PlayerActions['player:trade'](engine, {
-        player1: { 
+      AgentActions['agent:trade'](engine, {
+        agent1: { 
           name: 'Alice', 
           offer: { resource: 'gold', amount: 50 }  // Alice only has 10!
         },
-        player2: { 
+        agent2: { 
           name: 'Bob', 
           offer: { resource: 'wood', amount: 10 }
         }
@@ -307,8 +307,8 @@ function runTests() {
     }
   });
   
-  test('player:trade - token for token', () => {
-    engine._players = [];
+  test('agent:trade - token for token', () => {
+    engine._agents = [];
     
     const sword = createToken('sword-2', { label: 'Iron Sword' });
     const shield = createToken('shield-1', { label: 'Steel Shield' });
@@ -316,14 +316,14 @@ function runTests() {
     const alice = { name: 'Alice', id: 'alice-8', hand: [sword] };
     const bob = { name: 'Bob', id: 'bob-8', hand: [shield] };
     
-    engine._players.push(alice, bob);
+    engine._agents.push(alice, bob);
     
-    const result = PlayerActions['player:trade'](engine, {
-      player1: { 
+    const result = AgentActions['agent:trade'](engine, {
+      agent1: { 
         name: 'Alice', 
         offer: { token: sword }
       },
-      player2: { 
+      agent2: { 
         name: 'Bob', 
         offer: { token: shield }
       }
@@ -345,18 +345,18 @@ function runTests() {
   });
   
   // ============================================================
-  // TEST: player:steal - forcible taking
+  // TEST: agent:steal - forcible taking
   // ============================================================
   
-  test('player:steal - basic resource steal', () => {
-    engine._players = [];
+  test('agent:steal - basic resource steal', () => {
+    engine._agents = [];
     
     const victim = { name: 'Victim', id: 'v-1', resources: { gold: 100 } };
     const thief = { name: 'Thief', id: 't-1', resources: {} };
     
-    engine._players.push(victim, thief);
+    engine._agents.push(victim, thief);
     
-    const result = PlayerActions['player:steal'](engine, {
+    const result = AgentActions['agent:steal'](engine, {
       from: 'Victim',
       to: 'Thief',
       resource: 'gold',
@@ -377,16 +377,16 @@ function runTests() {
     }
   });
   
-  test('player:steal - steal more than available', () => {
-    engine._players = [];
+  test('agent:steal - steal more than available', () => {
+    engine._agents = [];
     
     const victim = { name: 'Victim', id: 'v-2', resources: { gold: 20 } };
     const thief = { name: 'Thief', id: 't-2', resources: {} };
     
-    engine._players.push(victim, thief);
+    engine._agents.push(victim, thief);
     
     // Try to steal 100, but only 20 available
-    const result = PlayerActions['player:steal'](engine, {
+    const result = AgentActions['agent:steal'](engine, {
       from: 'Victim',
       to: 'Thief',
       resource: 'gold',
@@ -407,17 +407,17 @@ function runTests() {
     }
   });
   
-  test('player:steal - token steal', () => {
-    engine._players = [];
+  test('agent:steal - token steal', () => {
+    engine._agents = [];
     
     const treasure = createToken('treasure-1', { label: 'Treasure Chest' });
     
     const victim = { name: 'Victim', id: 'v-3', hand: [treasure] };
     const thief = { name: 'Thief', id: 't-3', hand: [] };
     
-    engine._players.push(victim, thief);
+    engine._agents.push(victim, thief);
     
-    const result = PlayerActions['player:steal'](engine, {
+    const result = AgentActions['agent:steal'](engine, {
       from: 'Victim',
       to: 'Thief',
       token: treasure
@@ -434,8 +434,8 @@ function runTests() {
     }
   });
   
-  test('player:steal - with validation function', () => {
-    engine._players = [];
+  test('agent:steal - with validation function', () => {
+    engine._agents = [];
     
     const victim = { name: 'Victim', id: 'v-4', resources: { gold: 50 } };
     const thief = { 
@@ -451,7 +451,7 @@ function runTests() {
       meta: { hasThiefAbility: false }
     };
     
-    engine._players.push(victim, thief, nonThief);
+    engine._agents.push(victim, thief, nonThief);
     
     // Validation function: can only steal if has thief ability
     const validate = (stealer, victim, engine) => {
@@ -459,7 +459,7 @@ function runTests() {
     };
     
     // Thief should succeed
-    const result1 = PlayerActions['player:steal'](engine, {
+    const result1 = AgentActions['agent:steal'](engine, {
       from: 'Victim',
       to: 'Thief',
       resource: 'gold',
@@ -473,7 +473,7 @@ function runTests() {
     
     // NonThief should fail
     try {
-      PlayerActions['player:steal'](engine, {
+      AgentActions['agent:steal'](engine, {
         from: 'Victim',
         to: 'NonThief',
         resource: 'gold',
@@ -488,16 +488,16 @@ function runTests() {
     }
   });
   
-  test('player:steal - empty resources', () => {
-    engine._players = [];
+  test('agent:steal - empty resources', () => {
+    engine._agents = [];
     
     const victim = { name: 'Victim', id: 'v-5', resources: {} };
     const thief = { name: 'Thief', id: 't-5', resources: {} };
     
-    engine._players.push(victim, thief);
+    engine._agents.push(victim, thief);
     
     try {
-      PlayerActions['player:steal'](engine, {
+      AgentActions['agent:steal'](engine, {
         from: 'Victim',
         to: 'Thief',
         resource: 'gold',
@@ -512,14 +512,14 @@ function runTests() {
   });
   
   // ============================================================
-  // INTEGRATION TEST: Complex multi-player economy
+  // INTEGRATION TEST: Complex multi-agent economy
   // ============================================================
   
-  test('Integration - multi-player trading economy', () => {
-    engine._players = [];
+  test('Integration - multi-agent trading economy', () => {
+    engine._agents = [];
     engine._transactions = [];
     
-    // Setup 3 players with different resources
+    // Setup 3 agents with different resources
     const merchant = { 
       name: 'Merchant', 
       id: 'm-1',
@@ -540,15 +540,15 @@ function runTests() {
       meta: { hasThiefAbility: true }
     };
     
-    engine._players.push(merchant, farmer, warrior);
+    engine._agents.push(merchant, farmer, warrior);
     
     // 1. Merchant buys food from Farmer
-    PlayerActions['player:trade'](engine, {
-      player1: { 
+    AgentActions['agent:trade'](engine, {
+      agent1: { 
         name: 'Merchant', 
         offer: { resource: 'gold', amount: 100 }
       },
-      player2: { 
+      agent2: { 
         name: 'Farmer', 
         offer: { resource: 'food', amount: 200 }
       }
@@ -562,7 +562,7 @@ function runTests() {
     }
     
     // 2. Warrior demands tribute from Farmer
-    PlayerActions['player:transfer'](engine, {
+    AgentActions['agent:transfer'](engine, {
       from: 'Farmer',
       to: 'Warrior',
       resource: 'gold',
@@ -579,7 +579,7 @@ function runTests() {
     // 3. Warrior steals from Merchant
     const validate = (stealer) => stealer.meta.hasThiefAbility;
     
-    PlayerActions['player:steal'](engine, {
+    AgentActions['agent:steal'](engine, {
       from: 'Merchant',
       to: 'Warrior',
       resource: 'gold',
@@ -615,7 +615,7 @@ function runTests() {
   console.log(`📊 Total: ${passed + failed}`);
   
   if (failed === 0) {
-    console.log('\n🎉 All player transfer tests passed!');
+    console.log('\n🎉 All agent transfer tests passed!');
   } else {
     console.log('\n⚠️  Some tests failed. Review output above.');
   }

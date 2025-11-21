@@ -1,6 +1,6 @@
-# Deck Actions
+# Stack Actions
 
-Operations on the primary card deck. The deck is a stack-based collection with shuffling, drawing, and manipulation capabilities.
+Operations on the primary card stack. The stack is a stack-based collection with shuffling, drawing, and manipulation capabilities.
 
 [← Back to Action Reference](../ACTIONS.md)
 
@@ -8,29 +8,29 @@ Operations on the primary card deck. The deck is a stack-based collection with s
 
 ## Actions (10)
 
-1. [deck:shuffle](#deckshuffle) - Randomize deck order
-2. [deck:draw](#deckdraw) - Draw cards from top
-3. [deck:reset](#deckreset) - Reset to original state
-4. [deck:burn](#deckburn) - Discard cards without drawing
-5. [deck:peek](#deckpeek) - Look at top cards
-6. [deck:cut](#deckcut) - Cut the deck
-7. [deck:insertAt](#deckinsertat) - Insert card at position
-8. [deck:removeAt](#deckremoveat) - Remove card at position
-9. [deck:swap](#deckswap) - Swap two cards
-10. [deck:reverse](#deckreverse) - Reverse deck order
+1. [stack:shuffle](#stackshuffle) - Randomize stack order
+2. [stack:draw](#stackdraw) - Draw cards from top
+3. [stack:reset](#stackreset) - Reset to original state
+4. [stack:burn](#stackburn) - Discard cards without drawing
+5. [stack:peek](#stackpeek) - Look at top cards
+6. [stack:cut](#stackcut) - Cut the stack
+7. [stack:insertAt](#stackinsertat) - Insert card at position
+8. [stack:removeAt](#stackremoveat) - Remove card at position
+9. [stack:swap](#stackswap) - Swap two cards
+10. [stack:reverse](#stackreverse) - Reverse stack order
 
 ---
 
-## `deck:shuffle`
+## `stack:shuffle`
 
-Randomize the order of cards in the deck.
+Randomize the order of cards in the stack.
 
 ```javascript
 // Random shuffle
-engine.dispatch("deck:shuffle");
+engine.dispatch("stack:shuffle");
 
 // Deterministic shuffle with seed
-engine.dispatch("deck:shuffle", { seed: 42 });
+engine.dispatch("stack:shuffle", { seed: 42 });
 ```
 
 **Parameters:**
@@ -38,7 +38,7 @@ engine.dispatch("deck:shuffle", { seed: 42 });
 
 **Returns:** void
 
-**Events:** `deck:shuffled`
+**Events:** `stack:shuffled`
 
 **Use cases:** 
 - Start of game
@@ -47,27 +47,27 @@ engine.dispatch("deck:shuffle", { seed: 42 });
 
 **Example:**
 ```javascript
-const engine = new Engine({ deck: myDeck });
+const engine = new Engine({ stack: myStack });
 
 // Random shuffle
-engine.dispatch("deck:shuffle");
+engine.dispatch("stack:shuffle");
 
 // Same shuffle every time
-engine.dispatch("deck:shuffle", { seed: 12345 });
+engine.dispatch("stack:shuffle", { seed: 12345 });
 ```
 
 ---
 
-## `deck:draw`
+## `stack:draw`
 
-Draw one or more cards from the top of the deck.
+Draw one or more cards from the top of the stack.
 
 ```javascript
 // Draw 1 card
-const card = engine.dispatch("deck:draw");
+const card = engine.dispatch("stack:draw");
 
 // Draw 5 cards
-const cards = engine.dispatch("deck:draw", { count: 5 });
+const cards = engine.dispatch("stack:draw", { count: 5 });
 ```
 
 **Parameters:**
@@ -77,35 +77,35 @@ const cards = engine.dispatch("deck:draw", { count: 5 });
 - Single card if count=1
 - Array of cards if count>1
 
-**Events:** `deck:draw`
+**Events:** `stack:draw`
 
 **Use cases:**
-- Player draws cards
+- Agent draws cards
 - Dealing hands
 - Revealing cards
 
 **Example:**
 ```javascript
 // Deal starting hands
-const aliceHand = engine.dispatch("deck:draw", { count: 7 });
-const bobHand = engine.dispatch("deck:draw", { count: 7 });
+const aliceHand = engine.dispatch("stack:draw", { count: 7 });
+const bobHand = engine.dispatch("stack:draw", { count: 7 });
 ```
 
 ---
 
-## `deck:reset`
+## `stack:reset`
 
-Reset deck to original unshuffled state.
+Reset stack to original unshuffled state.
 
 ```javascript
-engine.dispatch("deck:reset");
+engine.dispatch("stack:reset");
 ```
 
 **Parameters:** none
 
 **Returns:** void
 
-**Events:** `deck:reset`
+**Events:** `stack:reset`
 
 **Use cases:**
 - Starting a new game
@@ -115,25 +115,25 @@ engine.dispatch("deck:reset");
 **Example:**
 ```javascript
 // Play a round
-engine.dispatch("deck:shuffle");
+engine.dispatch("stack:shuffle");
 playGame();
 
 // Reset for next game
-engine.dispatch("deck:reset");
+engine.dispatch("stack:reset");
 ```
 
 ---
 
-## `deck:burn`
+## `stack:burn`
 
-Discard N cards from top of deck without drawing them.
+Discard N cards from top of stack without drawing them.
 
 ```javascript
 // Burn 1 card
-engine.dispatch("deck:burn");
+engine.dispatch("stack:burn");
 
 // Burn 3 cards
-engine.dispatch("deck:burn", { count: 3 });
+engine.dispatch("stack:burn", { count: 3 });
 ```
 
 **Parameters:**
@@ -141,7 +141,7 @@ engine.dispatch("deck:burn", { count: 3 });
 
 **Returns:** void
 
-**Events:** `deck:burn`
+**Events:** `stack:burn`
 
 **Use cases:**
 - Poker (burn before flop/turn/river)
@@ -152,30 +152,30 @@ engine.dispatch("deck:burn", { count: 3 });
 **Example:**
 ```javascript
 // Texas Hold'em
-engine.dispatch("deck:burn");  // Burn before flop
-const flop = engine.dispatch("deck:draw", { count: 3 });
+engine.dispatch("stack:burn");  // Burn before flop
+const flop = engine.dispatch("stack:draw", { count: 3 });
 ```
 
 ---
 
-## `deck:peek`
+## `stack:peek`
 
 Look at top N cards without removing them.
 
 ```javascript
 // Peek at top card
-const topCard = engine.dispatch("deck:peek");
+const topCard = engine.dispatch("stack:peek");
 
 // Peek at top 3 cards
-const top3 = engine.dispatch("deck:peek", { count: 3 });
+const top3 = engine.dispatch("stack:peek", { count: 3 });
 ```
 
 **Parameters:**
 - `count` (number, default: 1): Number of cards to peek at
 
-**Returns:** Array of cards (deck unchanged)
+**Returns:** Array of cards (stack unchanged)
 
-**Events:** `deck:peeked`
+**Events:** `stack:peeked`
 
 **Use cases:**
 - Scrying abilities
@@ -186,7 +186,7 @@ const top3 = engine.dispatch("deck:peek", { count: 3 });
 **Example:**
 ```javascript
 // AI looks ahead to decide strategy
-const nextCard = engine.dispatch("deck:peek");
+const nextCard = engine.dispatch("stack:peek");
 if (nextCard.meta.value >= 10) {
   // Play aggressively
 }
@@ -194,16 +194,16 @@ if (nextCard.meta.value >= 10) {
 
 ---
 
-## `deck:cut`
+## `stack:cut`
 
-Cut the deck at a position.
+Cut the stack at a position.
 
 ```javascript
 // Cut at middle
-engine.dispatch("deck:cut");
+engine.dispatch("stack:cut");
 
 // Cut at specific position
-engine.dispatch("deck:cut", { position: 26, topToBottom: true });
+engine.dispatch("stack:cut", { position: 26, topToBottom: true });
 ```
 
 **Parameters:**
@@ -212,28 +212,28 @@ engine.dispatch("deck:cut", { position: 26, topToBottom: true });
 
 **Returns:** void
 
-**Events:** `deck:cut`
+**Events:** `stack:cut`
 
 **Use cases:**
-- Traditional deck cutting
+- Traditional stack cutting
 - Shuffling variations
 - Casino procedures
 
 **Example:**
 ```javascript
 // Traditional shuffle + cut
-engine.dispatch("deck:shuffle");
-engine.dispatch("deck:cut");
+engine.dispatch("stack:shuffle");
+engine.dispatch("stack:cut");
 ```
 
 ---
 
-## `deck:insertAt`
+## `stack:insertAt`
 
-Insert a card at a specific position in the deck.
+Insert a card at a specific position in the stack.
 
 ```javascript
-engine.dispatch("deck:insertAt", { 
+engine.dispatch("stack:insertAt", { 
   card: myCard, 
   position: 5 
 });
@@ -245,19 +245,19 @@ engine.dispatch("deck:insertAt", {
 
 **Returns:** void
 
-**Events:** `deck:inserted`
+**Events:** `stack:inserted`
 
 **Use cases:**
 - Putting cards back
-- Magical effects ("place on top of deck")
-- Deck manipulation
+- Magical effects ("place on top of stack")
+- Stack manipulation
 - Tutoring effects
 
 **Example:**
 ```javascript
-// "Search your deck for a card and put it on top"
-const searchedCard = findCardInDeck(engine.deck);
-engine.dispatch("deck:insertAt", { 
+// "Search your stack for a card and put it on top"
+const searchedCard = findCardInStack(engine.stack);
+engine.dispatch("stack:insertAt", { 
   card: searchedCard, 
   position: 0 
 });
@@ -265,12 +265,12 @@ engine.dispatch("deck:insertAt", {
 
 ---
 
-## `deck:removeAt`
+## `stack:removeAt`
 
 Remove and return card at specific position.
 
 ```javascript
-const card = engine.dispatch("deck:removeAt", { position: 10 });
+const card = engine.dispatch("stack:removeAt", { position: 10 });
 ```
 
 **Parameters:**
@@ -278,30 +278,30 @@ const card = engine.dispatch("deck:removeAt", { position: 10 });
 
 **Returns:** The removed card
 
-**Events:** `deck:removed`
+**Events:** `stack:removed`
 
 **Use cases:**
 - Removing specific cards
-- Deck manipulation
+- Stack manipulation
 - Extracting cards by position
 
 **Example:**
 ```javascript
 // Remove bottom card
-const deckSize = engine.deck.cards.length;
-const bottomCard = engine.dispatch("deck:removeAt", { 
-  position: deckSize - 1 
+const stackSize = engine.stack.cards.length;
+const bottomCard = engine.dispatch("stack:removeAt", { 
+  position: stackSize - 1 
 });
 ```
 
 ---
 
-## `deck:swap`
+## `stack:swap`
 
-Swap two cards in the deck by position.
+Swap two cards in the stack by position.
 
 ```javascript
-engine.dispatch("deck:swap", { 
+engine.dispatch("stack:swap", { 
   position1: 0, 
   position2: 10 
 });
@@ -313,18 +313,18 @@ engine.dispatch("deck:swap", {
 
 **Returns:** void
 
-**Events:** `deck:swapped`
+**Events:** `stack:swapped`
 
 **Use cases:**
-- Deck manipulation
+- Stack manipulation
 - Magical effects
 - Reordering specific cards
 
 **Example:**
 ```javascript
 // Swap top and bottom cards
-const last = engine.deck.cards.length - 1;
-engine.dispatch("deck:swap", { 
+const last = engine.stack.cards.length - 1;
+engine.dispatch("stack:swap", { 
   position1: 0, 
   position2: last 
 });
@@ -332,29 +332,29 @@ engine.dispatch("deck:swap", {
 
 ---
 
-## `deck:reverse`
+## `stack:reverse`
 
-Reverse the entire deck order.
+Reverse the entire stack order.
 
 ```javascript
-engine.dispatch("deck:reverse");
+engine.dispatch("stack:reverse");
 ```
 
 **Parameters:** none
 
 **Returns:** void
 
-**Events:** `deck:reversed`
+**Events:** `stack:reversed`
 
 **Use cases:**
-- Deck manipulation
+- Stack manipulation
 - Special abilities
 - Chaos effects
 
 **Example:**
 ```javascript
-// Flip deck upside down
-engine.dispatch("deck:reverse");
+// Flip stack upside down
+engine.dispatch("stack:reverse");
 ```
 
 ---
@@ -363,36 +363,36 @@ engine.dispatch("deck:reverse");
 
 ### Standard Game Setup
 ```javascript
-const deck = new Deck(createStandardCards());
-const engine = new Engine({ deck });
+const stack = new Stack(createStandardCards());
+const engine = new Engine({ stack });
 
-engine.dispatch("deck:shuffle");
-// Deal to players...
+engine.dispatch("stack:shuffle");
+// Deal to agents...
 ```
 
 ### Deterministic Shuffle (for testing)
 ```javascript
 // Always the same shuffle
-engine.dispatch("deck:shuffle", { seed: 42 });
+engine.dispatch("stack:shuffle", { seed: 42 });
 // Cards will be in identical order every run
 ```
 
 ### Card Counting / Peeking
 ```javascript
 // Count high cards remaining
-const remaining = engine.deck.cards.length;
-const next5 = engine.dispatch("deck:peek", { count: 5 });
+const remaining = engine.stack.cards.length;
+const next5 = engine.dispatch("stack:peek", { count: 5 });
 const highCards = next5.filter(c => c.meta.value >= 10).length;
 
 console.log(`${highCards} high cards in next 5`);
 ```
 
-### Manipulate Deck Order
+### Manipulate Stack Order
 ```javascript
 // Put specific card on top
-const aceOfSpades = findCard(engine.deck, 'ace-spades');
-engine.dispatch("deck:removeAt", { position: aceIndex });
-engine.dispatch("deck:insertAt", { card: aceOfSpades, position: 0 });
+const aceOfSpades = findCard(engine.stack, 'ace-spades');
+engine.dispatch("stack:removeAt", { position: aceIndex });
+engine.dispatch("stack:insertAt", { card: aceOfSpades, position: 0 });
 ```
 
 ---

@@ -52,11 +52,11 @@ function assert(condition, message) {
 // Mock classes for testing
 class MockEngine {
   constructor() {
-    this._players = [];
+    this._agents = [];
     this._gameState = {};
     this.history = [];
-    this.deck = { size: 52 };
-    this.table = { zones: new Map() };
+    this.stack = { size: 52 };
+    this.space = { zones: new Map() };
     this.listeners = new Map();
   }
   
@@ -116,8 +116,8 @@ test('Round-robin turn advancement', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  // Create players
-  engine._players = [
+  // Create agents
+  engine._agents = [
     { name: 'Alice', active: true },
     { name: 'Bob', active: false },
     { name: 'Carol', active: false }
@@ -126,28 +126,28 @@ test('Round-robin turn advancement', () => {
   // Register round-robin rule
   ruleEngine.addRule(
     'round-robin',
-    (engine, lastAction) => lastAction?.type === 'player:endTurn',
+    (engine, lastAction) => lastAction?.type === 'agent:endTurn',
     (engine) => {
-      const currentIdx = engine._players.findIndex(p => p.active);
-      engine._players[currentIdx].active = false;
-      const nextIdx = (currentIdx + 1) % engine._players.length;
-      engine._players[nextIdx].active = true;
+      const currentIdx = engine._agents.findIndex(p => p.active);
+      engine._agents[currentIdx].active = false;
+      const nextIdx = (currentIdx + 1) % engine._agents.length;
+      engine._agents[nextIdx].active = true;
     }
   );
   
   // Simulate turn
-  const action = engine.dispatch('player:endTurn');
+  const action = engine.dispatch('agent:endTurn');
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].active === false, 'Alice should no longer be active');
-  assert(engine._players[1].active === true, 'Bob should be active');
+  assert(engine._agents[0].active === false, 'Alice should no longer be active');
+  assert(engine._agents[1].active === true, 'Bob should be active');
 });
 
-test('Skip inactive players', () => {
+test('Skip inactive agents', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { name: 'Alice', active: true, status: 'active' },
     { name: 'Bob', active: false, status: 'eliminated' },
     { name: 'Carol', active: false, status: 'active' }
@@ -155,25 +155,25 @@ test('Skip inactive players', () => {
   
   ruleEngine.addRule(
     'skip-inactive',
-    (engine, lastAction) => lastAction?.type === 'player:endTurn',
+    (engine, lastAction) => lastAction?.type === 'agent:endTurn',
     (engine) => {
-      const currentIdx = engine._players.findIndex(p => p.active);
-      engine._players[currentIdx].active = false;
+      const currentIdx = engine._agents.findIndex(p => p.active);
+      engine._agents[currentIdx].active = false;
       
-      let nextIdx = (currentIdx + 1) % engine._players.length;
-      while (engine._players[nextIdx].status === 'eliminated') {
-        nextIdx = (nextIdx + 1) % engine._players.length;
+      let nextIdx = (currentIdx + 1) % engine._agents.length;
+      while (engine._agents[nextIdx].status === 'eliminated') {
+        nextIdx = (nextIdx + 1) % engine._agents.length;
       }
       
-      engine._players[nextIdx].active = true;
+      engine._agents[nextIdx].active = true;
     }
   );
   
-  const action = engine.dispatch('player:endTurn');
+  const action = engine.dispatch('agent:endTurn');
   ruleEngine.evaluate(action);
   
-  assert(engine._players[2].active === true, 'Carol should be active (Bob skipped)');
-  assert(engine._players[1].active === false, 'Bob should be skipped');
+  assert(engine._agents[2].active === true, 'Carol should be active (Bob skipped)');
+  assert(engine._agents[1].active === false, 'Bob should be skipped');
 });
 
 // ============================================================================
@@ -186,7 +186,7 @@ test('First to goal wins', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { name: 'Alice', score: 95 },
     { name: 'Bob', score: 105 },
     { name: 'Carol', score: 80 }
@@ -197,11 +197,11 @@ test('First to goal wins', () => {
   ruleEngine.addRule(
     'first-to-100',
     (engine) => {
-      const w = engine._players.find(p => p.score >= 100);
+      const w = engine._agents.find(p => p.score >= 100);
       return !!w && !engine._gameState.ended;
     },
     (engine) => {
-      winner = engine._players.find(p => p.score >= 100);
+      winner = engine._agents.find(p => p.score >= 100);
       engine._gameState.ended = true;
       engine.dispatch('game:end', { winner: winner.name });
     }
@@ -214,11 +214,11 @@ test('First to goal wins', () => {
   assert(engine._gameState.ended === true, 'Game should be ended');
 });
 
-test('Last player standing wins', () => {
+test('Last agent standing wins', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { name: 'Alice', alive: false },
     { name: 'Bob', alive: true },
     { name: 'Carol', alive: false }
@@ -229,11 +229,11 @@ test('Last player standing wins', () => {
   ruleEngine.addRule(
     'last-standing',
     (engine) => {
-      const alive = engine._players.filter(p => p.alive);
+      const alive = engine._agents.filter(p => p.alive);
       return alive.length === 1 && !engine._gameState.ended;
     },
     (engine) => {
-      winner = engine._players.find(p => p.alive);
+      winner = engine._agents.find(p => p.alive);
       engine._gameState.ended = true;
       engine.dispatch('game:end', { winner: winner.name });
     }
@@ -249,7 +249,7 @@ test('Stalemate detection', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine.deck.size = 0;
+  engine.stack.size = 0;
   engine._gameState.availableMoves = [];
   
   let gameEnded = false;
@@ -257,7 +257,7 @@ test('Stalemate detection', () => {
   ruleEngine.addRule(
     'stalemate',
     (engine) => {
-      const noCards = engine.deck.size === 0;
+      const noCards = engine.stack.size === 0;
       const noMoves = engine._gameState.availableMoves?.length === 0;
       return noCards && noMoves && !engine._gameState.ended;
     },
@@ -284,7 +284,7 @@ test('Hand size limit enforcement', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { 
       name: 'Alice', 
       hand: Array(10).fill({ id: 'card' }) 
@@ -296,29 +296,29 @@ test('Hand size limit enforcement', () => {
   ruleEngine.addRule(
     'hand-limit',
     (engine, lastAction) => {
-      if (lastAction?.type !== 'player:drawCards') return false;
-      const player = engine._players.find(p => p.hand.length > maxSize);
-      return !!player;
+      if (lastAction?.type !== 'agent:drawCards') return false;
+      const agent = engine._agents.find(p => p.hand.length > maxSize);
+      return !!agent;
     },
     (engine) => {
-      const player = engine._players.find(p => p.hand.length > maxSize);
-      const excess = player.hand.length - maxSize;
-      player.hand = player.hand.slice(0, maxSize);
-      engine.dispatch('player:discardCards', { count: excess });
+      const agent = engine._agents.find(p => p.hand.length > maxSize);
+      const excess = agent.hand.length - maxSize;
+      agent.hand = agent.hand.slice(0, maxSize);
+      engine.dispatch('agent:discardCards', { count: excess });
     }
   );
   
-  const action = engine.dispatch('player:drawCards', { count: 3 });
+  const action = engine.dispatch('agent:drawCards', { count: 3 });
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].hand.length === 7, 'Hand should be limited to 7 cards');
+  assert(engine._agents[0].hand.length === 7, 'Hand should be limited to 7 cards');
 });
 
 test('Resource cost deduction', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { 
       name: 'Alice', 
       active: true,
@@ -336,12 +336,12 @@ test('Resource cost deduction', () => {
       return lastAction && lastAction.type in costs;
     },
     (engine) => {
-      const player = engine._players.find(p => p.active);
+      const agent = engine._agents.find(p => p.active);
       const lastAction = engine.history[engine.history.length - 1];
       const cost = costs[lastAction.type];
       
       Object.entries(cost).forEach(([resource, amount]) => {
-        player.resources[resource] -= amount;
+        agent.resources[resource] -= amount;
       });
     }
   );
@@ -349,15 +349,15 @@ test('Resource cost deduction', () => {
   const action = engine.dispatch('game:specialMove');
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].resources.energy === 7, 'Energy should be deducted');
-  assert(engine._players[0].resources.gold === 45, 'Gold should be deducted');
+  assert(engine._agents[0].resources.energy === 7, 'Energy should be deducted');
+  assert(engine._agents[0].resources.gold === 45, 'Gold should be deducted');
 });
 
 test('Prevent negative resources', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { 
       name: 'Alice',
       resources: { health: -5, mana: 10 }
@@ -368,13 +368,13 @@ test('Prevent negative resources', () => {
     'no-negative',
     (engine, lastAction) => {
       if (!lastAction?.type.includes('Resource')) return false;
-      const player = engine._players.find(p => 
+      const agent = engine._agents.find(p => 
         Object.values(p.resources).some(v => v < 0)
       );
-      return !!player;
+      return !!agent;
     },
     (engine) => {
-      engine._players.forEach(p => {
+      engine._agents.forEach(p => {
         Object.keys(p.resources).forEach(key => {
           if (p.resources[key] < 0) {
             p.resources[key] = 0;
@@ -384,18 +384,18 @@ test('Prevent negative resources', () => {
     }
   );
   
-  const action = engine.dispatch('player:takeResource', { resource: 'health' });
+  const action = engine.dispatch('agent:takeResource', { resource: 'health' });
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].resources.health === 0, 'Health should be clamped to 0');
-  assert(engine._players[0].resources.mana === 10, 'Mana should be unchanged');
+  assert(engine._agents[0].resources.health === 0, 'Health should be clamped to 0');
+  assert(engine._agents[0].resources.mana === 10, 'Mana should be unchanged');
 });
 
 test('Resource generation per turn', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { name: 'Alice', resources: { energy: 0 } },
     { name: 'Bob', resources: { energy: 0 } }
   ];
@@ -404,7 +404,7 @@ test('Resource generation per turn', () => {
     'generate-energy',
     (engine, lastAction) => lastAction?.type === 'game:newTurn',
     (engine) => {
-      engine._players.forEach(p => {
+      engine._agents.forEach(p => {
         p.resources.energy += 2;
       });
     }
@@ -413,15 +413,15 @@ test('Resource generation per turn', () => {
   const action = engine.dispatch('game:newTurn');
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].resources.energy === 2, 'Alice should gain energy');
-  assert(engine._players[1].resources.energy === 2, 'Bob should gain energy');
+  assert(engine._agents[0].resources.energy === 2, 'Alice should gain energy');
+  assert(engine._agents[1].resources.energy === 2, 'Bob should gain energy');
 });
 
 test('Elimination on resource depletion', () => {
   const engine = new MockEngine();
   const ruleEngine = new MockRuleEngine(engine);
   
-  engine._players = [
+  engine._agents = [
     { name: 'Alice', resources: { health: 0 }, status: 'active' },
     { name: 'Bob', resources: { health: 50 }, status: 'active' }
   ];
@@ -430,27 +430,27 @@ test('Elimination on resource depletion', () => {
     'eliminate-on-death',
     (engine, lastAction) => {
       if (!lastAction?.type.includes('Resource')) return false;
-      const player = engine._players.find(p => 
+      const agent = engine._agents.find(p => 
         p.resources.health <= 0 && p.status !== 'eliminated'
       );
-      return !!player;
+      return !!agent;
     },
     (engine) => {
-      const player = engine._players.find(p => 
+      const agent = engine._agents.find(p => 
         p.resources.health <= 0 && p.status !== 'eliminated'
       );
-      player.status = 'eliminated';
-      player.alive = false;
-      engine.dispatch('player:eliminated', { name: player.name });
+      agent.status = 'eliminated';
+      agent.alive = false;
+      engine.dispatch('agent:eliminated', { name: agent.name });
     }
   );
   
-  const action = engine.dispatch('player:takeResource', { resource: 'health' });
+  const action = engine.dispatch('agent:takeResource', { resource: 'health' });
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].status === 'eliminated', 'Alice should be eliminated');
-  assert(engine._players[0].alive === false, 'Alice should not be alive');
-  assert(engine._players[1].status === 'active', 'Bob should still be active');
+  assert(engine._agents[0].status === 'eliminated', 'Alice should be eliminated');
+  assert(engine._agents[0].alive === false, 'Alice should not be alive');
+  assert(engine._agents[1].status === 'active', 'Bob should still be active');
 });
 
 // ============================================================================
@@ -464,7 +464,7 @@ test('Full turn cycle with multiple rules', () => {
   const ruleEngine = new MockRuleEngine(engine);
   
   // Setup
-  engine._players = [
+  engine._agents = [
     { name: 'Alice', active: true, score: 95, resources: { energy: 3 } },
     { name: 'Bob', active: false, score: 90, resources: { energy: 5 } }
   ];
@@ -474,7 +474,7 @@ test('Full turn cycle with multiple rules', () => {
     'generate-energy',
     (engine, lastAction) => lastAction?.type === 'game:startTurn',
     (engine) => {
-      const active = engine._players.find(p => p.active);
+      const active = engine._agents.find(p => p.active);
       if (active) active.resources.energy += 2;
     },
     { priority: 100 }
@@ -484,12 +484,12 @@ test('Full turn cycle with multiple rules', () => {
   ruleEngine.addRule(
     'check-winner',
     (engine, lastAction) => {
-      if (lastAction?.type !== 'player:endTurn') return false;
-      const winner = engine._players.find(p => p.score >= 100);
+      if (lastAction?.type !== 'agent:endTurn') return false;
+      const winner = engine._agents.find(p => p.score >= 100);
       return !!winner && !engine._gameState.ended;
     },
     (engine) => {
-      const winner = engine._players.find(p => p.score >= 100);
+      const winner = engine._agents.find(p => p.score >= 100);
       engine._gameState.ended = true;
       engine._gameState.winner = winner.name;
     },
@@ -499,12 +499,12 @@ test('Full turn cycle with multiple rules', () => {
   // Rule 3: Advance turn
   ruleEngine.addRule(
     'advance-turn',
-    (engine, lastAction) => lastAction?.type === 'player:endTurn',
+    (engine, lastAction) => lastAction?.type === 'agent:endTurn',
     (engine) => {
-      const currentIdx = engine._players.findIndex(p => p.active);
-      engine._players[currentIdx].active = false;
-      const nextIdx = (currentIdx + 1) % engine._players.length;
-      engine._players[nextIdx].active = true;
+      const currentIdx = engine._agents.findIndex(p => p.active);
+      engine._agents[currentIdx].active = false;
+      const nextIdx = (currentIdx + 1) % engine._agents.length;
+      engine._agents[nextIdx].active = true;
     },
     { priority: 80 }
   );
@@ -513,17 +513,17 @@ test('Full turn cycle with multiple rules', () => {
   let action = engine.dispatch('game:startTurn');
   ruleEngine.evaluate(action);
   
-  assert(engine._players[0].resources.energy === 5, 'Energy should be generated');
+  assert(engine._agents[0].resources.energy === 5, 'Energy should be generated');
   
   // Simulate scoring
-  engine._players[0].score = 100;
+  engine._agents[0].score = 100;
   
-  action = engine.dispatch('player:endTurn');
+  action = engine.dispatch('agent:endTurn');
   ruleEngine.evaluate(action);
   
   assert(engine._gameState.ended === true, 'Game should end');
   assert(engine._gameState.winner === 'Alice', 'Alice should win');
-  assert(engine._players[1].active === true, 'Turn should advance to Bob');
+  assert(engine._agents[1].active === true, 'Turn should advance to Bob');
 });
 
 // ============================================================================

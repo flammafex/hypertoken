@@ -12,13 +12,13 @@ The Prisoner's Dilemma is a fundamental problem in game theory that demonstrates
 
 ### The Setup
 
-Two players simultaneously choose to **cooperate** (C) or **defect** (D):
+Two agents simultaneously choose to **cooperate** (C) or **defect** (D):
 
 ```
-                Player 2
+                Agent 2
               C         D
          C  (3,3)     (0,5)
-Player 1
+Agent 1
          D  (5,0)     (1,1)
 ```
 
@@ -29,7 +29,7 @@ Player 1
 
 ### The Dilemma
 
-Each player's best individual strategy is to defect, but if both defect, they get a worse outcome than if both had cooperated!
+Each agent's best individual strategy is to defect, but if both defect, they get a worse outcome than if both had cooperated!
 
 ---
 
@@ -88,7 +88,7 @@ tournament.printResults();
 | **Prober** | Tests opponent | Probes for weakness, exploits if found |
 | **Soft Majority** | Democratic | Cooperates if opponent cooperated ≥50% |
 | **Hard Majority** | Strict democratic | Cooperates only if opponent cooperated >50% |
-| **Random** | Unpredictable | 50/50 random choice |
+| **Random** | Unpredicspace | 50/50 random choice |
 
 ---
 
@@ -331,9 +331,9 @@ Tests cover:
 
 This implementation uses:
 - ✅ **Engine** - Core game coordination
-- ✅ **Actions** - Player creation, resource management
+- ✅ **Actions** - Agent creation, resource management
 - ✅ **Events** - Round completion, game end
-- ✅ **Multi-Agent System** - Strategy-based players
+- ✅ **Multi-Agent System** - Strategy-based agents
 
 ### Extending the System
 
@@ -372,7 +372,7 @@ Licensed under the Apache License, Version 2.0
 Ideas for extensions:
 - Evolutionary tournaments (strategies that adapt)
 - Spatial Prisoner's Dilemma (grid-based)
-- N-player variations (public goods games)
+- N-agent variations (public goods games)
 - Noisy environments (misunderstandings)
 - Memory-limited strategies
 - Neural network strategies

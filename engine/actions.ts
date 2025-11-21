@@ -35,46 +35,46 @@ export interface ActionRegistryType {
 
 const BaseActions: ActionRegistryType = {
   /**
-   * Shuffle the deck
+   * Shuffle the stack
    */
-  "deck:shuffle": (engine: Engine, { seed = null }: { seed?: number | null } = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    engine.deck.shuffle(seed ?? undefined);
+  "stack:shuffle": (engine: Engine, { seed = null }: { seed?: number | null } = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    engine.stack.shuffle(seed ?? undefined);
   },
   
   /**
-   * Draw N cards from deck
+   * Draw N cards from stack
    */
-  "deck:draw": (engine: Engine, { count = 1 }: { count?: number } = {}) => {
-    if (!engine.deck) throw new Error("No deck attached to engine");
-    // Using the overloaded draw method from Deck.ts
-    return engine.deck.draw(count);
+  "stack:draw": (engine: Engine, { count = 1 }: { count?: number } = {}) => {
+    if (!engine.stack) throw new Error("No stack attached to engine");
+    // Using the overloaded draw method from stack.ts
+    return engine.stack.draw(count);
   },
   
   /**
-   * Place a card on the table in a specific zone
+   * Place a card on the space in a specific zone
    */
-  "table:place": (engine: Engine, { zone, card, opts = {} }: { zone: string; card: IToken; opts?: any } = {} as any) => {
-    if (!engine.table) throw new Error("No table attached to engine");
+  "space:place": (engine: Engine, { zone, card, opts = {} }: { zone: string; card: IToken; opts?: any } = {} as any) => {
+    if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     if (!card) throw new Error("card required");
-    return engine.table.place(zone, card, opts);
+    return engine.space.place(zone, card, opts);
   },
   
   /**
-   * Clear all cards from the table
+   * Clear all cards from the space
    */
-  "table:clear": (engine: Engine) => {
-    if (!engine.table) throw new Error("No table attached to engine");
-    engine.table.clear();
+  "space:clear": (engine: Engine) => {
+    if (!engine.space) throw new Error("No space attached to engine");
+    engine.space.clear();
   },
   
   /**
-   * Draw N cards from shoe
+   * Draw N cards from source
    */
-  "shoe:draw": (engine: Engine, { count = 1 }: { count?: number } = {}) => {
-    if (!engine.shoe) throw new Error("No shoe attached to engine");
-    return engine.shoe.draw(count);
+  "source:draw": (engine: Engine, { count = 1 }: { count?: number } = {}) => {
+    if (!engine.source) throw new Error("No source attached to engine");
+    return engine.source.draw(count);
   }
 };
 
@@ -103,10 +103,10 @@ export function listActions(): string[] {
  */
 export function listActionsByCategory(): Record<string, string[]> {
   const categories: Record<string, string[]> = {
-    deck: [],
-    table: [],
-    shoe: [],
-    player: [],
+    stack: [],
+    space: [],
+    source: [],
+    agent: [],
     game: [],
     other: []
   };

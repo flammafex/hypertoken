@@ -10,10 +10,10 @@ Complete documentation for all 58 built-in actions in the HyperToken engine.
 
 | Category | Count | Actions |
 |----------|-------|---------|
-| **Deck** | 10 | shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse |
-| **Table** | 13 | place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone |
-| **Shoe** | 7 | draw, shuffle, burn, reset, addDeck, removeDeck, inspect |
-| **Player** | 12 | create, remove, setActive, giveResource, takeResource, drawCards, discardCards, get, **transfer, trade, steal** |
+| **Stack** | 10 | shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse |
+| **Space** | 13 | place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone |
+| **Source** | 7 | draw, shuffle, burn, reset, addStack, removeStack, inspect |
+| **Agent** | 12 | create, remove, setActive, giveResource, takeResource, drawCards, discardCards, get, **transfer, trade, steal** |
 | **Game** | 6 | start, end, pause, resume, nextPhase, setProperty |
 | **Token** | 5 | transform, attach, detach, merge, split |
 | **Batch** | 5 | filter, forEach, collect, count, find |
@@ -21,34 +21,34 @@ Complete documentation for all 58 built-in actions in the HyperToken engine.
 
 ---
 
-## Table of Contents
+## Space of Contents
 
-1. [Deck Actions](#deck-actions) (10)
-2. [Table Actions](#table-actions) (13)
-3. [Shoe Actions](#shoe-actions) (7)
-4. [Player Actions](#player-actions) (12)
+1. [Stack Actions](#stack-actions) (10)
+2. [Space Actions](#space-actions) (13)
+3. [Source Actions](#source-actions) (7)
+4. [Agent Actions](#agent-actions) (12)
 5. [Game Actions](#game-actions) (6)
 6. [Token Actions](#token-actions) (5)
 7. [Batch Actions](#batch-actions) (5)
 
 ---
 
-# Deck Actions
+# Stack Actions
 
-Operations on the primary card deck. The deck is a stack-based collection with shuffling, drawing, and manipulation capabilities.
+Operations on the primary card stack. The stack is a stack-based collection with shuffling, drawing, and manipulation capabilities.
 
 ---
 
-## `deck:shuffle`
+## `stack:shuffle`
 
-Randomize the order of cards in the deck.
+Randomize the order of cards in the stack.
 
 ```javascript
 // Random shuffle
-engine.dispatch("deck:shuffle");
+engine.dispatch("stack:shuffle");
 
 // Deterministic shuffle with seed
-engine.dispatch("deck:shuffle", { seed: 42 });
+engine.dispatch("stack:shuffle", { seed: 42 });
 ```
 
 **Parameters:**
@@ -60,16 +60,16 @@ engine.dispatch("deck:shuffle", { seed: 42 });
 
 ---
 
-## `deck:draw`
+## `stack:draw`
 
-Draw one or more cards from the top of the deck.
+Draw one or more cards from the top of the stack.
 
 ```javascript
 // Draw 1 card
-const card = engine.dispatch("deck:draw");
+const card = engine.dispatch("stack:draw");
 
 // Draw 5 cards
-const cards = engine.dispatch("deck:draw", { count: 5 });
+const cards = engine.dispatch("stack:draw", { count: 5 });
 ```
 
 **Parameters:**
@@ -77,16 +77,16 @@ const cards = engine.dispatch("deck:draw", { count: 5 });
 
 **Returns:** Single card (if count=1) or array of cards
 
-**Use cases:** Player draws cards, dealing hands
+**Use cases:** Agent draws cards, dealing hands
 
 ---
 
-## `deck:reset`
+## `stack:reset`
 
-Reset deck to original unshuffled state.
+Reset stack to original unshuffled state.
 
 ```javascript
-engine.dispatch("deck:reset");
+engine.dispatch("stack:reset");
 ```
 
 **Parameters:** none
@@ -97,16 +97,16 @@ engine.dispatch("deck:reset");
 
 ---
 
-## `deck:burn`
+## `stack:burn`
 
-Discard N cards from top of deck without drawing them.
+Discard N cards from top of stack without drawing them.
 
 ```javascript
 // Burn 1 card
-engine.dispatch("deck:burn");
+engine.dispatch("stack:burn");
 
 // Burn 3 cards
-engine.dispatch("deck:burn", { count: 3 });
+engine.dispatch("stack:burn", { count: 3 });
 ```
 
 **Parameters:**
@@ -118,37 +118,37 @@ engine.dispatch("deck:burn", { count: 3 });
 
 ---
 
-## `deck:peek`
+## `stack:peek`
 
 Look at top N cards without removing them.
 
 ```javascript
 // Peek at top card
-const topCard = engine.dispatch("deck:peek");
+const topCard = engine.dispatch("stack:peek");
 
 // Peek at top 3 cards
-const top3 = engine.dispatch("deck:peek", { count: 3 });
+const top3 = engine.dispatch("stack:peek", { count: 3 });
 ```
 
 **Parameters:**
 - `count` (number, default: 1): Number of cards to peek at
 
-**Returns:** Array of cards (does not modify deck)
+**Returns:** Array of cards (does not modify stack)
 
 **Use cases:** Scrying effects, looking ahead, AI planning
 
 ---
 
-## `deck:cut`
+## `stack:cut`
 
-Cut the deck at a position.
+Cut the stack at a position.
 
 ```javascript
 // Cut at middle
-engine.dispatch("deck:cut");
+engine.dispatch("stack:cut");
 
 // Cut at specific position
-engine.dispatch("deck:cut", { position: 26, topToBottom: true });
+engine.dispatch("stack:cut", { position: 26, topToBottom: true });
 ```
 
 **Parameters:**
@@ -157,16 +157,16 @@ engine.dispatch("deck:cut", { position: 26, topToBottom: true });
 
 **Returns:** void
 
-**Use cases:** Traditional deck cutting, shuffling variations
+**Use cases:** Traditional stack cutting, shuffling variations
 
 ---
 
-## `deck:insertAt`
+## `stack:insertAt`
 
-Insert a card at a specific position in the deck.
+Insert a card at a specific position in the stack.
 
 ```javascript
-engine.dispatch("deck:insertAt", { 
+engine.dispatch("stack:insertAt", { 
   card: myCard, 
   position: 5 
 });
@@ -178,16 +178,16 @@ engine.dispatch("deck:insertAt", {
 
 **Returns:** void
 
-**Use cases:** Putting cards back, magical effects, deck manipulation
+**Use cases:** Putting cards back, magical effects, stack manipulation
 
 ---
 
-## `deck:removeAt`
+## `stack:removeAt`
 
 Remove and return card at specific position.
 
 ```javascript
-const card = engine.dispatch("deck:removeAt", { position: 10 });
+const card = engine.dispatch("stack:removeAt", { position: 10 });
 ```
 
 **Parameters:**
@@ -195,16 +195,16 @@ const card = engine.dispatch("deck:removeAt", { position: 10 });
 
 **Returns:** The removed card
 
-**Use cases:** Removing specific cards, deck manipulation
+**Use cases:** Removing specific cards, stack manipulation
 
 ---
 
-## `deck:swap`
+## `stack:swap`
 
-Swap two cards in the deck by position.
+Swap two cards in the stack by position.
 
 ```javascript
-engine.dispatch("deck:swap", { 
+engine.dispatch("stack:swap", { 
   position1: 0, 
   position2: 10 
 });
@@ -216,38 +216,38 @@ engine.dispatch("deck:swap", {
 
 **Returns:** void
 
-**Use cases:** Deck manipulation, magical effects
+**Use cases:** Stack manipulation, magical effects
 
 ---
 
-## `deck:reverse`
+## `stack:reverse`
 
-Reverse the entire deck order.
+Reverse the entire stack order.
 
 ```javascript
-engine.dispatch("deck:reverse");
+engine.dispatch("stack:reverse");
 ```
 
 **Parameters:** none
 
 **Returns:** void
 
-**Use cases:** Deck manipulation, special effects
+**Use cases:** Stack manipulation, special effects
 
 ---
 
-# Table Actions
+# Space Actions
 
-Operations on the game table and zones. The table supports multiple named zones with spatial positioning and card placement.
+Operations on the game space and zones. The space supports multiple named zones with spatial positioning and card placement.
 
 ---
 
-## `table:place`
+## `space:place`
 
 Place a card/token in a zone.
 
 ```javascript
-engine.dispatch("table:place", {
+engine.dispatch("space:place", {
   zone: "hand",
   token: myCard,
   x: 100,
@@ -270,12 +270,12 @@ engine.dispatch("table:place", {
 
 ---
 
-## `table:clear`
+## `space:clear`
 
-Clear all tokens from the table.
+Clear all tokens from the space.
 
 ```javascript
-engine.dispatch("table:clear");
+engine.dispatch("space:clear");
 ```
 
 **Parameters:** none
@@ -286,12 +286,12 @@ engine.dispatch("table:clear");
 
 ---
 
-## `table:move`
+## `space:move`
 
 Move a token from one zone to another.
 
 ```javascript
-engine.dispatch("table:move", {
+engine.dispatch("space:move", {
   from: "hand",
   to: "field",
   placement: placementObject,
@@ -313,12 +313,12 @@ engine.dispatch("table:move", {
 
 ---
 
-## `table:flip`
+## `space:flip`
 
 Flip a card face up or face down.
 
 ```javascript
-engine.dispatch("table:flip", {
+engine.dispatch("space:flip", {
   zone: "field",
   placement: placementObject,
   faceUp: true
@@ -336,12 +336,12 @@ engine.dispatch("table:flip", {
 
 ---
 
-## `table:remove`
+## `space:remove`
 
-Remove a token from the table.
+Remove a token from the space.
 
 ```javascript
-engine.dispatch("table:remove", {
+engine.dispatch("space:remove", {
   zone: "field",
   placement: placementObject
 });
@@ -357,12 +357,12 @@ engine.dispatch("table:remove", {
 
 ---
 
-## `table:createZone`
+## `space:createZone`
 
 Create a new named zone.
 
 ```javascript
-engine.dispatch("table:createZone", {
+engine.dispatch("space:createZone", {
   name: "graveyard",
   meta: { type: "discard", visible: true }
 });
@@ -378,12 +378,12 @@ engine.dispatch("table:createZone", {
 
 ---
 
-## `table:deleteZone`
+## `space:deleteZone`
 
 Delete a zone and its contents.
 
 ```javascript
-engine.dispatch("table:deleteZone", {
+engine.dispatch("space:deleteZone", {
   name: "graveyard"
 });
 ```
@@ -397,12 +397,12 @@ engine.dispatch("table:deleteZone", {
 
 ---
 
-## `table:clearZone`
+## `space:clearZone`
 
 Clear all tokens from a specific zone.
 
 ```javascript
-engine.dispatch("table:clearZone", {
+engine.dispatch("space:clearZone", {
   zone: "field"
 });
 ```
@@ -416,12 +416,12 @@ engine.dispatch("table:clearZone", {
 
 ---
 
-## `table:shuffleZone`
+## `space:shuffleZone`
 
 Randomize token positions in a zone.
 
 ```javascript
-engine.dispatch("table:shuffleZone", {
+engine.dispatch("space:shuffleZone", {
   zone: "field",
   seed: 42
 });
@@ -437,13 +437,13 @@ engine.dispatch("table:shuffleZone", {
 
 ---
 
-## `table:transferZone`
+## `space:transferZone`
 
 Move all tokens from one zone to another.
 
 ```javascript
-engine.dispatch("table:transferZone", {
-  from: "deck",
+engine.dispatch("space:transferZone", {
+  from: "stack",
   to: "discard"
 });
 ```
@@ -458,12 +458,12 @@ engine.dispatch("table:transferZone", {
 
 ---
 
-## `table:fanZone`
+## `space:fanZone`
 
 Arrange tokens in a fan layout.
 
 ```javascript
-engine.dispatch("table:fanZone", {
+engine.dispatch("space:fanZone", {
   zone: "hand",
   centerX: 400,
   centerY: 500,
@@ -485,13 +485,13 @@ engine.dispatch("table:fanZone", {
 
 ---
 
-## `table:stackZone`
+## `space:stackZone`
 
 Stack tokens vertically.
 
 ```javascript
-engine.dispatch("table:stackZone", {
-  zone: "deck",
+engine.dispatch("space:stackZone", {
+  zone: "stack",
   x: 100,
   y: 100,
   offsetY: 2
@@ -506,16 +506,16 @@ engine.dispatch("table:stackZone", {
 
 **Returns:** void
 
-**Use cases:** Deck visualization, pile displays
+**Use cases:** Stack visualization, pile displays
 
 ---
 
-## `table:spreadZone`
+## `space:spreadZone`
 
 Spread tokens in a line.
 
 ```javascript
-engine.dispatch("table:spreadZone", {
+engine.dispatch("space:spreadZone", {
   zone: "field",
   startX: 50,
   startY: 300,
@@ -533,16 +533,16 @@ engine.dispatch("table:spreadZone", {
 
 **Returns:** void
 
-**Use cases:** Laying out cards, displaying tableau
+**Use cases:** Laying out cards, displaying spaceau
 
 ---
 
-## `table:lockZone`
+## `space:lockZone`
 
 Lock a zone to prevent modifications.
 
 ```javascript
-engine.dispatch("table:lockZone", {
+engine.dispatch("space:lockZone", {
   zone: "field",
   locked: true
 });
@@ -558,34 +558,34 @@ engine.dispatch("table:lockZone", {
 
 ---
 
-# Shoe Actions
+# Source Actions
 
-Operations on multi-deck containers (shoes). Useful for games requiring multiple decks or weighted randomness.
+Operations on multi-stack containers (sources). Useful for games requiring multiple stacks or weighted randomness.
 
 ---
 
-## `shoe:draw`
+## `source:draw`
 
-Draw a card from the shoe.
+Draw a card from the source.
 
 ```javascript
-const card = engine.dispatch("shoe:draw");
+const card = engine.dispatch("source:draw");
 ```
 
 **Parameters:** none
 
-**Returns:** Single card from shoe
+**Returns:** Single card from source
 
-**Use cases:** Drawing from combined decks, blackjack
+**Use cases:** Drawing from combined stacks, blackjack
 
 ---
 
-## `shoe:shuffle`
+## `source:shuffle`
 
-Shuffle all decks in the shoe.
+Shuffle all stacks in the source.
 
 ```javascript
-engine.dispatch("shoe:shuffle", { seed: 42 });
+engine.dispatch("source:shuffle", { seed: 42 });
 ```
 
 **Parameters:**
@@ -593,16 +593,16 @@ engine.dispatch("shoe:shuffle", { seed: 42 });
 
 **Returns:** void
 
-**Use cases:** Reshuffling multi-deck shoe
+**Use cases:** Reshuffling multi-stack source
 
 ---
 
-## `shoe:burn`
+## `source:burn`
 
-Burn N cards from the shoe.
+Burn N cards from the source.
 
 ```javascript
-engine.dispatch("shoe:burn", { count: 5 });
+engine.dispatch("source:burn", { count: 5 });
 ```
 
 **Parameters:**
@@ -614,89 +614,89 @@ engine.dispatch("shoe:burn", { count: 5 });
 
 ---
 
-## `shoe:reset`
+## `source:reset`
 
-Reset shoe to original state.
+Reset source to original state.
 
 ```javascript
-engine.dispatch("shoe:reset");
+engine.dispatch("source:reset");
 ```
 
 **Parameters:** none
 
 **Returns:** void
 
-**Use cases:** New shoe, reset game
+**Use cases:** New source, reset game
 
 ---
 
-## `shoe:addDeck`
+## `source:addStack`
 
-Add a deck to the shoe.
+Add a stack to the source.
 
 ```javascript
-engine.dispatch("shoe:addDeck", {
-  deck: myDeck
+engine.dispatch("source:addStack", {
+  stack: myStack
 });
 ```
 
 **Parameters:**
-- `deck` (Deck, required): Deck to add
+- `stack` (Stack, required): Stack to add
 
 **Returns:** void
 
-**Use cases:** Building multi-deck shoe, adding cards
+**Use cases:** Building multi-stack source, adding cards
 
 ---
 
-## `shoe:removeDeck`
+## `source:removeStack`
 
-Remove a deck from the shoe.
+Remove a stack from the source.
 
 ```javascript
-engine.dispatch("shoe:removeDeck", {
+engine.dispatch("source:removeStack", {
   index: 0
 });
 ```
 
 **Parameters:**
-- `index` (number, required): Deck index to remove
+- `index` (number, required): Stack index to remove
 
-**Returns:** Removed deck
+**Returns:** Removed stack
 
-**Use cases:** Removing exhausted deck
+**Use cases:** Removing exhausted stack
 
 ---
 
-## `shoe:inspect`
+## `source:inspect`
 
-Inspect shoe contents.
+Inspect source contents.
 
 ```javascript
-const info = engine.dispatch("shoe:inspect");
-// Returns: { deckCount: 6, totalCards: 312, ... }
+const info = engine.dispatch("source:inspect");
+// Returns: { stackCount: 6, totalCards: 312, ... }
 ```
 
 **Parameters:** none
 
-**Returns:** Shoe information object
+**Returns:** Source information object
 
 **Use cases:** Debugging, game state display
 
 ---
 
-# Player Actions
+# Agent Actions
 
-Operations on players, including creation, resource management, and player-to-player interactions.
+Operations on agents, including creation, resource management, and agent-to-agent interactions.
 
 ---
 
-## `player:create`
+## `agent:create`
 
-Create a new player.
+Create a new agent.
 
 ```javascript
-engine.dispatch("player:create", {
+engine.dispatch("agent:create", {
   name: "Alice",
   agent: myAIAgent,
   meta: { color: "blue", avatar: "knight" }
@@ -704,48 +704,48 @@ engine.dispatch("player:create", {
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `agent` (object, optional): AI agent
 - `meta` (object, optional): Custom metadata
 
-**Returns:** Player object
+**Returns:** Agent object
 
-**Use cases:** Game setup, adding players
+**Use cases:** Game setup, adding agents
 
 ---
 
-## `player:remove`
+## `agent:remove`
 
-Remove a player from the game.
+Remove a agent from the game.
 
 ```javascript
-engine.dispatch("player:remove", {
+engine.dispatch("agent:remove", {
   name: "Alice"
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player to remove
+- `name` (string, required): Agent to remove
 
 **Returns:** void
 
-**Use cases:** Player elimination, leaving game
+**Use cases:** Agent elimination, leaving game
 
 ---
 
-## `player:setActive`
+## `agent:setActive`
 
-Set player active/inactive state.
+Set agent active/inactive state.
 
 ```javascript
-engine.dispatch("player:setActive", {
+engine.dispatch("agent:setActive", {
   name: "Alice",
   active: false
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `active` (boolean, default: true): Active state
 
 **Returns:** void
@@ -754,12 +754,12 @@ engine.dispatch("player:setActive", {
 
 ---
 
-## `player:giveResource`
+## `agent:giveResource`
 
-Give resources to a player.
+Give resources to a agent.
 
 ```javascript
-engine.dispatch("player:giveResource", {
+engine.dispatch("agent:giveResource", {
   name: "Alice",
   resource: "gold",
   amount: 100
@@ -767,7 +767,7 @@ engine.dispatch("player:giveResource", {
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `resource` (string, required): Resource type
 - `amount` (number, default: 1): Amount to give
 
@@ -777,12 +777,12 @@ engine.dispatch("player:giveResource", {
 
 ---
 
-## `player:takeResource`
+## `agent:takeResource`
 
-Take resources from a player.
+Take resources from a agent.
 
 ```javascript
-engine.dispatch("player:takeResource", {
+engine.dispatch("agent:takeResource", {
   name: "Alice",
   resource: "gold",
   amount: 50
@@ -790,7 +790,7 @@ engine.dispatch("player:takeResource", {
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `resource` (string, required): Resource type
 - `amount` (number, default: 1): Amount to take
 
@@ -800,22 +800,22 @@ engine.dispatch("player:takeResource", {
 
 ---
 
-## `player:drawCards`
+## `agent:drawCards`
 
-Player draws cards from deck/shoe.
+Agent draws cards from stack/source.
 
 ```javascript
-engine.dispatch("player:drawCards", {
+engine.dispatch("agent:drawCards", {
   name: "Alice",
   count: 5,
-  source: "deck"
+  source: "stack"
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `count` (number, default: 1): Cards to draw
-- `source` (string, default: "deck"): Source ("deck" or "shoe")
+- `source` (string, default: "stack"): Source ("stack" or "source")
 
 **Returns:** void
 
@@ -823,19 +823,19 @@ engine.dispatch("player:drawCards", {
 
 ---
 
-## `player:discardCards`
+## `agent:discardCards`
 
-Player discards specific cards.
+Agent discards specific cards.
 
 ```javascript
-engine.dispatch("player:discardCards", {
+engine.dispatch("agent:discardCards", {
   name: "Alice",
   cards: [card1, card2]
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 - `cards` (Array<Token> or Token, required): Cards to discard
 
 **Returns:** void
@@ -844,32 +844,32 @@ engine.dispatch("player:discardCards", {
 
 ---
 
-## `player:get`
+## `agent:get`
 
-Get player state.
+Get agent state.
 
 ```javascript
-const player = engine.dispatch("player:get", {
+const agent = engine.dispatch("agent:get", {
   name: "Alice"
 });
 ```
 
 **Parameters:**
-- `name` (string, required): Player name
+- `name` (string, required): Agent name
 
-**Returns:** Player object
+**Returns:** Agent object
 
 **Use cases:** Querying state, AI decision-making
 
 ---
 
-## `player:transfer`
+## `agent:transfer`
 
-Transfer resources/tokens between players.
+Transfer resources/tokens between agents.
 
 ```javascript
 // Transfer resources
-engine.dispatch("player:transfer", {
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   resource: "gold",
@@ -877,7 +877,7 @@ engine.dispatch("player:transfer", {
 });
 
 // Transfer a token
-engine.dispatch("player:transfer", {
+engine.dispatch("agent:transfer", {
   from: "Alice",
   to: "Bob",
   token: magicSword
@@ -885,8 +885,8 @@ engine.dispatch("player:transfer", {
 ```
 
 **Parameters:**
-- `from` (string, required): Source player
-- `to` (string, required): Target player
+- `from` (string, required): Source agent
+- `to` (string, required): Target agent
 - `resource` (string): Resource type (if transferring resources)
 - `amount` (number, default: 1): Amount to transfer
 - `token` (Token): Specific token to transfer
@@ -895,34 +895,34 @@ engine.dispatch("player:transfer", {
 
 **Use cases:** Gifting, tribute, payment, lending
 
-**Events:** Emits `player:transfer`
+**Events:** Emits `agent:transfer`
 
 ---
 
-## `player:trade`
+## `agent:trade`
 
-Bidirectional exchange between players.
+Bidirectional exchange between agents.
 
 ```javascript
 // Resource for resource
-engine.dispatch("player:trade", {
-  player1: { 
+engine.dispatch("agent:trade", {
+  agent1: { 
     name: "Alice", 
     offer: { resource: "gold", amount: 100 }
   },
-  player2: { 
+  agent2: { 
     name: "Bob", 
     offer: { resource: "wood", amount: 200 }
   }
 });
 
 // Token for resource
-engine.dispatch("player:trade", {
-  player1: { 
+engine.dispatch("agent:trade", {
+  agent1: { 
     name: "Alice", 
     offer: { token: magicRing }
   },
-  player2: { 
+  agent2: { 
     name: "Bob", 
     offer: { resource: "gold", amount: 500 }
   }
@@ -930,29 +930,29 @@ engine.dispatch("player:trade", {
 ```
 
 **Parameters:**
-- `player1` (object, required):
-  - `name` (string): Player name
+- `agent1` (object, required):
+  - `name` (string): Agent name
   - `offer` (object): What they offer
     - `resource` + `amount`, OR `token`
-- `player2` (object, required): Same structure
+- `agent2` (object, required): Same structure
 
 **Returns:** Trade result with transaction
 
 **Use cases:** Marketplace, bartering, agreements
 
-**Events:** Emits `player:trade`
+**Events:** Emits `agent:trade`
 
 **Notes:** Atomic operation - both transfers succeed or both fail
 
 ---
 
-## `player:steal`
+## `agent:steal`
 
 Forcibly take resources/tokens (with optional validation).
 
 ```javascript
 // Basic steal
-engine.dispatch("player:steal", {
+engine.dispatch("agent:steal", {
   from: "Victim",
   to: "Thief",
   resource: "gold",
@@ -960,7 +960,7 @@ engine.dispatch("player:steal", {
 });
 
 // Steal with validation
-engine.dispatch("player:steal", {
+engine.dispatch("agent:steal", {
   from: "Victim",
   to: "Thief",
   resource: "gold",
@@ -972,8 +972,8 @@ engine.dispatch("player:steal", {
 ```
 
 **Parameters:**
-- `from` (string, required): Victim player
-- `to` (string, required): Thief player
+- `from` (string, required): Victim agent
+- `to` (string, required): Thief agent
 - `resource` (string): Resource type
 - `amount` (number, default: 1): Amount to steal
 - `token` (Token): Specific token to steal
@@ -983,7 +983,7 @@ engine.dispatch("player:steal", {
 
 **Use cases:** Theft mechanics, raiding, piracy, combat loot
 
-**Events:** Emits `player:steal`
+**Events:** Emits `agent:steal`
 
 **Notes:** Steals as much as possible (up to requested amount)
 
@@ -1326,13 +1326,13 @@ Select tokens matching criteria.
 ```javascript
 // Filter array
 const redCards = engine.dispatch("tokens:filter", {
-  tokens: deck.cards,
+  tokens: stack.cards,
   predicate: (token) => token.meta.color === "red"
 });
 
 // Filter from source
 const highValue = engine.dispatch("tokens:filter", {
-  source: "deck",
+  source: "stack",
   predicate: (token) => token.meta.value >= 10
 });
 
@@ -1346,7 +1346,7 @@ const active = engine.dispatch("tokens:filter", {
 **Parameters:**
 - `tokens` (Array<Token>): Tokens to filter (if not using source)
 - `predicate` (function, required): Filter function
-- `source` (string): Source to filter from ('deck', 'table', or zone name)
+- `source` (string): Source to filter from ('stack', 'space', or zone name)
 
 **Returns:** Array of matching tokens
 
@@ -1363,7 +1363,7 @@ Apply operation to each token.
 ```javascript
 // Modify tokens
 engine.dispatch("tokens:forEach", {
-  tokens: playerHand,
+  tokens: agentHand,
   operation: (token) => {
     token.meta.buffed = true;
   }
@@ -1377,7 +1377,7 @@ const powers = engine.dispatch("tokens:forEach", {
 
 // Use index
 engine.dispatch("tokens:forEach", {
-  tokens: deck.cards,
+  tokens: stack.cards,
   operation: (token, index) => {
     token.meta.position = index;
   }
@@ -1404,7 +1404,7 @@ Gather tokens from multiple sources.
 ```javascript
 // From multiple sources
 const all = engine.dispatch("tokens:collect", {
-  sources: ["deck", "table", "discard"]
+  sources: ["stack", "space", "discard"]
 });
 
 // From specific zones
@@ -1421,7 +1421,7 @@ const withEquipment = engine.dispatch("tokens:collect", {
 
 **Parameters:**
 - `sources` (Array<string>, required): Sources to collect from
-  - Standard: 'deck', 'table', 'discard', 'shoe'
+  - Standard: 'stack', 'space', 'discard', 'source'
   - Or any zone name
 - `includeAttachments` (boolean, default: false): Also collect attached tokens
 
@@ -1439,8 +1439,8 @@ Count tokens with optional filtering.
 
 ```javascript
 // Count all
-const deckSize = engine.dispatch("tokens:count", {
-  source: "deck"
+const stackSize = engine.dispatch("tokens:count", {
+  source: "stack"
 });
 
 // Count matching
@@ -1476,7 +1476,7 @@ Find first token matching criteria.
 ```javascript
 // Find by ID
 const card = engine.dispatch("tokens:find", {
-  tokens: deck.cards,
+  tokens: stack.cards,
   predicate: (token) => token.id === "ace-spades"
 });
 
@@ -1508,55 +1508,55 @@ const legendary = engine.dispatch("tokens:find", {
 
 ## Action Index
 
-**Deck (10)**
-- deck:shuffle
-- deck:draw
-- deck:reset
-- deck:burn
-- deck:peek
-- deck:cut
-- deck:insertAt
-- deck:removeAt
-- deck:swap
-- deck:reverse
+**Stack (10)**
+- stack:shuffle
+- stack:draw
+- stack:reset
+- stack:burn
+- stack:peek
+- stack:cut
+- stack:insertAt
+- stack:removeAt
+- stack:swap
+- stack:reverse
 
-**Table (13)**
-- table:place
-- table:clear
-- table:move
-- table:flip
-- table:remove
-- table:createZone
-- table:deleteZone
-- table:clearZone
-- table:shuffleZone
-- table:transferZone
-- table:fanZone
-- table:stackZone
-- table:spreadZone
-- table:lockZone
+**Space (13)**
+- space:place
+- space:clear
+- space:move
+- space:flip
+- space:remove
+- space:createZone
+- space:deleteZone
+- space:clearZone
+- space:shuffleZone
+- space:transferZone
+- space:fanZone
+- space:stackZone
+- space:spreadZone
+- space:lockZone
 
-**Shoe (7)**
-- shoe:draw
-- shoe:shuffle
-- shoe:burn
-- shoe:reset
-- shoe:addDeck
-- shoe:removeDeck
-- shoe:inspect
+**Source (7)**
+- source:draw
+- source:shuffle
+- source:burn
+- source:reset
+- source:addStack
+- source:removeStack
+- source:inspect
 
-**Player (12)**
-- player:create
-- player:remove
-- player:setActive
-- player:giveResource
-- player:takeResource
-- player:drawCards
-- player:discardCards
-- player:get
-- player:transfer
-- player:trade
-- player:steal
+**Agent (12)**
+- agent:create
+- agent:remove
+- agent:setActive
+- agent:giveResource
+- agent:takeResource
+- agent:drawCards
+- agent:discardCards
+- agent:get
+- agent:transfer
+- agent:trade
+- agent:steal
 
 **Game (6)**
 - game:start
@@ -1586,7 +1586,7 @@ const legendary = engine.dispatch("tokens:find", {
 
 - All actions are synchronous except where noted
 - All actions emit events through EventBus
-- Player transfer actions track transactions in `engine._transactions`
+- Agent transfer actions track transactions in `engine._transactions`
 - Token transformations preserve metadata by merging
 - Batch operations work on both arrays and engine sources
 - See individual examples in `/examples` for real usage

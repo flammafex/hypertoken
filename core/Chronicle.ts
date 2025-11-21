@@ -1,11 +1,11 @@
 /*
- * core/SessionManager.ts
+ * core/Chronicle.ts
  */
 import * as A from "@automerge/automerge";
 import { Emitter } from "./events.js";
 import { HyperTokenState } from "./types.js";
 
-export class SessionManager extends Emitter {
+export class Chronicle extends Emitter {
   private _doc: A.Doc<HyperTokenState>;
 
   constructor(initialState?: HyperTokenState) {

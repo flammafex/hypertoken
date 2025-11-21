@@ -5,11 +5,11 @@
 _A mission of [The Carpocratian Church of Commonality and Equality](https://carpocratian.org/en/church/)_.</div>
 <div align=center><img src="mission.png" width=256 height=200></div>
 
-**HyperToken** is a **Local-First Multiplayer Engine** and **AI Research Platform**.
+**HyperToken** is a **Local-First Multiagent Engine** and **AI Research Platform**.
 
 It combines **CRDTs (Automerge)** for state synchronization, **OpenAI Gym** for agent training, and a **Host-Authoritative** architecture to create permissionless, persistent worlds without a blockchain.
 
-Inspired by the creative legacy of Apple's _HyperCard_, **HyperToken** reimagines that spirit for the age of intelligent systems. Where _HyperCard_ made computers writable for artists and educators, **HyperToken** makes complex simulations and game logic writable for designers, researchers, and philosophers.
+Inspired by the creative legacy of Apple's _HyperCard_, **HyperToken** reimagines that spirit for the age of intelligent systems. Where _HyperCard_ made computers wrispace for artists and educators, **HyperToken** makes complex simulations and game logic wrispace for designers, researchers, and philosophers.
 
 This project is an original work and is not affiliated with or endorsed by Apple Inc. The reference to _HyperCard_ is made solely for historical and conceptual comparison.
 
@@ -20,13 +20,13 @@ This project is an original work and is not affiliated with or endorsed by Apple
 At its heart, HyperToken is a **relationship engine** that lives in the network.
 
 A token isn't valuable because of what it IS — it's valuable because of:
-- **Who owns it** (players, agents)
+- **Who owns it** (agents, agents)
 - **What's attached to it** (equipment, enchantments, status effects)
 - **Where it is** (zones, locations, containers)
 - **What rules govern it** (policies, validators, game logic)
 - **Who wants it** (competing interests, economies, goals)
 
-This philosophy applies equally to cards in a blackjack shoe, shares in an economic model, or agents in a social simulation. HyperToken provides the primitives to model **any discrete system where entities have state, relationships, and location**, automatically synchronizing that truth between peers.
+This philosophy applies equally to cards in a blackjack source, shares in an economic model, or agents in a social simulation. HyperToken provides the primitives to model **any discrete system where entities have state, relationships, and location**, automatically synchronizing that truth between peers.
 
 ---
 
@@ -37,7 +37,7 @@ HyperToken is designed for two distinct audiences: creators building games and r
 | **For Creators & Communities** | **For Researchers & Enterprise** |
 | :--- | :--- |
 | **[👉 Read Community Use Cases](./COMMUNITY_USE_CASES.md)** | **[👉 Read Enterprise Use Cases](./ENTERPRISE_USE_CASES.md)** |
-| • **Serverless Multiplayer Games**<br>Host games on your own device; zero infrastructure costs. | • **Reinforcement Learning Environments**<br>Train AlphaZero-style agents using the standardized Gym interface. |
+| • **Serverless Multiagent Games**<br>Host games on your own device; zero infrastructure costs. | • **Reinforcement Learning Environments**<br>Train AlphaZero-style agents using the standardized Gym interface. |
 | • **"Headless" Autonomous Worlds**<br>Persistent game states that live in the swarm, not on a server. | • **Market & Economic Simulations**<br>Model complex trading economies to test incentive structures. |
 | • **Anti-Cheat P2P Gaming**<br>Host-authoritative logic ensures fair play without a central authority. | • **Rapid Mechanic Prototyping**<br>Script complex mechanics in text/CLI before committing to Unity/Unreal. |
 | • **Emergent Narrative Systems**<br>Items and NPCs that carry their own history across sessions. | • **Supply Chain & Logistics Logic**<br>Distinct tracking of assets moving through zones with strict rules. |
@@ -49,14 +49,14 @@ HyperToken is designed for two distinct audiences: creators building games and r
 ### The Distributed Engine
 - **State Kernel:** Built on **Automerge CRDTs**. History is preserved, merges are atomic, and the "truth" is mathematically guaranteed across peers.
 - **Networking:** Native **P2P Synchronization**. Clients exchange state deltas, not just message events.
-- **Time:** Distributed **GameLoop**. Turns, phases, and active player states are synchronized alongside data.
+- **Time:** Distributed **GameLoop**. Turns, phases, and active agent states are synchronized alongside data.
 - **AI Training:** Built-in **OpenAI Gym** interface. Connect your game logic directly to TensorFlow or PyTorch.
 
 ### Complete Action Registry (58 Actions)
-- 🎴 **Deck Operations (10)** — Atomic draw queues, cryptographic shuffling, burn/peek operations.
-- 🎯 **Table Operations (13)** — Spatial zones, layout management, locking/unlocking.
-- 👟 **Shoe Operations (7)** — Multi-deck containers for weighted randomness.
-- 👥 **Player Operations (12)** — Resource pools, atomic transfers, secure trading, theft mechanics.
+- 🎴 **Stack Operations (10)** — Atomic draw queues, cryptographic shuffling, burn/peek operations.
+- 🎯 **Space Operations (13)** — Spatial zones, layout management, locking/unlocking.
+- 👟 **Source Operations (7)** — Multi-stack containers for weighted randomness.
+- 👥 **Agent Operations (12)** — Resource pools, atomic transfers, secure trading, theft mechanics.
 - 🎮 **Game Operations (6)** — Lifecycle, phase transitions, property management.
 - 🔄 **Token Operations (5)** — Transform, attach/detach, merge/split entities.
 - 📊 **Batch Operations (5)** — High-performance filtering and querying.
@@ -82,17 +82,17 @@ HyperToken is designed for two distinct audiences: creators building games and r
 ./
 ├── core/                   # Foundation
 │   ├── Token.ts            # Universal entity representation
-│   ├── Deck.ts             # Atomic CRDT-backed collections
-│   ├── Shoe.ts             # Multi-deck randomness
-│   ├── Table.ts            # Spatial zones and placement
-│   ├── SessionManager.ts   # Automerge State Kernel
-│   └── SyncManager.ts      # P2P Synchronization Logic
+│   ├── stack.ts             # Atomic CRDT-backed collections
+│   ├── Source.ts             # Multi-stack randomness
+│   ├── Space.ts            # Spatial zones and placement
+│   ├── Chronicle.ts   # Automerge State Kernel
+│   └── ConsensusCore.ts      # P2P Synchronization Logic
 │
 ├── engine/                 # Simulation Logic
 │   ├── Engine.ts           # Core coordinator
 │   ├── GameLoop.ts         # Distributed time/turn control
 │   ├── RuleEngine.ts       # Global law enforcement
-│   ├── Player.ts           # Agent/participant wrapper
+│   ├── Agent.ts           # Agent/participant wrapper
 │   └── actions-extended.ts # Complete 58-action registry
 │
 ├── interface/              # I/O & Integration
@@ -102,7 +102,7 @@ HyperToken is designed for two distinct audiences: creators building games and r
 │   └── OpenAIAgent.js      # LLM Integration
 │
 ├── examples/               # Working Implementations
-│   ├── blackjack/          # Multiplayer Casino Game & AI Gym
+│   ├── blackjack/          # Multiagent Casino Game & AI Gym
 │   ├── tarot-reading/      # Divination system
 │   └── prisoners-dilemma/  # Game theory
 │
@@ -146,7 +146,7 @@ node examples/prisoners-dilemma/pd-cli.js
 
 ## 🧠 Philosophy
 
-> "Every player, every action, and every token tells a story.  
+> "Every agent, every action, and every token tells a story.  
 > HyperToken lets those stories play themselves out."
 
 ---

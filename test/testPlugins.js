@@ -24,11 +24,11 @@
 // Mock classes for testing
 class MockEngine {
   constructor() {
-    this._players = [];
+    this._agents = [];
     this._gameState = {};
     this.history = [];
-    this.deck = { size: 52 };
-    this.table = { zones: new Map() };
+    this.stack = { size: 52 };
+    this.space = { zones: new Map() };
     this._policies = new Map();
     this.listeners = new Map();
   }
@@ -60,18 +60,18 @@ class MockEngine {
   
   snapshot() {
     return {
-      deck: this.deck,
-      table: { zones: Array.from(this.table.zones.entries()) },
-      players: this._players,
+      stack: this.stack,
+      space: { zones: Array.from(this.space.zones.entries()) },
+      agents: this._agents,
       gameState: this._gameState,
       history: this.history.slice(-10) // Last 10 actions
     };
   }
   
   restore(snapshot) {
-    this.deck = snapshot.deck || { size: 52 };
-    this.table.zones = new Map(snapshot.table?.zones || []);
-    this._players = snapshot.players || [];
+    this.stack = snapshot.stack || { size: 52 };
+    this.space.zones = new Map(snapshot.space?.zones || []);
+    this._agents = snapshot.agents || [];
     this._gameState = snapshot.gameState || {};
   }
 }
@@ -181,13 +181,13 @@ test('Analytics plugin tracks actions', () => {
   
   assert(engine.analytics !== undefined, 'Plugin API should be exposed');
   
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:create', { name: 'Bob' });
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Bob' });
   engine.dispatch('game:start');
   
   const stats = engine.analytics.getStats();
   assert(stats.actions.total === 3, 'Should track 3 actions');
-  assert(stats.actions.byType['player:create'] === 2, 'Should count by type');
+  assert(stats.actions.byType['agent:create'] === 2, 'Should count by type');
   assert(stats.actions.byType['game:start'] === 1, 'Should count game start');
 });
 
@@ -205,8 +205,8 @@ test('Analytics plugin tracks turns', () => {
   
   const stats = engine.analytics.getStats();
   assert(stats.turns.total === 3, 'Should track 3 turns');
-  assert(stats.turns.byPlayer['Bob'] === 1, 'Should track turns by player');
-  assert(stats.turns.byPlayer['Carol'] === 1, 'Should track Carol\'s turn');
+  assert(stats.turns.byAgent['Bob'] === 1, 'Should track turns by agent');
+  assert(stats.turns.byAgent['Carol'] === 1, 'Should track Carol\'s turn');
 });
 
 test('Analytics plugin tracks errors', () => {
@@ -243,8 +243,8 @@ test('Analytics plugin generates report', () => {
   
   // Generate some activity
   engine.dispatch('game:start');
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:create', { name: 'Bob' });
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Bob' });
   engine.emit('turn:changed', { payload: { to: 'Alice' } });
   engine.emit('turn:changed', { payload: { to: 'Bob' } });
   engine.emit('game:end', { payload: { winner: 'Alice', reason: 'victory' } });
@@ -328,7 +328,7 @@ test('Multiple plugins work together', () => {
   
   // Trigger activity
   engine.dispatch('game:start');
-  engine.dispatch('player:create', { name: 'Alice' });
+  engine.dispatch('agent:create', { name: 'Alice' });
   engine.emit('turn:changed', { payload: { to: 'Alice' } });
   
   // Both plugins should track

@@ -121,35 +121,35 @@ export function formatHand(cards, hideFirst = false) {
 }
 
 /**
- * Determine winner between player and dealer hands
- * @param {Array} playerCards
+ * Determine winner between agent and dealer hands
+ * @param {Array} agentCards
  * @param {Array} dealerCards
- * @returns {string} - "player", "dealer", "push", or "player-blackjack"
+ * @returns {string} - "agent", "dealer", "push", or "agent-blackjack"
  */
-export function determineWinner(playerCards, dealerCards) {
-  const playerValue = getBestHandValue(playerCards);
+export function determineWinner(agentCards, dealerCards) {
+  const agentValue = getBestHandValue(agentCards);
   const dealerValue = getBestHandValue(dealerCards);
-  const playerBJ = isBlackjack(playerCards);
+  const agentBJ = isBlackjack(agentCards);
   const dealerBJ = isBlackjack(dealerCards);
   
   // Both blackjack = push
-  if (playerBJ && dealerBJ) return "push";
+  if (agentBJ && dealerBJ) return "push";
   
-  // Player blackjack wins
-  if (playerBJ) return "player-blackjack";
+  // Agent blackjack wins
+  if (agentBJ) return "agent-blackjack";
   
   // Dealer blackjack wins
   if (dealerBJ) return "dealer";
   
-  // Player busted
-  if (playerValue > 21) return "dealer";
+  // Agent busted
+  if (agentValue > 21) return "dealer";
   
   // Dealer busted
-  if (dealerValue > 21) return "player";
+  if (dealerValue > 21) return "agent";
   
   // Compare values
-  if (playerValue > dealerValue) return "player";
-  if (dealerValue > playerValue) return "dealer";
+  if (agentValue > dealerValue) return "agent";
+  if (dealerValue > agentValue) return "dealer";
   
   return "push";
 }

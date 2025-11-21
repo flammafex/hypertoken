@@ -1,24 +1,24 @@
 /*
- * core/Deck.ts
+ * core/stack.ts
  */
 import { Emitter } from "./events.js";
 import { mulberry32, shuffleArray } from "./random.js";
 import { Token } from "./Token.js";
 import { IToken, ReversalPolicy } from "./types.js";
-import { SessionManager } from "./SessionManager.js";
+import { Chronicle } from "./Chronicle.js";
 
-export interface DeckOptions {
+export interface StackOptions {
   seed?: number | null;
   autoInit?: boolean; // NEW: Control initialization behavior
 }
 
-export class Deck extends Emitter {
-  public readonly session: SessionManager;
+export class Stack extends Emitter {
+  public readonly session: Chronicle;
   private _seed: number | null;
   private _rev: ReversalPolicy;
   private _original: IToken[];
 
-  constructor(session: SessionManager, tokens: IToken[] = [], { seed, autoInit = true }: DeckOptions = {}) {
+  constructor(session: Chronicle, tokens: IToken[] = [], { seed, autoInit = true }: StackOptions = {}) {
     super();
     this.session = session;
     this._original = tokens.map(t => t instanceof Token ? { ...t } : t);
@@ -27,10 +27,10 @@ export class Deck extends Emitter {
 
     // FIX: Only initialize CRDT state if autoInit is true (Default)
     // Clients should set this to false to avoid overwriting Host state
-    if (autoInit && !this.session.state.deck) {
-      this.session.change("initialize deck", (doc) => {
+    if (autoInit && !this.session.state.stack) {
+      this.session.change("initialize stack", (doc) => {
         const cleanStack = this._original.map(t => this._sanitize(t));
-        doc.deck = {
+        doc.stack = {
           stack: cleanStack,
           drawn: [],
           discards: []
@@ -54,10 +54,10 @@ export class Deck extends Emitter {
   }
 
   // Read directly from CRDT
-  get size(): number { return this.session.state.deck?.stack.length ?? 0; }
-  get tokens(): IToken[] { return this.session.state.deck?.stack ?? []; }
-  get drawn(): IToken[] { return this.session.state.deck?.drawn ?? []; }
-  get discards(): IToken[] { return this.session.state.deck?.discards ?? []; }
+  get size(): number { return this.session.state.stack?.stack.length ?? 0; }
+  get tokens(): IToken[] { return this.session.state.stack?.stack ?? []; }
+  get drawn(): IToken[] { return this.session.state.stack?.drawn ?? []; }
+  get discards(): IToken[] { return this.session.state.stack?.discards ?? []; }
 
   /** Atomic Draw Operation */
   draw(n?: number): IToken | IToken[] | undefined {
@@ -68,13 +68,13 @@ export class Deck extends Emitter {
   private _drawSingle(): IToken | undefined {
     let drawnCard: IToken | undefined;
     this.session.change("draw card", (doc) => {
-      if (!doc.deck || doc.deck.stack.length === 0) return;
+      if (!doc.stack || doc.stack.stack.length === 0) return;
       
-      const cardProxy = doc.deck.stack.pop();
+      const cardProxy = doc.stack.stack.pop();
       
       if (cardProxy) {
         const card = this._clone(cardProxy);
-        doc.deck.drawn.push(card);
+        doc.stack.drawn.push(card);
         drawnCard = card;
       }
     });
@@ -85,14 +85,14 @@ export class Deck extends Emitter {
   private _drawMany(n: number): IToken[] {
     let drawnCards: IToken[] = [];
     this.session.change(`draw ${n} cards`, (doc) => {
-      if (!doc.deck) return;
-      const count = Math.min(n, doc.deck.stack.length);
-      const startIdx = doc.deck.stack.length - count;
+      if (!doc.stack) return;
+      const count = Math.min(n, doc.stack.stack.length);
+      const startIdx = doc.stack.stack.length - count;
       
-      const cardsProxy = doc.deck.stack.splice(startIdx, count);
+      const cardsProxy = doc.stack.stack.splice(startIdx, count);
       const cards = this._clone(cardsProxy);
       
-      doc.deck.drawn.push(...cards);
+      doc.stack.drawn.push(...cards);
       
       drawnCards = cards;
       drawnCards.reverse(); 
@@ -105,23 +105,23 @@ export class Deck extends Emitter {
 
   shuffle(newSeed?: number): this {
     if (newSeed !== undefined) this._seed = newSeed;
-    this.session.change("shuffle deck", (doc) => {
-      if (!doc.deck) return;
-      const stack = this._clone(doc.deck.stack);
+    this.session.change("shuffle stack", (doc) => {
+      if (!doc.stack) return;
+      const stack = this._clone(doc.stack.stack);
       // @ts-ignore
       shuffleArray(stack, this._seed);
-      doc.deck.stack = stack;
+      doc.stack.stack = stack;
     });
     this.emit("shuffle", { seed: this._seed });
     return this;
   }
 
   reset(): this {
-    this.session.change("reset deck", (doc) => {
-      if (!doc.deck) return;
-      doc.deck.stack = this._original.map(t => this._sanitize(t));
-      doc.deck.drawn = [];
-      doc.deck.discards = [];
+    this.session.change("reset stack", (doc) => {
+      if (!doc.stack) return;
+      doc.stack.stack = this._original.map(t => this._sanitize(t));
+      doc.stack.drawn = [];
+      doc.stack.discards = [];
     });
     this.emit("reset");
     return this;
@@ -130,12 +130,12 @@ export class Deck extends Emitter {
   burn(n: number = 1): IToken[] {
     let burned: IToken[] = [];
     this.session.change(`burn ${n} cards`, (doc) => {
-      if (!doc.deck) return;
-      const count = Math.min(n, doc.deck.stack.length);
-      const startIdx = doc.deck.stack.length - count;
-      const cardsProxy = doc.deck.stack.splice(startIdx, count);
+      if (!doc.stack) return;
+      const count = Math.min(n, doc.stack.stack.length);
+      const startIdx = doc.stack.stack.length - count;
+      const cardsProxy = doc.stack.stack.splice(startIdx, count);
       const cards = this._clone(cardsProxy);
-      doc.deck.discards.push(...cards);
+      doc.stack.discards.push(...cards);
       burned = cards;
     });
     if (burned.length) this.emit("burn", burned);
@@ -145,20 +145,20 @@ export class Deck extends Emitter {
   discard(token: IToken): IToken | null {
     if (!token) return null;
     this.session.change("discard card", (doc) => {
-      if (!doc.deck) return;
-      doc.deck.discards.push(this._sanitize(token));
+      if (!doc.stack) return;
+      doc.stack.discards.push(this._sanitize(token));
     });
     this.emit("discard", token);
     return token;
   }
 
   cut(n: number = 0, { topToBottom = true }: { topToBottom?: boolean } = {}): this {
-    this.session.change("cut deck", (doc) => {
-      if (!doc.deck) return;
-      const len = doc.deck.stack.length;
+    this.session.change("cut stack", (doc) => {
+      if (!doc.stack) return;
+      const len = doc.stack.stack.length;
       if (!Number.isInteger(n) || n <= 0 || n >= len) return;
       
-      let stack = this._clone(doc.deck.stack);
+      let stack = this._clone(doc.stack.stack);
       const cutPoint = n; 
       const top = stack.splice(cutPoint, len - cutPoint);
       const bottom = stack.splice(0, cutPoint);
@@ -166,67 +166,67 @@ export class Deck extends Emitter {
       if (topToBottom) stack = [...top, ...bottom];
       else stack = [...bottom, ...top];
       
-      doc.deck.stack = stack;
+      doc.stack.stack = stack;
     });
-    this.emit("deck:cut", { payload: { n, topToBottom } });
+    this.emit("stack:cut", { payload: { n, topToBottom } });
     return this;
   }
 
   insertAt(card: IToken, index: number): this {
     this.session.change("insert card", (doc) => {
-      if (!doc.deck) return;
+      if (!doc.stack) return;
       let idx = index;
       if (idx < 0) idx = 0;
-      if (idx > doc.deck.stack.length) idx = doc.deck.stack.length;
-      doc.deck.stack.splice(idx, 0, this._sanitize(card));
+      if (idx > doc.stack.stack.length) idx = doc.stack.stack.length;
+      doc.stack.stack.splice(idx, 0, this._sanitize(card));
     });
-    this.emit("deck:insert", { payload: { card, index } });
+    this.emit("stack:insert", { payload: { card, index } });
     return this;
   }
 
   removeAt(index: number): IToken | null {
     let removed: IToken | null = null;
     this.session.change("remove card at", (doc) => {
-      if (!doc.deck) return;
-      if (index < 0 || index >= doc.deck.stack.length) return;
-      const [itemProxy] = doc.deck.stack.splice(index, 1);
+      if (!doc.stack) return;
+      if (index < 0 || index >= doc.stack.stack.length) return;
+      const [itemProxy] = doc.stack.stack.splice(index, 1);
       removed = this._clone(itemProxy);
     });
-    if (removed) this.emit("deck:remove", { payload: { card: removed, index } });
+    if (removed) this.emit("stack:remove", { payload: { card: removed, index } });
     return removed;
   }
 
   swap(i: number, j: number): this {
     this.session.change("swap cards", (doc) => {
-      if (!doc.deck) return;
-      const stack = this._clone(doc.deck.stack);
+      if (!doc.stack) return;
+      const stack = this._clone(doc.stack.stack);
       if (i < 0 || j < 0 || i >= stack.length || j >= stack.length) return;
       const temp = stack[i];
       stack[i] = stack[j];
       stack[j] = temp;
-      doc.deck.stack = stack;
+      doc.stack.stack = stack;
     });
-    this.emit("deck:swap", { payload: { i, j } });
+    this.emit("stack:swap", { payload: { i, j } });
     return this;
   }
 
   reverseRange(i: number, j: number): this {
     this.session.change("reverse range", (doc) => {
-      if (!doc.deck) return;
-      const stack = this._clone(doc.deck.stack);
+      if (!doc.stack) return;
+      const stack = this._clone(doc.stack.stack);
       const len = stack.length;
       if (i < 0 || j < 0 || i >= len || j >= len || i === j) return;
       const [a, b] = i < j ? [i, j] : [j, i];
       const segment = stack.splice(a, b - a + 1);
       segment.reverse();
       stack.splice(a, 0, ...segment);
-      doc.deck.stack = stack;
+      doc.stack.stack = stack;
     });
-    this.emit("deck:reverseRange", { payload: { i, j } });
+    this.emit("stack:reverseRange", { payload: { i, j } });
     return this;
   }
 
   toJSON(): any {
-    return this.session.state.deck;
+    return this.session.state.stack;
   }
 }

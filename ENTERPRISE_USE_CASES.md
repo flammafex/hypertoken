@@ -51,7 +51,7 @@ class MarketEnv extends GymEnvironment {
 ### Pattern 2: The Sovereign Economy
 
 **Best For:** Modeling tokenomics, testing inflation controls, simulating trading floors.
-**Mechanism:** SessionManager (Automerge CRDTs).
+**Mechanism:** Chronicle (Automerge CRDTs).
 
 HyperToken's state is a **Conflict-Free Replicated Data Type**. This means you can simulate a distributed market where thousands of agents trade simultaneously, and the engine guarantees a mathematically consistent final ledger without a central database.
 
@@ -102,7 +102,7 @@ Every HyperToken carries its own history. When tokens are merged, split, or tran
 - **Reuse**: The same engine code runs the simulation, the unit tests, and the final product.
 
 **Infrastructure Savings:**
-- **Serverless**: Peer-to-Peer architecture means zero cloud hosting costs for multiplayer/multi-agent sessions.
+- **Serverless**: Peer-to-Peer architecture means zero cloud hosting costs for multiagent/multi-agent sessions.
 - **Scalability**: "Host-Authoritative" model allows horizontal scaling by simply spinning up more host nodes.
 
 **Risk Reduction:**

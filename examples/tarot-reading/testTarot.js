@@ -46,32 +46,32 @@ async function testAsync(name, fn) {
  */
 async function setup() {
   console.log('\n🔮 Setting up Tarot Reading System tests...\n');
-  reader = new TarotReader('./tarot-deck.json');
+  reader = new TarotReader('./tarot-stack.json');
   await reader.initialize();
   console.log('✓ Initialization complete\n');
 }
 
 /**
- * Test: Deck initialization
+ * Test: Stack initialization
  */
-function testDeckInitialization() {
-  test('Deck is initialized', () => {
-    assert(reader.deck !== null, 'Deck should be initialized');
+function testStackInitialization() {
+  test('Stack is initialized', () => {
+    assert(reader.stack !== null, 'Stack should be initialized');
   });
 
-  test('Deck has 78 cards', () => {
-    assert.strictEqual(reader.deck.size, 78, 'Standard tarot deck has 78 cards');
+  test('Stack has 78 cards', () => {
+    assert.strictEqual(reader.stack.size, 78, 'Standard tarot stack has 78 cards');
   });
 
-  test('Deck contains Major Arcana', () => {
-    const majors = reader.deck.tokens.filter(t => t.meta.arcana === 'major');
+  test('Stack contains Major Arcana', () => {
+    const majors = reader.stack.tokens.filter(t => t.meta.arcana === 'major');
     assert.strictEqual(majors.length, 22, 'Should have 22 Major Arcana cards');
   });
 
-  test('Deck contains all four suits', () => {
+  test('Stack contains all four suits', () => {
     const suits = ['wands', 'cups', 'swords', 'pentacles'];
     suits.forEach(suit => {
-      const cards = reader.deck.tokens.filter(t => t.meta.suit === suit);
+      const cards = reader.stack.tokens.filter(t => t.meta.suit === suit);
       assert.strictEqual(cards.length, 14, `Should have 14 ${suit} cards`);
     });
   });
@@ -82,7 +82,7 @@ function testDeckInitialization() {
     
     suits.forEach(suit => {
       courts.forEach(court => {
-        const card = reader.deck.tokens.find(t => 
+        const card = reader.stack.tokens.find(t => 
           t.meta.suit === suit && t.meta.court === court
         );
         assert(card !== undefined, `Should have ${court} of ${suit}`);
@@ -108,17 +108,17 @@ function testSpreadDefinitions() {
   });
 
   test('Celtic Cross has 10 positions', () => {
-    const spread = reader.table.spreads['celtic-cross'];
+    const spread = reader.space.spreads['celtic-cross'];
     assert.strictEqual(spread.length, 10, 'Celtic Cross should have 10 positions');
   });
 
   test('Year Ahead has 12 positions', () => {
-    const spread = reader.table.spreads['year-ahead'];
+    const spread = reader.space.spreads['year-ahead'];
     assert.strictEqual(spread.length, 12, 'Year Ahead should have 12 positions (months)');
   });
 
   test('Spread positions have required properties', () => {
-    const spread = reader.table.spreads['three-card'];
+    const spread = reader.space.spreads['three-card'];
     spread.forEach(position => {
       assert('id' in position, 'Position should have id');
       assert('label' in position, 'Position should have label');
@@ -210,7 +210,7 @@ async function testReversedCards() {
 
   await testAsync('Reversed cards have different meanings', async () => {
     // Find a card and check it has different upright/reversed meanings
-    const card = reader.deck.tokens.find(t => t.meta.arcana === 'major');
+    const card = reader.stack.tokens.find(t => t.meta.arcana === 'major');
     assert(card.meta.upright !== card.meta.reversed, 
       'Upright and reversed meanings should be different');
   });
@@ -303,7 +303,7 @@ async function testExport() {
  */
 function testCardMetadata() {
   test('All cards have required metadata', () => {
-    reader.deck.tokens.forEach(card => {
+    reader.stack.tokens.forEach(card => {
       assert('id' in card, `Card should have id: ${card.label}`);
       assert('label' in card, `Card should have label: ${card.id}`);
       assert('text' in card, `Card should have text: ${card.id}`);
@@ -313,14 +313,14 @@ function testCardMetadata() {
   });
 
   test('All cards have upright and reversed meanings', () => {
-    reader.deck.tokens.forEach(card => {
+    reader.stack.tokens.forEach(card => {
       assert('upright' in card.meta, `Card should have upright meaning: ${card.id}`);
       assert('reversed' in card.meta, `Card should have reversed meaning: ${card.id}`);
     });
   });
 
   test('Minor Arcana have suits', () => {
-    const minors = reader.deck.tokens.filter(t => t.meta.arcana === 'minor');
+    const minors = reader.stack.tokens.filter(t => t.meta.arcana === 'minor');
     minors.forEach(card => {
       assert('suit' in card.meta, `Minor card should have suit: ${card.id}`);
       assert(['wands', 'cups', 'swords', 'pentacles'].includes(card.meta.suit),
@@ -329,7 +329,7 @@ function testCardMetadata() {
   });
 
   test('All cards have elements', () => {
-    reader.deck.tokens.forEach(card => {
+    reader.stack.tokens.forEach(card => {
       assert('element' in card.meta, `Card should have element: ${card.id}`);
       assert(['fire', 'water', 'air', 'earth'].includes(card.meta.element),
         `Invalid element: ${card.meta.element}`);
@@ -341,10 +341,10 @@ function testCardMetadata() {
  * Test: Shuffling and drawing
  */
 async function testShufflingAndDrawing() {
-  await testAsync('Deck can be shuffled', async () => {
-    const initialOrder = reader.deck.tokens.map(t => t.id);
-    reader.deck.shuffle();
-    const shuffledOrder = reader.deck.tokens.map(t => t.id);
+  await testAsync('Stack can be shuffled', async () => {
+    const initialOrder = reader.stack.tokens.map(t => t.id);
+    reader.stack.shuffle();
+    const shuffledOrder = reader.stack.tokens.map(t => t.id);
     
     // At least some cards should be in different positions
     let differences = 0;
@@ -356,14 +356,14 @@ async function testShufflingAndDrawing() {
   });
 
   await testAsync('Drawing cards removes them temporarily', async () => {
-    reader.deck.shuffle();
-    const initialSize = reader.deck.size;
+    reader.stack.shuffle();
+    const initialSize = reader.stack.size;
     
     reader.performReading('three-card');
     
-    // Note: In the current implementation, deck isn't depleted
+    // Note: In the current implementation, stack isn't depleted
     // This test verifies the drawing mechanism works
-    assert(initialSize > 0, 'Deck should have cards');
+    assert(initialSize > 0, 'Stack should have cards');
   });
 }
 
@@ -386,7 +386,7 @@ async function testEdgeCases() {
   });
 
   await testAsync('Card interpretation handles all parameters', async () => {
-    const card = reader.deck.tokens[0];
+    const card = reader.stack.tokens[0];
     const interp = reader.interpretCard(card, 'Test Position', true);
     
     assert('card' in interp, 'Should return card name');
@@ -406,8 +406,8 @@ async function runTests() {
   
   await setup();
 
-  console.log('Running Deck Initialization Tests...');
-  testDeckInitialization();
+  console.log('Running Stack Initialization Tests...');
+  testStackInitialization();
 
   console.log('\nRunning Spread Definition Tests...');
   testSpreadDefinitions();

@@ -1,7 +1,7 @@
 {
   "name": "Rider-Waite-Smith Tarot",
   "kind": "tarot",
-  "description": "Complete 78-card tarot deck with Major Arcana (22 cards) and Minor Arcana (56 cards in four suits)",
+  "description": "Complete 78-card tarot stack with Major Arcana (22 cards) and Minor Arcana (56 cards in four suits)",
   "tokens": [
     {
       "id": "major-00-fool",
@@ -877,7 +877,7 @@
       "id": "cups-queen",
       "group": "cups",
       "label": "Queen of Cups",
-      "text": "Compassionate, caring, emotionally stable, intuitive, in flow. She embodies emotional maturity and deep empathy.",
+      "text": "Compassionate, caring, emotionally sspace, intuitive, in flow. She embodies emotional maturity and deep empathy.",
       "meta": {
         "arcana": "minor",
         "suit": "cups",
@@ -885,7 +885,7 @@
         "court": "queen",
         "element": "water",
         "keywords": ["compassion", "caring", "intuition", "empathy", "emotional-security"],
-        "upright": "Compassionate, caring, emotionally stable, intuitive, in flow",
+        "upright": "Compassionate, caring, emotionally sspace, intuitive, in flow",
         "reversed": "Inner feelings, self-care, self-love, co-dependency, emotional insecurity"
       },
       "char": "💧",
@@ -1085,7 +1085,7 @@
         "element": "air",
         "keywords": ["endings", "betrayal", "crisis", "rock-bottom", "defeat"],
         "upright": "Painful endings, deep wounds, betrayal, loss, crisis, rock bottom",
-        "reversed": "Recovery, regeneration, resisting an inevitable end, fear of ruin"
+        "reversed": "Recovery, regeneration, resisting an inevispace end, fear of ruin"
       },
       "char": "⚔️",
       "kind": "tarot",

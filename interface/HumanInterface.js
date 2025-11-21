@@ -58,11 +58,11 @@ constructor(engine, { adapter = null, onUpdate = null, verbose = false } = {}) {
   }
 
   /** Shortcut helpers for common verbs **/
-  draw(count = 1) { this.handleAction("deck:draw", { count }); }
-  shuffle(seed = null) { this.handleAction("deck:shuffle", { seed }); }
-  resetDeck() { this.handleAction("deck:reset"); }
-  place(zone = "table") { this.handleAction("table:place", { zone }); }
-  clearTable() { this.handleAction("table:clear"); }
+  draw(count = 1) { this.handleAction("stack:draw", { count }); }
+  shuffle(seed = null) { this.handleAction("stack:shuffle", { seed }); }
+  resetStack() { this.handleAction("stack:reset"); }
+  place(zone = "space") { this.handleAction("space:place", { zone }); }
+  clearSpace() { this.handleAction("space:clear"); }
 
   /*───────────────────────────────────────────────
     Engine state updates

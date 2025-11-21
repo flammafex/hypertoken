@@ -10,18 +10,18 @@ import { isBusted, isBlackjack, getBestHandValue } from './blackjack-utils.js';
  */
 export function registerBlackjackRules(ruleEngine) {
   
-  // Rule: Auto-check for player bust after hit
+  // Rule: Auto-check for agent bust after hit
   ruleEngine.addRule(
-    "player-bust-check",
+    "agent-bust-check",
     (engine, lastAction) => {
       if (!lastAction || lastAction.type !== "blackjack:hit") return false;
-      const playerHand = engine.table.zone("player-hand");
-      if (!playerHand || playerHand.length === 0) return false;
-      const cards = playerHand.map(p => p.card);
+      const agentHand = engine.space.zone("agent-hand");
+      if (!agentHand || agentHand.length === 0) return false;
+      const cards = agentHand.map(p => p.card);
       return isBusted(cards);
     },
     (engine) => {
-      engine.dispatch("blackjack:player-busted", {});
+      engine.dispatch("blackjack:agent-busted", {});
     },
     { priority: 100, once: false }
   );
@@ -31,13 +31,13 @@ export function registerBlackjackRules(ruleEngine) {
     "blackjack-check",
     (engine, lastAction) => {
       if (!lastAction || lastAction.type !== "blackjack:deal") return false;
-      const playerHand = engine.table.zone("player-hand");
-      if (!playerHand || playerHand.length !== 2) return false;
-      const cards = playerHand.map(p => p.card);
+      const agentHand = engine.space.zone("agent-hand");
+      if (!agentHand || agentHand.length !== 2) return false;
+      const cards = agentHand.map(p => p.card);
       return isBlackjack(cards);
     },
     (engine) => {
-      engine.dispatch("blackjack:player-blackjack", {});
+      engine.dispatch("blackjack:agent-blackjack", {});
     },
     { priority: 90, once: false }
   );
@@ -46,7 +46,7 @@ export function registerBlackjackRules(ruleEngine) {
   ruleEngine.addRule(
     "dealer-must-hit",
     (engine) => {
-      const dealerHand = engine.table.zone("dealer-hand");
+      const dealerHand = engine.space.zone("dealer-hand");
       if (!dealerHand || dealerHand.length === 0) return false;
       const cards = dealerHand.map(p => p.card);
       const value = getBestHandValue(cards);
@@ -62,7 +62,7 @@ export function registerBlackjackRules(ruleEngine) {
   ruleEngine.addRule(
     "dealer-must-stand",
     (engine) => {
-      const dealerHand = engine.table.zone("dealer-hand");
+      const dealerHand = engine.space.zone("dealer-hand");
       if (!dealerHand || dealerHand.length === 0) return false;
       const cards = dealerHand.map(p => p.card);
       const value = getBestHandValue(cards);

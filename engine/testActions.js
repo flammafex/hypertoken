@@ -26,9 +26,9 @@
  */
 
 import { ActionRegistry, listActions, listActionsByCategory, hasAction } from './actions.js';
-import { Deck } from '../core/Deck.js';
-import { Table } from '../core/Table.js';
-import { Shoe } from '../core/Shoe.js';
+import { Stack } from '../core/Stack.js';
+import { Space } from '../core/Space.js';
+import { Source } from '../core/Source.js';
 import { Engine } from './Engine.js';
 
 // Test helpers
@@ -83,12 +83,12 @@ function createTestEngine() {
     index: i
   }));
   
-  const deck = new Deck(cards, { seed: 42 });
-  const table = new Table('test');
-  const shoe = new Shoe(deck);
+  const stack = new Stack(cards, { seed: 42 });
+  const space = new Space('test');
+  const source = new Source(stack);
   
-  const engine = new Engine({ deck, table, shoe });
-  engine._players = [];
+  const engine = new Engine({ stack, space, source });
+  engine._agents = [];
   
   return engine;
 }
@@ -119,20 +119,20 @@ test('listActions returns all action names', () => {
 
 test('listActionsByCategory groups correctly', () => {
   const categories = listActionsByCategory();
-  assertExists(categories.deck);
-  assertExists(categories.table);
-  assertExists(categories.shoe);
-  assertExists(categories.player);
+  assertExists(categories.stack);
+  assertExists(categories.space);
+  assertExists(categories.source);
+  assertExists(categories.agent);
   assertExists(categories.game);
-  assertEquals(categories.deck.length, 10);
-  assertEquals(categories.table.length, 14);
-  assertEquals(categories.shoe.length, 7);
-  assertEquals(categories.player.length, 8);
+  assertEquals(categories.stack.length, 10);
+  assertEquals(categories.space.length, 14);
+  assertEquals(categories.source.length, 7);
+  assertEquals(categories.agent.length, 8);
   assertEquals(categories.game.length, 6);
 });
 
 test('hasAction works correctly', () => {
-  assertEquals(hasAction('deck:shuffle'), true);
+  assertEquals(hasAction('stack:shuffle'), true);
   assertEquals(hasAction('nonexistent:action'), false);
 });
 
@@ -140,139 +140,139 @@ test('hasAction works correctly', () => {
 // DECK ACTIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-console.log('\n🃏 Deck Actions\n');
+console.log('\n🃏 Stack Actions\n');
 
-test('deck:shuffle executes', () => {
+test('stack:shuffle executes', () => {
   const engine = createTestEngine();
-  engine.dispatch('deck:shuffle', { seed: 42 });
-  assertExists(engine.deck);
+  engine.dispatch('stack:shuffle', { seed: 42 });
+  assertExists(engine.stack);
 });
 
-test('deck:draw returns cards', () => {
+test('stack:draw returns cards', () => {
   const engine = createTestEngine();
-  const cards = engine.dispatch('deck:draw', { count: 5 });
+  const cards = engine.dispatch('stack:draw', { count: 5 });
   assertEquals(cards.length, 5);
 });
 
-test('deck:reset restores deck', () => {
+test('stack:reset restores stack', () => {
   const engine = createTestEngine();
-  engine.dispatch('deck:draw', { count: 10 });
-  engine.dispatch('deck:reset');
-  assertEquals(engine.deck.size, 52);
+  engine.dispatch('stack:draw', { count: 10 });
+  engine.dispatch('stack:reset');
+  assertEquals(engine.stack.size, 52);
 });
 
-test('deck:burn discards cards', () => {
+test('stack:burn discards cards', () => {
   const engine = createTestEngine();
-  const before = engine.deck.size;
-  engine.dispatch('deck:burn', { count: 3 });
-  assertEquals(engine.deck.size, before - 3);
+  const before = engine.stack.size;
+  engine.dispatch('stack:burn', { count: 3 });
+  assertEquals(engine.stack.size, before - 3);
 });
 
-test('deck:peek does not remove cards', () => {
+test('stack:peek does not remove cards', () => {
   const engine = createTestEngine();
-  const before = engine.deck.size;
-  const cards = engine.dispatch('deck:peek', { count: 3 });
+  const before = engine.stack.size;
+  const cards = engine.dispatch('stack:peek', { count: 3 });
   assertEquals(cards.length, 3);
-  assertEquals(engine.deck.size, before);
+  assertEquals(engine.stack.size, before);
 });
 
-test('deck:cut rearranges deck', () => {
+test('stack:cut rearranges stack', () => {
   const engine = createTestEngine();
-  engine.dispatch('deck:cut', { position: 26 });
-  assertExists(engine.deck);
+  engine.dispatch('stack:cut', { position: 26 });
+  assertExists(engine.stack);
 });
 
-test('deck:insertAt adds card at position', () => {
+test('stack:insertAt adds card at position', () => {
   const engine = createTestEngine();
   const card = { id: 'test', label: 'Test' };
-  engine.dispatch('deck:insertAt', { card, position: 0 });
-  assertEquals(engine.deck.size, 53);
+  engine.dispatch('stack:insertAt', { card, position: 0 });
+  assertEquals(engine.stack.size, 53);
 });
 
-test('deck:removeAt removes card', () => {
+test('stack:removeAt removes card', () => {
   const engine = createTestEngine();
-  const card = engine.dispatch('deck:removeAt', { position: 0 });
+  const card = engine.dispatch('stack:removeAt', { position: 0 });
   assertExists(card);
-  assertEquals(engine.deck.size, 51);
+  assertEquals(engine.stack.size, 51);
 });
 
-test('deck:swap exchanges positions', () => {
+test('stack:swap exchanges positions', () => {
   const engine = createTestEngine();
-  engine.dispatch('deck:swap', { i: 0, j: 51 });
-  assertExists(engine.deck);
+  engine.dispatch('stack:swap', { i: 0, j: 51 });
+  assertExists(engine.stack);
 });
 
-test('deck:reverse reverses range', () => {
+test('stack:reverse reverses range', () => {
   const engine = createTestEngine();
-  engine.dispatch('deck:reverse', { start: 0, end: 12 });
-  assertExists(engine.deck);
+  engine.dispatch('stack:reverse', { start: 0, end: 12 });
+  assertExists(engine.stack);
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TABLE ACTIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-console.log('\n🎴 Table Actions\n');
+console.log('\n🎴 Space Actions\n');
 
-test('table:place adds card to zone', () => {
+test('space:place adds card to zone', () => {
   const engine = createTestEngine();
-  const card = engine.deck.draw();
-  const placement = engine.dispatch('table:place', { 
+  const card = engine.stack.draw();
+  const placement = engine.dispatch('space:place', { 
     zone: 'test', 
     card,
     opts: { faceUp: true }
   });
   assertExists(placement);
-  assertEquals(engine.table.zoneCount('test'), 1);
+  assertEquals(engine.space.zoneCount('test'), 1);
 });
 
-test('table:clear removes all cards', () => {
+test('space:clear removes all cards', () => {
   const engine = createTestEngine();
-  const card = engine.deck.draw();
-  engine.table.place('test', card);
-  engine.dispatch('table:clear');
-  assertEquals(engine.table.zoneCount('test'), 0);
+  const card = engine.stack.draw();
+  engine.space.place('test', card);
+  engine.dispatch('space:clear');
+  assertEquals(engine.space.zoneCount('test'), 0);
 });
 
-test('table:createZone adds new zone', () => {
+test('space:createZone adds new zone', () => {
   const engine = createTestEngine();
-  engine.dispatch('table:createZone', { id: 'newzone', label: 'New Zone' });
-  assertExists(engine.table.zones.has('newzone'));
+  engine.dispatch('space:createZone', { id: 'newzone', label: 'New Zone' });
+  assertExists(engine.space.zones.has('newzone'));
 });
 
-test('table:deleteZone removes zone', () => {
+test('space:deleteZone removes zone', () => {
   const engine = createTestEngine();
-  engine.table.createZone('temp');
-  engine.dispatch('table:deleteZone', { id: 'temp' });
-  assertEquals(engine.table.zones.has('temp'), false);
+  engine.space.createZone('temp');
+  engine.dispatch('space:deleteZone', { id: 'temp' });
+  assertEquals(engine.space.zones.has('temp'), false);
 });
 
-test('table:clearZone empties specific zone', () => {
+test('space:clearZone empties specific zone', () => {
   const engine = createTestEngine();
-  const card = engine.deck.draw();
-  engine.table.place('test', card);
-  engine.dispatch('table:clearZone', { zone: 'test' });
-  assertEquals(engine.table.zoneCount('test'), 0);
+  const card = engine.stack.draw();
+  engine.space.place('test', card);
+  engine.dispatch('space:clearZone', { zone: 'test' });
+  assertEquals(engine.space.zoneCount('test'), 0);
 });
 
-test('table:move transfers card between zones', () => {
+test('space:move transfers card between zones', () => {
   const engine = createTestEngine();
-  const card = engine.deck.draw();
-  const placement = engine.table.place('zone1', card);
-  engine.table.createZone('zone2');
-  engine.dispatch('table:move', { 
+  const card = engine.stack.draw();
+  const placement = engine.space.place('zone1', card);
+  engine.space.createZone('zone2');
+  engine.dispatch('space:move', { 
     fromZone: 'zone1', 
     toZone: 'zone2', 
     placementId: placement.id 
   });
-  assertEquals(engine.table.zoneCount('zone2'), 1);
+  assertEquals(engine.space.zoneCount('zone2'), 1);
 });
 
-test('table:flip changes face state', () => {
+test('space:flip changes face state', () => {
   const engine = createTestEngine();
-  const card = engine.deck.draw();
-  const placement = engine.table.place('test', card, { faceUp: false });
-  engine.dispatch('table:flip', { 
+  const card = engine.stack.draw();
+  const placement = engine.space.place('test', card, { faceUp: false });
+  engine.dispatch('space:flip', { 
     zone: 'test', 
     placementId: placement.id, 
     faceUp: true 
@@ -280,99 +280,99 @@ test('table:flip changes face state', () => {
   assertEquals(placement.faceUp, true);
 });
 
-test('table:remove deletes placement', () => {
+test('space:remove deletes placement', () => {
   const engine = createTestEngine();
-  const card = engine.deck.draw();
-  const placement = engine.table.place('test', card);
-  engine.dispatch('table:remove', { zone: 'test', placementId: placement.id });
-  assertEquals(engine.table.zoneCount('test'), 0);
+  const card = engine.stack.draw();
+  const placement = engine.space.place('test', card);
+  engine.dispatch('space:remove', { zone: 'test', placementId: placement.id });
+  assertEquals(engine.space.zoneCount('test'), 0);
 });
 
-test('table:shuffleZone randomizes zone', () => {
+test('space:shuffleZone randomizes zone', () => {
   const engine = createTestEngine();
   for (let i = 0; i < 5; i++) {
-    engine.table.place('test', engine.deck.draw());
+    engine.space.place('test', engine.stack.draw());
   }
-  engine.dispatch('table:shuffleZone', { zone: 'test', seed: 42 });
-  assertEquals(engine.table.zoneCount('test'), 5);
+  engine.dispatch('space:shuffleZone', { zone: 'test', seed: 42 });
+  assertEquals(engine.space.zoneCount('test'), 5);
 });
 
-test('table:transferZone moves all cards', () => {
+test('space:transferZone moves all cards', () => {
   const engine = createTestEngine();
   for (let i = 0; i < 3; i++) {
-    engine.table.place('from', engine.deck.draw());
+    engine.space.place('from', engine.stack.draw());
   }
-  engine.table.createZone('to');
-  engine.dispatch('table:transferZone', { fromZone: 'from', toZone: 'to' });
-  assertEquals(engine.table.zoneCount('to'), 3);
+  engine.space.createZone('to');
+  engine.dispatch('space:transferZone', { fromZone: 'from', toZone: 'to' });
+  assertEquals(engine.space.zoneCount('to'), 3);
 });
 
-test('table:fanZone arranges cards', () => {
+test('space:fanZone arranges cards', () => {
   const engine = createTestEngine();
   for (let i = 0; i < 5; i++) {
-    engine.table.place('test', engine.deck.draw());
+    engine.space.place('test', engine.stack.draw());
   }
-  engine.dispatch('table:fanZone', { zone: 'test', radius: 100 });
-  assertEquals(engine.table.zoneCount('test'), 5);
+  engine.dispatch('space:fanZone', { zone: 'test', radius: 100 });
+  assertEquals(engine.space.zoneCount('test'), 5);
 });
 
-test('table:stackZone stacks cards', () => {
+test('space:stackZone stacks cards', () => {
   const engine = createTestEngine();
   for (let i = 0; i < 5; i++) {
-    engine.table.place('test', engine.deck.draw());
+    engine.space.place('test', engine.stack.draw());
   }
-  engine.dispatch('table:stackZone', { zone: 'test' });
-  assertEquals(engine.table.zoneCount('test'), 5);
+  engine.dispatch('space:stackZone', { zone: 'test' });
+  assertEquals(engine.space.zoneCount('test'), 5);
 });
 
-test('table:lockZone prevents modifications', () => {
+test('space:lockZone prevents modifications', () => {
   const engine = createTestEngine();
-  engine.table.createZone('locked');
-  engine.dispatch('table:lockZone', { zone: 'locked', locked: true });
-  assertExists(engine.table._lockedZones);
+  engine.space.createZone('locked');
+  engine.dispatch('space:lockZone', { zone: 'locked', locked: true });
+  assertExists(engine.space._lockedZones);
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SHOE ACTIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-console.log('\n👞 Shoe Actions\n');
+console.log('\n👞 Source Actions\n');
 
-test('shoe:draw returns card', () => {
+test('source:draw returns card', () => {
   const engine = createTestEngine();
-  const card = engine.dispatch('shoe:draw', { count: 1 });
+  const card = engine.dispatch('source:draw', { count: 1 });
   assertExists(card);
 });
 
-test('shoe:shuffle randomizes shoe', () => {
+test('source:shuffle randomizes source', () => {
   const engine = createTestEngine();
-  engine.dispatch('shoe:shuffle', { seed: 42 });
-  assertExists(engine.shoe);
+  engine.dispatch('source:shuffle', { seed: 42 });
+  assertExists(engine.source);
 });
 
-test('shoe:burn discards from shoe', () => {
+test('source:burn discards from source', () => {
   const engine = createTestEngine();
-  engine.dispatch('shoe:burn', { count: 3 });
-  assertExists(engine.shoe);
+  engine.dispatch('source:burn', { count: 3 });
+  assertExists(engine.source);
 });
 
-test('shoe:reset restores shoe', () => {
+test('source:reset restores source', () => {
   const engine = createTestEngine();
-  engine.shoe.draw(10);
-  engine.dispatch('shoe:reset');
-  assertExists(engine.shoe);
+  engine.source.draw(10);
+  engine.dispatch('source:reset');
+  assertExists(engine.source);
 });
 
-test('shoe:addDeck increases size', () => {
+test('source:addStack increases size', () => {
   const engine = createTestEngine();
-  const newDeck = new Deck([{ id: 'extra', label: 'Extra' }]);
-  engine.dispatch('shoe:addDeck', { deck: newDeck });
-  assertExists(engine.shoe);
+  const newStack = new Stack([{ id: 'extra', label: 'Extra' }]);
+  engine.dispatch('source:addStack', { stack: newStack });
+  assertExists(engine.source);
 });
 
-test('shoe:inspect returns stats', () => {
+test('source:inspect returns stats', () => {
   const engine = createTestEngine();
-  const stats = engine.dispatch('shoe:inspect');
+  const stats = engine.dispatch('source:inspect');
   assertExists(stats);
   assertExists(stats.remaining);
 });
@@ -381,84 +381,84 @@ test('shoe:inspect returns stats', () => {
 // PLAYER ACTIONS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-console.log('\n👤 Player Actions\n');
+console.log('\n👤 Agent Actions\n');
 
-test('player:create adds player', () => {
+test('agent:create adds agent', () => {
   const engine = createTestEngine();
-  const player = engine.dispatch('player:create', { name: 'Alice' });
-  assertExists(player);
-  assertEquals(player.name, 'Alice');
-  assertEquals(engine._players.length, 1);
+  const agent = engine.dispatch('agent:create', { name: 'Alice' });
+  assertExists(agent);
+  assertEquals(agent.name, 'Alice');
+  assertEquals(engine._agents.length, 1);
 });
 
-test('player:remove deletes player', () => {
+test('agent:remove deletes agent', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:remove', { name: 'Alice' });
-  assertEquals(engine._players.length, 0);
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:remove', { name: 'Alice' });
+  assertEquals(engine._agents.length, 0);
 });
 
-test('player:setActive changes state', () => {
+test('agent:setActive changes state', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:setActive', { name: 'Alice', active: false });
-  const player = engine._players[0];
-  assertEquals(player.active, false);
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:setActive', { name: 'Alice', active: false });
+  const agent = engine._agents[0];
+  assertEquals(agent.active, false);
 });
 
-test('player:giveResource adds resource', () => {
+test('agent:giveResource adds resource', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:giveResource', { 
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:giveResource', { 
     name: 'Alice', 
     resource: 'chips', 
     amount: 100 
   });
-  const player = engine._players[0];
-  assertEquals(player.resources.chips, 100);
+  const agent = engine._agents[0];
+  assertEquals(agent.resources.chips, 100);
 });
 
-test('player:takeResource removes resource', () => {
+test('agent:takeResource removes resource', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:giveResource', { 
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:giveResource', { 
     name: 'Alice', 
     resource: 'chips', 
     amount: 100 
   });
-  engine.dispatch('player:takeResource', { 
+  engine.dispatch('agent:takeResource', { 
     name: 'Alice', 
     resource: 'chips', 
     amount: 50 
   });
-  const player = engine._players[0];
-  assertEquals(player.resources.chips, 50);
+  const agent = engine._agents[0];
+  assertEquals(agent.resources.chips, 50);
 });
 
-test('player:drawCards adds to hand', () => {
+test('agent:drawCards adds to hand', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:drawCards', { name: 'Alice', count: 5 });
-  const player = engine._players[0];
-  assertEquals(player.hand.length, 5);
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:drawCards', { name: 'Alice', count: 5 });
+  const agent = engine._agents[0];
+  assertEquals(agent.hand.length, 5);
 });
 
-test('player:discardCards removes from hand', () => {
+test('agent:discardCards removes from hand', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  engine.dispatch('player:drawCards', { name: 'Alice', count: 5 });
-  const player = engine._players[0];
-  const toDiscard = player.hand.slice(0, 2);
-  engine.dispatch('player:discardCards', { name: 'Alice', cards: toDiscard });
-  assertEquals(player.hand.length, 3);
+  engine.dispatch('agent:create', { name: 'Alice' });
+  engine.dispatch('agent:drawCards', { name: 'Alice', count: 5 });
+  const agent = engine._agents[0];
+  const toDiscard = agent.hand.slice(0, 2);
+  engine.dispatch('agent:discardCards', { name: 'Alice', cards: toDiscard });
+  assertEquals(agent.hand.length, 3);
 });
 
-test('player:get returns player state', () => {
+test('agent:get returns agent state', () => {
   const engine = createTestEngine();
-  engine.dispatch('player:create', { name: 'Alice' });
-  const player = engine.dispatch('player:get', { name: 'Alice' });
-  assertExists(player);
-  assertEquals(player.name, 'Alice');
+  engine.dispatch('agent:create', { name: 'Alice' });
+  const agent = engine.dispatch('agent:get', { name: 'Alice' });
+  assertExists(agent);
+  assertEquals(agent.name, 'Alice');
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -518,25 +518,25 @@ test('game:setProperty sets custom value', () => {
 
 console.log('\n⚠️  Error Handling\n');
 
-test('deck actions fail without deck', () => {
+test('stack actions fail without stack', () => {
   const engine = new Engine({});
   assertThrows(() => {
-    engine.dispatch('deck:shuffle');
-  }, 'Should throw when no deck attached');
+    engine.dispatch('stack:shuffle');
+  }, 'Should throw when no stack attached');
 });
 
-test('table actions fail without table', () => {
+test('space actions fail without space', () => {
   const engine = new Engine({});
   assertThrows(() => {
-    engine.dispatch('table:clear');
-  }, 'Should throw when no table attached');
+    engine.dispatch('space:clear');
+  }, 'Should throw when no space attached');
 });
 
-test('player actions fail for nonexistent player', () => {
+test('agent actions fail for nonexistent agent', () => {
   const engine = createTestEngine();
   assertThrows(() => {
-    engine.dispatch('player:get', { name: 'Nonexistent' });
-  }, 'Should throw for nonexistent player');
+    engine.dispatch('agent:get', { name: 'Nonexistent' });
+  }, 'Should throw for nonexistent agent');
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

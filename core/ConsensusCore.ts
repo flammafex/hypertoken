@@ -1,19 +1,19 @@
 /*
- * core/SyncManager.ts
+ * core/ConsensusCore.ts
  * Fixed Event Unwrapping & Echo Loop
  */
 import * as A from "@automerge/automerge";
-import { SessionManager } from "./SessionManager.js";
+import { Chronicle } from "./Chronicle.js";
 import { NetworkInterface } from "../interface/NetworkInterface.js";
 import { Emitter } from "./events.js";
 
-export class SyncManager extends Emitter {
-  session: SessionManager;
+export class ConsensusCore extends Emitter {
+  session: Chronicle;
   network: NetworkInterface;
   
   private _syncStates: Map<string, A.SyncState> = new Map();
 
-  constructor(session: SessionManager, network: NetworkInterface) {
+  constructor(session: Chronicle, network: NetworkInterface) {
     super();
     this.session = session;
     this.network = network;

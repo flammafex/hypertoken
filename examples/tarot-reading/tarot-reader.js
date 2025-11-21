@@ -5,8 +5,8 @@
  * Built on the HyperToken framework
  */
 
-import { Table } from '../../core/Table.js';
-import { Deck } from '../../core/Deck.js';
+import { Space } from '../../core/Space.js';
+import { Stack } from '../../core/Stack.js';
 import { EventBus } from '../../core/EventBus.js';
 import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { readFile } from 'fs/promises';
@@ -18,35 +18,35 @@ import { dirname, resolve } from 'path';
  * Provides structured tarot readings with multiple spreads and interpretive guidance
  */
 export class TarotReader {
-  constructor(deckPath = './tarot-deck.json') {
+  constructor(stackPath = './tarot-stack.json') {
     this.events = new EventBus();
-    this.table = new Table(this.events);
-    this.deck = null;
-    this.deckPath = deckPath;
+    this.space = new Space(this.events);
+    this.stack = null;
+    this.stackPath = stackPath;
     this.readingHistory = [];
     this.currentReading = null;
   }
 
   /**
-   * Initialize the tarot deck
+   * Initialize the tarot stack
    */
   async initialize() {
     // Convert relative path to absolute path
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    const absolutePath = resolve(__dirname, this.deckPath);
+    const absolutePath = resolve(__dirname, this.stackPath);
     
     // Read and parse the JSON file
     const jsonData = await readFile(absolutePath, 'utf-8');
     const tokenSet = parseTokenSetObject(JSON.parse(jsonData));
     
-    this.deck = new Deck(tokenSet.tokens, { kind: 'tarot' });
-    this.deck.shuffle();
+    this.stack = new Stack(tokenSet.tokens, { kind: 'tarot' });
+    this.stack.shuffle();
     
     // Define standard spreads
     this.defineSpreads();
     
-    this.events.emit('tarot:initialized', { deckSize: this.deck.size });
+    this.events.emit('tarot:initialized', { stackSize: this.stack.size });
     return this;
   }
 
@@ -55,19 +55,19 @@ export class TarotReader {
    */
   defineSpreads() {
     // Single Card - Quick Insight
-    this.table.defineSpread('single-card', [
+    this.space.defineSpread('single-card', [
       { id: 'card', x: 0, y: 0, label: 'Your Card' }
     ]);
 
     // Three Card - Past, Present, Future
-    this.table.defineSpread('three-card', [
+    this.space.defineSpread('three-card', [
       { id: 'past', x: -150, y: 0, label: 'Past' },
       { id: 'present', x: 0, y: 0, label: 'Present' },
       { id: 'future', x: 150, y: 0, label: 'Future' }
     ]);
 
     // Celtic Cross - Comprehensive Reading
-    this.table.defineSpread('celtic-cross', [
+    this.space.defineSpread('celtic-cross', [
       { id: 'present', x: 0, y: 0, label: '1. Present Situation' },
       { id: 'challenge', x: 0, y: 0, label: '2. Challenge/Crossing' },
       { id: 'foundation', x: 0, y: 100, label: '3. Foundation/Past' },
@@ -81,7 +81,7 @@ export class TarotReader {
     ]);
 
     // Relationship Spread
-    this.table.defineSpread('relationship', [
+    this.space.defineSpread('relationship', [
       { id: 'you', x: -100, y: 0, label: 'You' },
       { id: 'them', x: 100, y: 0, label: 'Them' },
       { id: 'connection', x: 0, y: -80, label: 'Connection' },
@@ -90,7 +90,7 @@ export class TarotReader {
     ]);
 
     // Career Path Spread
-    this.table.defineSpread('career', [
+    this.space.defineSpread('career', [
       { id: 'current', x: 0, y: 0, label: 'Current Position' },
       { id: 'strengths', x: -100, y: -80, label: 'Your Strengths' },
       { id: 'obstacles', x: 100, y: -80, label: 'Obstacles' },
@@ -99,7 +99,7 @@ export class TarotReader {
     ]);
 
     // Decision Making Spread
-    this.table.defineSpread('decision', [
+    this.space.defineSpread('decision', [
       { id: 'situation', x: 0, y: -100, label: 'The Situation' },
       { id: 'option-a', x: -120, y: 0, label: 'Option A' },
       { id: 'option-b', x: 120, y: 0, label: 'Option B' },
@@ -120,10 +120,10 @@ export class TarotReader {
         label: this.getMonthName(i + 1)
       });
     }
-    this.table.defineSpread('year-ahead', yearSpread);
+    this.space.defineSpread('year-ahead', yearSpread);
 
     // Chakra Alignment Spread
-    this.table.defineSpread('chakra', [
+    this.space.defineSpread('chakra', [
       { id: 'root', x: 0, y: 180, label: 'Root - Foundation' },
       { id: 'sacral', x: 0, y: 150, label: 'Sacral - Creativity' },
       { id: 'solar', x: 0, y: 120, label: 'Solar Plexus - Power' },
@@ -138,35 +138,35 @@ export class TarotReader {
    * Perform a tarot reading with a specific spread
    */
   performReading(spreadName, question = null, options = {}) {
-    if (!this.deck) {
-      throw new Error('Tarot deck not initialized. Call initialize() first.');
+    if (!this.stack) {
+      throw new Error('Tarot stack not initialized. Call initialize() first.');
     }
 
-    const spread = this.table.spreads[spreadName];
+    const spread = this.space.spreads[spreadName];
     if (!spread) {
       throw new Error(`Unknown spread: ${spreadName}`);
     }
 
     // Shuffle if requested
     if (options.shuffle !== false) {
-      this.deck.shuffle();
+      this.stack.shuffle();
     }
 
     // Clear previous reading
     spread.forEach(position => {
-      this.table.zones.set(position.id, []);
+      this.space.zones.set(position.id, []);
     });
 
     // Deal cards into the spread
     const cards = [];
     for (const position of spread) {
-      const card = this.deck.draw();
+      const card = this.stack.draw();
       if (!card) break;
 
       // Randomly determine if card is reversed (if enabled)
       const isReversed = options.allowReversed !== false && Math.random() < 0.3;
       
-      const placement = this.table.place(position.id, card, {
+      const placement = this.space.place(position.id, card, {
         x: position.x,
         y: position.y,
         faceUp: true,

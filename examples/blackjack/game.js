@@ -3,9 +3,9 @@
  */
 
 import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
-import { Deck } from '../../core/Deck.js';
-import { Table } from '../../core/Table.js';
-import { Shoe } from '../../core/Shoe.js';
+import { Stack } from '../../core/Stack.js';
+import { Space } from '../../core/Space.js';
+import { Source } from '../../core/Source.js';
 import { Engine } from '../../engine/Engine.js';
 import { RuleEngine } from '../../engine/RuleEngine.js';
 import { ActionRegistry } from '../../engine/actions.js';
@@ -25,47 +25,47 @@ import { registerBlackjackRules } from './blackjack-rules.js';
 Object.assign(ActionRegistry, {
   "blackjack:deal": (engine) => {
     // Clear existing hands
-    engine.table.clearZone("player-hand");
-    engine.table.clearZone("dealer-hand");
+    engine.space.clearZone("agent-hand");
+    engine.space.clearZone("dealer-hand");
     
-    // Deal 2 cards to player
-    const p1 = engine.shoe.draw();
-    const p2 = engine.shoe.draw();
-    engine.table.place("player-hand", p1, { faceUp: true });
-    engine.table.place("player-hand", p2, { faceUp: true });
+    // Deal 2 cards to agent
+    const p1 = engine.source.draw();
+    const p2 = engine.source.draw();
+    engine.space.place("agent-hand", p1, { faceUp: true });
+    engine.space.place("agent-hand", p2, { faceUp: true });
     
     // Deal 2 cards to dealer (one face down)
-    const d1 = engine.shoe.draw();
-    const d2 = engine.shoe.draw();
-    engine.table.place("dealer-hand", d1, { faceUp: false });
-    engine.table.place("dealer-hand", d2, { faceUp: true });
+    const d1 = engine.source.draw();
+    const d2 = engine.source.draw();
+    engine.space.place("dealer-hand", d1, { faceUp: false });
+    engine.space.place("dealer-hand", d2, { faceUp: true });
     
     engine._gameState = { 
       dealerTurn: false, 
       gameOver: false,
-      playerStood: false
+      agentStood: false
     };
   },
   
   "blackjack:hit": (engine) => {
-    const card = engine.shoe.draw();
-    engine.table.place("player-hand", card, { faceUp: true });
+    const card = engine.source.draw();
+    engine.space.place("agent-hand", card, { faceUp: true });
   },
   
   "blackjack:stand": (engine) => {
-    engine._gameState.playerStood = true;
+    engine._gameState.agentStood = true;
     engine._gameState.dealerTurn = true;
     
     // Reveal dealer's hidden card
-    const dealerHand = engine.table.zone("dealer-hand");
+    const dealerHand = engine.space.zone("dealer-hand");
     if (dealerHand.length > 0) {
       dealerHand[0].faceUp = true;
     }
   },
   
   "blackjack:dealer-hit": (engine) => {
-    const card = engine.shoe.draw();
-    engine.table.place("dealer-hand", card, { faceUp: true });
+    const card = engine.source.draw();
+    engine.space.place("dealer-hand", card, { faceUp: true });
   },
   
   "blackjack:dealer-stand": (engine) => {
@@ -73,27 +73,27 @@ Object.assign(ActionRegistry, {
     engine._gameState.gameOver = true;
   },
   
-  "blackjack:player-busted": (engine) => {
+  "blackjack:agent-busted": (engine) => {
     engine._gameState.gameOver = true;
     engine._gameState.result = "dealer";
   },
   
-  "blackjack:player-blackjack": (engine) => {
+  "blackjack:agent-blackjack": (engine) => {
     // Check dealer for blackjack
-    const dealerHand = engine.table.zone("dealer-hand");
+    const dealerHand = engine.space.zone("dealer-hand");
     const dealerCards = dealerHand.map(p => p.card);
     if (isBlackjack(dealerCards)) {
       engine._gameState.result = "push";
     } else {
-      engine._gameState.result = "player-blackjack";
+      engine._gameState.result = "agent-blackjack";
     }
     engine._gameState.gameOver = true;
   },
   
   "blackjack:new-round": (engine) => {
-    engine.table.collectAllInto(engine.deck);
-    engine.shoe.reset();
-    engine.shoe.shuffle();
+    engine.space.collectAllInto(engine.stack);
+    engine.source.reset();
+    engine.source.shuffle();
   }
 });
 
@@ -101,40 +101,40 @@ Object.assign(ActionRegistry, {
  * BlackjackGame class - manages game flow
  */
 export class BlackjackGame {
-  constructor({ numDecks = 6, seed = null } = {}) {
-    // Load standard deck
-    const deckData = JSON.parse(
-      readFileSync('./token-sets/standard-deck.json', 'utf8')
+  constructor({ numStacks = 6, seed = null } = {}) {
+    // Load standard stack
+    const stackData = JSON.parse(
+      readFileSync('./token-sets/standard-stack.json', 'utf8')
     );
-    const tokenSet = parseTokenSetObject(deckData);
+    const tokenSet = parseTokenSetObject(stackData);
     
-    // Create decks for the shoe
-    const decks = [];
-    for (let i = 0; i < numDecks; i++) {
-      decks.push(new Deck(tokenSet.tokens, { seed: seed ? seed + i : null }));
+    // Create stacks for the source
+    const stacks = [];
+    for (let i = 0; i < numStacks; i++) {
+      stacks.push(new Stack(tokenSet.tokens, { seed: seed ? seed + i : null }));
     }
     
     // Setup game components
-    this.shoe = new Shoe(...decks);
-    this.shoe.shuffle(seed);
+    this.source = new Source(...stacks);
+    this.source.shuffle(seed);
     
-    this.table = new Table("blackjack");
-    this.table.createZone("player-hand");
-    this.table.createZone("dealer-hand");
+    this.space = new Space("blackjack");
+    this.space.createZone("agent-hand");
+    this.space.createZone("dealer-hand");
     
-    this.deck = decks[0]; // Reference for collecting cards
+    this.stack = stacks[0]; // Reference for collecting cards
     
     this.engine = new Engine({
-      deck: this.deck,
-      table: this.table,
-      shoe: this.shoe
+      stack: this.stack,
+      space: this.space,
+      source: this.source
     });
     
     // Add game state tracking
     this.engine._gameState = {
       dealerTurn: false,
       gameOver: false,
-      playerStood: false,
+      agentStood: false,
       result: null
     };
     
@@ -161,14 +161,14 @@ export class BlackjackGame {
   }
   
   /**
-   * Player hits (takes another card)
+   * Agent hits (takes another card)
    */
   hit() {
     if (this.engine._gameState.gameOver) {
       throw new Error("Game is over. Start a new round.");
     }
-    if (this.engine._gameState.playerStood) {
-      throw new Error("Player has already stood.");
+    if (this.engine._gameState.agentStood) {
+      throw new Error("Agent has already stood.");
     }
     
     this.engine.dispatch("blackjack:hit");
@@ -176,14 +176,14 @@ export class BlackjackGame {
   }
   
   /**
-   * Player stands (ends their turn)
+   * Agent stands (ends their turn)
    */
   stand() {
     if (this.engine._gameState.gameOver) {
       throw new Error("Game is over. Start a new round.");
     }
-    if (this.engine._gameState.playerStood) {
-      throw new Error("Player has already stood.");
+    if (this.engine._gameState.agentStood) {
+      throw new Error("Agent has already stood.");
     }
     
     this.engine.dispatch("blackjack:stand");
@@ -208,9 +208,9 @@ export class BlackjackGame {
     
     // Determine final result
     if (!this.engine._gameState.result) {
-      const playerHand = this.table.zone("player-hand").map(p => p.card);
-      const dealerHand = this.table.zone("dealer-hand").map(p => p.card);
-      this.engine._gameState.result = determineWinner(playerHand, dealerHand);
+      const agentHand = this.space.zone("agent-hand").map(p => p.card);
+      const dealerHand = this.space.zone("dealer-hand").map(p => p.card);
+      this.engine._gameState.result = determineWinner(agentHand, dealerHand);
     }
   }
   
@@ -218,25 +218,25 @@ export class BlackjackGame {
    * Get current game state
    */
   getGameState() {
-    const playerHand = this.table.zone("player-hand").map(p => p.card);
-    const dealerHand = this.table.zone("dealer-hand").map(p => p.card);
-    const dealerPlacements = this.table.zone("dealer-hand");
+    const agentHand = this.space.zone("agent-hand").map(p => p.card);
+    const dealerHand = this.space.zone("dealer-hand").map(p => p.card);
+    const dealerPlacements = this.space.zone("dealer-hand");
     
-    const playerValue = getBestHandValue(playerHand);
-    const playerBusted = isBusted(playerHand);
-    const playerBlackjack = isBlackjack(playerHand);
+    const agentValue = getBestHandValue(agentHand);
+    const agentBusted = isBusted(agentHand);
+    const agentBlackjack = isBlackjack(agentHand);
     
     // Only show dealer's up card if game is not over
     const showFullDealer = this.engine._gameState.gameOver || 
                           this.engine._gameState.dealerTurn;
     
     return {
-      playerHand: {
-        cards: playerHand,
-        value: playerValue,
-        busted: playerBusted,
-        blackjack: playerBlackjack,
-        display: formatHand(playerHand)
+      agentHand: {
+        cards: agentHand,
+        value: agentValue,
+        busted: agentBusted,
+        blackjack: agentBlackjack,
+        display: formatHand(agentHand)
       },
       dealerHand: {
         cards: dealerHand,
@@ -248,13 +248,13 @@ export class BlackjackGame {
       gameOver: this.engine._gameState.gameOver,
       result: this.engine._gameState.result,
       canHit: !this.engine._gameState.gameOver && 
-              !this.engine._gameState.playerStood &&
-              !playerBusted &&
-              !playerBlackjack,
+              !this.engine._gameState.agentStood &&
+              !agentBusted &&
+              !agentBlackjack,
       canStand: !this.engine._gameState.gameOver && 
-                !this.engine._gameState.playerStood &&
-                !playerBusted &&
-                !playerBlackjack
+                !this.engine._gameState.agentStood &&
+                !agentBusted &&
+                !agentBlackjack
     };
   }
   
@@ -274,9 +274,9 @@ export class BlackjackGame {
     if (!result) return null;
     
     switch (result) {
-      case "player-blackjack":
+      case "agent-blackjack":
         return "🎉 BLACKJACK! You win 3:2!";
-      case "player":
+      case "agent":
         return "🎉 You win!";
       case "dealer":
         return "😞 Dealer wins.";

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 export { Token } from "./Token.js";
-export { Deck } from "./Deck.js";
-export { Table } from "./Table.js";
-export { Shoe } from "./Shoe.js";
-export { SessionManager } from "./SessionManager.js";
+export { Stack as Stack } from "./Stack.js";
+export { Space as Space } from "./Space.js";
+export { Source as Source } from "./Source.js";
+export { Chronicle as Chronicle } from "./Chronicle.js";
 export { Emitter, EventRegistry } from "./events.js";
 export { mulberry32, shuffleArray } from "./random.js";
 export { EventBus } from "./EventBus.js";

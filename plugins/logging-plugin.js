@@ -44,7 +44,7 @@ export function init(engine, config = {}) {
       'rule:error',
       'turn:changed',
       'round:complete',
-      'player:eliminated',
+      'agent:eliminated',
       'game:end'
     ],
     logPayloads = true,
@@ -98,7 +98,7 @@ function getEventIcon(eventName) {
   if (eventName.startsWith('rule:')) return '📜';
   if (eventName.startsWith('turn:')) return '🔄';
   if (eventName.startsWith('round:')) return '🔁';
-  if (eventName.startsWith('player:')) return '👤';
+  if (eventName.startsWith('agent:')) return '👤';
   if (eventName.startsWith('game:')) return '🎮';
   return '📡';
 }
