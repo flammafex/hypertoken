@@ -5,7 +5,7 @@
 _A mission of [The Carpocratian Church of Commonality and Equality](https://carpocratian.org/en/church/)_.</div>
 <div align=center><img src="mission.png" width=256 height=200></div>
 
-**HyperToken** is a **Local-First Multiagent Engine** and **AI Research Platform**.
+**HyperToken** is a **Local-First Multiplayer Engine** and **AI Research Platform**.
 
 It combines **CRDTs (Automerge)** for state synchronization, **OpenAI Gym** for agent training, and a **Host-Authoritative** architecture to create permissionless, persistent worlds without a blockchain.
 
@@ -37,7 +37,7 @@ HyperToken is designed for two distinct audiences: creators building games and r
 | **For Creators & Communities** | **For Researchers & Enterprise** |
 | :--- | :--- |
 | **[👉 Read Community Use Cases](./COMMUNITY_USE_CASES.md)** | **[👉 Read Enterprise Use Cases](./ENTERPRISE_USE_CASES.md)** |
-| • **Serverless Multiagent Games**<br>Host games on your own device; zero infrastructure costs. | • **Reinforcement Learning Environments**<br>Train AlphaZero-style agents using the standardized Gym interface. |
+| • **Serverless Multiplayer Games**<br>Host games on your own device; zero infrastructure costs. | • **Reinforcement Learning Environments**<br>Train AlphaZero-style agents using the standardized Gym interface. |
 | • **"Headless" Autonomous Worlds**<br>Persistent game states that live in the swarm, not on a server. | • **Market & Economic Simulations**<br>Model complex trading economies to test incentive structures. |
 | • **Anti-Cheat P2P Gaming**<br>Host-authoritative logic ensures fair play without a central authority. | • **Rapid Mechanic Prototyping**<br>Script complex mechanics in text/CLI before committing to Unity/Unreal. |
 | • **Emergent Narrative Systems**<br>Items and NPCs that carry their own history across sessions. | • **Supply Chain & Logistics Logic**<br>Distinct tracking of assets moving through zones with strict rules. |
@@ -102,7 +102,7 @@ HyperToken is designed for two distinct audiences: creators building games and r
 │   └── OpenAIAgent.js      # LLM Integration
 │
 ├── examples/               # Working Implementations
-│   ├── blackjack/          # Multiagent Casino Game & AI Gym
+│   ├── blackjack/          # Multiplayer Casino Game & AI Gym
 │   ├── tarot-reading/      # Divination system
 │   └── prisoners-dilemma/  # Game theory
 │
