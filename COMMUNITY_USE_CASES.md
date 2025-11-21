@@ -22,7 +22,7 @@ Power to the players. For real.
 
 ## Implementation Patterns
 
-### Pattern 1: The Pop-Up Game (Serverless Multiplayer)
+### Pattern 1: BitTorrent for Game State (Serverless Multiplayer)
 
 **Best For:** Indie games, game jams, playing with friends over LAN/Internet.
 **Mechanism:** Host-Client P2P.
