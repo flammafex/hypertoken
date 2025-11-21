@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --loader ./test/ts-esm-loader.js
 /*
  * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
  *
