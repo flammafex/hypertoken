@@ -17,6 +17,7 @@ import { NetworkInterface } from "../interface/NetworkInterface.js";
 import { ConsensusCore } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
+import { EventBus } from "../core/EventBus.js";
 
 export interface EngineOptions {
   stack?: Stack | null;
@@ -34,6 +35,9 @@ export class Engine extends Emitter {
   network?: NetworkInterface;
   sync?: ConsensusCore;
   loop: GameLoop;
+
+  // Local event dispatcher for tests and plugins
+  eventBus: EventBus;
   
   // Exposed RuleEngine
   ruleEngine?: RuleEngine; 
@@ -55,6 +59,7 @@ export class Engine extends Emitter {
     this.stack = stack;
     this.source = source;
     this.loop = new GameLoop(this);
+    this.eventBus = new EventBus();
 
     this.history = [];
     this.future = [];
