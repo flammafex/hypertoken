@@ -2,15 +2,17 @@
 
 ## Overview
 
-HyperToken democratizes the creation of multiagent worlds. By combining **Local-First** architecture with **Host-Authoritative** logic, it enables creators to build persistent, rule-enforced games and simulations that run directly between peers—without requiring expensive servers or cloud infrastructure.
+HyperToken democratizes the creation of multiplayer worlds. By combining **Local-First** architecture with **Host-Authoritative** logic, it enables creators to build persistent, rule-enforced games and simulations that run directly between peers—without requiring expensive servers or cloud infrastructure.
 
 This shifts power from centralized platforms to communities, allowing games to live as long as their agents keep them alive.
+
+Power to the players. For real.
 
 ### Quick Reference
 
 | Sector | Use Case | Mechanism | Primary Benefit |
 | :--- | :--- | :--- | :--- |
-| **Gaming** | [Serverless Multiagent](#pattern-1-the-pop-up-game) | P2P / Relay | Zero hosting costs; play anywhere |
+| **Gaming** | [Serverless Multiplayer](#pattern-1-the-pop-up-game) | P2P / Relay | Zero hosting costs; play anywhere |
 | **Gaming** | [Anti-Cheat P2P](#pattern-1-the-pop-up-game) | Rule Engine | Fair play without a central server |
 | **Web3** | ["Headless" Worlds](#pattern-2-the-infinite-space) | CRDT Sync | Persistent worlds that live in the swarm |
 | **Education** | [Probability Labs](#pattern-4-the-classroom-lab) | Stack / Gym | Interactive stats teaching tools |
@@ -20,12 +22,12 @@ This shifts power from centralized platforms to communities, allowing games to l
 
 ## Implementation Patterns
 
-### Pattern 1: The Pop-Up Game (Serverless Multiagent)
+### Pattern 1: The Pop-Up Game (Serverless Multiplayer)
 
 **Best For:** Indie games, game jams, playing with friends over LAN/Internet.
 **Mechanism:** Host-Client P2P.
 
-Turn any agent's machine into the server instantly. The "Host" runs the `GameLoop` and `RuleEngine` to ensure fairness, while friends connect as clients. When the session ends, the game state can be saved to a file and resumed later by *anyone*.
+Turn any player's machine into the server instantly. The "Host" runs the `GameLoop` and `RuleEngine` to ensure fairness, while friends connect as clients. When the session ends, the game state can be saved to a file and resumed later by *anyone*.
 
 ```javascript
 // server.js (The Host)
@@ -59,7 +61,7 @@ engine.loadGame("world-snapshot-v1");
 **Best For:** Fan-made expansions, "What If" scenarios, collaborative storytelling.
 **Mechanism:** `Chronicle` (Automerge).
 
-Because state is decentralized, any agent can "fork" the current game timeline to try a different outcome or add house rules, creating a multiverse of game realities without breaking the original.
+Because state is decentralized, any player can "fork" the current game timeline to try a different outcome or add house rules, creating a multiverse of game realities without breaking the original.
 
 ```javascript
 // Agent B forks the game to try a risky strategy
@@ -96,7 +98,7 @@ console.log(engine.analytics.getReport());
 - **No Sunset**: Games don't die when the developer stops paying for servers.
 
 **True Ownership**
-- **Data Sovereignty**: Agents own their game data (it's on their machine).
+- **Data Sovereignty**: Players own their game data (it's on their machine).
 - **Moddability**: The engine logic is transparent and extensible via plugins.
 
 **Privacy First**
