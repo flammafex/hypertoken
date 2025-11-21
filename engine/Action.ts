@@ -13,28 +13,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//.engine/Action.js
-export class Action {
-  constructor(type, payload = {}, { seed = null, reversible = true } = {}) {
+/*
+ * engine/Action.ts
+ */
+import { IAction, IActionPayload } from "../core/types.js";
+
+export interface ActionOptions {
+  seed?: number | null;
+  reversible?: boolean;
+}
+
+export class Action implements IAction {
+  id: string;
+  type: string;
+  payload: IActionPayload;
+  seed?: number | null;
+  reversible?: boolean;
+  timestamp: number;
+  result?: any; // To store the return value of the action
+
+  constructor(
+    type: string, 
+    payload: IActionPayload = {}, 
+    { seed = null, reversible = true }: ActionOptions = {}
+  ) {
     this.id = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-    this.type = type;          // e.g. "deck:draw", "table:place"
-    this.payload = payload;    // event-like data
-    this.seed = seed;          // for determinism
+    this.type = type;
+    this.payload = payload;
+    this.seed = seed;
     this.reversible = reversible;
     this.timestamp = Date.now();
   }
 
-  static fromJSON(data) {
-  const a = new Action(data.type, data.payload, {
-    seed: data.seed,
-    reversible: data.reversible
-  });
-  a.timestamp = data.timestamp ?? Date.now();
-  return a;
-}
+  static fromJSON(data: any): Action {
+    const a = new Action(data.type, data.payload, {
+      seed: data.seed,
+      reversible: data.reversible
+    });
+    // Restore timestamp/id if present
+    if (data.timestamp) a.timestamp = data.timestamp;
+    if (data.id) a.id = data.id;
+    return a;
+  }
 
-  toJSON() {
+  toJSON(): any {
     return {
+      id: this.id,
       type: this.type,
       payload: this.payload,
       seed: this.seed,

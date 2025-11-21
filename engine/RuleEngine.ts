@@ -35,73 +35,62 @@
  * resolution when multiple conditions are true simultaneously.
  */
 
+/*
+ * engine/RuleEngine.ts
+ */
+// @ts-ignore - Script.js is likely still JS, which is fine for now
 import { Script } from "./Script.js";
 import { Action } from "./Action.js";
+import { Engine } from "./Engine.js";
+
+export type RuleCondition = (engine: Engine, lastAction?: Action | null) => boolean;
+// Sequence can be a Script, Action array, single Action, or Function
+export type RuleSequence = any; 
+
+export interface Rule {
+  name: string;
+  condition: RuleCondition;
+  sequence: RuleSequence;
+  priority: number;
+  once: boolean;
+  fired: boolean;
+}
 
 export class RuleEngine {
-  /**
-   * Associates a RuleEngine instance with a specific Engine context.
-   * On initialization, the engine is observed for every "engine:action"
-   * emission, triggering automatic rule evaluation.
-   */
-  constructor(engine) {
+  engine: Engine;
+  rules: Rule[];
+  debug: boolean;
+
+  constructor(engine: Engine) {
     this.engine = engine;
     this.rules = [];
     this.debug = false;
 
-    // Attach post-action evaluation hook.
-    this.engine?.on?.("engine:action", e => this.evaluate(e?.payload?.payload || e?.payload));
+    // Attach post-action evaluation hook
+    // @ts-ignore - Engine event payload typing
+    this.engine?.on("engine:action", (e: any) => this.evaluate(e?.payload?.payload || e?.payload));
   }
 
-  /*───────────────────────────────────────────────
-    Rule definition and registration
-  ───────────────────────────────────────────────*/
-
-  /**
-   * Registers a new rule definition.
-   * Rules are stored with execution metadata and immediately sorted
-   * by descending priority. The structure is minimal and fully serializable.
-   */
-  addRule(name, condition, sequence, { priority = 0, once = false } = {}) {
+  addRule(name: string, condition: RuleCondition, sequence: RuleSequence, { priority = 0, once = false } = {}): this {
     this.rules.push({ name, condition, sequence, priority, once, fired: false });
     this.rules.sort((a, b) => b.priority - a.priority);
     if (this.debug) console.log(`📜 Rule added: ${name}`);
     return this;
   }
 
-  /**
-   * Removes a rule by name and notifies observers.
-   * This is a non-destructive operation on unrelated rules.
-   */
-  removeRule(name) {
+  removeRule(name: string): this {
     this.rules = this.rules.filter(r => r.name !== name);
-    this.engine?.emit?.("rule:removed", { payload: { name } });
+    this.engine?.emit("rule:removed", { payload: { name } });
     return this;
   }
 
-  /**
-   * Clears all rules and emits a global notification.
-   * Typically used when resetting simulation state.
-   */
-  clear() {
+  clear(): this {
     this.rules = [];
-    this.engine?.emit?.("rule:cleared");
+    this.engine?.emit("rule:cleared");
     return this;
   }
 
-  /*───────────────────────────────────────────────
-    Evaluation cycle
-  ───────────────────────────────────────────────*/
-
-  /**
-   * Evaluates all active rules against the current engine state.
-   * Automatically invoked after each engine action or manually by controllers.
-   *
-   * Conditions are sandboxed to prevent systemic failure from individual errors.
-   * Firing order follows descending priority; "once" rules deactivate after
-   * first successful execution.
-   */
-  evaluate(lastAction = null) {
+  evaluate(lastAction: Action | null = null): void {
     for (const rule of this.rules) {
       if (rule.once && rule.fired) continue;
 
@@ -126,21 +115,7 @@ export class RuleEngine {
     }
   }
 
-  /*───────────────────────────────────────────────
-    Execution layer
-  ───────────────────────────────────────────────*/
-
-  /**
-   * Resolves and executes a rule's sequence payload.
-   * Supports multiple sequence representations:
-   *   - Script: high-level procedural block
-   *   - Array<Action>: ordered multi-step behavior
-   *   - Action: single discrete event
-   *   - Function(engine): arbitrary callback
-   *
-   * Execution occurs synchronously or asynchronously as required.
-   */
-  async _execute(seq) {
+  async _execute(seq: RuleSequence): Promise<void> {
     if (!seq) return;
 
     if (seq instanceof Script) {
@@ -159,16 +134,7 @@ export class RuleEngine {
     }
   }
 
-  /*───────────────────────────────────────────────
-    Serialization
-  ───────────────────────────────────────────────*/
-
-  /**
-   * Serializes rule metadata for persistence or inspection.
-   * Execution details such as conditions and sequences are excluded,
-   * as they are generally non-transferable across runtime contexts.
-   */
-  toJSON() {
+  toJSON(): any {
     return this.rules.map(({ name, priority, once, fired }) => ({
       name, priority, once, fired
     }));

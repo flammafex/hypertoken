@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,11 +28,42 @@
  * runtime orchestration.
  */
 
+// @ts-ignore
 import { Emitter } from "../core/events.js";
+import { Deck } from "../core/Deck.js";
+import { Table } from "../core/Table.js";
+import { Shoe } from "../core/Shoe.js";
 import { Action } from "./Action.js";
+// @ts-ignore
 import { ActionRegistry } from "./actions.js";
+import { IActionPayload } from "../core/types.js";
+
+export interface GameState {
+  started?: boolean;
+  ended?: boolean;
+  phase?: string;
+  turn?: number;
+  winner?: string;
+  reason?: string;
+  startTime?: number;
+  [key: string]: any;
+}
 
 export class Engine extends Emitter {
+  deck: Deck | null;
+  table: Table | null;
+  shoe: Shoe | null;
+
+  history: Action[];
+  future: Action[];
+  _policies: Map<string, any>;
+  
+  // Dynamic state properties
+  _players: any[];
+  _gameState: GameState;
+  _transactions: any[];
+  debug: boolean;
+
   /**
    * Initializes an engine instance with optional shared state containers.
    * Deck, table, and shoe references may be null for domain configurations
@@ -42,7 +73,7 @@ export class Engine extends Emitter {
    * and reversal. Policies are maintained in an ordered Map for deterministic
    * evaluation.
    */
-  constructor({ deck = null, table = null, shoe = null } = {}) {
+  constructor({ deck = null, table = null, shoe = null }: { deck?: Deck | null; table?: Table | null; shoe?: Shoe | null } = {}) {
     super();
     this.deck = deck;
     this.table = table;
@@ -52,6 +83,11 @@ export class Engine extends Emitter {
     this.future = [];
     this._policies = new Map();
     this.debug = false;
+
+    // Initialize dynamic state containers
+    this._players = [];
+    this._gameState = {};
+    this._transactions = [];
   }
 
   /*───────────────────────────────────────────────
@@ -63,21 +99,21 @@ export class Engine extends Emitter {
    * Policies are invoked after every dispatched action to perform
    * autonomous state checks, rule enforcement, or derived event emission.
    */
-  registerPolicy(name, policy) {
+  registerPolicy(name: string, policy: any): this {
     this._policies.set(name, policy);
     this.emit("engine:policy", { payload: { name } });
     return this;
   }
 
   /** Removes a previously registered policy by name. */
-  unregisterPolicy(name) {
+  unregisterPolicy(name: string): this {
     this._policies.delete(name);
     this.emit("engine:policy:removed", { payload: { name } });
     return this;
   }
 
   /** Clears all registered policies in a single operation. */
-  clearPolicies() {
+  clearPolicies(): this {
     this._policies.clear();
     this.emit("engine:policy:cleared");
     return this;
@@ -94,9 +130,9 @@ export class Engine extends Emitter {
    *
    * This process represents one complete simulation tick.
    */
-  dispatch(type, payload = {}, opts = {}) {
+  dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): any {
     const action = new Action(type, payload, opts);
-    if (this.debug) console.log("ðŸ§­ dispatch:", type, payload);
+    if (this.debug) console.log("🧩 dispatch:", type, payload);
 
     // Apply action synchronously; no deferred queueing.
     const result = this.apply(action);
@@ -120,7 +156,7 @@ export class Engine extends Emitter {
    * Resolution is delegated to the ActionRegistry entry corresponding
    * to the action type. Exceptions are isolated and reported via events.
    */
-  apply(action) {
+  apply(action: Action): any {
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {
@@ -146,7 +182,7 @@ export class Engine extends Emitter {
    * The reverted action is moved from history to the future stack.
    * Non-reversible actions are ignored.
    */
-  undo() {
+  undo(): Action | null {
     const last = this.history.pop();
     if (!last || !last.reversible) return null;
     this.future.push(last);
@@ -158,7 +194,7 @@ export class Engine extends Emitter {
    * Reapplies the next action from the future stack.
    * Used to restore forward progression after an undo.
    */
-  redo() {
+  redo(): Action | null {
     const next = this.future.pop();
     if (!next) return null;
     this.apply(next);
@@ -177,7 +213,7 @@ export class Engine extends Emitter {
    * and the set of registered policy names. Policies themselves are not
    * serialized—only their identifiers are preserved.
    */
-  snapshot() {
+  snapshot(): any {
     return {
       deck: this.deck?.toJSON?.() ?? null,
       table: this.table?.toJSON?.() ?? null,
@@ -188,7 +224,7 @@ export class Engine extends Emitter {
   }
 
   /** Alias for snapshot(), allowing transparent JSON serialization. */
-  toJSON() { return this.snapshot(); }
+  toJSON(): any { return this.snapshot(); }
 
   /**
    * Restores the engine’s structural state from a prior snapshot.
@@ -196,17 +232,18 @@ export class Engine extends Emitter {
    * Policies are re-created as name stubs and must be reattached
    * with concrete logic by the caller after restoration.
    */
-  restore(snapshot) {
+  restore(snapshot: any): this {
     if (!snapshot) return this;
-    if (snapshot.deck && this.deck?.fromJSON)
-      this.deck = this.deck.fromJSON(snapshot.deck);
-    if (snapshot.table && this.table?.fromJSON)
-      this.table = this.table.fromJSON(snapshot.table);
-    if (snapshot.shoe && this.shoe?.fromJSON)
-      this.shoe = this.shoe.fromJSON(snapshot.shoe);
+    // Note: Using casting to allow for potential static/instance method discrepancies in usage
+    if (snapshot.deck && (this.deck as any)?.fromJSON)
+      this.deck = (this.deck as any).fromJSON(snapshot.deck);
+    if (snapshot.table && (this.table as any)?.fromJSON)
+      this.table = (this.table as any).fromJSON(snapshot.table);
+    if (snapshot.shoe && (this.shoe as any)?.fromJSON)
+      this.shoe = (this.shoe as any).fromJSON(snapshot.shoe);
 
     this.history = snapshot.history ?? [];
-    this._policies = new Map(snapshot.policies?.map(n => [n, null]) ?? []);
+    this._policies = new Map(snapshot.policies?.map((n: string) => [n, null]) ?? []);
     this.emit("engine:restored", { payload: { history: this.history.length } });
     return this;
   }
@@ -215,14 +252,26 @@ export class Engine extends Emitter {
     Introspection utilities (AI / debugging)
   ───────────────────────────────────────────────*/
 
+  // Helper to provide a read-only view of the state for describe()
+  get state() {
+    return {
+      version: "1.0.0",
+      turn: this._gameState.turn,
+      players: this._players,
+      deck: this.deck,
+      table: this.table,
+      shoe: this.shoe
+    };
+  }
+
   /**
    * Returns a descriptive summary of the engine’s state for inspection or AI reasoning.
    * The summary is structural by default and may include detailed sub-states when
    * invoked with { detail: true }.
    */
-  describe({ detail = false } = {}) {
+  describe({ detail = false } = {}): any {
     const { deck, table, shoe } = this;
-    const players = this.state.players?.map(p => ({
+    const players = this.state.players?.map((p: any) => ({
       name: p.name,
       handCount: p.hand?.length ?? 0,
       discardCount: p.discard?.length ?? 0,
@@ -235,7 +284,7 @@ export class Engine extends Emitter {
       turn: this.state.turn ?? null,
       players,
       deck: deck
-        ? { remaining: deck.size, drawn: deck.drawnTokens?.length ?? 0 }
+        ? { remaining: deck.size, drawn: deck.drawn?.length ?? 0 }
         : null,
       table: table
         ? {
@@ -259,7 +308,7 @@ export class Engine extends Emitter {
 
     return {
       ...summary,
-      deckState: deck?.snapshot?.() ?? null,
+      deckState: deck?.toJSON?.() ?? null,
       tableState: table?.snapshot?.() ?? null,
       shoeState: {
         decks: shoe?._decks?.length ?? 0,
@@ -273,7 +322,7 @@ export class Engine extends Emitter {
    * This utility is primarily used for AI policy generation or user interface
    * affordances. The list is derived from the presence of active subsystems.
    */
-  availableActions() {
+  availableActions(): any[] {
     const actions = [];
 
     if (this.state.deck) {

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,67 +16,45 @@
 
 /**
  * ActionRegistry - Complete set of game actions
- * 
- * This module provides 45 actions covering all common game operations:
- * 
- * DECK (10 actions):
- *   deck:shuffle, deck:draw, deck:reset, deck:burn, deck:peek, 
- *   deck:cut, deck:insertAt, deck:removeAt, deck:swap, deck:reverse
- * 
- * TABLE (14 actions):
- *   table:place, table:clear, table:move, table:flip, table:remove,
- *   table:createZone, table:deleteZone, table:clearZone, table:shuffleZone,
- *   table:transferZone, table:fanZone, table:stackZone, table:spreadZone,
- *   table:lockZone
- * 
- * SHOE (7 actions):
- *   shoe:draw, shoe:shuffle, shoe:burn, shoe:reset, shoe:addDeck,
- *   shoe:removeDeck, shoe:inspect
- * 
- * PLAYER (8 actions):
- *   player:create, player:remove, player:setActive, player:giveResource,
- *   player:takeResource, player:drawCards, player:discardCards, player:get
- * 
- * GAME (6 actions):
- *   game:start, game:end, game:pause, game:resume, game:nextPhase,
- *   game:setProperty
  */
 
-import { ExtendedActions } from './actions-extended.js';
+import { Engine } from "./Engine.js";
+// @ts-ignore
+import { ExtendedActions } from "./actions-extended.js";
+import { IToken } from "../core/types.js";
+
+export type ActionHandler = (engine: Engine, payload: any) => any;
+
+export interface ActionRegistryType {
+  [key: string]: ActionHandler;
+}
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   BASE ACTIONS (Original 5)
-  These are the minimal actions that were originally in HyperToken
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-const BaseActions = {
+const BaseActions: ActionRegistryType = {
   /**
    * Shuffle the deck
-   * Usage: engine.dispatch("deck:shuffle", { seed: 42 })
    */
-  "deck:shuffle": (engine, { seed = null } = {}) => {
+  "deck:shuffle": (engine: Engine, { seed = null }: { seed?: number | null } = {}) => {
     if (!engine.deck) throw new Error("No deck attached to engine");
-    engine.deck.shuffle(seed);
+    engine.deck.shuffle(seed ?? undefined);
   },
   
   /**
    * Draw N cards from deck
-   * Usage: engine.dispatch("deck:draw", { count: 5 })
    */
-  "deck:draw": (engine, { count = 1 } = {}) => {
+  "deck:draw": (engine: Engine, { count = 1 }: { count?: number } = {}) => {
     if (!engine.deck) throw new Error("No deck attached to engine");
-    return engine.deck.drawMany ? engine.deck.drawMany(count) : [engine.deck.draw()];
+    // Using the overloaded draw method from Deck.ts
+    return engine.deck.draw(count);
   },
   
   /**
    * Place a card on the table in a specific zone
-   * Usage: engine.dispatch("table:place", { 
-   *   zone: "field", 
-   *   card: myCard, 
-   *   opts: { faceUp: true, x: 100, y: 200 } 
-   * })
    */
-  "table:place": (engine, { zone, card, opts = {} } = {}) => {
+  "table:place": (engine: Engine, { zone, card, opts = {} }: { zone: string; card: IToken; opts?: any } = {} as any) => {
     if (!engine.table) throw new Error("No table attached to engine");
     if (!zone) throw new Error("zone required");
     if (!card) throw new Error("card required");
@@ -85,18 +63,16 @@ const BaseActions = {
   
   /**
    * Clear all cards from the table
-   * Usage: engine.dispatch("table:clear")
    */
-  "table:clear": (engine) => {
+  "table:clear": (engine: Engine) => {
     if (!engine.table) throw new Error("No table attached to engine");
     engine.table.clear();
   },
   
   /**
    * Draw N cards from shoe
-   * Usage: engine.dispatch("shoe:draw", { count: 1 })
    */
-  "shoe:draw": (engine, { count = 1 } = {}) => {
+  "shoe:draw": (engine: Engine, { count = 1 }: { count?: number } = {}) => {
     if (!engine.shoe) throw new Error("No shoe attached to engine");
     return engine.shoe.draw(count);
   }
@@ -104,33 +80,29 @@ const BaseActions = {
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   COMPLETE ACTION REGISTRY
-  Base actions + Extended actions = 45 total actions
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-export const ActionRegistry = {
+export const ActionRegistry: ActionRegistryType = {
   ...BaseActions,
-  ...ExtendedActions
+  ...(ExtendedActions as any)
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   UTILITY FUNCTIONS
-  Helpers for working with actions
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 /**
  * List all available action types
- * @returns {Array<string>} Array of action type strings
  */
-export function listActions() {
+export function listActions(): string[] {
   return Object.keys(ActionRegistry).sort();
 }
 
 /**
  * List actions by category
- * @returns {Object} Actions grouped by category (deck, table, shoe, player, game)
  */
-export function listActionsByCategory() {
-  const categories = {
+export function listActionsByCategory(): Record<string, string[]> {
+  const categories: Record<string, string[]> = {
     deck: [],
     table: [],
     shoe: [],
@@ -153,28 +125,22 @@ export function listActionsByCategory() {
 
 /**
  * Check if an action exists
- * @param {string} type - Action type to check
- * @returns {boolean}
  */
-export function hasAction(type) {
+export function hasAction(type: string): boolean {
   return type in ActionRegistry;
 }
 
 /**
  * Get action handler function
- * @param {string} type - Action type
- * @returns {Function|null} Handler function or null if not found
  */
-export function getAction(type) {
+export function getAction(type: string): ActionHandler | null {
   return ActionRegistry[type] || null;
 }
 
 /**
  * Register a new custom action
- * @param {string} type - Action type (e.g. "mygame:custom")
- * @param {Function} handler - Action handler function(engine, payload)
  */
-export function registerAction(type, handler) {
+export function registerAction(type: string, handler: ActionHandler): void {
   if (type in ActionRegistry) {
     console.warn(`Action ${type} already exists, overwriting`);
   }
@@ -183,8 +149,7 @@ export function registerAction(type, handler) {
 
 /**
  * Unregister an action
- * @param {string} type - Action type to remove
  */
-export function unregisterAction(type) {
+export function unregisterAction(type: string): void {
   delete ActionRegistry[type];
 }
