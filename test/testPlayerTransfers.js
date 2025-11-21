@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --loader ./test/ts-esm-loader.js
 /*
  * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
  *
@@ -41,9 +41,18 @@ function runTests() {
   
   let passed = 0;
   let failed = 0;
-  
+
+  function createEngine() {
+    const engine = new Engine();
+    engine.eventBus = new EventBus();
+    return engine;
+  }
+
+  let engine;
+
   function test(name, fn) {
     try {
+      engine = createEngine();
       fn();
       console.log(`✅ ${name}`);
       passed++;
@@ -53,10 +62,6 @@ function runTests() {
       failed++;
     }
   }
-  
-  // Setup
-  const engine = new Engine();
-  engine.eventBus = new EventBus();
   
   // ============================================================
   // TEST: agent:transfer - resource transfers
