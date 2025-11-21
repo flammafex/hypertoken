@@ -76,55 +76,40 @@ HyperToken is designed for two distinct audiences: creators building games and r
 
 ## 🧭 Architecture
 
+    
 ```
+
 ./
 ├── core/                   # Foundation
-│   ├── Token.js           # Universal entity representation
-│   ├── Deck.js            # Ordered collections with shuffling
-│   ├── Shoe.js            # Multi-deck randomness containers
-│   ├── Table.js           # Spatial zones and placement
-│   ├── EventBus.js        # Event system
-│   └── SessionManager.js  # State persistence
+│   ├── Token.ts            # Universal entity representation
+│   ├── Deck.ts             # Atomic CRDT-backed collections
+│   ├── Shoe.ts             # Multi-deck randomness
+│   ├── Table.ts            # Spatial zones and placement
+│   ├── SessionManager.ts   # Automerge State Kernel
+│   └── SyncManager.ts      # P2P Synchronization Logic
 │
-├── engine/                # Simulation Logic
-│   ├── Engine.js          # Core coordinator
-│   ├── GameLoop.js        # Turn-based control
-│   ├── RuleEngine.js      # Rule evaluation
-│   ├── Action.js          # Action definitions
-│   ├── Player.js          # Agent/participant
-│   ├── Policy.js          # Decision strategies
-│   ├── Recorder.js        # Replay system
-│   ├── actions.js         # Base actions (5)
-│   ├── actions-extended.js # Complete registry (58)
-│   └── ACTIONS.md         # Full documentation
+├── engine/                 # Simulation Logic
+│   ├── Engine.ts           # Core coordinator
+│   ├── GameLoop.ts         # Distributed time/turn control
+│   ├── RuleEngine.ts       # Global law enforcement
+│   ├── Player.ts           # Agent/participant wrapper
+│   └── actions-extended.ts # Complete 58-action registry
 │
-├── patterns/              # Reusable Game Logic
-│   ├── turn-order.js      # Round-robin, priority, custom
-│   ├── win-conditions.js  # Points, elimination, objectives
-│   └── resource-limits.js # Caps, budgets, hand limits
+├── interface/              # I/O & Integration
+│   ├── NetworkInterface.ts # WebSocket/P2P transport
+│   ├── RelayServer.ts      # Lightweight signal relay
+│   ├── Gym.ts              # Reinforcement Learning Standard API
+│   └── OpenAIAgent.js      # LLM Integration
 │
-├── plugins/               # Extensibility
-│   ├── analytics-plugin.js
-│   ├── logging-plugin.js
-│   └── save-state-plugin.js
+├── examples/               # Working Implementations
+│   ├── blackjack/          # Multiplayer Casino Game & AI Gym
+│   ├── tarot-reading/      # Divination system
+│   └── prisoners-dilemma/  # Game theory
 │
-├── interface/             # I/O & Integration
-│   ├── CLIInterface.js
-│   ├── HumanInterface.js
-│   ├── NetworkInterface.js
-│   ├── OpenAIAgent.js
-│   └── Narrator.js
-│
-├── examples/              # Working Implementations
-│   ├── blackjack/         # Casino game with AI
-│   ├── tarot-reading/     # Divination system
-│   └── prisoners-dilemma/ # Game theory
-│
-└── schemas/               # Data Validation
+└── schemas/                # Data Validation
     ├── token-set.schema.json
     └── session-state-schema.json
 ```
-
 ---
 
 ## ⚡ Quick Start
@@ -136,6 +121,7 @@ git clone [https://git.carpocratian.org/sibyl/hypertoken.git](https://git.carpoc
 cd hypertoken
 npm install
 npx tsc
+```
 
 ### Run the Examples
 
