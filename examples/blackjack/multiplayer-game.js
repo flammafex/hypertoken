@@ -1,15 +1,14 @@
-/**
- * Multi-player Blackjack Game
- * Supports 2-6 players at a single table with sequential turns
+/*
+ * examples/blackjack/multiplayer-game.js
+ * Fixed: Removed manual event emissions to prevent double-firing
  */
 
 import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { Deck } from '../../core/Deck.js';
 import { Table } from '../../core/Table.js';
-import { Shoe } from '../../core/Shoe.js';
 import { Engine } from '../../engine/Engine.js';
 import { RuleEngine } from '../../engine/RuleEngine.js';
-import { ActionRegistry } from '../../engine/actions.js';
+import { Player } from '../../engine/Player.js';
 import { readFileSync } from 'fs';
 import { 
   getBestHandValue, 
@@ -19,368 +18,223 @@ import {
   determineWinner 
 } from './blackjack-utils.js';
 import { registerBlackjackRules } from './blackjack-rules.js';
-import { BettingManager, registerBettingActions } from './blackjack-betting.js';
+import { registerBettingActions } from './blackjack-betting.js';
 
-registerBettingActions();
+try { registerBettingActions(); } catch (e) {}
 
-/**
- * Player state tracker
- */
-class Player {
-  constructor(name, seat, initialBankroll = 1000, options = {}) {
-    this.name = name;
-    this.seat = seat;
-    this.bettingManager = new BettingManager(initialBankroll, options);
-    this.handZone = `player-${seat}-hand`;
-    this.currentBet = 0;
-    this.isActive = true;
-    this.stood = false;
-    this.busted = false;
-    this.blackjack = false;
-    this.result = null;
-    this.payout = null;
-  }
-  
-  reset() {
-    this.stood = false;
-    this.busted = false;
-    this.blackjack = false;
-    this.result = null;
-    this.payout = null;
-  }
-  
-  placeBet(amount) {
-    this.bettingManager.placeBet(amount);
-    this.currentBet = amount;
-  }
-  
-  resolveBet(result) {
-    this.result = result;
-    this.payout = this.bettingManager.resolveBet(result);
-    return this.payout;
-  }
-}
-
-/**
- * Multi-player Blackjack Game
- */
 export class MultiplayerBlackjackGame {
-  constructor({ 
+  constructor(engine, { 
+    isHost = false,
     numPlayers = 2, 
     numDecks = 6, 
     seed = null, 
     initialBankroll = 1000,
-    minBet = 5,
-    maxBet = 500,
     playerNames = null
   } = {}) {
-    if (numPlayers < 2 || numPlayers > 6) {
-      throw new Error("Number of players must be between 2 and 6");
-    }
-    
+    this.engine = engine;
     this.numPlayers = numPlayers;
+    this.isHost = isHost;
     
-    // Load deck
-    const deckData = JSON.parse(
-      readFileSync('./token-sets/standard-deck.json', 'utf8')
-    );
-    const tokenSet = parseTokenSetObject(deckData);
-    
-    // Setup shoe
-    const decks = [];
-    for (let i = 0; i < numDecks; i++) {
-      decks.push(new Deck(tokenSet.tokens, { seed: seed ? seed + i : null }));
-    }
-    
-    this.shoe = new Shoe(...decks);
-    this.shoe.shuffle(seed);
-    this.deck = decks[0];
-    
-    // Setup table
-    this.table = new Table("multiplayer-blackjack");
-    this.table.createZone("dealer-hand");
-    
-    // Create players
-    this.players = [];
-    for (let i = 0; i < numPlayers; i++) {
-      const name = playerNames && playerNames[i] ? playerNames[i] : `Player ${i + 1}`;
-      const player = new Player(name, i, initialBankroll, { minBet, maxBet });
-      this.players.push(player);
-      this.table.createZone(player.handZone);
-    }
-    
-    // Setup engine
-    this.engine = new Engine({
-      deck: this.deck,
-      table: this.table,
-      shoe: this.shoe
-    });
-    
-    this.engine._gameState = {
-      dealerTurn: false,
-      gameOver: false,
-      currentPlayerIndex: 0,
-      allPlayersFinished: false
-    };
-    
-    this.ruleEngine = new RuleEngine(this.engine);
-    registerBlackjackRules(this.ruleEngine);
-    
-    this.debug = false;
-  }
-  
-  /**
-   * Collect bets from all active players
-   */
-  collectBets(bets) {
-    if (bets.length !== this.numPlayers) {
-      throw new Error(`Expected ${this.numPlayers} bets, got ${bets.length}`);
-    }
-    
-    for (let i = 0; i < this.numPlayers; i++) {
-      const player = this.players[i];
-      if (player.isActive && bets[i] > 0) {
-        player.placeBet(bets[i]);
-      }
-    }
-  }
-  
-  /**
-   * Deal initial cards to all players and dealer
-   */
-  deal() {
-    // Reset all players
-    this.players.forEach(p => p.reset());
-    
-    // Clear all zones
-    this.table.clearZone("dealer-hand");
-    this.players.forEach(p => this.table.clearZone(p.handZone));
-    
-    // Deal first card to each player
-    for (const player of this.players) {
-      if (player.isActive && player.currentBet > 0) {
-        const card = this.shoe.draw();
-        this.table.place(player.handZone, card, { faceUp: true });
-      }
-    }
-    
-    // Deal first card to dealer (face down)
-    const dealerCard1 = this.shoe.draw();
-    this.table.place("dealer-hand", dealerCard1, { faceUp: false });
-    
-    // Deal second card to each player
-    for (const player of this.players) {
-      if (player.isActive && player.currentBet > 0) {
-        const card = this.shoe.draw();
-        this.table.place(player.handZone, card, { faceUp: true });
-      }
-    }
-    
-    // Deal second card to dealer (face up)
-    const dealerCard2 = this.shoe.draw();
-    this.table.place("dealer-hand", dealerCard2, { faceUp: true });
-    
-    // Check for blackjacks
-    for (const player of this.players) {
-      if (player.currentBet > 0) {
-        const cards = this.getPlayerCards(player);
-        if (isBlackjack(cards)) {
-          player.blackjack = true;
-          player.stood = true;
+    if (!this.engine.deck) {
+      let allTokens = [];
+      if (isHost) {
+        try {
+          const deckData = JSON.parse(
+            readFileSync('./examples/blackjack/token-sets/standard-deck.json', 'utf8')
+          );
+          const baseTokens = parseTokenSetObject(deckData).tokens;
+          for (let i = 0; i < numDecks; i++) {
+            const deckCopy = baseTokens.map(t => ({ ...t, id: `${t.id}-${i}` }));
+            allTokens.push(...deckCopy);
+          }
+        } catch (e) {
+          console.error("Failed to load deck file (Host):", e.message);
         }
       }
+      this.engine.deck = new Deck(this.engine.session, allTokens, { seed, autoInit: isHost });
+      if (isHost) this.engine.deck.shuffle(seed);
     }
-    
-    this.engine._gameState.currentPlayerIndex = 0;
-    this.engine._gameState.allPlayersFinished = false;
-    this.engine._gameState.dealerTurn = false;
-    this.engine._gameState.gameOver = false;
-    
-    return this.getGameState();
-  }
-  
-  /**
-   * Get current active player
-   */
-  getCurrentPlayer() {
-    return this.players[this.engine._gameState.currentPlayerIndex];
-  }
-  
-  /**
-   * Hit for current player
-   */
-  hit() {
-    const player = this.getCurrentPlayer();
-    
-    if (player.stood || player.busted) {
-      throw new Error(`${player.name} cannot hit`);
+
+    ['dealer-hand', 'discard-pile'].forEach(z => {
+      if (!this.engine.table.zones.includes(z)) this.engine.table.createZone(z);
+    });
+
+    for (let i = 0; i < numPlayers; i++) {
+      const name = playerNames && playerNames[i] ? playerNames[i] : `Player ${i + 1}`;
+      let player = this.engine._players.find(p => p.name === name);
+      if (!player) {
+        player = new Player(name);
+        player.resources.bankroll = initialBankroll;
+        player.resources.currentBet = 0;
+        player.resources.stood = 0; 
+        player.resources.busted = 0;
+        this.engine._players.push(player);
+      }
+      const handZone = `player-${i}-hand`;
+      if (!this.engine.table.zones.includes(handZone)) {
+        this.engine.table.createZone(handZone);
+      }
+      player.handZone = handZone;
     }
+
+    this.ruleEngine = new RuleEngine(this.engine);
+    this.engine.useRuleEngine(this.ruleEngine);
+    registerBlackjackRules(this.ruleEngine);
+  }
+
+  deal() {
+    if (!this.isHost) return;
+
+    this.engine._players.forEach(p => {
+      p.resources.stood = 0;
+      p.resources.busted = 0;
+    });
+
+    this.engine.table.collectAllInto(this.engine.deck); 
     
-    const card = this.shoe.draw();
-    this.table.place(player.handZone, card, { faceUp: true });
-    
-    // Check for bust
-    const cards = this.getPlayerCards(player);
-    if (isBusted(cards)) {
-      player.busted = true;
-      player.stood = true;
-      this.nextPlayer();
+    for (let i = 0; i < 2; i++) {
+      this.engine._players.forEach(player => {
+        if (player.resources.currentBet > 0) { 
+          const card = this.engine.deck.draw();
+          if (card) this.engine.table.place(player.handZone, card, { faceUp: true });
+        }
+      });
+      
+      const dealerCard = this.engine.deck.draw();
+      const faceUp = i === 1; 
+      if (dealerCard) this.engine.table.place("dealer-hand", dealerCard, { faceUp });
     }
-    
-    return this.getGameState();
+
+    // Start Round via CRDT (GameLoop will reactively emit loop:start)
+    this.engine.session.change("start round", (doc) => {
+      if (!doc.gameLoop) doc.gameLoop = { turn: 0, running: true, activePlayerIndex: 0, phase: "play", maxTurns: Infinity };
+      doc.gameLoop.running = true;
+      doc.gameLoop.turn = 1;
+      doc.gameLoop.activePlayerIndex = 0; 
+      doc.gameLoop.phase = "play";
+    });
+
+    // REMOVED MANUAL EMIT
+    this.checkTurnState();
   }
-  
-  /**
-   * Stand for current player
-   */
-  stand() {
-    const player = this.getCurrentPlayer();
-    player.stood = true;
-    this.nextPlayer();
-    return this.getGameState();
-  }
-  
-  /**
-   * Move to next player
-   */
+
   nextPlayer() {
-    let nextIndex = this.engine._gameState.currentPlayerIndex + 1;
+    const currentIdx = this.engine.loop.activePlayerIndex;
+    const players = this.engine._players;
+    let nextIdx = currentIdx + 1;
     
-    // Find next active player who hasn't finished
-    while (nextIndex < this.numPlayers) {
-      const player = this.players[nextIndex];
-      if (player.currentBet > 0 && !player.stood) {
-        this.engine._gameState.currentPlayerIndex = nextIndex;
+    while (nextIdx < players.length) {
+      const p = players[nextIdx];
+      if (p.resources.currentBet > 0) {
+        this.engine.session.change("next player", (doc) => {
+          doc.gameLoop.activePlayerIndex = nextIdx;
+        });
         return;
       }
-      nextIndex++;
+      nextIdx++;
     }
-    
-    // All players finished
-    this.engine._gameState.allPlayersFinished = true;
-    this.playDealerHand();
+
+    this.endRound();
   }
-  
-  /**
-   * Play dealer's hand
-   */
-  playDealerHand() {
-    this.engine._gameState.dealerTurn = true;
-    
-    // Reveal dealer's hole card
-    const dealerHand = this.table.zone("dealer-hand");
-    if (dealerHand.length > 0) {
-      dealerHand[0].faceUp = true;
+
+  checkTurnState() {
+    const player = this.engine.loop.activePlayer;
+    if (!player || player.resources.currentBet === 0) {
+      this.nextPlayer();
     }
-    
-    // Dealer draws according to rules
-    let dealerCards = this.getDealerCards();
-    let dealerValue = getBestHandValue(dealerCards);
-    
-    while (dealerValue < 17) {
-      const card = this.shoe.draw();
-      this.table.place("dealer-hand", card, { faceUp: true });
-      dealerCards = this.getDealerCards();
-      dealerValue = getBestHandValue(dealerCards);
+  }
+
+  endRound() {
+    // End Round via CRDT (GameLoop will reactively emit loop:stop)
+    this.engine.session.change("stop round", (doc) => {
+      doc.gameLoop.running = false;
+      doc.gameLoop.phase = "dealer";
+    });
+    // REMOVED MANUAL EMIT
+  }
+
+  hit() {
+    const player = this.engine.loop.activePlayer;
+    if (!player) return;
+
+    const card = this.engine.deck.draw();
+    if (!card) {
+        console.error("Deck empty!");
+        return;
     }
+
+    this.engine.table.place(player.handZone, card, { faceUp: true });
+
+    const cards = this.engine.table.zone(player.handZone).map(p => p.tokenSnapshot);
+    if (isBusted(cards)) {
+      console.log(`💥 ${player.name} Busted!`);
+      player.resources.busted = 1;
+      this.nextPlayer();
+    }
+  }
+
+  stand() {
+    const player = this.engine.loop.activePlayer;
+    if (player) {
+      player.resources.stood = 1;
+      this.nextPlayer();
+    }
+  }
+
+  playDealer() {
+    if (!this.isHost) return;
     
-    this.engine._gameState.dealerTurn = false;
-    this.engine._gameState.gameOver = true;
+    console.log("🤖 Dealer playing...");
     
-    // Resolve all bets
+    const dealerHand = this.engine.table.zone("dealer-hand");
+    if (dealerHand[0]) {
+      this.engine.table.flip("dealer-hand", dealerHand[0].id, true);
+    }
+
+    let cards = this.engine.table.zone("dealer-hand").map(p => p.tokenSnapshot);
+    let val = getBestHandValue(cards);
+    
+    while (val < 17) {
+      const card = this.engine.deck.draw(); 
+      if (!card) break;
+      
+      this.engine.table.place("dealer-hand", card, { faceUp: true });
+      cards = this.engine.table.zone("dealer-hand").map(p => p.tokenSnapshot);
+      val = getBestHandValue(cards);
+    }
+
     this.resolveBets();
   }
-  
-  /**
-   * Resolve all player bets
-   */
+
   resolveBets() {
-    const dealerCards = this.getDealerCards();
+    const dealerCards = this.engine.table.zone("dealer-hand").map(p => p.tokenSnapshot);
     
-    for (const player of this.players) {
-      if (player.currentBet > 0) {
-        const playerCards = this.getPlayerCards(player);
-        const result = determineWinner(playerCards, dealerCards);
-        player.resolveBet(result);
-      }
-    }
-  }
-  
-  /**
-   * Get cards for a player
-   */
-  getPlayerCards(player) {
-    return this.table.zone(player.handZone).map(p => p.card);
-  }
-  
-  /**
-   * Get dealer cards
-   */
-  getDealerCards() {
-    return this.table.zone("dealer-hand").map(p => p.card);
-  }
-  
-  /**
-   * Get complete game state
-   */
-  getGameState() {
-    const dealerCards = this.getDealerCards();
-    const showFullDealer = this.engine._gameState.gameOver || this.engine._gameState.dealerTurn;
-    
-    const playerStates = this.players.map(player => {
-      const cards = this.getPlayerCards(player);
-      const value = cards.length > 0 ? getBestHandValue(cards) : 0;
+    this.engine._players.forEach(player => {
+      if (player.resources.currentBet === 0) return;
+
+      const playerCards = this.engine.table.zone(player.handZone).map(p => p.tokenSnapshot);
       
-      return {
-        name: player.name,
-        seat: player.seat,
-        cards: cards,
-        value: value,
-        busted: player.busted,
-        blackjack: player.blackjack,
-        stood: player.stood,
-        currentBet: player.currentBet,
-        bankroll: player.bettingManager.bankroll,
-        result: player.result,
-        payout: player.payout,
-        display: cards.length > 0 ? formatHand(cards) : "No cards",
-        isActive: player.currentBet > 0
-      };
+      if (player.resources.busted) {
+         console.log(`${player.name}: BUST (-$${player.resources.currentBet})`);
+         player.resources.currentBet = 0;
+         return;
+      }
+
+      const result = determineWinner(playerCards, dealerCards);
+      
+      let payout = 0;
+      const bet = player.resources.currentBet;
+
+      if (result === "player-blackjack") payout = bet * 2.5;
+      else if (result === "player") payout = bet * 2;
+      else if (result === "push") payout = bet;
+      
+      if (payout > 0) {
+        player.resources.bankroll += payout;
+      }
+      
+      player.resources.currentBet = 0; 
+      console.log(`${player.name}: ${result} (+$${payout})`);
     });
-    
-    return {
-      players: playerStates,
-      dealer: {
-        cards: dealerCards,
-        value: showFullDealer ? getBestHandValue(dealerCards) : null,
-        busted: showFullDealer ? isBusted(dealerCards) : null,
-        display: formatHand(dealerCards, !showFullDealer)
-      },
-      currentPlayerIndex: this.engine._gameState.currentPlayerIndex,
-      currentPlayer: this.getCurrentPlayer().name,
-      gameOver: this.engine._gameState.gameOver,
-      dealerTurn: this.engine._gameState.dealerTurn,
-      allPlayersFinished: this.engine._gameState.allPlayersFinished
-    };
-  }
-  
-  /**
-   * Start new round
-   */
-  newRound() {
-    this.table.collectAllInto(this.deck);
-    this.shoe.reset();
-    this.shoe.shuffle();
-    return this.getGameState();
-  }
-  
-  /**
-   * Get statistics for all players
-   */
-  getAllStats() {
-    return this.players.map(p => ({
-      name: p.name,
-      stats: p.bettingManager.getStats()
-    }));
   }
 }

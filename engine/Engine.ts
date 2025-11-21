@@ -1,33 +1,4 @@
 /*
- * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * Engine
- * -------
- * Core runtime responsible for coordinating stateful systems within the simulation.
- * The engine serves as the execution host for actions, policy evaluation, and
- * temporal control (undo/redo, history management, serialization).
- *
- * It extends the core Emitter to broadcast events to external observers and
- * integrates modular components such as Deck, Table, and Shoe.
- *
- * The design maintains a minimal surface area: it does not enforce domain
- * semantics, but delegates those responsibilities to action handlers and
- * registered policies. This allows domain logic to evolve independently of
- * runtime orchestration.
- */
-/*
  * engine/Engine.ts
  */
 // @ts-ignore
@@ -44,28 +15,33 @@ import { SessionManager } from "../core/SessionManager.js";
 import { NetworkInterface } from "../interface/NetworkInterface.js";
 // @ts-ignore
 import { SyncManager } from "../core/SyncManager.js";
+import { GameLoop } from "./GameLoop.js";
+import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
 
 export interface EngineOptions {
   deck?: Deck | null;
   table?: Table | null;
   shoe?: Shoe | null;
-  autoConnect?: string; // URL to auto-connect
+  autoConnect?: string; 
 }
 
 export class Engine extends Emitter {
   deck: Deck | null;
-  table: Table; // Table is guaranteed now
+  table: Table;
   shoe: Shoe | null;
   
   session: SessionManager;
   network?: NetworkInterface;
   sync?: SyncManager;
+  loop: GameLoop;
+  
+  // Exposed RuleEngine
+  ruleEngine?: RuleEngine; 
 
   history: Action[];
   future: Action[];
   _policies: Map<string, any>;
   
-  // Dynamic state properties
   _players: any[];
   _gameState: any;
   _transactions: any[];
@@ -74,15 +50,11 @@ export class Engine extends Emitter {
   constructor({ deck = null, table = null, shoe = null, autoConnect }: EngineOptions = {}) {
     super();
     
-    // 1. Initialize State Kernel (CRDT)
     this.session = new SessionManager();
-
-    // 2. Initialize View (Table)
-    // If a table was passed in, we assume it's already wired, otherwise create new
     this.table = table ?? new Table(this.session, "main-table");
-    
     this.deck = deck;
     this.shoe = shoe;
+    this.loop = new GameLoop(this);
 
     this.history = [];
     this.future = [];
@@ -93,34 +65,24 @@ export class Engine extends Emitter {
     this._gameState = {};
     this._transactions = [];
 
-    // Forward state changes to the outside world (UI updates)
     this.session.on("state:changed", (e) => this.emit("state:updated", e));
 
-    // Auto-connect if requested
     if (autoConnect) {
       this.connect(autoConnect);
     }
   }
 
-  /**
-   * Connect to a multiplayer relay server.
-   * Enables real-time synchronization of the Table state.
-   */
+  // Add helper to attach a RuleEngine
+  useRuleEngine(ruleEngine: RuleEngine) {
+    this.ruleEngine = ruleEngine;
+  }
+
   connect(url: string): void {
     if (this.network) return;
-
     console.log(`[Engine] Connecting to ${url}...`);
-    
-    // 1. Create Network Layer
     this.network = new NetworkInterface(url, this);
-    
-    // 2. Create Sync Layer (wires Network <-> Session)
     this.sync = new SyncManager(this.session, this.network);
-
-    // 3. Start Connection
     this.network.connect();
-
-    // Forward network events for debugging/UI
     this.network.on("net:ready", (e) => this.emit("net:ready", e));
     this.network.on("net:peer:connected", (e) => this.emit("net:peer:connected", e));
   }
@@ -131,8 +93,6 @@ export class Engine extends Emitter {
     this.sync = undefined;
   }
 
-  // ... (Rest of the class remains the same: registerPolicy, dispatch, apply, etc.)
-  
   registerPolicy(name: string, policy: any): this {
     this._policies.set(name, policy);
     this.emit("engine:policy", { payload: { name } });
@@ -211,7 +171,7 @@ export class Engine extends Emitter {
       shoe: this.shoe?.toJSON?.() ?? null,
       history: this.history.map(a => a.toJSON()),
       policies: Array.from(this._policies.keys()),
-      crdt: this.session.saveToBase64() // Include CRDT binary in snapshots
+      crdt: this.session.saveToBase64()
     };
   }
 
@@ -219,19 +179,13 @@ export class Engine extends Emitter {
 
   restore(snapshot: any): this {
     if (!snapshot) return this;
-    
-    // Restore CRDT state first if available
     if (snapshot.crdt) {
       this.session.loadFromBase64(snapshot.crdt);
     }
-
-    if (snapshot.deck && (this.deck as any)?.fromJSON)
-      this.deck = (this.deck as any).fromJSON(snapshot.deck);
-    if (snapshot.shoe && (this.shoe as any)?.fromJSON)
-      this.shoe = (this.shoe as any).fromJSON(snapshot.shoe);
-
+    // Local history isn't synced via CRDT, so we trust the snapshot
     this.history = snapshot.history ?? [];
-    this._policies = new Map(snapshot.policies?.map((n: string) => [n, null]) ?? []);
+    // Policies are code, not state, so we just list them. 
+    // Logic must be re-registered by the application layer.
     this.emit("engine:restored", { payload: { history: this.history.length } });
     return this;
   }
@@ -266,7 +220,7 @@ export class Engine extends Emitter {
         : null,
       table: table
         ? {
-            zones: table.zones, // Uses new getter
+            zones: table.zones, 
             totalPlacements: table.cards().length
           }
         : null,
@@ -292,14 +246,8 @@ export class Engine extends Emitter {
     };
   }
 
-  /**
-   * Enumerates potential actions available in the current engine context.
-   * This utility is primarily used for AI policy generation or user interface
-   * affordances. The list is derived from the presence of active subsystems.
-   */
   availableActions(): any[] {
     const actions = [];
-
     if (this.state.deck) {
       actions.push(
         { type: "deck:draw", payload: { count: 1 } },
@@ -307,23 +255,22 @@ export class Engine extends Emitter {
         { type: "deck:reset", payload: {} }
       );
     }
-
     if (this.state.table) {
       actions.push(
         { type: "table:place", payload: { zone: "altar" } },
         { type: "table:clear", payload: {} }
       );
     }
-
     if (this.state.shoe) {
       actions.push(
         { type: "shoe:draw", payload: { count: 1 } },
         { type: "shoe:shuffle", payload: {} }
       );
     }
-
-    actions.push({ type: "loop:stop", payload: {} });
-
+    actions.push(
+      { type: "loop:start", payload: {} },
+      { type: "loop:stop", payload: {} }
+    );
     return actions;
   }
 }

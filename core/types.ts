@@ -66,10 +66,30 @@ export interface IPlacementCRDT {
   tags: string[];
 }
 
-// Fix: Make properties optional for lazy initialization
+export interface IDeckState {
+  stack: IToken[];
+  drawn: IToken[];
+  discards: IToken[];
+}
+
+export interface IGameLoopState {
+  turn: number;
+  running: boolean;
+  activePlayerIndex: number;
+  phase: string; 
+  maxTurns: number;
+}
+
+// NEW: Rule State
+export interface IRuleState {
+  fired: Record<string, number>; // Maps RuleName -> Timestamp
+}
+
 export interface HyperTokenState {
   zones?: Record<string, IPlacementCRDT[]>;
-  deck?: IToken[];
+  deck?: IDeckState;
+  gameLoop?: IGameLoopState;
+  rules?: IRuleState; // Added rules state
   players?: Record<string, any>;
   version?: string;
   

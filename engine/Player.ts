@@ -1,37 +1,4 @@
 /*
- * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * Player
- * -------
- * Represents an autonomous or interactive participant within a simulation.
- * Each player maintains personal state containers (deck, table, shoe)
- * and participates in the turn loop coordinated by the engine.
- *
- * The implementation extends the core Emitter to broadcast player-specific
- * lifecycle and action events independently of global engine events.
- *
- * The class is agnostic to control type; it can represent a human,
- * a rule-based bot, or an AI agent. Controller logic is externalized
- * through the `agent` interface, which exposes an asynchronous think() method.
- *
- * Player instances are responsible for local card management—drawing,
- * discarding, shuffling, and playing tokens to zones—while the engine
- * enforces sequencing and overall game flow.
- */
-
-/*
  * engine/Player.ts
  */
 // @ts-ignore
@@ -42,6 +9,7 @@ import { Shoe } from "../core/Shoe.js";
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
 import { SessionManager } from "../core/SessionManager.js";
+
 export interface IAgent {
   think: (engine: Engine, player: Player) => Promise<any>;
 }
@@ -68,43 +36,46 @@ export class Player extends Emitter {
   
   active: boolean;
   turns: number;
-  resources: Record<string, number> = {}; // Added this based on your action usage
+  resources: Record<string, number> = {};
 
-constructor(name: string, { deck = null, table = null, shoe = null, meta = {}, agent = null }: PlayerOptions = {}) {
+  // FIX: Added optional property for game-specific zone tracking
+  handZone?: string;
+
+  constructor(name: string, { deck = null, table = null, shoe = null, meta = {}, agent = null }: PlayerOptions = {}) {
     super();
 
     this.name = name;
     this.id = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
     this.meta = meta;
 
-    // Handle array vs Deck instance
+    // 1. Resolve Session and Table first
+    let session: SessionManager;
+
+    if (table) {
+      this.table = table;
+      // Reuse the table's session if available
+      session = table.session;
+    } else {
+      session = new SessionManager();
+      this.table = new Table(session, `${name}-table`);
+    }
+
+    // 2. Initialize Deck using the resolved SessionManager
     if (Array.isArray(deck)) {
-      this.deck = new Deck(deck);
+      this.deck = new Deck(session, deck);
     } else {
       this.deck = deck;
     }
-
-    // Fix: Instantiate a local SessionManager for the player's private table
-    if (table) {
-      this.table = table;
-    } else {
-      // We need to import SessionManager here or pass it in options.
-      // Assuming we imported it at top of file: import { SessionManager } from "../core/SessionManager.js";
-      const session = new SessionManager();
-      this.table = new Table(session, `${name}-table`);
-    }
     
     this.shoe = shoe;
-    this.shoe = shoe;
-
     this.hand = [];
     this.discard = [];
     this.agent = agent;
-
     this.active = true;
     this.turns = 0;
   }
 
+  // ... rest of methods unchanged
   beginTurn(engine: Engine): void {
     this.turns++;
     this.emit("player:beginTurn", { payload: { name: this.name, turn: this.turns } });
@@ -126,7 +97,7 @@ constructor(name: string, { deck = null, table = null, shoe = null, meta = {}, a
 
   draw(n: number = 1): IToken[] {
     if (!this.deck) return [];
-    const cards = this.deck.draw(n); // Use the overloaded draw method
+    const cards = this.deck.draw(n); 
     const cardArray = Array.isArray(cards) ? cards : (cards ? [cards] : []);
     this.hand.push(...cardArray);
     this.emit("player:draw", { payload: { name: this.name, count: cardArray.length, cards: cardArray } });

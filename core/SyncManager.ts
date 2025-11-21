@@ -1,6 +1,6 @@
 /*
  * core/SyncManager.ts
- * Fixed Event Unwrapping
+ * Fixed Event Unwrapping & Echo Loop
  */
 import * as A from "@automerge/automerge";
 import { SessionManager } from "./SessionManager.js";
@@ -18,11 +18,12 @@ export class SyncManager extends Emitter {
     this.session = session;
     this.network = network;
 
-    this.session.on("state:changed", () => {
-      this.updatePeers();
+    // FIX: Check the source of the change to avoid echoing back to sender
+    this.session.on("state:changed", (evt) => {
+      const source = evt.source || "local";
+      this.updatePeers(source);
     });
 
-    // Note: 'evt.payload' contains the data we emitted
     this.network.on("net:peer:connected", (evt) => {
       const { peerId } = evt.payload; 
       console.log(`[Sync] Connected to peer: ${peerId}`);
@@ -35,7 +36,6 @@ export class SyncManager extends Emitter {
       this.removePeer(peerId);
     });
 
-    // FIX: Unwrap 'evt.payload' here!
     this.network.on("net:message", (evt) => {
       this.processMessage(evt.payload);
     });
@@ -51,9 +51,12 @@ export class SyncManager extends Emitter {
     this._syncStates.delete(peerId);
   }
 
-  private updatePeers() {
+  // FIX: Don't send updates back to the peer that generated them
+  private updatePeers(excludePeerId: string = "local") {
     for (const peerId of this._syncStates.keys()) {
-      this.updatePeer(peerId);
+      if (peerId !== excludePeerId) {
+        this.updatePeer(peerId);
+      }
     }
   }
 
@@ -67,7 +70,7 @@ export class SyncManager extends Emitter {
     this._syncStates.set(peerId, nextSyncState);
 
     if (message) {
-      console.log(`[Sync] Sending ${message.byteLength} bytes to ${peerId}`);
+      // console.log(`[Sync] Sending ${message.byteLength} bytes to ${peerId}`);
       this.network.sendToPeer(peerId, {
         type: "sync",
         data: this.arrayBufferToBase64(message)
@@ -76,7 +79,6 @@ export class SyncManager extends Emitter {
   }
 
   private processMessage(payload: any) {
-    // Now 'payload' is the actual data object, e.g. { type: 'sync', ... }
     if (!payload || payload.type !== "sync") return;
     
     if (!payload.data || !payload.fromPeerId) {
@@ -85,7 +87,7 @@ export class SyncManager extends Emitter {
     }
 
     const peerId = payload.fromPeerId;
-    console.log(`[Sync] Received sync data from ${peerId}`);
+    // console.log(`[Sync] Received sync data from ${peerId}`);
 
     let syncState = this._syncStates.get(peerId);
     if (!syncState) {
@@ -103,8 +105,14 @@ export class SyncManager extends Emitter {
       );
 
       this._syncStates.set(peerId, newSyncState);
-      this.session.update(newDoc);
+      
+      // FIX: Mark this update as coming from 'peerId' so we don't echo it back in the listener
+      this.session.update(newDoc, peerId);
+      
+      // We DO want to reply to the sender specifically to acknowledge/converge, 
+      // just not via the generic broadcast listener loop.
       this.updatePeer(peerId);
+      
     } catch (err) {
       console.error("[Sync] Error applying sync message:", err);
     }

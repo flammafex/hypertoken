@@ -18,21 +18,23 @@ export class SessionManager extends Emitter {
     return this._doc;
   }
 
-  change(message: string, callback: (doc: HyperTokenState) => void): void {
+  // Modified to accept an optional source
+  change(message: string, callback: (doc: HyperTokenState) => void, source: string = "local"): void {
     const newDoc = A.change(this._doc, message, callback);
     this._doc = newDoc;
-    this.emit("state:changed", { doc: newDoc });
+    this.emit("state:changed", { doc: newDoc, source });
   }
 
-  update(newDoc: A.Doc<HyperTokenState>): void {
+  // Modified to accept an optional source
+  update(newDoc: A.Doc<HyperTokenState>, source: string = "local"): void {
     this._doc = newDoc;
-    this.emit("state:changed", { doc: this._doc });
+    this.emit("state:changed", { doc: this._doc, source });
   }
 
   // ... (merge, save, load methods remain the same)
   merge(remoteDoc: A.Doc<HyperTokenState>): void {
     this._doc = A.merge(this._doc, remoteDoc);
-    this.emit("state:changed", { doc: this._doc });
+    this.emit("state:changed", { doc: this._doc, source: "merge" });
   }
 
   save(): Uint8Array {
@@ -41,7 +43,7 @@ export class SessionManager extends Emitter {
 
   load(binary: Uint8Array): void {
     this._doc = A.load(binary);
-    this.emit("state:changed", { doc: this._doc });
+    this.emit("state:changed", { doc: this._doc, source: "load" });
   }
 
   saveToBase64(): string {
