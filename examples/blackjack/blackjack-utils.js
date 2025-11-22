@@ -131,25 +131,74 @@ export function determineWinner(agentCards, dealerCards) {
   const dealerValue = getBestHandValue(dealerCards);
   const agentBJ = isBlackjack(agentCards);
   const dealerBJ = isBlackjack(dealerCards);
-  
+
   // Both blackjack = push
   if (agentBJ && dealerBJ) return "push";
-  
+
   // Agent blackjack wins
   if (agentBJ) return "agent-blackjack";
-  
+
   // Dealer blackjack wins
   if (dealerBJ) return "dealer";
-  
+
   // Agent busted
   if (agentValue > 21) return "dealer";
-  
+
   // Dealer busted
   if (dealerValue > 21) return "agent";
-  
+
   // Compare values
   if (agentValue > dealerValue) return "agent";
   if (dealerValue > agentValue) return "dealer";
-  
+
   return "push";
+}
+
+/**
+ * Check if player can double down (has exactly 2 cards)
+ * @param {Array} cards - Array of card tokens
+ * @returns {boolean}
+ */
+export function canDoubleDown(cards) {
+  return cards.length === 2 && !isBusted(cards);
+}
+
+/**
+ * Check if player can split (has exactly 2 cards of the same rank)
+ * @param {Array} cards - Array of card tokens
+ * @returns {boolean}
+ */
+export function canSplit(cards) {
+  if (cards.length !== 2) return false;
+
+  // Extract rank from card labels (e.g., "A♠" -> "A", "10♥" -> "10")
+  const rank1 = cards[0].label?.replace(/[♠♥♦♣]/g, '');
+  const rank2 = cards[1].label?.replace(/[♠♥♦♣]/g, '');
+
+  return rank1 === rank2;
+}
+
+/**
+ * Check if insurance is available (dealer shows Ace)
+ * @param {Array} dealerCards - Dealer's visible cards
+ * @returns {boolean}
+ */
+export function canTakeInsurance(dealerCards) {
+  if (!dealerCards || dealerCards.length === 0) return false;
+
+  // Check if the visible card (second card dealt) is an Ace
+  // In typical blackjack, dealer's first card is face down, second is face up
+  const visibleCard = dealerCards.length > 1 ? dealerCards[1] : dealerCards[0];
+  const rank = visibleCard.label?.replace(/[♠♥♦♣]/g, '');
+
+  return rank === 'A';
+}
+
+/**
+ * Get the rank of a card (for splitting)
+ * @param {object} card - Card token
+ * @returns {string}
+ */
+export function getCardRank(card) {
+  return card.label?.replace(/[♠♥♦♣]/g, '') || '';
 }

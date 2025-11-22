@@ -28,7 +28,10 @@ import {
   isBusted,
   isBlackjack,
   formatHand,
-  determineWinner
+  determineWinner,
+  canDoubleDown,
+  canSplit,
+  canTakeInsurance
 } from './blackjack-utils.js';
 import { registerBlackjackRules } from './blackjack-rules.js';
 
@@ -98,7 +101,9 @@ export class BlackjackGame {
       dealerTurn: false,
       gameOver: false,
       agentStood: false,
-      result: null
+      result: null,
+      insuranceOffered: false,
+      insuranceTaken: false
     };
 
     // Betting configuration (if provided)
@@ -126,7 +131,9 @@ export class BlackjackGame {
       dealerTurn: false,
       gameOver: false,
       agentStood: false,
-      result: null
+      result: null,
+      insuranceOffered: false,
+      insuranceTaken: false
     };
 
     // Deal 2 cards to agent
@@ -197,6 +204,204 @@ export class BlackjackGame {
   }
 
   /**
+   * Double down - double bet and take exactly one more card
+   */
+  doubleDown() {
+    if (this.gameState.gameOver) {
+      throw new Error("Game is over. Start a new round.");
+    }
+    if (this.gameState.agentStood) {
+      throw new Error("Agent has already stood.");
+    }
+
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    if (!canDoubleDown(agentHand)) {
+      throw new Error("Cannot double down - must have exactly 2 cards.");
+    }
+
+    // Double the bet (if betting is enabled)
+    const agent = this.engine._agents[0];
+    if (this.hasBetting && agent.resources.currentBet > 0) {
+      if (agent.resources.bankroll < agent.resources.currentBet) {
+        throw new Error("Insufficient funds to double down.");
+      }
+      agent.resources.bankroll -= agent.resources.currentBet;
+      agent.resources.currentBet *= 2;
+    }
+
+    // Take exactly one card
+    const card = this.engine.stack.draw();
+    if (card) {
+      this.engine.space.place("agent-hand", card, { faceUp: true });
+    }
+
+    // Automatically stand after doubling down
+    this.gameState.agentStood = true;
+    this.gameState.dealerTurn = true;
+
+    // Check for bust
+    const newHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    if (isBusted(newHand)) {
+      this.gameState.gameOver = true;
+      this.gameState.result = "dealer";
+      return this.getGameState();
+    }
+
+    // Reveal dealer's hidden card
+    const dealerHand = this.engine.space.zone("dealer-hand");
+    if (dealerHand.length > 0 && dealerHand[0]) {
+      this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+    }
+
+    // Play out dealer's hand
+    this.playDealerHand();
+
+    return this.getGameState();
+  }
+
+  /**
+   * Take insurance bet
+   */
+  takeInsurance(amount = null) {
+    const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+    if (!canTakeInsurance(dealerHand)) {
+      throw new Error("Insurance not available - dealer must show an Ace.");
+    }
+
+    if (this.gameState.insuranceTaken) {
+      throw new Error("Insurance already taken.");
+    }
+
+    const agent = this.engine._agents[0];
+    const insuranceAmount = amount !== null ? amount : agent.resources.currentBet / 2;
+
+    // Validate insurance bet
+    if (insuranceAmount > agent.resources.currentBet / 2) {
+      throw new Error(`Insurance bet cannot exceed half of original bet ($${agent.resources.currentBet / 2})`);
+    }
+    if (insuranceAmount > agent.resources.bankroll) {
+      throw new Error(`Insufficient funds for insurance. Bankroll: ${agent.resources.bankroll}`);
+    }
+
+    // Place insurance bet
+    agent.resources.bankroll -= insuranceAmount;
+    agent.resources.insuranceBet = insuranceAmount;
+    this.gameState.insuranceTaken = true;
+    this.gameState.insuranceOffered = true;
+
+    return this.getGameState();
+  }
+
+  /**
+   * Resolve insurance bet (called internally)
+   */
+  resolveInsurance() {
+    const agent = this.engine._agents[0];
+    if (!agent.resources.insuranceBet) return;
+
+    const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+    const dealerHasBlackjack = isBlackjack(dealerHand);
+
+    if (dealerHasBlackjack) {
+      // Insurance pays 2:1
+      const payout = agent.resources.insuranceBet * 3;
+      agent.resources.bankroll += payout;
+    }
+
+    agent.resources.insuranceBet = 0;
+  }
+
+  /**
+   * Split hand into two separate hands
+   */
+  split() {
+    if (this.gameState.gameOver) {
+      throw new Error("Game is over. Start a new round.");
+    }
+    if (this.gameState.agentStood) {
+      throw new Error("Agent has already stood.");
+    }
+
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    if (!canSplit(agentHand)) {
+      throw new Error("Cannot split - must have exactly 2 cards of the same rank.");
+    }
+
+    const agent = this.engine._agents[0];
+    if (this.hasBetting) {
+      if (agent.resources.bankroll < agent.resources.currentBet) {
+        throw new Error("Insufficient funds to split.");
+      }
+      // Deduct split bet
+      agent.resources.bankroll -= agent.resources.currentBet;
+    }
+
+    // Create split hand zone
+    if (!this.engine.space.zones.includes("agent-hand-split")) {
+      this.engine.space.createZone("agent-hand-split");
+    }
+
+    // Move second card to split hand
+    const agentHandPlacements = this.engine.space.zone("agent-hand");
+    if (agentHandPlacements.length >= 2) {
+      const secondCard = agentHandPlacements[1];
+      this.engine.space.move(secondCard.id, "agent-hand", "agent-hand-split");
+    }
+
+    // Deal one card to each hand
+    const card1 = this.engine.stack.draw();
+    const card2 = this.engine.stack.draw();
+    if (card1) this.engine.space.place("agent-hand", card1, { faceUp: true });
+    if (card2) this.engine.space.place("agent-hand-split", card2, { faceUp: true });
+
+    // Track that we have a split
+    this.gameState.hasSplit = true;
+    this.gameState.currentSplitHand = 0; // 0 = first hand, 1 = second hand
+
+    return this.getSplitGameState();
+  }
+
+  /**
+   * Get game state for split hands
+   */
+  getSplitGameState() {
+    const hand1 = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    const hand2 = this.engine.space.zone("agent-hand-split").map(p => p.tokenSnapshot);
+    const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+
+    const showFullDealer = this.gameState.gameOver || this.gameState.dealerTurn;
+
+    return {
+      splitHands: [
+        {
+          cards: hand1,
+          value: getBestHandValue(hand1),
+          busted: isBusted(hand1),
+          blackjack: isBlackjack(hand1),
+          display: formatHand(hand1)
+        },
+        {
+          cards: hand2,
+          value: getBestHandValue(hand2),
+          busted: isBusted(hand2),
+          blackjack: isBlackjack(hand2),
+          display: formatHand(hand2)
+        }
+      ],
+      dealerHand: {
+        cards: dealerHand,
+        value: showFullDealer ? getBestHandValue(dealerHand) : null,
+        busted: showFullDealer ? isBusted(dealerHand) : null,
+        blackjack: showFullDealer ? isBlackjack(dealerHand) : null,
+        display: formatHand(dealerHand, !showFullDealer)
+      },
+      currentHand: this.gameState.currentSplitHand,
+      gameOver: this.gameState.gameOver,
+      results: this.gameState.splitResults || []
+    };
+  }
+
+  /**
    * Play out dealer's hand automatically
    */
   playDealerHand() {
@@ -235,6 +440,12 @@ export class BlackjackGame {
     // Only show dealer's up card if game is not over
     const showFullDealer = this.gameState.gameOver || this.gameState.dealerTurn;
 
+    // Check available actions
+    const canTakeActions = !this.gameState.gameOver &&
+                           !this.gameState.agentStood &&
+                           !agentBusted &&
+                           !agentBlackjack;
+
     return {
       agentHand: {
         cards: agentHand,
@@ -252,14 +463,13 @@ export class BlackjackGame {
       },
       gameOver: this.gameState.gameOver,
       result: this.gameState.result,
-      canHit: !this.gameState.gameOver &&
-              !this.gameState.agentStood &&
-              !agentBusted &&
-              !agentBlackjack,
-      canStand: !this.gameState.gameOver &&
-                !this.gameState.agentStood &&
-                !agentBusted &&
-                !agentBlackjack
+      canHit: canTakeActions,
+      canStand: canTakeActions,
+      canDouble: canTakeActions && canDoubleDown(agentHand),
+      canSplit: canTakeActions && canSplit(agentHand),
+      canInsurance: agentHand.length === 2 &&
+                    !this.gameState.insuranceOffered &&
+                    canTakeInsurance(dealerHand)
     };
   }
 
