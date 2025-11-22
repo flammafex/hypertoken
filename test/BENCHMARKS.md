@@ -15,15 +15,17 @@ The benchmark suite consists of two main components:
 # Build TypeScript files first
 npx tsc
 
-# Run performance benchmarks
+# Run performance benchmarks (takes ~3-5 minutes)
 npm run benchmark
 
-# Run memory benchmarks (requires --expose-gc)
+# Run memory benchmarks (requires --expose-gc, takes ~2-3 minutes)
 npm run benchmark:memory
 
-# Run all benchmarks
+# Run all benchmarks (takes ~5-8 minutes total)
 npm run benchmark:all
 ```
+
+**Note:** Benchmarks are intentionally comprehensive and may take several minutes to complete. This is normal - the benchmarks test thousands of operations across multiple categories to provide statistically significant results.
 
 ## Performance Benchmarks
 
