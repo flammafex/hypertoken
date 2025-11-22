@@ -17,8 +17,7 @@
  * engine/Action.ts
  */
 import { IAction, IActionPayload } from "../core/types.js";
-// FIX 1: Explicitly import the crypto module for Node.js environments
-import * as crypto from "node:crypto";
+import { generateId } from "../core/crypto.js";
 
 export interface ActionOptions {
   seed?: number | null;
@@ -35,16 +34,11 @@ export class Action implements IAction {
   result?: any; // To store the return value of the action
 
   constructor(
-    type: string, 
-    payload: IActionPayload = {}, 
+    type: string,
+    payload: IActionPayload = {},
     { seed = null, reversible = true }: ActionOptions = {}
   ) {
-    // FIX 2: Use the explicitly imported crypto module with a fallback.
-    const generateId = typeof crypto.randomUUID === 'function' 
-      ? crypto.randomUUID() 
-      : `${Date.now()}-${Math.random()}`;
-
-    this.id = generateId;
+    this.id = generateId();
     this.type = type;
     this.payload = payload;
     this.seed = seed;

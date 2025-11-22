@@ -1,7 +1,6 @@
 /*
  * engine/Agent.ts
  */
-// @ts-ignore
 import { Emitter } from "../core/events.js";
 import { Stack } from "../core/Stack.js";
 import { Space } from "../core/Space.js";
@@ -9,7 +8,7 @@ import { Source } from "../core/Source.js";
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
 import { Chronicle } from "../core/Chronicle.js";
-import * as crypto from "node:crypto";
+import { generateId } from "../core/crypto.js";
 
 export interface IAgent {
   think: (engine: Engine, agent: Agent) => Promise<any>;
@@ -46,10 +45,7 @@ export class Agent extends Emitter {
     super();
 
     this.name = name;
-    const generateId = typeof crypto.randomUUID === 'function' 
-      ? crypto.randomUUID() 
-      : `${Date.now()}-${Math.random()}`;
-    this.id = generateId;
+    this.id = generateId();
     this.meta = meta;
 
     // 1. Resolve Session and Space first

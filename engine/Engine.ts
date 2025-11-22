@@ -1,19 +1,15 @@
 /*
  * engine/Engine.ts
  */
-// @ts-ignore
 import { Emitter } from "../core/events.js";
 import { Stack } from "../core/Stack.js";
 import { Space } from "../core/Space.js";
 import { Source } from "../core/Source.js";
 import { Action } from "./Action.js";
-// @ts-ignore
 import { ActionRegistry } from "./actions.js";
 import { IActionPayload } from "../core/types.js";
 import { Chronicle } from "../core/Chronicle.js";
-// @ts-ignore
 import { PeerConnection } from "../network/PeerConnection.js";
-// @ts-ignore
 import { ConsensusCore } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
