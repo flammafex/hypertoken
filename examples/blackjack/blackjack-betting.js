@@ -621,7 +621,147 @@ export class ProgressiveBettingStrategy extends BettingStrategy {
       this.currentBet = this.baseBet;
     }
     // Push - keep same bet
-    
+
     return this.currentBet;
+  }
+}
+
+/**
+ * Kelly Criterion Strategy - Optimal bet sizing based on edge
+ *
+ * The Kelly Criterion calculates the optimal fraction of bankroll to wager
+ * based on the player's edge. Commonly used with card counting where the
+ * true count indicates the player's advantage.
+ *
+ * Formula: f* = edge / variance
+ * Where edge is player advantage (e.g., +1% = 0.01)
+ */
+export class KellyCriterionStrategy extends BettingStrategy {
+  constructor(baseEdge = 0.005, countMultiplier = 0.005) {
+    super("Kelly Criterion");
+    this.baseEdge = baseEdge; // Base edge (small positive edge)
+    this.countMultiplier = countMultiplier; // How much each +1 true count adds to edge
+    this.variance = 1.33; // Blackjack variance (standard)
+    this.fractionOfKelly = 0.5; // Use half-Kelly for safety (reduces risk)
+  }
+
+  getBetSize(gameState, bettingManager, lastResult = null, trueCount = 0) {
+    // Calculate edge based on true count
+    // True count of +1 ≈ +0.5% edge, +2 ≈ +1%, etc.
+    const edge = this.baseEdge + (trueCount * this.countMultiplier);
+
+    // If no edge, bet minimum
+    if (edge <= 0) {
+      return bettingManager.minBet;
+    }
+
+    // Kelly formula: optimal bet = (edge / variance) * bankroll
+    const kellyFraction = edge / this.variance;
+    const fullKellyBet = kellyFraction * bettingManager.bankroll;
+
+    // Use fractional Kelly (safer)
+    const safeBet = fullKellyBet * this.fractionOfKelly;
+
+    // Clamp to table limits
+    return Math.max(
+      bettingManager.minBet,
+      Math.min(
+        Math.floor(safeBet),
+        bettingManager.maxBet,
+        bettingManager.bankroll
+      )
+    );
+  }
+
+  /**
+   * Set the fraction of Kelly to use (0.5 = half-Kelly, 1.0 = full Kelly)
+   * Half-Kelly is recommended for reduced variance
+   */
+  setKellyFraction(fraction) {
+    this.fractionOfKelly = Math.max(0.1, Math.min(1.0, fraction));
+  }
+}
+
+/**
+ * Oscar's Grind Strategy - Progressive system with profit targets
+ *
+ * A low-risk progressive betting system designed to grind out small profits.
+ * The goal is to win one unit profit per cycle. After each win that brings
+ * session profit to target, reset to base bet. Increase bet by one unit after
+ * wins (but never exceeding target profit), keep same bet after losses.
+ *
+ * Example cycle (base bet = $5):
+ * - Bet $5, lose (-$5 session)
+ * - Bet $5, lose (-$10 session)
+ * - Bet $5, win (-$5 session)
+ * - Bet $10, win (+$5 session) ← target reached, reset
+ */
+export class OscarsGrindStrategy extends BettingStrategy {
+  constructor(baseBet = 5, targetProfit = null) {
+    super("Oscar's Grind");
+    this.baseBet = baseBet;
+    this.targetProfit = targetProfit || baseBet; // Default target = 1 unit
+    this.currentBet = baseBet;
+    this.sessionProfit = 0;
+    this.cycleCount = 0;
+  }
+
+  getBetSize(gameState, bettingManager, lastResult = null) {
+    // Process last result
+    if (lastResult) {
+      this.sessionProfit += lastResult.netGain;
+
+      // If we've reached or exceeded target profit, reset cycle
+      if (this.sessionProfit >= this.targetProfit) {
+        this.currentBet = this.baseBet;
+        this.sessionProfit = 0;
+        this.cycleCount++;
+        return Math.min(this.currentBet, bettingManager.maxBet, bettingManager.bankroll);
+      }
+
+      // After a win (but not at target): increase bet by one unit
+      if (lastResult.result === "agent" || lastResult.result === "agent-blackjack") {
+        // Don't increase bet beyond what's needed to reach target
+        const remainingToTarget = this.targetProfit - this.sessionProfit;
+        const maxIncrease = Math.min(this.baseBet, remainingToTarget);
+
+        this.currentBet = Math.min(
+          this.currentBet + this.baseBet,
+          this.baseBet + maxIncrease
+        );
+      }
+      // After loss: keep same bet (grind it out)
+      // After push: keep same bet
+    }
+
+    // Clamp to table limits
+    return Math.max(
+      bettingManager.minBet,
+      Math.min(
+        this.currentBet,
+        bettingManager.maxBet,
+        bettingManager.bankroll
+      )
+    );
+  }
+
+  /**
+   * Get current cycle statistics
+   */
+  getStats() {
+    return {
+      cycleCount: this.cycleCount,
+      currentProfit: this.sessionProfit,
+      targetProfit: this.targetProfit,
+      currentBet: this.currentBet
+    };
+  }
+
+  /**
+   * Reset the cycle (useful for testing or manual reset)
+   */
+  resetCycle() {
+    this.currentBet = this.baseBet;
+    this.sessionProfit = 0;
   }
 }
