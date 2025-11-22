@@ -687,7 +687,13 @@ async function runAllBenchmarks(): Promise<void> {
   runner.printResults();
 
   console.log('\n✅ All benchmarks completed!\n');
+
+  // Force exit since event listeners may keep process alive
+  process.exit(0);
 }
 
 // Run benchmarks
-runAllBenchmarks().catch(console.error);
+runAllBenchmarks().catch((err) => {
+  console.error('Benchmark failed:', err);
+  process.exit(1);
+});
