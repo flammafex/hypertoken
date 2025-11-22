@@ -22,6 +22,7 @@ import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
 import { Stack } from "../core/Stack.js";
 import { Agent } from "./Agent.js";
+import { generateId } from "../core/crypto.js";
 
 // Helper types for payloads
 interface StackPayload { count?: number; seed?: number | null; position?: number | null; topToBottom?: boolean; card?: IToken; start?: number; end?: number | null; i?: number; j?: number; }
@@ -257,9 +258,9 @@ export const AgentActions = {
       throw new Error(`Agent ${name} already exists`);
     }
     
-    const agent = { 
-      id: crypto?.randomUUID?.() || `agent-${Date.now()}`,
-      name, 
+    const agent = {
+      id: generateId(),
+      name,
       controllerLogic,
       meta,
       active: true,

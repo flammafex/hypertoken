@@ -16,7 +16,7 @@
 /*
  * core/events.ts
  */
-import * as crypto from "node:crypto";
+import { generateId } from "./crypto.js";
 // Define a generic handler type
 export type EventHandler = (payload: any) => void;
 
@@ -60,7 +60,7 @@ export class Emitter {
     const evt: IEvent = (payload && payload.type && payload.payload !== undefined)
       ? payload  // already an event object
       : {
-          id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now() + Math.random()),
+          id: generateId(),
           type,
           payload,
           ts: Date.now()
@@ -138,7 +138,7 @@ export class EventRegistry extends Emitter {
    */
   record(type: string, source: string, payload: unknown): void {
     const evt: IEvent = {
-      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now() + Math.random()),
+      id: generateId(),
       type,
       source,
       payload,
