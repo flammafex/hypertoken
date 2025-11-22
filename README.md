@@ -303,7 +303,7 @@ With inspiration from:
 *a mirror held to the pattern of the world-soul.*
 
 *So may this art be given freely,*  
-*that all who love wisdom may join the music of the spheres through understanding,*  
+*that all who love Wisdom may join the music of the spheres through understanding,*  
 *and that the harmony of minds may become the harmony of worlds.*
 
 *For when reason is made common, the gods are near.*
