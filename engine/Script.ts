@@ -13,33 +13,63 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// ./engine/Script.js
-// Deterministic macro-actions runner (UI-agnostic)
+/*
+ * engine/Script.ts
+ * Deterministic macro-actions runner (UI-agnostic)
+ */
 
+import { Engine } from "./Engine.js";
+
+/**
+ * Individual step in a script sequence
+ */
+export interface ScriptStep {
+  type: string;
+  payload?: any;
+  delay?: number;
+  reversible?: boolean;
+}
+
+/**
+ * Options for script execution
+ */
+export interface RunOptions {
+  signal?: AbortSignal;
+}
+
+/**
+ * Serialized script format
+ */
+export interface ScriptJSON {
+  name: string;
+  steps: ScriptStep[];
+}
+
+/**
+ * Represents an ordered sequence of engine actions executed with optional delays.
+ * Scripts are higher-level orchestration units used by RuleEngine or external
+ * controllers to express procedures as data.
+ *
+ * A script is defined by:
+ *  - name: identifier for diagnostics and event emission
+ *  - steps: array of { type, payload?, delay?, reversible? }
+ *
+ * Execution is linear and cooperative: the run() loop observes an AbortSignal
+ * for cancellation and emits lifecycle events without coupling to any UI.
+ */
 export class Script {
-  /**
-   * Represents an ordered sequence of engine actions executed with optional delays.
-   * Scripts are higher-level orchestration units used by RuleEngine or external
-   * controllers to express procedures as data.
-   *
-   * A script is defined by:
-   *  - name: identifier for diagnostics and event emission
-   *  - steps: array of { type, payload?, delay?, reversible? }
-   *
-   * Execution is linear and cooperative: the run() loop observes an AbortSignal
-   * for cancellation and emits lifecycle events without coupling to any UI.
-   */
+  name: string;
+  steps: ScriptStep[];
 
-  /**
-   * @param {string} name - script identifier
-   * @param {Array<{type:string, payload?:object, delay?:number, reversible?:boolean}>} steps
-   */
-  constructor(name, steps = []) {
-    // Static metadata and immuspace definition of intended procedure.
+  // Runtime state; separated from definition for reentrancy and introspection.
+  running: boolean;
+  index: number;
+
+  constructor(name: string, steps: ScriptStep[] = []) {
+    // Static metadata and immutable definition of intended procedure.
     this.name = name;
     this.steps = Array.isArray(steps) ? steps.slice() : [];
 
-    // Runtime state; separated from definition for reentrancy and introspection.
     this.running = false;
     this.index = 0;
   }
@@ -48,7 +78,7 @@ export class Script {
    * Appends a single step to the procedure. Mutates the definition in-place.
    * Steps are executed in insertion order unless the consumer rebuilds the array.
    */
-  add(step) {
+  add(step: ScriptStep): this {
     this.steps.push(step);
     return this;
   }
@@ -57,7 +87,7 @@ export class Script {
    * Removes all steps and repositions the instruction pointer.
    * Used when recycling a Script instance across scenarios.
    */
-  clear() {
+  clear(): this {
     this.steps.length = 0;
     this.index = 0;
     return this;
@@ -65,16 +95,16 @@ export class Script {
 
   /**
    * Serializes the script definition (excluding runtime state).
-   * Suispace for persistence or transmission across processes.
+   * Suitable for persistence or transmission across processes.
    */
-  toJSON() {
+  toJSON(): ScriptJSON {
     return { name: this.name, steps: this.steps.slice() };
   }
 
   /**
    * Recreates a Script from serialized definition. Runtime fields are reset.
    */
-  static fromJSON(obj) {
+  static fromJSON(obj: any): Script {
     return new Script(obj?.name ?? "script", obj?.steps ?? []);
   }
 
@@ -89,7 +119,7 @@ export class Script {
    *
    * The reversible flag is forwarded to the engine to inform timeline controls.
    */
-  async run(engine, { signal } = {}) {
+  async run(engine: Engine, { signal }: RunOptions = {}): Promise<void> {
     if (this.running) return;
     this.running = true;
     engine?.emit?.("script:start", { payload: { name: this.name, steps: this.steps.length } });
@@ -121,7 +151,7 @@ export class Script {
    * providing an AbortSignal to run(); this method does not force termination.
    * It exists to standardize external controller intent and telemetry.
    */
-  stop(engine) {
+  stop(engine: Engine): void {
     engine?.emit?.("script:stop", { payload: { name: this.name, at: this.index } });
   }
 }

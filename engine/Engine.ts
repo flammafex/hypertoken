@@ -18,6 +18,7 @@ import { ConsensusCore } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
 import { EventBus } from "../core/EventBus.js";
+import { IEngineAgent, IGameState, ITransaction, IEngineSnapshot, IEngineState } from "./types.js";
 
 export interface EngineOptions {
   stack?: Stack | null;
@@ -45,10 +46,10 @@ export class Engine extends Emitter {
   history: Action[];
   future: Action[];
   _policies: Map<string, any>;
-  
-  _agents: any[];
-  _gameState: any;
-  _transactions: any[];
+
+  _agents: IEngineAgent[];
+  _gameState: IGameState;
+  _transactions: ITransaction[];
   debug: boolean;
 
   constructor({ stack = null, space = null, source = null, autoConnect }: EngineOptions = {}) {
@@ -169,7 +170,7 @@ export class Engine extends Emitter {
     return next;
   }
 
-  snapshot(): any {
+  snapshot(): IEngineSnapshot {
     return {
       stack: this.stack?.toJSON?.() ?? null,
       space: this.space.snapshot(),
@@ -180,9 +181,9 @@ export class Engine extends Emitter {
     };
   }
 
-  toJSON(): any { return this.snapshot(); }
+  toJSON(): IEngineSnapshot { return this.snapshot(); }
 
-  restore(snapshot: any): this {
+  restore(snapshot: IEngineSnapshot): this {
     if (!snapshot) return this;
     if (snapshot.crdt) {
       this.session.loadFromBase64(snapshot.crdt);
@@ -195,7 +196,7 @@ export class Engine extends Emitter {
     return this;
   }
 
-  get state() {
+  get state(): IEngineState {
     return {
       version: "2.0.0-crdt",
       turn: this._gameState.turn,
