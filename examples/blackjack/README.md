@@ -9,7 +9,9 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - AI agents with different strategies
 - Event-driven architecture
 - **💰 Comprehensive betting system with 6 betting strategies**
-- **🎰 Full casino features: Double Down, Split, Insurance**
+- **🎰 Full casino features: Double Down, Split, Insurance, Re-Split**
+- **🎲 Side bets: Perfect Pairs, 21+3 (poker hands)**
+- **🇪🇺 European blackjack variant with delayed hole card**
 - **📊 Card counting agents: Hi-Lo, Hi-Opt I, Omega II, Zen Count**
 - **👥 Multi-agent support (2-6 agents at one space)**
 
@@ -423,6 +425,60 @@ These features are available in:
 - ✅ Network multiplayer (`client.js` / `server.js`)
 - ✅ All game modes with full betting integration
 
+### 🎰 Side Bets
+Optional side bets add extra excitement and payout opportunities:
+
+**Perfect Pairs** - Bet on whether your first two cards will be a pair:
+```javascript
+game.placePerfectPairsBet(10); // Place $10 side bet
+game.deal();
+const sideBetResults = game.resolveSideBets();
+
+// Payouts:
+// - Mixed Pair (different colors): 5:1
+// - Colored Pair (same color, different suits): 10:1
+// - Perfect Pair (same suit): 30:1
+```
+
+**21+3** - Bet on a 3-card poker hand (your 2 cards + dealer's up card):
+```javascript
+game.place21Plus3Bet(10); // Place $10 side bet
+game.deal();
+const sideBetResults = game.resolveSideBets();
+
+// Payouts:
+// - Flush: 5:1
+// - Straight: 10:1
+// - Three of a Kind: 30:1
+// - Straight Flush: 40:1
+// - Suited Three of a Kind: 100:1
+```
+
+### ♻️ Re-Splitting
+Split again when you receive another matching card:
+```javascript
+// Initial split
+game.split(); // Split first pair
+
+// If you get another pair on one of the split hands
+game.reSplit(0); // Re-split hand #0
+
+// Maximum 4 hands total
+// Each hand requires an additional bet equal to the original wager
+```
+
+### 🇪🇺 European Blackjack Variant
+Play European-style blackjack with different dealer card rules:
+```javascript
+const game = new BlackjackGame({ variant: 'european' });
+
+// Key differences from American blackjack:
+// - Dealer receives only 1 card initially (face up)
+// - Dealer's hole card dealt AFTER all players finish
+// - No insurance available (dealer doesn't show potential blackjack early)
+// - If dealer gets blackjack, all double/split bets are lost
+```
+
 ## Performance
 
 On a typical laptop:
@@ -464,12 +520,12 @@ Choose the right one for your needs:
 
 ### Community Contributions Welcome
 
-- Side bets (pairs, 21+3, perfect pairs)
 - Mobile/web clients using the network server
-- Re-splitting support (split again after initial split)
-- European blackjack variant (dealer doesn't check for blackjack)
-- Additional betting strategies (e.g., Labouchere, D'Alembert)
-- More card counting systems (e.g., Wong Halves, Red Seven)
+- Additional betting strategies (e.g., Labouchere, D'Alembert, Fibonacci)
+- More card counting systems (e.g., Wong Halves, Red Seven, KO Count)
+- Additional side bets (Lucky Ladies, Royal Match, Super Sevens)
+- Late surrender and early surrender options
+- Blackjack tournaments and elimination formats
 
 ## License
 
@@ -477,4 +533,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with Double Down, Split, and Insurance. Showcases token-based game design, AI agents, betting systems, card counting, and multiagent architecture.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Side Bets, and European variant. Showcases token-based game design, AI agents with professional card counting systems, advanced betting strategies, and multiagent architecture. A comprehensive example of building complex card games with HyperToken.

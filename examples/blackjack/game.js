@@ -34,6 +34,7 @@ import {
   canTakeInsurance
 } from './blackjack-utils.js';
 import { registerBlackjackRules } from './blackjack-rules.js';
+import { SideBetManager } from './side-bets.js';
 
 // Get the directory of this file (works in both source and compiled contexts)
 const __filename = fileURLToPath(import.meta.url);
@@ -45,9 +46,13 @@ const __dirname = dirname(__filename);
  * BlackjackGame class - manages game flow for single-player blackjack
  */
 export class BlackjackGame {
-  constructor({ numStacks = 6, seed = null, initialBankroll = null, minBet = 5, maxBet = 500 } = {}) {
+  constructor({ numStacks = 6, seed = null, initialBankroll = null, minBet = 5, maxBet = 500, variant = 'american' } = {}) {
     // Initialize engine with Chronicle session
     this.engine = new Engine();
+
+    // Game variant: 'american' (default) or 'european'
+    // European: Dealer receives only 1 card initially, hole card dealt after player actions
+    this.variant = variant;
 
     // Load standard deck - try multiple paths for source vs dist
     let allTokens = [];
@@ -111,6 +116,9 @@ export class BlackjackGame {
     this.minBet = minBet;
     this.maxBet = maxBet;
 
+    // Side bets manager
+    this.sideBetManager = new SideBetManager();
+
     // Setup rules
     this.ruleEngine = new RuleEngine(this.engine);
     this.engine.useRuleEngine(this.ruleEngine);
@@ -142,11 +150,18 @@ export class BlackjackGame {
       if (card) this.engine.space.place("agent-hand", card, { faceUp: true });
     }
 
-    // Deal 2 cards to dealer (one face down)
-    const d1 = this.engine.stack.draw();
-    const d2 = this.engine.stack.draw();
-    if (d1) this.engine.space.place("dealer-hand", d1, { faceUp: false });
-    if (d2) this.engine.space.place("dealer-hand", d2, { faceUp: true });
+    // Deal cards to dealer based on variant
+    if (this.variant === 'european') {
+      // European: Only 1 card initially (face up)
+      const d1 = this.engine.stack.draw();
+      if (d1) this.engine.space.place("dealer-hand", d1, { faceUp: true });
+    } else {
+      // American: 2 cards (one face down, one face up)
+      const d1 = this.engine.stack.draw();
+      const d2 = this.engine.stack.draw();
+      if (d1) this.engine.space.place("dealer-hand", d1, { faceUp: false });
+      if (d2) this.engine.space.place("dealer-hand", d2, { faceUp: true });
+    }
 
     return this.getGameState();
   }
@@ -191,10 +206,17 @@ export class BlackjackGame {
     this.gameState.agentStood = true;
     this.gameState.dealerTurn = true;
 
-    // Reveal dealer's hidden card
-    const dealerHand = this.engine.space.zone("dealer-hand");
-    if (dealerHand.length > 0 && dealerHand[0]) {
-      this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+    // Variant-specific dealer card handling
+    if (this.variant === 'european') {
+      // European: Deal dealer's hole card now (after player finishes)
+      const holeCard = this.engine.stack.draw();
+      if (holeCard) this.engine.space.place("dealer-hand", holeCard, { faceUp: true });
+    } else {
+      // American: Reveal dealer's hidden card
+      const dealerHand = this.engine.space.zone("dealer-hand");
+      if (dealerHand.length > 0 && dealerHand[0]) {
+        this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+      }
     }
 
     // Play out dealer's hand
@@ -247,10 +269,17 @@ export class BlackjackGame {
       return this.getGameState();
     }
 
-    // Reveal dealer's hidden card
-    const dealerHand = this.engine.space.zone("dealer-hand");
-    if (dealerHand.length > 0 && dealerHand[0]) {
-      this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+    // Variant-specific dealer card handling
+    if (this.variant === 'european') {
+      // European: Deal dealer's hole card now (after player finishes)
+      const holeCard = this.engine.stack.draw();
+      if (holeCard) this.engine.space.place("dealer-hand", holeCard, { faceUp: true });
+    } else {
+      // American: Reveal dealer's hidden card
+      const dealerHand = this.engine.space.zone("dealer-hand");
+      if (dealerHand.length > 0 && dealerHand[0]) {
+        this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+      }
     }
 
     // Play out dealer's hand
@@ -263,6 +292,11 @@ export class BlackjackGame {
    * Take insurance bet
    */
   takeInsurance(amount = null) {
+    // Insurance not available in European variant (dealer only has 1 card)
+    if (this.variant === 'european') {
+      throw new Error("Insurance not available in European blackjack variant.");
+    }
+
     const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
     if (!canTakeInsurance(dealerHand)) {
       throw new Error("Insurance not available - dealer must show an Ace.");
@@ -357,6 +391,63 @@ export class BlackjackGame {
     // Track that we have a split
     this.gameState.hasSplit = true;
     this.gameState.currentSplitHand = 0; // 0 = first hand, 1 = second hand
+    this.gameState.splitHandsCount = 2;
+    this.gameState.splitHandZones = ["agent-hand", "agent-hand-split"];
+
+    return this.getSplitGameState();
+  }
+
+  /**
+   * Re-split a hand (split again after initial split)
+   * @param {number} handIndex - Which split hand to re-split (0 or 1)
+   */
+  reSplit(handIndex = 0) {
+    if (!this.gameState.hasSplit) {
+      throw new Error("No split hands to re-split.");
+    }
+
+    if (this.gameState.splitHandsCount >= 4) {
+      throw new Error("Maximum 4 hands reached. Cannot split further.");
+    }
+
+    const handZone = this.gameState.splitHandZones[handIndex];
+    const handCards = this.engine.space.zone(handZone).map(p => p.tokenSnapshot);
+
+    if (!canSplit(handCards)) {
+      throw new Error("Cannot re-split - hand must have exactly 2 cards of the same rank.");
+    }
+
+    const agent = this.engine._agents[0];
+    if (this.hasBetting) {
+      if (agent.resources.bankroll < agent.resources.currentBet) {
+        throw new Error("Insufficient funds to re-split.");
+      }
+      // Deduct re-split bet
+      agent.resources.bankroll -= agent.resources.currentBet;
+    }
+
+    // Create new split hand zone
+    const newSplitZone = `agent-hand-split-${this.gameState.splitHandsCount}`;
+    if (!this.engine.space.zones.includes(newSplitZone)) {
+      this.engine.space.createZone(newSplitZone);
+    }
+
+    // Move second card to new split hand
+    const handPlacements = this.engine.space.zone(handZone);
+    if (handPlacements.length >= 2) {
+      const secondCard = handPlacements[1];
+      this.engine.space.move(secondCard.id, handZone, newSplitZone);
+    }
+
+    // Deal one card to each hand
+    const card1 = this.engine.stack.draw();
+    const card2 = this.engine.stack.draw();
+    if (card1) this.engine.space.place(handZone, card1, { faceUp: true });
+    if (card2) this.engine.space.place(newSplitZone, card2, { faceUp: true });
+
+    // Update split hands tracking
+    this.gameState.splitHandsCount++;
+    this.gameState.splitHandZones.push(newSplitZone);
 
     return this.getSplitGameState();
   }
@@ -365,29 +456,30 @@ export class BlackjackGame {
    * Get game state for split hands
    */
   getSplitGameState() {
-    const hand1 = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
-    const hand2 = this.engine.space.zone("agent-hand-split").map(p => p.tokenSnapshot);
     const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
-
     const showFullDealer = this.gameState.gameOver || this.gameState.dealerTurn;
 
+    // Build split hands array dynamically based on actual split hands
+    const splitHands = [];
+    const handZones = this.gameState.splitHandZones || ["agent-hand", "agent-hand-split"];
+
+    for (const zone of handZones) {
+      const cards = this.engine.space.zone(zone).map(p => p.tokenSnapshot);
+      if (cards.length > 0) {
+        splitHands.push({
+          zone,
+          cards,
+          value: getBestHandValue(cards),
+          busted: isBusted(cards),
+          blackjack: isBlackjack(cards),
+          display: formatHand(cards),
+          canReSplit: canSplit(cards) && (this.gameState.splitHandsCount || 2) < 4
+        });
+      }
+    }
+
     return {
-      splitHands: [
-        {
-          cards: hand1,
-          value: getBestHandValue(hand1),
-          busted: isBusted(hand1),
-          blackjack: isBlackjack(hand1),
-          display: formatHand(hand1)
-        },
-        {
-          cards: hand2,
-          value: getBestHandValue(hand2),
-          busted: isBusted(hand2),
-          blackjack: isBlackjack(hand2),
-          display: formatHand(hand2)
-        }
-      ],
+      splitHands,
       dealerHand: {
         cards: dealerHand,
         value: showFullDealer ? getBestHandValue(dealerHand) : null,
@@ -396,8 +488,74 @@ export class BlackjackGame {
         display: formatHand(dealerHand, !showFullDealer)
       },
       currentHand: this.gameState.currentSplitHand,
+      splitHandsCount: this.gameState.splitHandsCount || 2,
       gameOver: this.gameState.gameOver,
       results: this.gameState.splitResults || []
+    };
+  }
+
+  /**
+   * Place Perfect Pairs side bet
+   * @param {number} amount - Bet amount
+   */
+  placePerfectPairsBet(amount) {
+    const agent = this.engine._agents[0];
+    if (this.hasBetting && agent.resources.bankroll < amount) {
+      throw new Error(`Insufficient funds for Perfect Pairs bet. Bankroll: ${agent.resources.bankroll}`);
+    }
+
+    if (this.hasBetting) {
+      agent.resources.bankroll -= amount;
+    }
+
+    this.sideBetManager.placePerfectPairsBet(amount);
+  }
+
+  /**
+   * Place 21+3 side bet
+   * @param {number} amount - Bet amount
+   */
+  place21Plus3Bet(amount) {
+    const agent = this.engine._agents[0];
+    if (this.hasBetting && agent.resources.bankroll < amount) {
+      throw new Error(`Insufficient funds for 21+3 bet. Bankroll: ${agent.resources.bankroll}`);
+    }
+
+    if (this.hasBetting) {
+      agent.resources.bankroll -= amount;
+    }
+
+    this.sideBetManager.place21Plus3Bet(amount);
+  }
+
+  /**
+   * Resolve all side bets (called after initial deal)
+   * @returns {object} - Side bet results
+   */
+  resolveSideBets() {
+    const playerCards = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+
+    // Get dealer's up card (second card in American, first in European)
+    const dealerUpCard = this.variant === 'european' ? dealerHand[0] : dealerHand[1];
+
+    // Resolve Perfect Pairs
+    const perfectPairsResult = this.sideBetManager.resolvePerfectPairs(playerCards);
+    if (perfectPairsResult.win && this.hasBetting) {
+      const agent = this.engine._agents[0];
+      agent.resources.bankroll += perfectPairsResult.payout;
+    }
+
+    // Resolve 21+3
+    const twentyOnePlus3Result = this.sideBetManager.resolve21Plus3(playerCards, dealerUpCard);
+    if (twentyOnePlus3Result.win && this.hasBetting) {
+      const agent = this.engine._agents[0];
+      agent.resources.bankroll += twentyOnePlus3Result.payout;
+    }
+
+    return {
+      perfectPairs: perfectPairsResult,
+      twentyOnePlus3: twentyOnePlus3Result
     };
   }
 
@@ -467,9 +625,11 @@ export class BlackjackGame {
       canStand: canTakeActions,
       canDouble: canTakeActions && canDoubleDown(agentHand),
       canSplit: canTakeActions && canSplit(agentHand),
-      canInsurance: agentHand.length === 2 &&
+      canInsurance: this.variant === 'american' &&
+                    agentHand.length === 2 &&
                     !this.gameState.insuranceOffered &&
-                    canTakeInsurance(dealerHand)
+                    canTakeInsurance(dealerHand),
+      variant: this.variant
     };
   }
 
