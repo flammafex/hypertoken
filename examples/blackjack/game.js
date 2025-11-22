@@ -463,17 +463,27 @@ export class BlackjackGame {
     const splitHands = [];
     const handZones = this.gameState.splitHandZones || ["agent-hand", "agent-hand-split"];
 
-    for (const zone of handZones) {
+    // Initialize handStates if not exists
+    if (!this.gameState.splitHandStates) {
+      this.gameState.splitHandStates = handZones.map(() => ({ stood: false, busted: false }));
+    }
+
+    for (let i = 0; i < handZones.length; i++) {
+      const zone = handZones[i];
       const cards = this.engine.space.zone(zone).map(p => p.tokenSnapshot);
+      const handState = this.gameState.splitHandStates[i] || { stood: false, busted: false };
+
       if (cards.length > 0) {
         splitHands.push({
           zone,
           cards,
           value: getBestHandValue(cards),
-          busted: isBusted(cards),
+          busted: isBusted(cards) || handState.busted,
           blackjack: isBlackjack(cards),
           display: formatHand(cards),
-          canReSplit: canSplit(cards) && (this.gameState.splitHandsCount || 2) < 4
+          canReSplit: canSplit(cards) && (this.gameState.splitHandsCount || 2) < 4,
+          stood: handState.stood,
+          active: i === this.gameState.currentSplitHand && !handState.stood && !handState.busted
         });
       }
     }
@@ -492,6 +502,216 @@ export class BlackjackGame {
       gameOver: this.gameState.gameOver,
       results: this.gameState.splitResults || []
     };
+  }
+
+  /**
+   * Hit on a specific split hand
+   * @param {number} handIndex - Index of the hand to hit (0, 1, 2, or 3)
+   */
+  hitSplitHand(handIndex = null) {
+    if (!this.gameState.hasSplit) {
+      throw new Error("No split hands available.");
+    }
+
+    // Use current hand if not specified
+    const index = handIndex !== null ? handIndex : this.gameState.currentSplitHand;
+    const handZone = this.gameState.splitHandZones[index];
+
+    if (!handZone) {
+      throw new Error(`Invalid hand index: ${index}`);
+    }
+
+    // Check if this hand can still be played
+    const handState = this.gameState.splitHandStates[index];
+    if (handState.stood) {
+      throw new Error("Cannot hit - hand has already stood.");
+    }
+    if (handState.busted) {
+      throw new Error("Cannot hit - hand is busted.");
+    }
+
+    // Draw and place card
+    const card = this.engine.stack.draw();
+    if (card) {
+      this.engine.space.place(handZone, card, { faceUp: true });
+    }
+
+    // Check for bust
+    const handCards = this.engine.space.zone(handZone).map(p => p.tokenSnapshot);
+    if (isBusted(handCards)) {
+      this.gameState.splitHandStates[index].busted = true;
+      // Auto-advance to next hand if busted
+      this.advanceToNextSplitHand();
+    }
+
+    return this.getSplitGameState();
+  }
+
+  /**
+   * Stand on a specific split hand
+   * @param {number} handIndex - Index of the hand to stand (0, 1, 2, or 3)
+   */
+  standSplitHand(handIndex = null) {
+    if (!this.gameState.hasSplit) {
+      throw new Error("No split hands available.");
+    }
+
+    // Use current hand if not specified
+    const index = handIndex !== null ? handIndex : this.gameState.currentSplitHand;
+
+    if (index < 0 || index >= this.gameState.splitHandsCount) {
+      throw new Error(`Invalid hand index: ${index}`);
+    }
+
+    // Mark hand as stood
+    this.gameState.splitHandStates[index].stood = true;
+
+    // Advance to next hand or finish
+    this.advanceToNextSplitHand();
+
+    return this.getSplitGameState();
+  }
+
+  /**
+   * Double down on a specific split hand
+   * @param {number} handIndex - Index of the hand to double (0, 1, 2, or 3)
+   */
+  doubleDownSplitHand(handIndex = null) {
+    if (!this.gameState.hasSplit) {
+      throw new Error("No split hands available.");
+    }
+
+    // Use current hand if not specified
+    const index = handIndex !== null ? handIndex : this.gameState.currentSplitHand;
+    const handZone = this.gameState.splitHandZones[index];
+
+    if (!handZone) {
+      throw new Error(`Invalid hand index: ${index}`);
+    }
+
+    const handCards = this.engine.space.zone(handZone).map(p => p.tokenSnapshot);
+    if (!canDoubleDown(handCards)) {
+      throw new Error("Cannot double down - must have exactly 2 cards.");
+    }
+
+    // Double the bet (if betting is enabled)
+    const agent = this.engine._agents[0];
+    if (this.hasBetting && agent.resources.currentBet > 0) {
+      if (agent.resources.bankroll < agent.resources.currentBet) {
+        throw new Error("Insufficient funds to double down.");
+      }
+      agent.resources.bankroll -= agent.resources.currentBet;
+      // Note: We track the doubled bet in the BettingManager in cli.js
+    }
+
+    // Take exactly one card
+    const card = this.engine.stack.draw();
+    if (card) {
+      this.engine.space.place(handZone, card, { faceUp: true });
+    }
+
+    // Check for bust
+    const newHandCards = this.engine.space.zone(handZone).map(p => p.tokenSnapshot);
+    if (isBusted(newHandCards)) {
+      this.gameState.splitHandStates[index].busted = true;
+    }
+
+    // Automatically stand after doubling down
+    this.gameState.splitHandStates[index].stood = true;
+
+    // Advance to next hand
+    this.advanceToNextSplitHand();
+
+    return this.getSplitGameState();
+  }
+
+  /**
+   * Advance to next split hand or finish all hands
+   * @private
+   */
+  advanceToNextSplitHand() {
+    // Find next hand that hasn't stood and isn't busted
+    for (let i = this.gameState.currentSplitHand + 1; i < this.gameState.splitHandsCount; i++) {
+      const handState = this.gameState.splitHandStates[i];
+      if (!handState.stood && !handState.busted) {
+        this.gameState.currentSplitHand = i;
+        return;
+      }
+    }
+
+    // All hands complete - play dealer hand
+    this.gameState.dealerTurn = true;
+
+    // Variant-specific dealer card handling
+    if (this.variant === 'european') {
+      // European: Deal dealer's hole card now (after all players finish)
+      const holeCard = this.engine.stack.draw();
+      if (holeCard) this.engine.space.place("dealer-hand", holeCard, { faceUp: true });
+    } else {
+      // American: Reveal dealer's hidden card
+      const dealerHand = this.engine.space.zone("dealer-hand");
+      if (dealerHand.length > 0 && dealerHand[0]) {
+        this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+      }
+    }
+
+    // Play out dealer's hand
+    this.playDealerHand();
+
+    // Resolve all split hands
+    this.resolveSplitHands();
+  }
+
+  /**
+   * Resolve all split hands and calculate payouts
+   * @private
+   */
+  resolveSplitHands() {
+    const dealerCards = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+    const agent = this.engine._agents[0];
+    const results = [];
+
+    for (let i = 0; i < this.gameState.splitHandsCount; i++) {
+      const handZone = this.gameState.splitHandZones[i];
+      const handCards = this.engine.space.zone(handZone).map(p => p.tokenSnapshot);
+      const handState = this.gameState.splitHandStates[i];
+
+      let result;
+      if (handState.busted) {
+        result = "dealer";
+      } else {
+        result = determineWinner(handCards, dealerCards);
+      }
+
+      results.push({
+        handIndex: i,
+        result,
+        cards: handCards,
+        value: getBestHandValue(handCards),
+        busted: handState.busted
+      });
+
+      // Calculate payout (if betting enabled)
+      if (this.hasBetting) {
+        let payout = 0;
+        const betAmount = agent.resources.currentBet;
+
+        if (result === "agent-blackjack") {
+          payout = betAmount + (betAmount * 1.5);
+        } else if (result === "agent") {
+          payout = betAmount * 2;
+        } else if (result === "push") {
+          payout = betAmount;
+        }
+
+        if (payout > 0) {
+          agent.resources.bankroll += payout;
+        }
+      }
+    }
+
+    this.gameState.splitResults = results;
+    this.gameState.gameOver = true;
   }
 
   /**
