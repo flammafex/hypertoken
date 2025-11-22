@@ -8,9 +8,9 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - Deterministic simulation with seedable RNG
 - AI agents with different strategies
 - Event-driven architecture
-- **💰 Comprehensive betting system with bankroll management**
+- **💰 Comprehensive betting system with 6 betting strategies**
 - **🎰 Full casino features: Double Down, Split, Insurance**
-- **📊 Card counting agents using Hi-Lo system**
+- **📊 Card counting agents: Hi-Lo, Hi-Opt I, Omega II, Zen Count**
 - **👥 Multi-agent support (2-6 agents at one space)**
 
 ## Quick Start
@@ -136,20 +136,27 @@ Complete bankroll and chip management integrated into all game modes:
 - **Martingale**: Double bet after loss, reset after win
 - **Percentage**: Bet a percentage of current bankroll
 - **Progressive**: Increase bet after wins
+- **Kelly Criterion**: Optimal bet sizing based on player edge and variance
+- **Oscar's Grind**: Progressive system with profit targets and cycle tracking
 
 **Usage:**
 ```javascript
-import { BettingManager } from './blackjack-betting.js';
+import { BettingManager, KellyCriterionStrategy, OscarsGrindStrategy } from './blackjack-betting.js';
 
 const betting = new BettingManager(1000, { minBet: 5, maxBet: 500 });
 betting.placeBet(25);
 const payout = betting.resolveBet('agent'); // Win!
 console.log(betting.getStats());
+
+// Advanced strategies
+const kellyStrategy = new KellyCriterionStrategy(0.005, 0.005);
+const oscarStrategy = new OscarsGrindStrategy(10, 10);
+const betSize = kellyStrategy.getBetSize(gameState, betting, null, trueCount);
 ```
 
 ### 🎯 Card Counting Agents
 
-Hi-Lo card counting system with bet spread adjustment:
+Multiple professional card counting systems with bet spread adjustment:
 
 **Features:**
 - Running count tracking
@@ -157,20 +164,35 @@ Hi-Lo card counting system with bet spread adjustment:
 - Automatic bet sizing based on advantage
 - Strategy deviations at key counts
 - Multiple counting styles (aggressive, conservative)
+- Multi-level counting systems for advanced play
+- Ace side-counting for precision
 
-**Agents:**
-- **HiLoCountingAgent**: Standard 1-8x bet spread
-- **AggressiveCountingAgent**: Wide 1-12x bet spread
-- **ConservativeCountingAgent**: Small 1-4x bet spread
+**Counting Systems:**
+- **HiLoCountingAgent**: Classic balanced system (1-8x bet spread)
+  - Simple: 2-6 = +1, 10-A = -1
+- **HiOptICountingAgent**: More accurate with Ace side-count (1-8x spread)
+  - 3-6 = +1, 10-K = -1, Aces tracked separately
+- **OmegaIICountingAgent**: Multi-level balanced system (1-10x spread)
+  - 2,3,7 = +1, 4,5,6 = +2, 9 = -1, 10-K = -2
+- **ZenCountAgent**: Balanced multi-level system (1-8x spread)
+  - 2,3,7 = +1, 4,5,6 = +2, A = -1, 10-K = -2
+- **AggressiveCountingAgent**: Wide spread Hi-Lo variant (1-12x spread)
+- **ConservativeCountingAgent**: Small spread Hi-Lo variant (1-4x spread)
 
 **Usage:**
 ```javascript
-import { HiLoCountingAgent } from './card-counting-agents.js';
+import { HiLoCountingAgent, HiOptICountingAgent, OmegaIICountingAgent, ZenCountAgent } from './card-counting-agents.js';
 
-const counter = new HiLoCountingAgent("Card Counter", 10, 8);
-const betSize = counter.getBetSize(gameState, bettingManager);
-const decision = counter.decide(gameState);
-console.log(counter.getCountStats()); // { runningCount, trueCount, ... }
+// Basic Hi-Lo counter
+const hiloCounter = new HiLoCountingAgent("Hi-Lo Counter", 10, 8);
+
+// Advanced multi-level counter
+const omegaCounter = new OmegaIICountingAgent("Omega II Counter", 10, 10);
+
+// Get count statistics
+const betSize = hiloCounter.getBetSize(gameState, bettingManager);
+const decision = hiloCounter.decide(gameState);
+console.log(hiloCounter.getCountStats()); // { runningCount, trueCount, ... }
 ```
 
 ### 👥 Multi-Agent Support
@@ -442,12 +464,12 @@ Choose the right one for your needs:
 
 ### Community Contributions Welcome
 
-- Additional betting strategies (Kelly Criterion, Oscar's Grind)
-- More card counting systems (Hi-Opt, Omega II, Zen Count)
 - Side bets (pairs, 21+3, perfect pairs)
 - Mobile/web clients using the network server
 - Re-splitting support (split again after initial split)
 - European blackjack variant (dealer doesn't check for blackjack)
+- Additional betting strategies (e.g., Labouchere, D'Alembert)
+- More card counting systems (e.g., Wong Halves, Red Seven)
 
 ## License
 
