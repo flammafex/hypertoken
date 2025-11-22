@@ -1,154 +1,100 @@
 /**
  * Blackjack Game Implementation using HyperToken Engine
+ *
+ * This is a simplified single-player blackjack implementation.
+ * For multi-agent games with networking support, use MultiagentBlackjackGame.
+ *
+ * Features:
+ * - Single player vs dealer
+ * - Standard blackjack rules
+ * - Optional betting system integration
+ * - Deterministic replay with seeds
+ * - Rule-based automatic dealer play
+ *
+ * @see multiagent-game.js for advanced multi-player support
  */
 
 import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { Stack } from '../../core/Stack.js';
 import { Space } from '../../core/Space.js';
-import { Source } from '../../core/Source.js';
 import { Engine } from '../../engine/Engine.js';
 import { RuleEngine } from '../../engine/RuleEngine.js';
-import { ActionRegistry } from '../../engine/actions.js';
+import { Agent } from '../../engine/Agent.js';
 import { readFileSync } from 'fs';
-import { 
-  getBestHandValue, 
-  isBusted, 
-  isBlackjack, 
+import {
+  getBestHandValue,
+  isBusted,
+  isBlackjack,
   formatHand,
-  determineWinner 
+  determineWinner
 } from './blackjack-utils.js';
 import { registerBlackjackRules } from './blackjack-rules.js';
 
-/**
- * Extend ActionRegistry with blackjack-specific actions
- */
-Object.assign(ActionRegistry, {
-  "blackjack:deal": (engine) => {
-    // Clear existing hands
-    engine.space.clearZone("agent-hand");
-    engine.space.clearZone("dealer-hand");
-    
-    // Deal 2 cards to agent
-    const p1 = engine.source.draw();
-    const p2 = engine.source.draw();
-    engine.space.place("agent-hand", p1, { faceUp: true });
-    engine.space.place("agent-hand", p2, { faceUp: true });
-    
-    // Deal 2 cards to dealer (one face down)
-    const d1 = engine.source.draw();
-    const d2 = engine.source.draw();
-    engine.space.place("dealer-hand", d1, { faceUp: false });
-    engine.space.place("dealer-hand", d2, { faceUp: true });
-    
-    engine._gameState = { 
-      dealerTurn: false, 
-      gameOver: false,
-      agentStood: false
-    };
-  },
-  
-  "blackjack:hit": (engine) => {
-    const card = engine.source.draw();
-    engine.space.place("agent-hand", card, { faceUp: true });
-  },
-  
-  "blackjack:stand": (engine) => {
-    engine._gameState.agentStood = true;
-    engine._gameState.dealerTurn = true;
-    
-    // Reveal dealer's hidden card
-    const dealerHand = engine.space.zone("dealer-hand");
-    if (dealerHand.length > 0) {
-      dealerHand[0].faceUp = true;
-    }
-  },
-  
-  "blackjack:dealer-hit": (engine) => {
-    const card = engine.source.draw();
-    engine.space.place("dealer-hand", card, { faceUp: true });
-  },
-  
-  "blackjack:dealer-stand": (engine) => {
-    engine._gameState.dealerTurn = false;
-    engine._gameState.gameOver = true;
-  },
-  
-  "blackjack:agent-busted": (engine) => {
-    engine._gameState.gameOver = true;
-    engine._gameState.result = "dealer";
-  },
-  
-  "blackjack:agent-blackjack": (engine) => {
-    // Check dealer for blackjack
-    const dealerHand = engine.space.zone("dealer-hand");
-    const dealerCards = dealerHand.map(p => p.card);
-    if (isBlackjack(dealerCards)) {
-      engine._gameState.result = "push";
-    } else {
-      engine._gameState.result = "agent-blackjack";
-    }
-    engine._gameState.gameOver = true;
-  },
-  
-  "blackjack:new-round": (engine) => {
-    engine.space.collectAllInto(engine.stack);
-    engine.source.reset();
-    engine.source.shuffle();
-  }
-});
+// No ActionRegistry extensions needed - using direct method calls
 
 /**
- * BlackjackGame class - manages game flow
+ * BlackjackGame class - manages game flow for single-player blackjack
  */
 export class BlackjackGame {
-  constructor({ numStacks = 6, seed = null } = {}) {
-    // Load standard stack
-    const stackData = JSON.parse(
-      readFileSync('./token-sets/standard-stack.json', 'utf8')
-    );
-    const tokenSet = parseTokenSetObject(stackData);
-    
-    // Create stacks for the source
-    const stacks = [];
-    for (let i = 0; i < numStacks; i++) {
-      stacks.push(new Stack(tokenSet.tokens, { seed: seed ? seed + i : null }));
+  constructor({ numStacks = 6, seed = null, initialBankroll = null, minBet = 5, maxBet = 500 } = {}) {
+    // Initialize engine with Chronicle session
+    this.engine = new Engine();
+
+    // Load standard deck
+    let allTokens = [];
+    try {
+      const stackData = JSON.parse(
+        readFileSync('./token-sets/standard-deck.json', 'utf8')
+      );
+      const baseTokens = parseTokenSetObject(stackData).tokens;
+
+      // Create multiple decks
+      for (let i = 0; i < numStacks; i++) {
+        const deckCopy = baseTokens.map(t => ({ ...t, id: `${t.id}-${i}` }));
+        allTokens.push(...deckCopy);
+      }
+    } catch (e) {
+      console.error("Failed to load deck file:", e.message);
     }
-    
-    // Setup game components
-    this.source = new Source(...stacks);
-    this.source.shuffle(seed);
-    
-    this.space = new Space("blackjack");
-    this.space.createZone("agent-hand");
-    this.space.createZone("dealer-hand");
-    
-    this.stack = stacks[0]; // Reference for collecting cards
-    
-    this.engine = new Engine({
-      stack: this.stack,
-      space: this.space,
-      source: this.source
+
+    // Create stack with new API (requires Chronicle session)
+    this.engine.stack = new Stack(this.engine.session, allTokens, { seed, autoInit: true });
+    if (seed !== null) {
+      this.engine.stack.shuffle(seed);
+    }
+
+    // Create zones
+    ['agent-hand', 'dealer-hand'].forEach(zone => {
+      if (!this.engine.space.zones.includes(zone)) {
+        this.engine.space.createZone(zone);
+      }
     });
-    
+
+    // Create a simple agent for single-player
+    const agent = new Agent("Player");
+    agent.resources.bankroll = initialBankroll || 1000;
+    agent.resources.currentBet = 0;
+    agent.handZone = "agent-hand";
+    this.engine._agents.push(agent);
+
     // Add game state tracking
-    this.engine._gameState = {
+    this.gameState = {
       dealerTurn: false,
       gameOver: false,
       agentStood: false,
       result: null
     };
-    
+
+    // Betting configuration (if provided)
+    this.hasBetting = initialBankroll !== null;
+    this.minBet = minBet;
+    this.maxBet = maxBet;
+
     // Setup rules
     this.ruleEngine = new RuleEngine(this.engine);
+    this.engine.useRuleEngine(this.ruleEngine);
     registerBlackjackRules(this.ruleEngine);
-    
-    // Event logging
-    this.engine.on("*", (e) => {
-      if (this.debug) {
-        console.log(`[${e.type}]`, e.payload || '');
-      }
-    });
-    
+
     this.debug = false;
   }
   
@@ -156,80 +102,123 @@ export class BlackjackGame {
    * Start a new round
    */
   deal() {
-    this.engine.dispatch("blackjack:deal");
+    // Clear existing hands
+    this.engine.space.collectAllInto(this.engine.stack);
+
+    // Reset game state
+    this.gameState = {
+      dealerTurn: false,
+      gameOver: false,
+      agentStood: false,
+      result: null
+    };
+
+    // Deal 2 cards to agent
+    for (let i = 0; i < 2; i++) {
+      const card = this.engine.stack.draw();
+      if (card) this.engine.space.place("agent-hand", card, { faceUp: true });
+    }
+
+    // Deal 2 cards to dealer (one face down)
+    const d1 = this.engine.stack.draw();
+    const d2 = this.engine.stack.draw();
+    if (d1) this.engine.space.place("dealer-hand", d1, { faceUp: false });
+    if (d2) this.engine.space.place("dealer-hand", d2, { faceUp: true });
+
     return this.getGameState();
   }
-  
+
   /**
    * Agent hits (takes another card)
    */
   hit() {
-    if (this.engine._gameState.gameOver) {
+    if (this.gameState.gameOver) {
       throw new Error("Game is over. Start a new round.");
     }
-    if (this.engine._gameState.agentStood) {
+    if (this.gameState.agentStood) {
       throw new Error("Agent has already stood.");
     }
-    
-    this.engine.dispatch("blackjack:hit");
+
+    const card = this.engine.stack.draw();
+    if (card) {
+      this.engine.space.place("agent-hand", card, { faceUp: true });
+    }
+
+    // Check for bust
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    if (isBusted(agentHand)) {
+      this.gameState.gameOver = true;
+      this.gameState.result = "dealer";
+    }
+
     return this.getGameState();
   }
-  
+
   /**
    * Agent stands (ends their turn)
    */
   stand() {
-    if (this.engine._gameState.gameOver) {
+    if (this.gameState.gameOver) {
       throw new Error("Game is over. Start a new round.");
     }
-    if (this.engine._gameState.agentStood) {
+    if (this.gameState.agentStood) {
       throw new Error("Agent has already stood.");
     }
-    
-    this.engine.dispatch("blackjack:stand");
-    
+
+    this.gameState.agentStood = true;
+    this.gameState.dealerTurn = true;
+
+    // Reveal dealer's hidden card
+    const dealerHand = this.engine.space.zone("dealer-hand");
+    if (dealerHand.length > 0 && dealerHand[0]) {
+      this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+    }
+
     // Play out dealer's hand
     this.playDealerHand();
-    
+
     return this.getGameState();
   }
-  
+
   /**
    * Play out dealer's hand automatically
    */
   playDealerHand() {
-    const maxIterations = 10;
-    let iterations = 0;
-    
-    while (this.engine._gameState.dealerTurn && iterations < maxIterations) {
-      this.ruleEngine.evaluate();
-      iterations++;
+    let dealerCards = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+    let dealerValue = getBestHandValue(dealerCards);
+
+    // Dealer hits on 16 or less, stands on 17+
+    while (dealerValue < 17) {
+      const card = this.engine.stack.draw();
+      if (!card) break;
+
+      this.engine.space.place("dealer-hand", card, { faceUp: true });
+      dealerCards = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+      dealerValue = getBestHandValue(dealerCards);
     }
-    
+
+    this.gameState.dealerTurn = false;
+    this.gameState.gameOver = true;
+
     // Determine final result
-    if (!this.engine._gameState.result) {
-      const agentHand = this.space.zone("agent-hand").map(p => p.card);
-      const dealerHand = this.space.zone("dealer-hand").map(p => p.card);
-      this.engine._gameState.result = determineWinner(agentHand, dealerHand);
-    }
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    this.gameState.result = determineWinner(agentHand, dealerCards);
   }
   
   /**
    * Get current game state
    */
   getGameState() {
-    const agentHand = this.space.zone("agent-hand").map(p => p.card);
-    const dealerHand = this.space.zone("dealer-hand").map(p => p.card);
-    const dealerPlacements = this.space.zone("dealer-hand");
-    
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    const dealerHand = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+
     const agentValue = getBestHandValue(agentHand);
     const agentBusted = isBusted(agentHand);
     const agentBlackjack = isBlackjack(agentHand);
-    
+
     // Only show dealer's up card if game is not over
-    const showFullDealer = this.engine._gameState.gameOver || 
-                          this.engine._gameState.dealerTurn;
-    
+    const showFullDealer = this.gameState.gameOver || this.gameState.dealerTurn;
+
     return {
       agentHand: {
         cards: agentHand,
@@ -245,24 +234,27 @@ export class BlackjackGame {
         blackjack: showFullDealer ? isBlackjack(dealerHand) : null,
         display: formatHand(dealerHand, !showFullDealer)
       },
-      gameOver: this.engine._gameState.gameOver,
-      result: this.engine._gameState.result,
-      canHit: !this.engine._gameState.gameOver && 
-              !this.engine._gameState.agentStood &&
+      gameOver: this.gameState.gameOver,
+      result: this.gameState.result,
+      canHit: !this.gameState.gameOver &&
+              !this.gameState.agentStood &&
               !agentBusted &&
               !agentBlackjack,
-      canStand: !this.engine._gameState.gameOver && 
-                !this.engine._gameState.agentStood &&
+      canStand: !this.gameState.gameOver &&
+                !this.gameState.agentStood &&
                 !agentBusted &&
                 !agentBlackjack
     };
   }
-  
+
   /**
    * Start a fresh round (collect and reshuffle)
    */
   newRound() {
-    this.engine.dispatch("blackjack:new-round");
+    this.engine.space.collectAllInto(this.engine.stack);
+    if (this.engine.stack.size < 52) {
+      this.engine.stack.shuffle();
+    }
     return this.deal();
   }
   
@@ -270,9 +262,9 @@ export class BlackjackGame {
    * Get formatted result message
    */
   getResultMessage() {
-    const result = this.engine._gameState.result;
+    const result = this.gameState.result;
     if (!result) return null;
-    
+
     switch (result) {
       case "agent-blackjack":
         return "🎉 BLACKJACK! You win 3:2!";
@@ -285,5 +277,33 @@ export class BlackjackGame {
       default:
         return null;
     }
+  }
+
+  /**
+   * Get betting statistics (if betting is enabled)
+   */
+  getStats() {
+    if (!this.hasBetting) {
+      return null;
+    }
+
+    const agent = this.engine._agents[0];
+    const netProfit = agent.resources.bankroll - (this.hasBetting ? agent.resources.bankroll : 1000);
+
+    return {
+      handsPlayed: 0, // Would need to track this
+      currentBankroll: agent.resources.bankroll,
+      netProfit,
+      winRate: 0
+    };
+  }
+
+  /**
+   * Check if player can afford to continue (betting mode only)
+   */
+  isBroke() {
+    if (!this.hasBetting) return false;
+    const agent = this.engine._agents[0];
+    return agent.resources.bankroll < this.minBet;
   }
 }

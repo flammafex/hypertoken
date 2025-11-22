@@ -16,7 +16,11 @@ A complete implementation of Blackjack using the HyperToken engine, demonstratin
 
 ### Play Single-Agent Blackjack
 ```bash
+# Play without betting
 node cli.js
+
+# Play with betting system
+node cli.js --betting
 ```
 
 Play blackjack in your terminal against the dealer. Standard rules apply:
@@ -24,12 +28,7 @@ Play blackjack in your terminal against the dealer. Standard rules apply:
 - Dealer stands on 17 or more
 - Blackjack pays 3:2
 
-### Play with Betting System
-```bash
-node cli-with-betting.js
-```
-
-Play with full money management:
+**Betting Mode Features:**
 - Set your starting bankroll
 - Place bets each round
 - Track session statistics
@@ -37,10 +36,14 @@ Play with full money management:
 
 ### Play Multi-agent (2-6 agents)
 ```bash
-node multiagent-cli.js
+node multiagent-cli.js [numAgents]
+
+# Examples:
+node multiagent-cli.js 2  # 2 players
+node multiagent-cli.js 4  # 4 players
 ```
 
-Play blackjack with multiple human agents at one space:
+Play blackjack with multiple human agents at one table:
 - Each agent has their own bankroll
 - Sequential turn-taking
 - Individual betting
@@ -65,7 +68,12 @@ Watch different AI strategies compete:
 
 ### Run Betting Strategy Tournament
 ```bash
-node tournament-with-betting.js
+node tournament.js [rounds] [seed] [initialBankroll]
+
+# Examples:
+node tournament.js 1000       # 1000 rounds with default settings
+node tournament.js 5000 42    # 5000 rounds with seed 42
+node tournament.js 1000 42 2000  # 1000 rounds, seed 42, $2000 bankroll
 ```
 
 Compare AI playing strategies combined with different betting strategies:
@@ -78,29 +86,32 @@ Compare AI playing strategies combined with different betting strategies:
 ```
 blackjack/
 ├── token-sets/
-│   └── standard-stack.json          # 52-card stack definition
+│   └── standard-deck.json          # 52-card deck definition
 ├── agents/
 │   ├── basic-strategy.js           # AI agent implementations
 │   └── tournament.js               # AI vs AI simulation
 ├── blackjack-utils.js              # Hand evaluation utilities
 ├── blackjack-rules.js              # RuleEngine rules
-├── game.js                         # Main game implementation
-├── game-with-betting.js            # Game with betting integration
-├── blackjack-betting.js            # Betting system (NEW!)
-├── card-counting-agents.js         # Hi-Lo card counting (NEW!)
-├── multiagent-game.js             # Multi-agent support (NEW!)
-├── multiagent-cli.js              # Multi-agent CLI (NEW!)
-├── cli.js                          # Interactive CLI
-├── cli-with-betting.js             # CLI with betting (NEW!)
-├── tournament-with-betting.js      # Betting strategy tournament (NEW!)
+├── game.js                         # Single-player game (simple)
+├── multiagent-game.js              # Multi-agent game (advanced)
+├── blackjack-betting.js            # Betting system & strategies
+├── card-counting-agents.js         # Hi-Lo card counting agents
+├── cli.js                          # Interactive CLI (supports --betting flag)
+├── multiagent-cli.js               # Multi-agent CLI (2-6 players)
+├── tournament.js                   # Betting strategy tournament
+├── server.js                       # Network server for multiplayer
+├── client.js                       # Network client for multiplayer
+├── BlackjackEnv.ts                 # Gym environment for RL training
+├── train.js                        # Training script using Gym env
+├── test.js                         # Quick test script
 └── README.md                       # This file
 ```
 
-## New Features
+## Features
 
-### ✅ Phase 1: Betting System
+### 💰 Betting System
 
-Complete bankroll and chip management:
+Complete bankroll and chip management integrated into all game modes:
 
 **Features:**
 - Initial bankroll configuration
@@ -125,16 +136,16 @@ const payout = betting.resolveBet('agent'); // Win!
 console.log(betting.getStats());
 ```
 
-### ✅ Phase 2: Card Counting Agents
+### 🎯 Card Counting Agents
 
 Hi-Lo card counting system with bet spread adjustment:
 
 **Features:**
 - Running count tracking
-- True count calculation (accounts for stacks remaining)
+- True count calculation (accounts for decks remaining)
 - Automatic bet sizing based on advantage
 - Strategy deviations at key counts
-- Multiple counting styles (aggressive, conservative, wonging)
+- Multiple counting styles (aggressive, conservative)
 
 **Agents:**
 - **HiLoCountingAgent**: Standard 1-8x bet spread
@@ -151,9 +162,9 @@ const decision = counter.decide(gameState);
 console.log(counter.getCountStats()); // { runningCount, trueCount, ... }
 ```
 
-### ✅ Phase 3: Multi-agent Support
+### 👥 Multi-Agent Support
 
-Play with 2-6 agents at a single space:
+Play with 2-6 agents at a single table:
 
 **Features:**
 - Support for 2-6 agents
@@ -161,20 +172,26 @@ Play with 2-6 agents at a single space:
 - Sequential turn-taking
 - Automatic dealer play after all agents finish
 - Per-agent statistics
+- Network multiplayer support
 
 **Usage:**
 ```javascript
+import { Engine } from '../../engine/Engine.js';
 import { MultiagentBlackjackGame } from './multiagent-game.js';
 
-const game = new MultiagentBlackjackGame({
+const engine = new Engine();
+const game = new MultiagentBlackjackGame(engine, {
+  isHost: true,
   numAgents: 3,
   agentNames: ['Alice', 'Bob', 'Carol'],
   initialBankroll: 1000
 });
 
-game.collectBets([10, 25, 50]); // Each agent's bet
+// Agents place bets
+engine._agents.forEach(agent => agent.resources.currentBet = 10);
+
 game.deal();
-game.hit();  // Current agent hits
+game.hit();   // Current agent hits
 game.stand(); // Current agent stands
 ```
 
@@ -372,20 +389,42 @@ On a typical laptop:
 
 The bottleneck is rule evaluation. For high-performance sims, cache hand values.
 
+## Architecture Notes
+
+This example provides **two complementary implementations**:
+
+### 1. Simple Single-Player (`game.js`)
+- **Purpose**: Learning and simple use cases
+- **Features**: Single player vs dealer, optional betting
+- **Best for**: CLI games, tournaments, AI training
+- **Complexity**: Low - direct approach with minimal abstractions
+
+### 2. Advanced Multi-Agent (`multiagent-game.js`)
+- **Purpose**: Production-ready multi-player games
+- **Features**: 2-6 agents, networking, CRDT state sync
+- **Best for**: Multiplayer games, networked play, complex scenarios
+- **Complexity**: Higher - uses full Engine/Agent/CRDT architecture
+
+Choose the right one for your needs:
+- **Learning HyperToken?** Start with `game.js`
+- **Building a multiplayer game?** Use `multiagent-game.js`
+- **Just want to play?** Use `cli.js` or `multiagent-cli.js`
+
 ## Future Enhancements
 
 ### Planned Features
 
-4. **Visualize** - Create web UI with canvas rendering
-5. **Network play** - Use RelayServer for online multiagent
+- **Web UI** - Canvas-based visualization with interactive controls
+- **AI Training** - Reinforcement learning integration (partial support via `BlackjackEnv.ts`)
+- **Tournament Modes** - Elimination, sit-and-go formats
 
 ### Community Contributions Welcome
 
 - Additional betting strategies (Kelly Criterion, Oscar's Grind)
 - More card counting systems (Hi-Opt, Omega II, Zen Count)
-- Advanced play options (surrender, insurance)
+- Advanced play options (surrender, insurance, split, double down)
 - Side bets (pairs, 21+3, perfect pairs)
-- Tournament formats (elimination, sit-and-go)
+- Mobile/web clients using the network server
 
 ## License
 
