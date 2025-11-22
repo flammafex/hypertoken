@@ -375,14 +375,18 @@ export class BlackjackGame {
       this.engine.space.createZone("agent-hand-split");
     }
 
-    // Move second card to split hand
+    // Get the current placements and move second card to split hand
+    // We need to get the placement objects before moving to avoid index issues
     const agentHandPlacements = this.engine.space.zone("agent-hand");
-    if (agentHandPlacements.length >= 2) {
-      const secondCard = agentHandPlacements[1];
-      this.engine.space.move(secondCard.id, "agent-hand", "agent-hand-split");
+    const firstCardPlacement = agentHandPlacements[0];
+    const secondCardPlacement = agentHandPlacements[1];
+
+    if (agentHandPlacements.length >= 2 && secondCardPlacement) {
+      // Move the second card to the split hand
+      this.engine.space.move(secondCardPlacement.id, "agent-hand", "agent-hand-split");
     }
 
-    // Deal one card to each hand
+    // Deal one new card to each hand
     const card1 = this.engine.stack.draw();
     const card2 = this.engine.stack.draw();
     if (card1) this.engine.space.place("agent-hand", card1, { faceUp: true });
