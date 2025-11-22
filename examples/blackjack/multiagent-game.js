@@ -9,16 +9,22 @@ import { Space } from '../../core/Space.js';
 import { Engine } from '../../engine/Engine.js';
 import { RuleEngine } from '../../engine/RuleEngine.js';
 import { Agent } from '../../engine/Agent.js';
-import { readFileSync } from 'fs';
-import { 
-  getBestHandValue, 
-  isBusted, 
-  isBlackjack, 
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import {
+  getBestHandValue,
+  isBusted,
+  isBlackjack,
   formatHand,
-  determineWinner 
+  determineWinner
 } from './blackjack-utils.js';
 import { registerBlackjackRules } from './blackjack-rules.js';
 import { registerBettingActions } from './blackjack-betting.js';
+
+// Get the directory of this file (works in both source and compiled contexts)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 try { registerBettingActions(); } catch (e) {}
 
@@ -38,17 +44,28 @@ export class MultiagentBlackjackGame {
     if (!this.engine.stack) {
       let allTokens = [];
       if (isHost) {
-        try {
-          const stackData = JSON.parse(
-            readFileSync('./examples/blackjack/token-sets/standard-stack.json', 'utf8')
-          );
-          const baseTokens = parseTokenSetObject(stackData).tokens;
-          for (let i = 0; i < numStacks; i++) {
-            const stackCopy = baseTokens.map(t => ({ ...t, id: `${t.id}-${i}` }));
-            allTokens.push(...stackCopy);
+        // Load standard deck - try multiple paths for source vs dist
+        const possiblePaths = [
+          join(__dirname, 'token-sets', 'standard-deck.json'),  // When running from source
+          join(__dirname, '..', '..', 'examples', 'blackjack', 'token-sets', 'standard-deck.json')  // When running from dist
+        ];
+
+        let deckPath = possiblePaths.find(p => existsSync(p));
+
+        if (!deckPath) {
+          console.error("Failed to load deck file: Could not find standard-deck.json in any expected location");
+          console.error("Tried paths:", possiblePaths);
+        } else {
+          try {
+            const stackData = JSON.parse(readFileSync(deckPath, 'utf8'));
+            const baseTokens = parseTokenSetObject(stackData).tokens;
+            for (let i = 0; i < numStacks; i++) {
+              const stackCopy = baseTokens.map(t => ({ ...t, id: `${t.id}-${i}` }));
+              allTokens.push(...stackCopy);
+            }
+          } catch (e) {
+            console.error("Failed to load deck file (Host):", e.message);
           }
-        } catch (e) {
-          console.error("Failed to load stack file (Host):", e.message);
         }
       }
       this.engine.stack = new Stack(this.engine.session, allTokens, { seed, autoInit: isHost });
