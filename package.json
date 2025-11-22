@@ -10,10 +10,23 @@
     "ws": "^8.18.3"
   },
   "scripts": {
+    "test:core": "node --loader ./test/ts-esm-loader.js test/testCore.js",
+    "test:engine": "node --loader ./test/ts-esm-loader.js test/testEngine.js",
+    "test:exporters": "node --loader ./test/ts-esm-loader.js test/testExporters.js",
     "test:token": "node --loader ./test/ts-esm-loader.js test/testTokenActions.js",
     "test:batch": "node --loader ./test/ts-esm-loader.js test/testBatchActions.js",
     "test:player-transfers": "node --loader ./test/ts-esm-loader.js test/testPlayerTransfers.js",
-    "test": "npm run test:token && npm run test:batch && npm run test:player-transfers",
+    "test:plugins": "node testPlugins.js",
+    "test:plugin-loader": "node --loader ./test/ts-esm-loader.js test/testPluginLoader.js",
+    "test:integration": "node testIntegration.js",
+    "test:sync": "node --loader ./test/ts-esm-loader.js test/testSync.ts",
+    "test:rule-sync": "node --loader ./test/ts-esm-loader.js test/testRuleSync.ts",
+    "test:game-loop": "node --loader ./test/ts-esm-loader.js test/testGameLoop.ts",
+    "test:unit": "npm run test:core && npm run test:engine && npm run test:exporters && npm run test:token && npm run test:batch && npm run test:player-transfers",
+    "test:plugins-all": "npm run test:plugins && npm run test:plugin-loader",
+    "test:network": "npm run test:sync && npm run test:rule-sync",
+    "test": "npm run test:unit && npm run test:plugins-all && npm run test:integration && npm run test:network",
+    "test:all": "npm test && npm run test:game-loop",
     "test:pd": "node examples/prisoners-dilemma/testPD.js"
   }
 }
