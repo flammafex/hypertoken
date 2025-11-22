@@ -25,6 +25,6 @@ const space = new Space(session);
 space.place("altar", c); 
 console.log("Space zones:", space.zoneCount("altar"));
 
-const source = new Source(stack);
+const source = new Source(session, [stack]);
 source.shuffle(123);
 console.log("Source remaining:", source.inspect().remaining);

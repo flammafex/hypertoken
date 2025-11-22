@@ -576,8 +576,8 @@ function runTests() {
     if (farmer.resources.gold !== 150) {
       throw new Error('Farmer tribute failed');
     }
-    if (warrior.resources.gold !== 350) {
-      throw new Error('Warrior tribute failed (Expected 250, got 350)');
+    if (warrior.resources.gold !== 250) {
+      throw new Error(`Warrior tribute failed (Expected 250, got ${warrior.resources.gold})`);
     }
     
     // 3. Warrior steals from Merchant
