@@ -465,7 +465,13 @@ async function runMemoryBenchmarks(): Promise<void> {
   console.log('\n' + '='.repeat(80));
   console.log('✅ All memory benchmarks completed!');
   console.log('='.repeat(80) + '\n');
+
+  // Force exit since event listeners may keep process alive
+  process.exit(0);
 }
 
 // Run benchmarks
-runMemoryBenchmarks().catch(console.error);
+runMemoryBenchmarks().catch((err) => {
+  console.error('Benchmark failed:', err);
+  process.exit(1);
+});
