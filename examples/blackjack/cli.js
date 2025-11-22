@@ -146,6 +146,17 @@ async function playRound(game, bettingManager = null) {
       return true;
     } else if ((choice === 'd' || choice === 'double') && state.canDouble) {
       console.log('\n💎 Doubling down!');
+
+      // Update betting manager to reflect the doubled bet
+      if (bettingManager) {
+        try {
+          bettingManager.doubleDown();
+        } catch (err) {
+          console.log(`❌ ${err.message}`);
+          continue;
+        }
+      }
+
       state = game.doubleDown();
       clearScreen();
       printBanner(bettingManager !== null);
