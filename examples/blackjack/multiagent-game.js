@@ -32,17 +32,19 @@ const __dirname = dirname(__filename);
 try { registerBettingActions(); } catch (e) {}
 
 export class MultiagentBlackjackGame {
-  constructor(engine, { 
+  constructor(engine, {
     isHost = false,
-    numAgents = 2, 
-    numStacks = 6, 
-    seed = null, 
+    numAgents = 2,
+    numStacks = 6,
+    seed = null,
     initialBankroll = 1000,
-    agentNames = null
+    agentNames = null,
+    variant = 'american'
   } = {}) {
     this.engine = engine;
     this.numAgents = numAgents;
     this.isHost = isHost;
+    this.variant = variant; // 'american' or 'european'
     
     if (!this.engine.stack) {
       let allTokens = [];
@@ -113,19 +115,30 @@ export class MultiagentBlackjackGame {
       p.resources.busted = 0;
     });
 
-    this.engine.space.collectAllInto(this.engine.stack); 
-    
+    this.engine.space.collectAllInto(this.engine.stack);
+
+    // Deal to agents
     for (let i = 0; i < 2; i++) {
       this.engine._agents.forEach(agent => {
-        if (agent.resources.currentBet > 0) { 
+        if (agent.resources.currentBet > 0) {
           const card = this.engine.stack.draw();
           if (card) this.engine.space.place(agent.handZone, card, { faceUp: true });
         }
       });
-      
+    }
+
+    // Deal to dealer based on variant
+    if (this.variant === 'european') {
+      // European: Only 1 card initially (face up)
       const dealerCard = this.engine.stack.draw();
-      const faceUp = i === 1; 
-      if (dealerCard) this.engine.space.place("dealer-hand", dealerCard, { faceUp });
+      if (dealerCard) this.engine.space.place("dealer-hand", dealerCard, { faceUp: true });
+    } else {
+      // American: 2 cards (one face down, one face up)
+      for (let i = 0; i < 2; i++) {
+        const dealerCard = this.engine.stack.draw();
+        const faceUp = i === 1;
+        if (dealerCard) this.engine.space.place("dealer-hand", dealerCard, { faceUp });
+      }
     }
 
     // Start Round via CRDT (GameLoop will reactively emit loop:start)
@@ -249,6 +262,12 @@ export class MultiagentBlackjackGame {
     const agent = this.engine.loop.activeAgent;
     if (!agent) return;
 
+    // Insurance not available in European variant
+    if (this.variant === 'european') {
+      console.error("Insurance not available in European blackjack variant");
+      return;
+    }
+
     const dealerCards = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
     if (!canTakeInsurance(dealerCards)) {
       console.error("Insurance not available - dealer must show an Ace");
@@ -321,12 +340,20 @@ export class MultiagentBlackjackGame {
 
   playDealer() {
     if (!this.isHost) return;
-    
+
     console.log("🤖 Dealer playing...");
-    
-    const dealerHand = this.engine.space.zone("dealer-hand");
-    if (dealerHand[0]) {
-      this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+
+    // Variant-specific dealer card handling
+    if (this.variant === 'european') {
+      // European: Deal hole card now (after all players finish)
+      const holeCard = this.engine.stack.draw();
+      if (holeCard) this.engine.space.place("dealer-hand", holeCard, { faceUp: true });
+    } else {
+      // American: Reveal hidden card
+      const dealerHand = this.engine.space.zone("dealer-hand");
+      if (dealerHand[0]) {
+        this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+      }
     }
 
     let cards = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
