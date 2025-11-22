@@ -195,7 +195,7 @@ export class Engine extends Emitter {
   get state(): IEngineState {
     return {
       version: "2.0.0-crdt",
-      turn: this._gameState.turn,
+      turn: this._gameState.turn ?? null,
       agents: this._agents,
       stack: this.stack,
       space: this.space,

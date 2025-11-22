@@ -143,7 +143,7 @@ function runTests(): boolean {
     if (!character._attachments || character._attachments.length !== 1) {
       throw new Error('Attachment not added to host');
     }
-    if (character._attachments[0].token !== sword) {
+    if ((character._attachments[0] as any).token !== sword) {
       throw new Error('Wrong token attached');
     }
     if (sword._attachedTo !== character.id) {

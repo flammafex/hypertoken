@@ -6,6 +6,7 @@ import { Engine } from "./Engine.js";
 import { Agent } from "./Agent.js"; // This import is necessary for activeAgent's type
 import { Chronicle } from "../core/Chronicle.js";
 import { IGameLoopState } from "../core/types.js";
+import { IEngineAgent } from "./types.js";
 
 export class GameLoop extends Emitter {
   engine: Engine;
@@ -124,7 +125,7 @@ export class GameLoop extends Emitter {
   }
 
   // FIX 4: This entire getter must be present for compilation to pass
-  get activeAgent(): Agent | null {
+  get activeAgent(): IEngineAgent | null {
     const idx = this.activeAgentIndex;
     // Check Agent import is resolved here, otherwise the Agent type won't work
     if (idx >= 0 && idx < this.engine._agents.length) {
