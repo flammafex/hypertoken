@@ -34,6 +34,9 @@
     "test:plugins-all": "npm run test:plugins && npm run test:plugin-loader",
     "test:network": "npm run test:sync && npm run test:rule-sync",
     "test": "npm run test:unit && npm run test:engine-components && npm run test:core-components && npm run test:plugins-all && npm run test:integration && npm run test:network",
-    "test:pd": "node examples/prisoners-dilemma/testPD.js"
+    "test:pd": "node examples/prisoners-dilemma/testPD.js",
+    "benchmark": "node --loader ./test/ts-esm-loader.js test/benchmarks.ts",
+    "benchmark:memory": "node --expose-gc --loader ./test/ts-esm-loader.js test/benchmarks-memory.ts",
+    "benchmark:all": "npm run benchmark && npm run benchmark:memory"
   }
 }
