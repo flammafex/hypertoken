@@ -12,6 +12,7 @@ import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import { BlackjackGame } from './game.js';
 import { BettingManager, getPayoutMessage, formatSessionStats } from './blackjack-betting.js';
+import { formatHand } from './blackjack-utils.js';
 
 const rl = readline.createInterface({ input, output });
 
@@ -195,7 +196,8 @@ async function playSplitHands(game, splitState, bettingManager = null) {
                    result.result === 'push' ? 'PUSH' : 'LOSE';
     }
 
-    console.log(`\n${handLabel}: ${result.display} (${result.value}) - ${resultText}`);
+    const handDisplay = formatHand(result.cards);
+    console.log(`\n${handLabel}: ${handDisplay} (${result.value}) - ${resultText}`);
   });
 
   if (bettingManager) {
