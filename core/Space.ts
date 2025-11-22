@@ -15,17 +15,37 @@ export interface SpreadZone {
   label?: string;
 }
 
+export interface SpaceEvent {
+  type: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Space: CRDT-backed spatial zone management
+ * Manages 2D placement of tokens in named zones with locking and layout patterns
+ */
 export class Space extends Emitter {
-  // CHANGED: Made public readonly to allow sharing with Stack/Agent
   public readonly session: Chronicle;
-  
+
   name: string;
   spreads: Record<string, SpreadZone[]> = {};
-  _lockedZones: Set<string> = new Set();
-  log: any[] = [];
+  private _lockedZones: Set<string> = new Set();
+  log: SpaceEvent[] = [];
 
+  /**
+   * Create a new Space
+   * @param session - Chronicle instance for CRDT state management
+   * @param name - Name of this space
+   * @throws Error if session is null/undefined
+   */
   constructor(session: Chronicle, name: string = "space") {
     super();
+
+    if (!session) {
+      throw new Error("Space requires a valid Chronicle session");
+    }
+
     this.session = session;
     this.name = name;
   }
@@ -71,7 +91,7 @@ export class Space extends Emitter {
   cards(zoneName?: string): readonly IPlacementCRDT[] {
     if (zoneName) return this.zone(zoneName);
     if (!this.session.state.zones) return [];
-    return Object.values(this.session.state.zones).flat();
+    return (Object.values(this.session.state.zones) as IPlacementCRDT[][]).flat();
   }
 
   findCard(idOrFn: string | ((p: IPlacementCRDT) => boolean)): IPlacementCRDT | null {
@@ -86,8 +106,24 @@ export class Space extends Emitter {
     return this._lockedZones.has(name);
   }
 
+  /**
+   * Place a token in a zone
+   * @param zoneName - Name of the zone
+   * @param token - Token to place
+   * @param opts - Placement options (position, face up, etc.)
+   * @returns Placement object or null if zone is locked
+   * @throws Error if token is invalid
+   * @emits space:locked if zone is locked
+   */
   place(zoneName: string, token: IToken, opts: Partial<IPlacementCRDT> = {}): IPlacementCRDT | null {
-    if (this._isLocked(zoneName)) return null;
+    if (!token || !token.id) {
+      throw new Error("Cannot place invalid token (missing id)");
+    }
+
+    if (this._isLocked(zoneName)) {
+      this.emit("space:locked", { operation: "place", zoneName });
+      return null;
+    }
 
     const safeToken = this._sanitizeToken(token);
 
@@ -110,14 +146,28 @@ export class Space extends Emitter {
       doc.zones[zoneName].push(placement);
     });
 
-    this.log.push({ t: "place", zoneName, placementId: placement.id });
+    this.log.push({ type: "place", zoneName, placementId: placement.id, timestamp: Date.now() });
     this.emit("place", placement);
     return placement;
   }
 
+  /**
+   * Move a placement from one zone to another
+   * @param fromZone - Source zone name
+   * @param toZone - Destination zone name
+   * @param placementId - ID of placement to move
+   * @param opts - Optional new position
+   * @throws Error if placement not found
+   * @emits space:locked if either zone is locked
+   * @emits space:notFound if placement doesn't exist
+   */
   move(fromZone: string, toZone: string, placementId: string, opts: { x?: number; y?: number } = {}): void {
-    if (this._isLocked(fromZone) || this._isLocked(toZone)) return;
+    if (this._isLocked(fromZone) || this._isLocked(toZone)) {
+      this.emit("space:locked", { operation: "move", fromZone, toZone });
+      return;
+    }
 
+    let found = false;
     this.session.change(`move card from ${fromZone} to ${toZone}`, (doc) => {
       if (!doc.zones) return;
       const from = doc.zones[fromZone];
@@ -126,8 +176,9 @@ export class Space extends Emitter {
       const idx = from.findIndex(p => p.id === placementId);
       if (idx === -1) return;
 
+      found = true;
       const [placement] = from.splice(idx, 1);
-      
+
       if (opts.x !== undefined) placement.x = opts.x;
       if (opts.y !== undefined) placement.y = opts.y;
 
@@ -135,40 +186,82 @@ export class Space extends Emitter {
       doc.zones[toZone].push(placement);
     });
 
-    this.log.push({ t: "move", fromZone, toZone, placementId });
+    if (!found) {
+      this.emit("space:notFound", { operation: "move", placementId, fromZone });
+      return;
+    }
+
+    this.log.push({ type: "move", fromZone, toZone, placementId, timestamp: Date.now() });
     this.emit("move", { fromZone, toZone, placementId });
   }
 
+  /**
+   * Flip a placement face up or face down
+   * @param zoneName - Zone name
+   * @param placementId - Placement ID
+   * @param faceUp - Optional explicit face state (toggles if not provided)
+   * @emits space:locked if zone is locked
+   * @emits space:notFound if placement doesn't exist
+   */
   flip(zoneName: string, placementId: string, faceUp?: boolean): void {
-    if (this._isLocked(zoneName)) return;
+    if (this._isLocked(zoneName)) {
+      this.emit("space:locked", { operation: "flip", zoneName });
+      return;
+    }
 
+    let found = false;
     this.session.change(`flip card in ${zoneName}`, (doc) => {
       if (!doc.zones) return;
       const zone = doc.zones[zoneName];
       if (!zone) return;
       const placement = zone.find(p => p.id === placementId);
       if (placement) {
+        found = true;
         placement.faceUp = faceUp !== undefined ? faceUp : !placement.faceUp;
       }
     });
 
-    this.log.push({ t: "flip", zoneName, placementId, faceUp });
+    if (!found) {
+      this.emit("space:notFound", { operation: "flip", placementId, zoneName });
+      return;
+    }
+
+    this.log.push({ type: "flip", zoneName, placementId, faceUp, timestamp: Date.now() });
     this.emit("flip", { id: placementId, faceUp });
   }
 
+  /**
+   * Remove a placement from a zone
+   * @param zoneName - Zone name
+   * @param placementId - Placement ID
+   * @emits space:locked if zone is locked
+   * @emits space:notFound if placement doesn't exist
+   */
   remove(zoneName: string, placementId: string): void {
-    if (this._isLocked(zoneName)) return;
+    if (this._isLocked(zoneName)) {
+      this.emit("space:locked", { operation: "remove", zoneName });
+      return;
+    }
 
+    let found = false;
     this.session.change(`remove card from ${zoneName}`, (doc) => {
       if (!doc.zones) return;
       const zone = doc.zones[zoneName];
       if (zone) {
         const idx = zone.findIndex(p => p.id === placementId);
-        if (idx >= 0) zone.splice(idx, 1);
+        if (idx >= 0) {
+          zone.splice(idx, 1);
+          found = true;
+        }
       }
     });
 
-    this.log.push({ t: "remove", zoneName, placementId });
+    if (!found) {
+      this.emit("space:notFound", { operation: "remove", placementId, zoneName });
+      return;
+    }
+
+    this.log.push({ type: "remove", zoneName, placementId, timestamp: Date.now() });
     this.emit("remove", { id: placementId });
   }
 
@@ -283,7 +376,7 @@ export class Space extends Emitter {
       if (!doc.zones) doc.zones = {};
       doc.zones[name] = items;
     });
-    this.log.push({ t: "shuffleZone", name, ts: Date.now() });
+    this.log.push({ type: "shuffleZone", name, timestamp: Date.now() });
   }
 
   pile(name: string): readonly IPlacementCRDT[] {

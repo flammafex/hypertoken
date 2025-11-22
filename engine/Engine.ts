@@ -231,9 +231,9 @@ export class Engine extends Emitter {
         : null,
       source: source
         ? {
-            remaining: source._stack?.length ?? 0,
-            burned: source._burned?.length ?? 0,
-            policy: source._reshufflePolicy ?? null
+            remaining: source.tokens?.length ?? 0,
+            burned: source.burned?.length ?? 0,
+            policy: source.policy ?? null
           }
         : null
     };
@@ -244,10 +244,7 @@ export class Engine extends Emitter {
       ...summary,
       stackState: stack?.toJSON?.() ?? null,
       spaceState: space?.snapshot?.() ?? null,
-      sourceState: {
-        stacks: source?._stacks?.length ?? 0,
-        cards: source?._stack ?? []
-      }
+      sourceState: source?.inspect?.() ?? null
     };
   }
 

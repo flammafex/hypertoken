@@ -780,13 +780,7 @@ export const BatchActions = {
       } else if (source === 'discard' && engine.stack) {
         tokensFromSource = engine.stack.discards || [];
       } else if (source === 'source' && engine.source) {
-        // @ts-ignore
-        if (engine.source._stacks) {
-          // @ts-ignore
-          engine.source._stacks.forEach((stack: any) => {
-            tokensFromSource.push(...(stack._stack || []));
-          });
-        }
+        tokensFromSource = engine.source.tokens || [];
       } else if (engine.space) {
         // @ts-ignore
         const zone = engine.space.zone(source);
