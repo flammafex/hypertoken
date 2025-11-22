@@ -14,13 +14,20 @@ A complete implementation of Blackjack using the HyperToken engine, demonstratin
 
 ## Quick Start
 
+**Note**: Run examples from the `examples/blackjack` directory with the TypeScript loader:
+
+```bash
+cd examples/blackjack
+node --loader ../../test/ts-esm-loader.js <command>
+```
+
 ### Play Single-Agent Blackjack
 ```bash
 # Play without betting
-node cli.js
+node --loader ../../test/ts-esm-loader.js cli.js
 
 # Play with betting system
-node cli.js --betting
+node --loader ../../test/ts-esm-loader.js cli.js --betting
 ```
 
 Play blackjack in your terminal against the dealer. Standard rules apply:
@@ -36,11 +43,11 @@ Play blackjack in your terminal against the dealer. Standard rules apply:
 
 ### Play Multi-agent (2-6 agents)
 ```bash
-node multiagent-cli.js [numAgents]
+node --loader ../../test/ts-esm-loader.js multiagent-cli.js [numAgents]
 
 # Examples:
-node multiagent-cli.js 2  # 2 players
-node multiagent-cli.js 4  # 4 players
+node --loader ../../test/ts-esm-loader.js multiagent-cli.js 2  # 2 players
+node --loader ../../test/ts-esm-loader.js multiagent-cli.js 4  # 4 players
 ```
 
 Play blackjack with multiple human agents at one table:
@@ -52,10 +59,10 @@ Play blackjack with multiple human agents at one table:
 ### Run AI Tournament
 ```bash
 # Run 1000 rounds with default agents
-node agents/tournament.js
+node --loader ../../test/ts-esm-loader.js agents/tournament.js
 
 # Run 5000 rounds with specific seed
-node agents/tournament.js 5000 42
+node --loader ../../test/ts-esm-loader.js agents/tournament.js 5000 42
 
 # Arguments: [rounds] [seed]
 ```
@@ -68,12 +75,12 @@ Watch different AI strategies compete:
 
 ### Run Betting Strategy Tournament
 ```bash
-node tournament.js [rounds] [seed] [initialBankroll]
+node --loader ../../test/ts-esm-loader.js tournament.js [rounds] [seed] [initialBankroll]
 
 # Examples:
-node tournament.js 1000       # 1000 rounds with default settings
-node tournament.js 5000 42    # 5000 rounds with seed 42
-node tournament.js 1000 42 2000  # 1000 rounds, seed 42, $2000 bankroll
+node --loader ../../test/ts-esm-loader.js tournament.js 1000       # 1000 rounds
+node --loader ../../test/ts-esm-loader.js tournament.js 5000 42    # With seed 42
+node --loader ../../test/ts-esm-loader.js tournament.js 1000 42 2000  # Custom bankroll
 ```
 
 Compare AI playing strategies combined with different betting strategies:
