@@ -18,6 +18,16 @@
  */
 import { IToken, TokenMeta } from "./types.js";
 
+/**
+ * Token: Universal entity representation
+ *
+ * Tokens are immutable data structures representing game entities (cards, items, agents, etc.)
+ * They can be placed in Stacks, Spaces, and Sources, and support:
+ * - Metadata and grouping
+ * - Reversals (tarot-style)
+ * - Tags and attachments
+ * - Merge/split tracking for composite entities
+ */
 export class Token implements IToken {
   id: string;
   group: string | null;
@@ -27,11 +37,11 @@ export class Token implements IToken {
   char: string;
   kind: string;
   index: number;
-  
+
   // Runtime properties
   _rev?: boolean;
   _tags?: Set<string>;
-  _attachments?: any[];
+  _attachments?: unknown[];
   _attachedTo?: string;
   _attachmentType?: string;
 
@@ -46,15 +56,19 @@ export class Token implements IToken {
   _splitIndex?: number;
   _splitAt?: number;
 
-  constructor({ 
-    id, 
-    group = null, 
-    label = null, 
-    text = "", 
-    meta = {}, 
-    char = "□", 
-    kind = "default", 
-    index = 0 
+  /**
+   * Create a new Token
+   * @param props - Token properties (all optional, will use defaults)
+   */
+  constructor({
+    id,
+    group = null,
+    label = null,
+    text = "",
+    meta = {},
+    char = "□",
+    kind = "default",
+    index = 0
   }: Partial<IToken> = {}) {
     this.id = id ?? `token-${index}`;
     this.group = group;

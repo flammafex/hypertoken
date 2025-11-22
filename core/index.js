@@ -20,5 +20,6 @@ export { Source as Source } from "./Source.js";
 export { Chronicle as Chronicle } from "./Chronicle.js";
 export { Emitter, EventRegistry } from "./events.js";
 export { mulberry32, shuffleArray } from "./random.js";
-export { EventBus } from "./EventBus.js";
+// EventBus is deprecated - use Emitter instead
+export { Emitter as EventBus } from "./events.js";
 export { loadTokenSetJSON, parseTokenSetObject } from "./loaders/tokenSetLoader.js";

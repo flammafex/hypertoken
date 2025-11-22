@@ -72,15 +72,26 @@ export interface IStackState {
   discards: IToken[];
 }
 
+export interface ISourceState {
+  stackIds: string[];
+  tokens: IToken[];
+  burned: IToken[];
+  seed: number | null;
+  reshufflePolicy: {
+    threshold: number | null;
+    mode: "auto" | "manual";
+  };
+}
+
 export interface IGameLoopState {
   turn: number;
   running: boolean;
   activeAgentIndex: number;
-  phase: string; 
+  phase: string;
   maxTurns: number;
 }
 
-// NEW: Rule State
+// Rule State
 export interface IRuleState {
   fired: Record<string, number>; // Maps RuleName -> Timestamp
 }
@@ -88,10 +99,11 @@ export interface IRuleState {
 export interface HyperTokenState {
   zones?: Record<string, IPlacementCRDT[]>;
   stack?: IStackState;
+  source?: ISourceState;
   gameLoop?: IGameLoopState;
-  rules?: IRuleState; // Added rules state
-  agents?: Record<string, any>;
+  rules?: IRuleState;
+  agents?: Record<string, unknown>;
   version?: string;
-  
-  [key: string]: any;
+
+  [key: string]: unknown;
 }

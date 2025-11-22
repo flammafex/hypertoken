@@ -78,18 +78,37 @@ export class Emitter {
   }
 }
 
+export interface EventRegistryOptions {
+  storage?: Storage;
+  maxEvents?: number;
+  pruneStrategy?: "oldest" | "fifo";
+}
+
+/**
+ * EventRegistry: Event logging and replay system with automatic pruning
+ * Maintains a bounded log of events with configurable pruning strategies
+ */
 export class EventRegistry extends Emitter {
   name: string;
   events: IEvent[];
   private _sources: Set<Emitter>;
-  private storage?: Storage; 
+  private storage?: Storage;
+  private _maxEvents: number;
+  private _pruneStrategy: "oldest" | "fifo";
 
-  constructor(name: string = "session", { storage }: { storage?: Storage } = {}) {
+  /**
+   * Create a new EventRegistry
+   * @param name - Name of this registry
+   * @param options - Configuration options
+   */
+  constructor(name: string = "session", { storage, maxEvents = 10000, pruneStrategy = "fifo" }: EventRegistryOptions = {}) {
     super();
     this.name = name;
     this.events = [];
     this._sources = new Set();
     this.storage = storage;
+    this._maxEvents = maxEvents;
+    this._pruneStrategy = pruneStrategy;
   }
 
   attach(source: Emitter, label: string | null = null): this {
@@ -110,7 +129,14 @@ export class EventRegistry extends Emitter {
     return this;
   }
 
-  record(type: string, source: string, payload: any): void {
+  /**
+   * Record an event to the registry
+   * Automatically prunes old events if max limit is reached
+   * @param type - Event type
+   * @param source - Event source identifier
+   * @param payload - Event payload data
+   */
+  record(type: string, source: string, payload: unknown): void {
     const evt: IEvent = {
       id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now() + Math.random()),
       type,
@@ -119,10 +145,58 @@ export class EventRegistry extends Emitter {
       ts: Date.now()
     };
     this.events.push(evt);
+
+    // Prune if we've exceeded max events
+    if (this.events.length > this._maxEvents) {
+      this._prune();
+    }
+
     // Emit without wildcard to prevent infinite loops if registry is attached to itself
     if (this._events[type]) {
       for (const fn of this._events[type]) fn(evt);
     }
+  }
+
+  /**
+   * Prune events based on configured strategy
+   * @private
+   */
+  private _prune(): void {
+    const excess = this.events.length - this._maxEvents;
+    if (excess <= 0) return;
+
+    if (this._pruneStrategy === "fifo" || this._pruneStrategy === "oldest") {
+      // Both strategies remove from the beginning
+      this.events.splice(0, excess);
+      this.emit("registry:pruned", { count: excess, strategy: this._pruneStrategy });
+    }
+  }
+
+  /**
+   * Set maximum number of events to retain
+   * @param max - Maximum event count
+   * @throws Error if max is not a positive integer
+   */
+  setMaxEvents(max: number): this {
+    if (max < 1 || !Number.isInteger(max)) {
+      throw new Error(`Invalid max events: ${max}. Must be a positive integer.`);
+    }
+    this._maxEvents = max;
+    if (this.events.length > this._maxEvents) {
+      this._prune();
+    }
+    return this;
+  }
+
+  /**
+   * Get current event count and maximum
+   */
+  getStats(): { current: number; max: number; strategy: string } {
+    return {
+      current: this.events.length,
+      max: this._maxEvents,
+      strategy: this._pruneStrategy
+    };
   }
 
   last(n: number | null = null): IEvent[] { 
