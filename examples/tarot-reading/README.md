@@ -60,17 +60,16 @@ The system generates multi-layered interpretations:
 ## Installation
 
 ```bash
-# Ensure you have the HyperToken framework
-# Place these files in your HyperToken directory:
-# - tarot-stack.json
-# - tarot-reader.js
-# - tarot-cli.js
-
-# Make the CLI execuspace
-chmod +x tarot-cli.js
+# Ensure you have the HyperToken framework and dependencies installed
+cd /path/to/hypertoken
+npm install
 
 # Run the interactive CLI
-node tarot-cli.js
+cd examples/tarot-reading
+node --loader ../../test/ts-esm-loader.js tarot-cli.js
+
+# Or run the test suite
+node --loader ../../test/ts-esm-loader.js testTarot.js
 ```
 
 ## Usage
@@ -78,7 +77,7 @@ node tarot-cli.js
 ### Interactive CLI
 
 ```bash
-node tarot-cli.js
+node --loader ../../test/ts-esm-loader.js tarot-cli.js
 ```
 
 The CLI provides:
@@ -114,6 +113,11 @@ const spreads = reader.getAvailableSpreads();
 
 // Access reading history
 const history = reader.getHistory();
+```
+
+**Note:** When running programmatically, you need to use Node's TypeScript loader:
+```bash
+node --loader path/to/ts-esm-loader.js your-script.js
 ```
 
 ### Example Reading Output
@@ -301,9 +305,10 @@ The tarot reader is built on HyperToken's modular architecture and can be integr
 ### Dependencies
 
 - HyperToken framework components:
-  - `Space.js` - Card layout and spread management
-  - `stack.js` - Card collection and shuffling
-  - `EventBus.js` - Event-driven architecture
+  - `Space.ts` - Card layout and spread management with CRDT-backed state
+  - `Stack.ts` - Card collection and shuffling with CRDT-backed state
+  - `Chronicle.ts` - CRDT state management using Automerge
+  - `events.ts` - Event-driven architecture (Emitter)
   - `tokenSetLoader.js` - JSON token set loading
 
 ### Token Schema Compliance

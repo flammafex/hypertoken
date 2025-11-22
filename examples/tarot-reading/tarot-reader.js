@@ -7,7 +7,7 @@
 
 import { Space } from '../../core/Space.js';
 import { Stack } from '../../core/Stack.js';
-import { EventBus } from '../../core/EventBus.js';
+import { Chronicle } from '../../core/Chronicle.js';
 import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
@@ -19,8 +19,8 @@ import { dirname, resolve } from 'path';
  */
 export class TarotReader {
   constructor(stackPath = './tarot-stack.json') {
-    this.events = new EventBus();
-    this.space = new Space(this.events);
+    this.session = new Chronicle();
+    this.space = new Space(this.session, 'tarot-space');
     this.stack = null;
     this.stackPath = stackPath;
     this.readingHistory = [];
@@ -35,18 +35,18 @@ export class TarotReader {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const absolutePath = resolve(__dirname, this.stackPath);
-    
+
     // Read and parse the JSON file
     const jsonData = await readFile(absolutePath, 'utf-8');
     const tokenSet = parseTokenSetObject(JSON.parse(jsonData));
-    
-    this.stack = new Stack(tokenSet.tokens, { kind: 'tarot' });
+
+    this.stack = new Stack(this.session, tokenSet.tokens);
     this.stack.shuffle();
-    
+
     // Define standard spreads
     this.defineSpreads();
-    
-    this.events.emit('tarot:initialized', { stackSize: this.stack.size });
+
+    this.space.emit('tarot:initialized', { stackSize: this.stack.size });
     return this;
   }
 
@@ -154,7 +154,7 @@ export class TarotReader {
 
     // Clear previous reading
     spread.forEach(position => {
-      this.space.zones.set(position.id, []);
+      this.space.clearZone(position.id);
     });
 
     // Deal cards into the spread
@@ -194,7 +194,7 @@ export class TarotReader {
     };
 
     this.readingHistory.push(this.currentReading);
-    this.events.emit('tarot:reading-complete', this.currentReading);
+    this.space.emit('tarot:reading-complete', this.currentReading);
 
     return this.currentReading;
   }
