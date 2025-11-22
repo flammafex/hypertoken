@@ -17,11 +17,27 @@
 
 /**
  * Prisoner's Dilemma Tournament CLI
- * 
+ *
  * Run classic game theory tournaments from the command line
  */
 
-// Mock Engine for standalone use
+/**
+ * Mock Engine for standalone use
+ *
+ * This example uses a lightweight MockEngine instead of the full HyperToken Engine
+ * because the Prisoner's Dilemma game doesn't require the card/token manipulation
+ * features (Stack, Space, Source) that HyperToken provides.
+ *
+ * The MockEngine implements only the minimal agent and game state management
+ * actions needed for this game theory simulation, making the example:
+ * - Easy to understand and modify
+ * - Self-contained with minimal dependencies
+ * - Fast to execute
+ *
+ * For examples that use the full HyperToken Engine with card games, see:
+ * - examples/blackjack/
+ * - examples/tarot-reading/
+ */
 class MockEngine {
   constructor() {
     this._agents = [];
