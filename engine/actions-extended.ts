@@ -327,7 +327,14 @@ export const AgentActions = {
     
     for (let i = 0; i < (count!); i++) {
       const card = drawSource.draw ? drawSource.draw() : null;
-      if (card) agent.inventory.push(card);
+      if (card) {
+        // Handle both single token and array of tokens
+        if (Array.isArray(card)) {
+          agent.inventory.push(...card);
+        } else {
+          agent.inventory.push(card);
+        }
+      }
     }
   },
   
@@ -494,12 +501,14 @@ export const AgentActions = {
     if (!engine._transactions) engine._transactions = [];
     engine._transactions.push({
       type: 'trade',
+      from: agent1.name,
+      to: agent2.name,
       agent1: agent1.name,
       agent2: agent2.name,
       offer1: offer1.token ? { token: offer1.token.id } : { resource: offer1.resource, amount: offer1.amount },
       offer2: offer2.token ? { token: offer2.token.id } : { resource: offer2.resource, amount: offer2.amount },
       timestamp: Date.now()
-    });
+    } as any);
     
     engine.emit("agent:trade", { agent1: agent1.name, agent2: agent2.name, offer1, offer2 });
     return { success: true, transaction: engine._transactions[engine._transactions.length - 1] };

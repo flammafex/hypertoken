@@ -6,6 +6,7 @@ import { GymEnvironment, Observation, StepResult, Space } from "../../interface/
 import { Engine } from "../../engine/Engine.js";
 import { MultiagentBlackjackGame } from "./multiagent-game.js";
 import { Agent } from "../../engine/Agent.js";
+import { IEngineAgent } from "../../engine/types.js";
 import { getBestHandValue, isSoftHand } from "./blackjack-utils.js";
 
 export class BlackjackEnv extends GymEnvironment {
@@ -99,7 +100,7 @@ export class BlackjackEnv extends GymEnvironment {
 
   // --- Helpers ---
 
-  private getAgent(): Agent {
+  private getAgent(): IEngineAgent {
     return this.engine._agents.find(p => p.name === this.agentName)!;
   }
 
