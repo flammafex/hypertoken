@@ -1,4 +1,4 @@
-# 🃏 Accordion Solitaire
+# 🃏 Accordion Solitaire &mdash; Good luck, robot!
 
 **The nearly impossible solitaire game - perfect for probability research!**
 
