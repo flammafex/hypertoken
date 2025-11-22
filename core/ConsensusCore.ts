@@ -4,17 +4,17 @@
  */
 import * as A from "@automerge/automerge";
 import { Chronicle } from "./Chronicle.js";
-import { NetworkInterface } from "../interface/NetworkInterface.js";
+import { PeerConnection } from "../network/PeerConnection.js";
 import { Emitter } from "./events.js";
 import { Buffer } from "node:buffer";
 
 export class ConsensusCore extends Emitter {
   session: Chronicle;
-  network: NetworkInterface;
+  network: PeerConnection;
   
   private _syncStates: Map<string, A.SyncState> = new Map();
 
-  constructor(session: Chronicle, network: NetworkInterface) {
+  constructor(session: Chronicle, network: PeerConnection) {
     super();
     this.session = session;
     this.network = network;

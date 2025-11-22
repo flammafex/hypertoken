@@ -1,5 +1,6 @@
 /*
- * interface/RelayServer.ts
+ * network/RelayServer.ts
+ * WebSocket relay server for P2P engine synchronization
  * With Packet Tracing
  */
 import { Emitter } from "../core/events.js";
@@ -10,7 +11,7 @@ export class RelayServer extends Emitter {
   engine: Engine | null;
   port: number;
   verbose: boolean;
-  clients: Map<WebSocket, string>; 
+  clients: Map<WebSocket, string>;
   wss: WebSocketServer | null = null;
 
   constructor(engine: Engine | null = null, { port = 8080, verbose = false } = {}) {
@@ -31,7 +32,7 @@ export class RelayServer extends Emitter {
       this.wss.on("connection", (ws: WebSocket) => {
         const peerId = `peer-${Math.random().toString(36).substring(2, 9)}`;
         this.clients.set(ws, peerId);
-        
+
         console.log(`[Server] Client connected: ${peerId}`);
 
         this._send(ws, { type: "welcome", peerId });
@@ -44,7 +45,7 @@ export class RelayServer extends Emitter {
         }
 
         ws.on("message", (data: any) => this._handle(ws, peerId, data));
-        
+
         ws.on("close", () => {
           this.clients.delete(ws);
           this._broadcast({ type: "peer:left", peerId });
@@ -80,7 +81,7 @@ export class RelayServer extends Emitter {
         const target = msg.targetPeerId;
         const type = msg.payload?.type || "unknown";
         // console.log(`[Server] Routing ${type} from ${fromPeerId} -> ${target}`);
-        
+
         for (const [client, id] of this.clients) {
           if (id === target) {
             this._send(client, { ...msg, fromPeerId });

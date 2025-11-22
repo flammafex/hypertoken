@@ -1,6 +1,9 @@
 /*
- * interface/NetworkInterface.ts
+ * network/PeerConnection.ts
  * Robust handling for both Node (ws) and Browser (WebSocket) environments.
+ *
+ * Renamed from NetworkInterface to avoid confusion with UI adapters.
+ * This is network transport infrastructure for P2P engine synchronization.
  */
 import { Emitter } from "../core/events.js";
 import { Engine } from "../engine/Engine.js";
@@ -14,12 +17,12 @@ export interface NetworkMessage {
   fromPeerId?: string;
 }
 
-export class NetworkInterface extends Emitter {
+export class PeerConnection extends Emitter {
   url: string;
   engine: Engine | null;
   socket: WebSocket | null;
   connected: boolean;
-  
+
   peerId: string | null = null;
   peers: Set<string> = new Set();
 
@@ -34,7 +37,7 @@ export class NetworkInterface extends Emitter {
    connect(): void {
     // FIX 2: Check for Node's 'ws' constructor (Ws.WebSocket) first, otherwise fall back to browser global
     const WS = typeof Ws.WebSocket !== 'undefined' ? Ws.WebSocket : (global as any).WebSocket;
-    
+
     this.socket = new WS(this.url);
 
     if (!this.socket) return;
@@ -100,7 +103,7 @@ export class NetworkInterface extends Emitter {
       const msg = JSON.parse(str);
 
       // DEBUG LOG: Uncomment if needed to trace raw traffic
-      // if (msg.type !== 'p2p') console.log(`[Net In] ${msg.type}`); 
+      // if (msg.type !== 'p2p') console.log(`[Net In] ${msg.type}`);
 
       switch (msg.type) {
         case "welcome":
@@ -121,9 +124,9 @@ export class NetworkInterface extends Emitter {
           break;
 
         case "p2p":
-          this.emit("net:message", { 
-            ...msg.payload, 
-            fromPeerId: msg.fromPeerId 
+          this.emit("net:message", {
+            ...msg.payload,
+            fromPeerId: msg.fromPeerId
           });
           break;
 
@@ -140,3 +143,7 @@ export class NetworkInterface extends Emitter {
     }
   }
 }
+
+// DEPRECATED: Backward compatibility alias
+// TODO: Remove in next major version
+export const NetworkInterface = PeerConnection;

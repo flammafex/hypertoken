@@ -402,8 +402,8 @@ This example teaches:
 **HyperToken Documentation:**
 - [Engine Architecture](../../engine/Engine.js)
 - [Action System](../../engine/ACTIONS.md)
-- [Network Interface](../../interface/NetworkInterface.js)
-- [Relay Server](../../interface/RelayServer.js)
+- [Peer Connection](../../network/PeerConnection.ts)
+- [Relay Server](../../network/RelayServer.ts)
 
 **Multiagent Game Design:**
 - [Networked Game Architecture](https://gafferongames.com/post/what_every_programmer_needs_to_know_about_game_networking/)

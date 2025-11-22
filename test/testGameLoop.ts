@@ -3,7 +3,7 @@
  * FINAL LOGICALLY CORRECT VERSION
  */
 import { Engine } from "../engine/Engine.js";
-import { RelayServer } from "../interface/RelayServer.js";
+import { RelayServer } from "../network/RelayServer.js";
 import { Agent } from "../engine/Agent.js";
 import { Engine as EngineType } from "../engine/Engine.js";
 

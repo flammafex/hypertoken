@@ -95,11 +95,15 @@ HyperToken is designed for two distinct audiences: creators building games and r
 │   ├── Agent.ts            # Agent/participant wrapper
 │   └── actions-extended.ts # Complete 58-action registry
 │
-├── interface/              # I/O & Integration
-│   ├── NetworkInterface.ts # WebSocket/P2P transport
-│   ├── RelayServer.ts      # Lightweight signal relay
+├── network/                # Network Transport
+│   ├── PeerConnection.ts   # WebSocket/P2P client
+│   └── RelayServer.ts      # Lightweight P2P relay server
+│
+├── interface/              # User/Agent Adapters
 │   ├── Gym.ts              # Reinforcement Learning Standard API
-│   └── OpenAIAgent.js      # LLM Integration
+│   ├── OpenAIAgent.js      # LLM Integration
+│   ├── HumanInterface.js   # Human input handler
+│   └── CLIInterface.js     # Terminal UI adapter
 │
 ├── examples/               # Working Implementations
 │   ├── accordian/          # A Solitaire Game for AI

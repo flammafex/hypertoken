@@ -2,7 +2,7 @@
  * test/testSync.ts
  */
 import { Engine } from "../engine/Engine.js";
-import { RelayServer } from "../interface/RelayServer.js";
+import { RelayServer } from "../network/RelayServer.js";
 import { Token } from "../core/Token.js";
 import { Stack } from "../core/Stack.js";
 
