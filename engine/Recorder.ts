@@ -47,8 +47,9 @@ export class Recorder {
     this.enabled = false;
     this._onAction = (e: any) => {
       if (!this.enabled) return;
-      // Store as plain JSON for portability
-      this.log.push(e?.payload?.toJSON ? e.payload.toJSON() : e?.payload);
+      // Extract the action from event payload (nested in e.payload.payload)
+      const action = e?.payload?.payload;
+      this.log.push(action?.toJSON ? action.toJSON() : action);
     };
   }
 
