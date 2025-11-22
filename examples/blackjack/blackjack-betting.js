@@ -19,9 +19,11 @@ export class BettingManager {
     this.initialBankroll = initialBankroll;
     this.bankroll = initialBankroll;
     this.currentBet = 0;
+    this.insuranceBet = 0;
+    this.splitBets = []; // Array of bets for split hands
     this.minBet = options.minBet || 5;
     this.maxBet = options.maxBet || 500;
-    
+
     // Session statistics
     this.stats = {
       handsPlayed: 0,
@@ -29,6 +31,10 @@ export class BettingManager {
       handsLost: 0,
       handsPushed: 0,
       blackjacks: 0,
+      splits: 0,
+      doubles: 0,
+      insurances: 0,
+      insuranceWins: 0,
       totalWagered: 0,
       totalWon: 0,
       totalLost: 0,
@@ -168,6 +174,163 @@ export class BettingManager {
   isBroke() {
     return this.bankroll < this.minBet;
   }
+
+  /**
+   * Place an insurance bet (up to half the original bet)
+   * @param {number} amount - Insurance bet amount
+   * @returns {boolean} - Success status
+   */
+  placeInsurance(amount = null) {
+    // Default to half the current bet
+    const insuranceAmount = amount !== null ? amount : this.currentBet / 2;
+
+    // Validate insurance bet
+    if (insuranceAmount > this.currentBet / 2) {
+      throw new Error(`Insurance bet cannot exceed half of original bet ($${this.currentBet / 2})`);
+    }
+    if (insuranceAmount > this.bankroll) {
+      throw new Error(`Insufficient funds for insurance. Bankroll: ${this.bankroll}`);
+    }
+
+    this.insuranceBet = insuranceAmount;
+    this.bankroll -= insuranceAmount;
+    this.stats.totalWagered += insuranceAmount;
+    this.stats.insurances++;
+
+    return true;
+  }
+
+  /**
+   * Resolve insurance bet
+   * @param {boolean} dealerHasBlackjack - Whether dealer has blackjack
+   * @returns {number} - Payout amount
+   */
+  resolveInsurance(dealerHasBlackjack) {
+    if (this.insuranceBet === 0) return 0;
+
+    let payout = 0;
+    if (dealerHasBlackjack) {
+      // Insurance pays 2:1
+      payout = this.insuranceBet * 3; // Original bet + 2:1 payout
+      this.stats.insuranceWins++;
+      this.stats.totalWon += this.insuranceBet * 2;
+    }
+
+    this.bankroll += payout;
+    const insuranceBetAmount = this.insuranceBet;
+    this.insuranceBet = 0;
+
+    return dealerHasBlackjack ? insuranceBetAmount * 2 : -insuranceBetAmount;
+  }
+
+  /**
+   * Double down - double the current bet
+   * @returns {boolean} - Success status
+   */
+  doubleDown() {
+    const doubleAmount = this.currentBet;
+
+    if (doubleAmount > this.bankroll) {
+      throw new Error(`Insufficient funds to double down. Bankroll: ${this.bankroll}`);
+    }
+
+    this.bankroll -= doubleAmount;
+    this.currentBet *= 2;
+    this.stats.totalWagered += doubleAmount;
+    this.stats.doubles++;
+
+    return true;
+  }
+
+  /**
+   * Split hand - place additional bet equal to original
+   * @returns {boolean} - Success status
+   */
+  split() {
+    const splitAmount = this.currentBet;
+
+    if (splitAmount > this.bankroll) {
+      throw new Error(`Insufficient funds to split. Bankroll: ${this.bankroll}`);
+    }
+
+    this.bankroll -= splitAmount;
+    this.splitBets.push(splitAmount);
+    this.stats.totalWagered += splitAmount;
+    this.stats.splits++;
+
+    return true;
+  }
+
+  /**
+   * Resolve bet for a split hand
+   * @param {number} handIndex - Index of the split hand (0 = original, 1+ = split hands)
+   * @param {string} result - Game result
+   * @returns {object} - Payout details
+   */
+  resolveSplitHand(handIndex, result) {
+    const bet = handIndex === 0 ? this.currentBet : this.splitBets[handIndex - 1];
+    const payout = this.calculatePayoutForBet(result, bet);
+    const netGain = payout - bet;
+
+    this.bankroll += payout;
+
+    // Update statistics (but don't count as separate hands)
+    if (result === "agent-blackjack" || result === "agent") {
+      this.stats.totalWon += netGain;
+      if (netGain > this.stats.biggestWin) {
+        this.stats.biggestWin = netGain;
+      }
+    } else if (result === "dealer") {
+      this.stats.totalLost += bet;
+      if (bet > this.stats.biggestLoss) {
+        this.stats.biggestLoss = bet;
+      }
+    }
+
+    if (this.bankroll > this.stats.maxBankroll) {
+      this.stats.maxBankroll = this.bankroll;
+    }
+    if (this.bankroll < this.stats.minBankroll) {
+      this.stats.minBankroll = this.bankroll;
+    }
+
+    return {
+      handIndex,
+      result,
+      bet,
+      payout,
+      netGain
+    };
+  }
+
+  /**
+   * Calculate payout for a specific bet amount
+   * @param {string} result - Game result
+   * @param {number} betAmount - Bet amount
+   * @returns {number} - Payout amount
+   */
+  calculatePayoutForBet(result, betAmount) {
+    switch (result) {
+      case "agent-blackjack":
+        return betAmount + (betAmount * 1.5);
+      case "agent":
+        return betAmount * 2;
+      case "push":
+        return betAmount;
+      case "dealer":
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Clear split bets after round ends
+   */
+  clearSplitBets() {
+    this.splitBets = [];
+    this.currentBet = 0;
+    this.insuranceBet = 0;
+  }
   
   /**
    * Get formatted betting status
@@ -202,12 +365,18 @@ export class BettingManager {
   reset(newBankroll = null) {
     this.bankroll = newBankroll !== null ? newBankroll : this.initialBankroll;
     this.currentBet = 0;
+    this.insuranceBet = 0;
+    this.splitBets = [];
     this.stats = {
       handsPlayed: 0,
       handsWon: 0,
       handsLost: 0,
       handsPushed: 0,
       blackjacks: 0,
+      splits: 0,
+      doubles: 0,
+      insurances: 0,
+      insuranceWins: 0,
       totalWagered: 0,
       totalWon: 0,
       totalLost: 0,
@@ -305,7 +474,10 @@ export function getPayoutMessage(payoutDetails) {
 export function formatSessionStats(stats) {
   const profitSign = stats.netProfit >= 0 ? '+' : '';
   const profitColor = stats.netProfit >= 0 ? '💚' : '💔';
-  
+  const insuranceWinRate = stats.insurances > 0
+    ? ((stats.insuranceWins / stats.insurances) * 100).toFixed(1)
+    : 0;
+
   return `
 ╔═══════════════════════════════════════════════════╗
 ║              SESSION STATISTICS                    ║
@@ -316,6 +488,11 @@ export function formatSessionStats(stats) {
 ❌ Hands Lost:       ${stats.handsLost}
 🤝 Pushes:           ${stats.handsPushed}
 🎰 Blackjacks:       ${stats.blackjacks}
+
+🎯 Advanced Plays:
+   💎 Doubles:       ${stats.doubles}
+   ✂️  Splits:        ${stats.splits}
+   🛡️  Insurances:    ${stats.insurances} (${insuranceWinRate}% won)
 
 💵 Total Wagered:    $${stats.totalWagered.toFixed(2)}
 📈 Total Won:        $${stats.totalWon.toFixed(2)}

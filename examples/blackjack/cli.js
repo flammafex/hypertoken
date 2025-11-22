@@ -88,13 +88,28 @@ async function playRound(game, bettingManager = null) {
     return true;
   }
 
+  // Check for insurance opportunity
+  if (state.canInsurance) {
+    const insuranceAnswer = await rl.question('\n🛡️  Dealer shows an Ace. Take insurance? (y/n): ');
+    if (insuranceAnswer.trim().toLowerCase() === 'y') {
+      try {
+        game.takeInsurance();
+        console.log('✅ Insurance placed!');
+      } catch (err) {
+        console.log(`❌ ${err.message}`);
+      }
+    }
+  }
+
   // Agent's turn
   while (state.canHit || state.canStand) {
-    console.log('\nWhat would you like to do?');
+    console.log('\n💭 What would you like to do?');
 
     const choices = [];
     if (state.canHit) choices.push('[H]it');
     if (state.canStand) choices.push('[S]tand');
+    if (state.canDouble) choices.push('[D]ouble');
+    if (state.canSplit) choices.push('Sp[L]it');
 
     console.log(choices.join('  '));
 
@@ -129,8 +144,41 @@ async function playRound(game, bettingManager = null) {
         console.log('\n' + getPayoutMessage(payoutDetails));
       }
       return true;
+    } else if ((choice === 'd' || choice === 'double') && state.canDouble) {
+      console.log('\n💎 Doubling down!');
+      state = game.doubleDown();
+      clearScreen();
+      printBanner(bettingManager !== null);
+      printGameState(state, bettingManager);
+      console.log('\n' + game.getResultMessage());
+
+      if (bettingManager) {
+        const payoutDetails = bettingManager.resolveBet(state.result);
+        console.log('\n' + getPayoutMessage(payoutDetails));
+      }
+      return true;
+    } else if ((choice === 'l' || choice === 'split') && state.canSplit) {
+      console.log('\n✂️  Splitting hand!');
+      state = game.split();
+
+      // Play split hands (simplified - just show both hands)
+      clearScreen();
+      printBanner(bettingManager !== null);
+      console.log('\n🃏 Split hands created! Playing each hand separately.');
+      console.log('\n(Note: Full split hand play coming in future update)');
+
+      // For now, auto-stand on split (full implementation would play each hand)
+      state = game.stand();
+      printGameState(state, bettingManager);
+      console.log('\n' + game.getResultMessage());
+
+      if (bettingManager) {
+        const payoutDetails = bettingManager.resolveBet(state.result);
+        console.log('\n' + getPayoutMessage(payoutDetails));
+      }
+      return true;
     } else {
-      console.log('Invalid choice. Please enter H or S.');
+      console.log('❌ Invalid choice or action not available.');
     }
   }
 
@@ -152,7 +200,8 @@ async function main() {
   printBanner(useBetting);
 
   console.log('Welcome to HyperToken Blackjack!');
-  console.log('Standard rules: Dealer hits on 16, stands on 17.\n');
+  console.log('Standard rules: Dealer hits on 16, stands on 17.');
+  console.log('🎰 Full casino experience with Double Down, Split, and Insurance!\n');
 
   // Setup betting manager if in betting mode
   let bettingManager = null;

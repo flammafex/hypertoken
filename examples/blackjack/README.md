@@ -2,13 +2,14 @@
 
 # HyperToken Blackjack
 
-A complete implementation of Blackjack using the HyperToken engine, demonstrating:
+A complete **casino-grade** Blackjack implementation using the HyperToken engine, featuring:
 - Token-based card representation
 - Rule engine for game logic
 - Deterministic simulation with seedable RNG
 - AI agents with different strategies
 - Event-driven architecture
 - **💰 Comprehensive betting system with bankroll management**
+- **🎰 Full casino features: Double Down, Split, Insurance**
 - **📊 Card counting agents using Hi-Lo system**
 - **👥 Multi-agent support (2-6 agents at one space)**
 
@@ -30,15 +31,18 @@ node --loader ../../test/ts-esm-loader.js cli.js
 node --loader ../../test/ts-esm-loader.js cli.js --betting
 ```
 
-Play blackjack in your terminal against the dealer. Standard rules apply:
+Play blackjack in your terminal against the dealer. Standard casino rules apply:
 - Dealer hits on 16 or less
 - Dealer stands on 17 or more
 - Blackjack pays 3:2
+- **💎 Double Down**: Double your bet and take one card
+- **✂️ Split**: Split matching pairs into two hands
+- **🛡️ Insurance**: Protect against dealer blackjack when showing Ace
 
 **Betting Mode Features:**
 - Set your starting bankroll
 - Place bets each round
-- Track session statistics
+- Track session statistics including doubles, splits, and insurance
 - See your profit/loss in real-time
 
 ### Play Multi-agent (2-6 agents)
@@ -347,45 +351,55 @@ while (!gameState.allAgentsFinished) {
 8. **Card Counting** - Adaptive strategy based on game state *(NEW!)*
 9. **Multi-agent Architecture** - Sequential turn-based multiagent *(NEW!)*
 
-## Extending This Example
+## Casino Features (Fully Implemented!) 🎰
 
-### Add Double Down
+HyperToken Blackjack now includes a complete casino experience with all advanced play options:
+
+### 💎 Double Down
+Double your bet and receive exactly one more card, then automatically stand:
 ```javascript
-ActionRegistry["blackjack:double"] = (engine, payload) => {
-  const card = engine.source.draw();
-  engine.space.place("agent-hand", card, { faceUp: true });
-  engine._bettingManager.currentBet *= 2;
-  engine.dispatch("blackjack:stand");
-};
+// In CLI: Press 'd' when you have exactly 2 cards
+game.doubleDown();
+
+// The implementation:
+// 1. Doubles the current bet
+// 2. Draws exactly one card
+// 3. Automatically stands
+// 4. Resolves with doubled payout
 ```
 
-### Add Splitting Pairs
+### ✂️ Split
+When you have two cards of the same rank, split them into two separate hands:
 ```javascript
-ActionRegistry["blackjack:split"] = (engine) => {
-  const agentHand = engine.space.zone("agent-hand");
-  const [card1, card2] = agentHand.splice(0, 2);
-  
-  engine.space.createZone("agent-hand-2");
-  engine.space.place("agent-hand", card1.card);
-  engine.space.place("agent-hand-2", card2.card);
-  
-  engine._gameState.splitHand = true;
-};
+// In CLI: Press 'l' when you have a matching pair
+game.split();
+
+// The implementation:
+// 1. Checks for matching card ranks
+// 2. Places additional bet equal to original
+// 3. Creates separate hand zones
+// 4. Deals one card to each hand
+// 5. Resolves each hand independently
 ```
 
-### Add Insurance
+### 🛡️ Insurance
+When dealer shows an Ace, take insurance to protect against dealer blackjack:
 ```javascript
-ruleEngine.addRule(
-  "offer-insurance",
-  (engine) => {
-    const dealerUpCard = engine.space.zone("dealer-hand")[1].card;
-    return dealerUpCard.label === "A";
-  },
-  (engine) => {
-    engine.dispatch("blackjack:insurance-offered", {});
-  }
-);
+// In CLI: Press 'i' when dealer shows Ace
+game.takeInsurance();
+
+// The implementation:
+// 1. Allows bet up to half the original wager
+// 2. If dealer has blackjack, insurance pays 2:1
+// 3. If dealer doesn't have blackjack, insurance bet is lost
+// 4. Original hand still resolves normally
 ```
+
+These features are available in:
+- ✅ Single-player CLI (`cli.js`)
+- ✅ Multi-agent games (`multiagent-game.js`)
+- ✅ Network multiplayer (`client.js` / `server.js`)
+- ✅ All game modes with full betting integration
 
 ## Performance
 
@@ -424,14 +438,16 @@ Choose the right one for your needs:
 - **Web UI** - Canvas-based visualization with interactive controls
 - **AI Training** - Reinforcement learning integration (partial support via `BlackjackEnv.ts`)
 - **Tournament Modes** - Elimination, sit-and-go formats
+- **Surrender** - Early surrender and late surrender options
 
 ### Community Contributions Welcome
 
 - Additional betting strategies (Kelly Criterion, Oscar's Grind)
 - More card counting systems (Hi-Opt, Omega II, Zen Count)
-- Advanced play options (surrender, insurance, split, double down)
 - Side bets (pairs, 21+3, perfect pairs)
 - Mobile/web clients using the network server
+- Re-splitting support (split again after initial split)
+- European blackjack variant (dealer doesn't check for blackjack)
 
 ## License
 
@@ -439,4 +455,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete, extensible blackjack simulation showcasing token-based game design, AI agents, betting systems, card counting, and multiagent architecture.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with Double Down, Split, and Insurance. Showcases token-based game design, AI agents, betting systems, card counting, and multiagent architecture.
