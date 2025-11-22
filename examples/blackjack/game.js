@@ -20,7 +20,9 @@ import { Space } from '../../core/Space.js';
 import { Engine } from '../../engine/Engine.js';
 import { RuleEngine } from '../../engine/RuleEngine.js';
 import { Agent } from '../../engine/Agent.js';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import {
   getBestHandValue,
   isBusted,
@@ -29,6 +31,10 @@ import {
   determineWinner
 } from './blackjack-utils.js';
 import { registerBlackjackRules } from './blackjack-rules.js';
+
+// Get the directory of this file (works in both source and compiled contexts)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // No ActionRegistry extensions needed - using direct method calls
 
@@ -40,21 +46,31 @@ export class BlackjackGame {
     // Initialize engine with Chronicle session
     this.engine = new Engine();
 
-    // Load standard deck
+    // Load standard deck - try multiple paths for source vs dist
     let allTokens = [];
-    try {
-      const stackData = JSON.parse(
-        readFileSync('./token-sets/standard-deck.json', 'utf8')
-      );
-      const baseTokens = parseTokenSetObject(stackData).tokens;
+    const possiblePaths = [
+      join(__dirname, 'token-sets', 'standard-deck.json'),  // When running from source
+      join(__dirname, '..', '..', 'examples', 'blackjack', 'token-sets', 'standard-deck.json')  // When running from dist
+    ];
 
-      // Create multiple decks
-      for (let i = 0; i < numStacks; i++) {
-        const deckCopy = baseTokens.map(t => ({ ...t, id: `${t.id}-${i}` }));
-        allTokens.push(...deckCopy);
+    let deckPath = possiblePaths.find(p => existsSync(p));
+
+    if (!deckPath) {
+      console.error("Failed to load deck file: Could not find standard-deck.json in any expected location");
+      console.error("Tried paths:", possiblePaths);
+    } else {
+      try {
+        const stackData = JSON.parse(readFileSync(deckPath, 'utf8'));
+        const baseTokens = parseTokenSetObject(stackData).tokens;
+
+        // Create multiple decks
+        for (let i = 0; i < numStacks; i++) {
+          const deckCopy = baseTokens.map(t => ({ ...t, id: `${t.id}-${i}` }));
+          allTokens.push(...deckCopy);
+        }
+      } catch (e) {
+        console.error("Failed to load deck file:", e.message);
       }
-    } catch (e) {
-      console.error("Failed to load deck file:", e.message);
     }
 
     // Create stack with new API (requires Chronicle session)

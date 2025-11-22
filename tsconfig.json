@@ -12,6 +12,6 @@
     "allowJs": true,           /* Allows you to migrate file-by-file */
     "checkJs": false           /* Set to true if you want TS to check .js files too */
   },
-  "include": ["./**/*.ts", "./**/*.js"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules", "dist", "examples/**/*.js", "test/**/*.js"]
 }
