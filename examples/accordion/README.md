@@ -187,10 +187,10 @@ This is an **open question!** Ideas:
 ### HyperToken Integration
 
 This implementation uses HyperToken's:
-- **Stack** for standard 52-card stack
+- **Chronicle** for CRDT-based state management
+- **Stack** for standard 52-card deck with deterministic shuffling
 - **Token** for card representation
-- **Engine** for game state management
-- **Deterministic shuffling** (seeded RNG)
+- **Seeded RNG** for reproducible games
 
 ### Game State
 
@@ -239,7 +239,7 @@ All processing is single-threaded JavaScript.
 ## Files
 
 ```
-accordion-solitaire/
+accordion/
 ├── accordion.js       # Main game implementation
 └── README.md          # This file
 ```
