@@ -2,7 +2,7 @@
  * test/testRuleSync.ts
  */
 import { Engine } from "../engine/Engine.js";
-import { RelayServer } from "../interface/RelayServer.js";
+import { RelayServer } from "../network/RelayServer.js";
 import { RuleEngine } from "../engine/RuleEngine.js";
 import { Action } from "../engine/Action.js"; // Import Action for types
 

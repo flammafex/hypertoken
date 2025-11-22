@@ -3,7 +3,7 @@
  * Fixed: Debounced round management
  */
 import { Engine } from '../../engine/Engine.js';
-import { RelayServer } from '../../interface/RelayServer.js';
+import { RelayServer } from '../../network/RelayServer.js';
 import { MultiagentBlackjackGame } from './multiagent-game.js';
 
 async function main() {

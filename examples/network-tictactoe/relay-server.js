@@ -16,11 +16,11 @@
 
 /**
  * RelayServer for Network Tic-Tac-Toe
- * 
+ *
  * Self-contained relay server that doesn't depend on root HyperToken dependencies.
  * This is a simplified version specifically for the network-tictactoe example.
- * 
- * For the full HyperToken RelayServer, see interface/RelayServer.js
+ *
+ * For the full HyperToken RelayServer, see network/RelayServer.ts
  */
 
 import { WebSocketServer } from 'ws';

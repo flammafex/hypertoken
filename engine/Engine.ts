@@ -12,7 +12,7 @@ import { ActionRegistry } from "./actions.js";
 import { IActionPayload } from "../core/types.js";
 import { Chronicle } from "../core/Chronicle.js";
 // @ts-ignore
-import { NetworkInterface } from "../interface/NetworkInterface.js";
+import { PeerConnection } from "../network/PeerConnection.js";
 // @ts-ignore
 import { ConsensusCore } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
@@ -32,7 +32,7 @@ export class Engine extends Emitter {
   source: Source | null;
   
   session: Chronicle;
-  network?: NetworkInterface;
+  network?: PeerConnection;
   sync?: ConsensusCore;
   loop: GameLoop;
 
@@ -85,7 +85,7 @@ export class Engine extends Emitter {
   connect(url: string): void {
     if (this.network) return;
     console.log(`[Engine] Connecting to ${url}...`);
-    this.network = new NetworkInterface(url, this);
+    this.network = new PeerConnection(url, this);
     this.sync = new ConsensusCore(this.session, this.network);
     this.network.connect();
     this.network.on("net:ready", (e) => this.emit("net:ready", e));
