@@ -138,6 +138,9 @@ export class Script {
         if (delay && !signal?.aborted) {
           await new Promise(r => setTimeout(r, delay));
         }
+
+        // Check abort again after delay in case signal was aborted during delay
+        if (signal?.aborted) break;
       }
     } finally {
       const completed = this.index >= this.steps.length;
