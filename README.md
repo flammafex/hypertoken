@@ -232,32 +232,27 @@ This applies equally to cards in blackjack, shares in a market, or NPCs in a wor
 
 ---
 
-## 🛠️ Roadmap
+## Roadmap
 
-### Phase 1: Polish (Now)
-- [ ] Complete TypeScript migration
-- [ ] Unified documentation site
-- [ ] Performance benchmarks
+God mapped the road. I'm just walking it. Hand in hand with Lady Wisdom.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-HyperToken thrives on community contributions. Whether you're building games, training agents, or exploring new frontiers in distributed systems, we want to hear from you.
+From who? You? 🙄
 
-```bash
-# Get started
-git clone https://github.com/your-org/hypertoken.git
-cd hypertoken
-npm install
-npm test
+- No more apolitical chuds.
+- No more sociopath "hackers" with the "news".
+- No more blockchain bros.
+- No more image board posters.
+- No more business majors.
 
-# Join the conversation
-Discord: [coming soon]
-Matrix: [coming soon]
-```
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+- I've had it with all of you.
+- The robot and I are gonna ruin you.
+- There won't be any snakes left in the grass.
+- Not one.
+- See ya, losers.
 
 ---
 
