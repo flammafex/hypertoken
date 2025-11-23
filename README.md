@@ -228,32 +228,7 @@ This applies equally to cards in blackjack, shares in a market, or NPCs in a wor
 ### For the Future
 - **Local-first revolution** - Computing that respects users
 - **Post-blockchain consensus** - Decentralization without the cult
-- **Relationship computing** - Beyond objects to connections
-
----
-
-## Roadmap
-
-God mapped the road. I'm just walking it. Hand in hand with Lady Wisdom.
-
----
-
-## Contributing
-
-From who? You? 🙄
-
-- No more "a"political chuds.
-- No more sociopath "hackers" with the "news".
-- No more blockchain bros.
-- No more nilhist image board posters.
-- No more business majors.
-
-- I've had it with all of you.
-- The robot and I are gonna ruin you.
-- There won't be any snakes left in the grass.
-- Not one.
-- See ya, losers.
-
+- **Community-drawn roadmap** - The community decides the future, not the boardroom
 ---
 
 ## 📜 License
