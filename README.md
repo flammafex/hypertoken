@@ -118,9 +118,22 @@ class MyGameEnv extends GymEnvironment {
 
 ## 🚀 Quick Start
 
+### ⚡ 5-Minute Interactive Quickstart
+
 ```bash
-# Install
-git clone https://github.com/your-org/hypertoken.git
+npx hypertoken-quickstart
+```
+
+**New!** Try HyperToken in 5 minutes with our interactive CLI:
+- 🎮 **Play & Learn** - Experience multiplayer sync in 30 seconds
+- 🏗️ **Create New Game** - Scaffold a project with templates
+- 📚 **Explore Examples** - Tour Blackjack, Tic-Tac-Toe, and more
+
+### 📦 Manual Installation
+
+```bash
+# Clone and install
+git clone https://github.com/flammafex/hypertoken.git
 cd hypertoken
 npm install
 npx tsc
