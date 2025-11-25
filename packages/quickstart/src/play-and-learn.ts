@@ -1,88 +1,43 @@
 import prompts from 'prompts';
 import chalk from 'chalk';
-import ora from 'ora';
-import { WebSocketServer, WebSocket } from 'ws';
-import { createServer } from 'http';
 
 export async function playAndLearn(isJoining: boolean) {
   console.log(chalk.bold.cyan('\n🎮 Play & Learn - Interactive Demo\n'));
 
+  // For now, just run the demo (network sync would require actual HyperToken engine)
   if (isJoining) {
-    await joinDemo();
-  } else {
-    await hostDemo();
+    console.log(chalk.yellow('Note: This demo runs locally with an AI opponent.'));
+    console.log(chalk.gray('Full multiplayer sync requires the HyperToken engine.\n'));
   }
+
+  await runSimpleDemo();
 }
 
-async function hostDemo() {
-  console.log(chalk.yellow('Let\'s experience serverless multiplayer in action!\n'));
-
-  const spinner = ora('Starting demo environment...').start();
-
-  // Start embedded relay server
-  const httpServer = createServer();
-  const wss = new WebSocketServer({ server: httpServer });
-
-  const PORT = 8765;
-
-  await new Promise<void>((resolve, reject) => {
-    httpServer.listen(PORT, () => {
-      spinner.succeed('Demo server ready!');
-      resolve();
-    });
-    httpServer.on('error', reject);
-  });
-
-  console.log(chalk.green(`\n✓ Local relay running on port ${PORT}\n`));
-
-  console.log(boxen(
-    chalk.bold('To see multiplayer sync in action:\n\n') +
-    chalk.cyan('Open another terminal and run:\n') +
-    chalk.yellow.bold(`  npx hypertoken-quickstart --join\n\n`) +
-    chalk.gray('(Or press Enter to play solo)'),
-    { padding: 1, borderColor: 'yellow', borderStyle: 'round' }
-  ));
+async function runSimpleDemo() {
+  console.log(chalk.yellow('Let\'s see HyperToken concepts in action!\n'));
+  console.log(chalk.gray('(Playing against AI opponent)\n'));
 
   const { ready } = await prompts({
     type: 'confirm',
     name: 'ready',
-    message: 'Ready to start the demo?',
+    message: 'Ready to start?',
     initial: true
   });
 
   if (!ready) {
-    httpServer.close();
     return;
   }
 
   // Simple Tic-Tac-Toe demo
-  await runTicTacToeDemo(wss, 'X');
+  await runTicTacToeDemo();
 
   console.log(chalk.green('\n✨ Demo complete!\n'));
 
   await showLearningMoments();
-
-  httpServer.close();
 }
 
-async function joinDemo() {
-  console.log(chalk.cyan('Connecting to demo...'));
-
-  const ws = new WebSocket('ws://localhost:8765');
-
-  await new Promise((resolve, reject) => {
-    ws.on('open', resolve);
-    ws.on('error', reject);
-  });
-
-  console.log(chalk.green('✓ Connected!\n'));
-
-  await runTicTacToeDemo(ws, 'O');
-
-  ws.close();
-}
-
-async function runTicTacToeDemo(connection: any, player: 'X' | 'O') {
+async function runTicTacToeDemo() {
+  const player: 'X' | 'O' = 'X';
   console.log(chalk.bold(`\n🎯 Simple Tic-Tac-Toe - You are ${player}\n`));
 
   let board = [
@@ -175,62 +130,67 @@ async function runTicTacToeDemo(connection: any, player: 'X' | 'O') {
 
       currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
     } else {
-      // In a real implementation, this would sync via CRDT
-      console.log(chalk.gray(`Waiting for ${currentPlayer}...`));
+      // AI opponent's turn
+      console.log(chalk.gray(`AI (${currentPlayer}) is thinking...`));
 
-      // For demo purposes, simulate opponent or allow single-player
-      if (player === 'X') {
-        // Simple AI: pick random available spot
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const available: [number, number][] = [];
-        for (let i = 0; i < 3; i++) {
-          for (let j = 0; j < 3; j++) {
-            if (board[i][j] === ' ') available.push([i, j]);
-          }
+      // Simple AI: pick random available spot
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const available: [number, number][] = [];
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          if (board[i][j] === ' ') available.push([i, j]);
         }
-        if (available.length > 0) {
-          const [row, col] = available[Math.floor(Math.random() * available.length)];
-          board[row][col] = 'O';
-          console.log(chalk.cyan(`O played at position ${row * 3 + col + 1}`));
-          printBoard();
+      }
 
-          const winner = checkWinner();
-          if (winner) {
-            if (winner === 'tie') {
-              console.log(chalk.yellow('🤝 It\'s a tie!'));
-            } else {
-              console.log(chalk.green(`🎉 ${winner} wins!`));
-            }
-            gameOver = true;
-            break;
+      if (available.length > 0) {
+        const [row, col] = available[Math.floor(Math.random() * available.length)];
+        board[row][col] = currentPlayer;
+        console.log(chalk.cyan(`${currentPlayer} played at position ${row * 3 + col + 1}`));
+        printBoard();
+
+        const winner = checkWinner();
+        if (winner) {
+          if (winner === 'tie') {
+            console.log(chalk.yellow('🤝 It\'s a tie!'));
+          } else {
+            console.log(chalk.green(`🎉 ${winner} wins!`));
           }
-
-          currentPlayer = 'X';
+          gameOver = true;
+          break;
         }
+
+        currentPlayer = 'X'; // Back to player's turn
+      } else {
+        // No moves available
+        gameOver = true;
       }
     }
   }
 }
 
 async function showLearningMoments() {
-  console.log(chalk.bold.cyan('💡 What just happened?\n'));
+  console.log(chalk.bold.cyan('💡 Key HyperToken Concepts\n'));
 
   const moments = [
     {
-      title: '🌍 No Server Needed',
-      description: 'That game ran peer-to-peer. The "relay" was just for WebSocket connections.\nThe game state synchronized automatically using CRDTs (Conflict-free Replicated Data Types).'
+      title: '🎮 Token-Based Game State',
+      description: 'In HyperToken, everything is a Token (game pieces, cards, characters).\nTokens live in Stacks (ordered collections) or Spaces (positioned zones).'
+    },
+    {
+      title: '🌍 Distributed by Default',
+      description: 'With the full HyperToken engine, this game would sync across multiple clients\nusing CRDTs (Conflict-free Replicated Data Types) - no server required!'
     },
     {
       title: '⚡ Instant Execution',
-      description: 'Your moves were applied locally first, then synchronized.\nNo waiting for server confirmation. No lag.'
+      description: 'Moves are applied locally first, then synchronized.\nNo waiting for server confirmation. No lag. No server costs.'
     },
     {
-      title: '🔒 Mathematically Consistent',
-      description: 'Both players saw the exact same game state, guaranteed by CRDT mathematics.\nNo possibility of desync. Ever.'
+      title: '📝 Perfect Determinism',
+      description: 'Every action can be recorded with actor ID and timestamp.\nReplay any game exactly with the same seed. Perfect for AI training and debugging.'
     },
     {
-      title: '📝 Perfect Audit Trail',
-      description: 'Every action was recorded with actor ID and timestamp.\nYou could replay this exact game deterministically with the same seed.'
+      title: '🤖 AI-Ready',
+      description: 'Any HyperToken game can become an OpenAI Gym environment.\nTrain reinforcement learning agents at 1000x real-time speed.'
     }
   ];
 
