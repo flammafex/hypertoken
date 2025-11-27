@@ -5,6 +5,7 @@ This example demonstrates HyperToken's hybrid WebSocket + WebRTC networking capa
 ## Features
 
 - ✅ **Automatic WebRTC upgrade**: Starts with WebSocket, automatically upgrades to WebRTC for lower latency
+- ✅ **TURN fallback**: Automatically retries with TURN servers if direct connection fails (NAT traversal)
 - ✅ **Graceful fallback**: Falls back to WebSocket if WebRTC connection fails
 - ✅ **Transparent routing**: Application code doesn't need to know which transport is used
 - ✅ **Interactive CLI**: Test commands to see WebRTC in action
@@ -44,7 +45,89 @@ This example demonstrates HyperToken's hybrid WebSocket + WebRTC networking capa
 3. **Automatic Upgrade**: After a short delay, clients initiate WebRTC connection
 4. **Signaling**: WebRTC SDP offers/answers and ICE candidates are exchanged via WebSocket
 5. **Direct Connection**: Once WebRTC is established, data flows directly between peers
-6. **Fallback**: If WebRTC fails or disconnects, communication continues via WebSocket
+6. **TURN Fallback**: If direct connection fails (restrictive NAT), automatically retries with TURN relay
+7. **Graceful Degradation**: If all WebRTC attempts fail, communication continues via WebSocket
+
+## TURN Fallback (Phase 2)
+
+HyperToken now includes intelligent connection retry with TURN server fallback:
+
+### Connection Lifecycle
+
+```
+Attempt 1: STUN Only (Direct P2P)
+    ↓
+  Timeout (15s) or ICE Failed
+    ↓
+Attempt 2: STUN + TURN (Relayed P2P)
+    ↓
+  Success → WebRTC via TURN
+    OR
+  Failure → WebSocket Fallback
+```
+
+### What You'll See
+
+**Successful Direct Connection:**
+```
+🚀 WebRTC connection established with peer-abc123 (Bob)
+   Now using direct P2P DataChannel for low-latency communication!
+```
+
+**TURN Fallback (Restrictive NAT):**
+```
+⚠️  WebRTC connection attempt 0 failed with Bob
+   Will retry with TURN relay servers...
+
+🔄 Retrying WebRTC connection with Bob (attempt 1)
+   Using TURN relay servers for NAT traversal...
+
+🚀 WebRTC connection established with peer-abc123 (Bob)
+   ⚡ Connected via TURN relay server
+   🔄 Succeeded after 1 retry attempt(s)
+   Now using direct P2P DataChannel for low-latency communication!
+```
+
+**Complete Failure (WebSocket Fallback):**
+```
+❌ WebRTC connection failed with Bob after 1 attempts
+   Falling back to WebSocket relay
+```
+
+### Configuration
+
+TURN fallback is enabled by default. You can configure it:
+
+```javascript
+const manager = new HybridPeerManager({
+  url: 'ws://localhost:8080',
+  rtcConfig: {
+    enableTurnFallback: true,    // Enable TURN retry (default: true)
+    connectionTimeout: 15000,     // Time before retry (default: 15s)
+    maxRetries: 1,                // Number of retries (default: 1)
+    iceServers: [
+      // Your custom STUN/TURN servers
+      { urls: 'stun:stun.l.google.com:19302' },
+      {
+        urls: 'turn:your-turn-server.com:3478',
+        username: 'user',
+        credential: 'password'
+      }
+    ]
+  }
+});
+```
+
+### Default TURN Servers
+
+The example uses free public TURN servers for demonstration:
+- `turn:openrelay.metered.ca:80` (username: openrelayproject)
+- `turn:openrelay.metered.ca:443` (username: openrelayproject)
+
+⚠️ **For production, use your own TURN servers:**
+- [Twilio STUN/TURN](https://www.twilio.com/stun-turn)
+- [coturn](https://github.com/coturn/coturn) (self-hosted)
+- [Xirsys](https://xirsys.com/)
 
 ## Setup
 

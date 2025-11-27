@@ -55,11 +55,20 @@ manager.on('net:peer:disconnected', (evt) => {
 
 manager.on('rtc:upgraded', (evt) => {
   const peerId = evt.payload.peerId;
+  const { usingTurn, retryCount } = evt.payload;
   const peer = peers.get(peerId);
   if (peer) peer.isWebRTC = true;
 
-  console.log(`\n🚀 WebRTC connection established with ${peerId} (${peer?.name || 'unknown'})`);
-  console.log('   Now using direct P2P DataChannel for low-latency communication!');
+  let statusMsg = `\n🚀 WebRTC connection established with ${peerId} (${peer?.name || 'unknown'})`;
+  if (usingTurn) {
+    statusMsg += '\n   ⚡ Connected via TURN relay server';
+  }
+  if (retryCount > 0) {
+    statusMsg += `\n   🔄 Succeeded after ${retryCount} retry attempt(s)`;
+  }
+  statusMsg += '\n   Now using direct P2P DataChannel for low-latency communication!';
+
+  console.log(statusMsg);
 });
 
 manager.on('rtc:downgraded', (evt) => {
@@ -68,6 +77,29 @@ manager.on('rtc:downgraded', (evt) => {
   if (peer) peer.isWebRTC = false;
 
   console.log(`\n⚠️  WebRTC connection lost with ${peerId}, using WebSocket fallback`);
+});
+
+manager.on('rtc:connection-failed', (evt) => {
+  const { peerId, retryCount, willRetry } = evt.payload;
+  const peer = peers.get(peerId);
+
+  if (willRetry) {
+    console.log(`\n⚠️  WebRTC connection attempt ${retryCount} failed with ${peer?.name || peerId}`);
+    console.log('   Will retry with TURN relay servers...');
+  } else {
+    console.log(`\n❌ WebRTC connection failed with ${peer?.name || peerId} after ${retryCount} attempts`);
+    console.log('   Falling back to WebSocket relay');
+  }
+});
+
+manager.on('rtc:retrying', (evt) => {
+  const { peerId, retryCount, usingTurn } = evt.payload;
+  const peer = peers.get(peerId);
+
+  console.log(`\n🔄 Retrying WebRTC connection with ${peer?.name || peerId} (attempt ${retryCount})`);
+  if (usingTurn) {
+    console.log('   Using TURN relay servers for NAT traversal...');
+  }
 });
 
 manager.on('net:message', (evt) => {

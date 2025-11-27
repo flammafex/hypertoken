@@ -12,6 +12,10 @@ export interface WebRTCConfig {
   // Optional: Configure DataChannel behavior
   ordered?: boolean;
   maxRetransmits?: number;
+  // Connection retry configuration
+  enableTurnFallback?: boolean;
+  connectionTimeout?: number; // ms to wait before considering connection failed
+  maxRetries?: number;
 }
 
 export const DEFAULT_RTC_CONFIG: WebRTCConfig = {
@@ -21,8 +25,26 @@ export const DEFAULT_RTC_CONFIG: WebRTCConfig = {
     { urls: 'stun:stun2.l.google.com:19302' },
   ],
   ordered: true,
-  maxRetransmits: 3
+  maxRetransmits: 3,
+  enableTurnFallback: true,
+  connectionTimeout: 15000, // 15 seconds
+  maxRetries: 1
 };
+
+// Public TURN servers (for fallback)
+// Note: For production, use your own TURN servers with authentication
+export const DEFAULT_TURN_SERVERS: RTCIceServer[] = [
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  }
+];
 
 /**
  * WebRTCConnection manages a single peer-to-peer WebRTC connection
@@ -33,6 +55,8 @@ export const DEFAULT_RTC_CONFIG: WebRTCConfig = {
  * - 'rtc:disconnected' - Connection closed
  * - 'rtc:data' - Data received from peer
  * - 'rtc:error' - Connection error occurred
+ * - 'rtc:connection-failed' - Connection attempt failed (before retry)
+ * - 'rtc:retrying' - Attempting to reconnect with TURN
  */
 export class WebRTCConnection extends Emitter {
   private peerConnection: RTCPeerConnection;
@@ -40,18 +64,34 @@ export class WebRTCConnection extends Emitter {
   private remotePeerId: string;
   private config: WebRTCConfig;
   private connectionState: RTCPeerConnectionState = 'new';
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private retryCount: number = 0;
+  private usingTurn: boolean = false;
 
   constructor(remotePeerId: string, config: WebRTCConfig = DEFAULT_RTC_CONFIG) {
     super();
     this.remotePeerId = remotePeerId;
     this.config = config;
 
+    this.initializePeerConnection();
+  }
+
+  /**
+   * Initialize or re-initialize the peer connection
+   */
+  private initializePeerConnection(): void {
+    // Clean up existing connection if any
+    if (this.peerConnection) {
+      this.peerConnection.close();
+    }
+
     // Create peer connection with ICE servers for NAT traversal
     this.peerConnection = new RTCPeerConnection({
-      iceServers: config.iceServers
+      iceServers: this.config.iceServers
     });
 
     this.setupConnectionHandlers();
+    this.startConnectionTimeout();
   }
 
   /**
@@ -147,6 +187,8 @@ export class WebRTCConnection extends Emitter {
    * Close the connection
    */
   close(): void {
+    this.clearConnectionTimeout();
+
     if (this.dataChannel) {
       this.dataChannel.close();
       this.dataChannel = null;
@@ -154,6 +196,97 @@ export class WebRTCConnection extends Emitter {
 
     this.peerConnection.close();
     this.emit('rtc:disconnected', { peerId: this.remotePeerId });
+  }
+
+  /**
+   * Check if currently using TURN servers
+   */
+  isUsingTurn(): boolean {
+    return this.usingTurn;
+  }
+
+  /**
+   * Get current retry count
+   */
+  getRetryCount(): number {
+    return this.retryCount;
+  }
+
+  /**
+   * Start connection timeout
+   */
+  private startConnectionTimeout(): void {
+    this.clearConnectionTimeout();
+
+    const timeout = this.config.connectionTimeout || 15000;
+    this.connectionTimeout = setTimeout(() => {
+      if (!this.isConnected()) {
+        console.warn(`[WebRTC] Connection timeout after ${timeout}ms with ${this.remotePeerId}`);
+        this.handleConnectionFailure();
+      }
+    }, timeout);
+  }
+
+  /**
+   * Clear connection timeout
+   */
+  private clearConnectionTimeout(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+  }
+
+  /**
+   * Handle connection failure and retry with TURN if enabled
+   */
+  private handleConnectionFailure(): void {
+    const maxRetries = this.config.maxRetries || 1;
+    const enableTurnFallback = this.config.enableTurnFallback !== false;
+
+    // Emit failure event
+    this.emit('rtc:connection-failed', {
+      peerId: this.remotePeerId,
+      retryCount: this.retryCount,
+      willRetry: enableTurnFallback && this.retryCount < maxRetries
+    });
+
+    // Retry with TURN if enabled and within retry limit
+    if (enableTurnFallback && this.retryCount < maxRetries && !this.usingTurn) {
+      this.retryCount++;
+      this.retryWithTurn();
+    } else {
+      console.error(`[WebRTC] Connection failed permanently with ${this.remotePeerId}`);
+      this.emit('rtc:error', {
+        error: 'Connection failed after retries',
+        peerId: this.remotePeerId
+      });
+    }
+  }
+
+  /**
+   * Retry connection with TURN servers
+   */
+  private retryWithTurn(): void {
+    console.log(`[WebRTC] Retrying connection with TURN servers (attempt ${this.retryCount}/${this.config.maxRetries})`);
+
+    this.usingTurn = true;
+
+    // Add TURN servers to existing STUN servers
+    const turnConfig = [...this.config.iceServers, ...DEFAULT_TURN_SERVERS];
+    this.config = {
+      ...this.config,
+      iceServers: turnConfig
+    };
+
+    this.emit('rtc:retrying', {
+      peerId: this.remotePeerId,
+      retryCount: this.retryCount,
+      usingTurn: true
+    });
+
+    // Reinitialize connection with TURN servers
+    this.initializePeerConnection();
   }
 
   /**
@@ -176,20 +309,29 @@ export class WebRTCConnection extends Emitter {
 
       console.log(`[WebRTC] Connection state with ${this.remotePeerId}: ${this.connectionState}`);
 
-      if (this.connectionState === 'failed' || this.connectionState === 'closed') {
+      if (this.connectionState === 'connected') {
+        // Connection succeeded, clear timeout
+        this.clearConnectionTimeout();
+      } else if (this.connectionState === 'failed') {
+        // Connection failed, trigger failure handler
+        this.handleConnectionFailure();
+      } else if (this.connectionState === 'closed') {
         this.emit('rtc:disconnected', { peerId: this.remotePeerId });
       }
     };
 
     // ICE connection state changes
     this.peerConnection.oniceconnectionstatechange = () => {
-      console.log(`[WebRTC] ICE state with ${this.remotePeerId}: ${this.peerConnection.iceConnectionState}`);
+      const iceState = this.peerConnection.iceConnectionState;
+      console.log(`[WebRTC] ICE state with ${this.remotePeerId}: ${iceState}`);
 
-      if (this.peerConnection.iceConnectionState === 'failed') {
-        this.emit('rtc:error', {
-          error: 'ICE connection failed',
-          peerId: this.remotePeerId
-        });
+      if (iceState === 'connected' || iceState === 'completed') {
+        // ICE connection successful
+        this.clearConnectionTimeout();
+      } else if (iceState === 'failed') {
+        // ICE connection failed, trigger failure handler
+        console.warn(`[WebRTC] ICE connection failed with ${this.remotePeerId}`);
+        this.handleConnectionFailure();
       }
     };
 
@@ -209,7 +351,16 @@ export class WebRTCConnection extends Emitter {
 
     this.dataChannel.onopen = () => {
       console.log(`[WebRTC] DataChannel opened with ${this.remotePeerId}`);
-      this.emit('rtc:connected', { peerId: this.remotePeerId });
+      this.clearConnectionTimeout(); // Connection successful
+
+      const turnStatus = this.usingTurn ? ' (via TURN)' : '';
+      console.log(`[WebRTC] ✅ Connection established${turnStatus}`);
+
+      this.emit('rtc:connected', {
+        peerId: this.remotePeerId,
+        usingTurn: this.usingTurn,
+        retryCount: this.retryCount
+      });
     };
 
     this.dataChannel.onclose = () => {

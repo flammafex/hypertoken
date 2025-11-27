@@ -31,6 +31,8 @@ export interface HybridPeerManagerOptions {
  * - 'net:error' - Connection error
  * - 'rtc:upgraded' - WebRTC connection established for a peer
  * - 'rtc:downgraded' - Fell back to WebSocket for a peer
+ * - 'rtc:connection-failed' - WebRTC connection attempt failed
+ * - 'rtc:retrying' - Retrying WebRTC with TURN servers
  */
 export class HybridPeerManager extends Emitter {
   private wsConnection: PeerConnection;
@@ -301,9 +303,17 @@ export class HybridPeerManager extends Emitter {
     });
 
     // WebRTC connection established
-    rtcConn.on('rtc:connected', () => {
-      console.log(`[Hybrid] ✅ WebRTC connection established with ${peerId}`);
-      this.emit('rtc:upgraded', { peerId });
+    rtcConn.on('rtc:connected', (evt) => {
+      const { usingTurn, retryCount } = evt.payload;
+      const turnInfo = usingTurn ? ' (via TURN relay)' : '';
+      const retryInfo = retryCount > 0 ? ` after ${retryCount} retries` : '';
+
+      console.log(`[Hybrid] ✅ WebRTC connection established with ${peerId}${turnInfo}${retryInfo}`);
+      this.emit('rtc:upgraded', {
+        peerId,
+        usingTurn,
+        retryCount
+      });
     });
 
     // WebRTC connection closed
@@ -312,6 +322,25 @@ export class HybridPeerManager extends Emitter {
       this.rtcConnections.delete(peerId);
       this.initiatedRTC.delete(peerId);
       this.emit('rtc:downgraded', { peerId });
+    });
+
+    // WebRTC connection failed (before retry)
+    rtcConn.on('rtc:connection-failed', (evt) => {
+      const { retryCount, willRetry } = evt.payload;
+      console.warn(`[Hybrid] WebRTC connection failed with ${peerId} (attempt ${retryCount})`);
+
+      if (!willRetry) {
+        console.log(`[Hybrid] No more retries, using WebSocket fallback for ${peerId}`);
+      }
+
+      this.emit('rtc:connection-failed', evt.payload);
+    });
+
+    // WebRTC retrying with TURN
+    rtcConn.on('rtc:retrying', (evt) => {
+      const { retryCount, usingTurn } = evt.payload;
+      console.log(`[Hybrid] 🔄 Retrying WebRTC connection with ${peerId} (attempt ${retryCount}, TURN: ${usingTurn})`);
+      this.emit('rtc:retrying', evt.payload);
     });
 
     // Forward data from WebRTC to application
