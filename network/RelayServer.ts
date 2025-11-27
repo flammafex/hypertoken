@@ -77,6 +77,12 @@ export class RelayServer extends Emitter {
     try {
       const msg = JSON.parse(rawData.toString());
 
+      // Handle WebRTC signaling messages (always have targetPeerId in payload)
+      if (this._isWebRTCSignaling(msg)) {
+        this._routeWebRTCSignaling(ws, fromPeerId, msg);
+        return;
+      }
+
       if (msg.targetPeerId) {
         const target = msg.targetPeerId;
         const type = msg.payload?.type || "unknown";
@@ -96,5 +102,36 @@ export class RelayServer extends Emitter {
     } catch (err) {
       console.error("Relay handling error:", err);
     }
+  }
+
+  private _isWebRTCSignaling(msg: any): boolean {
+    return msg.payload && [
+      'webrtc-offer',
+      'webrtc-answer',
+      'webrtc-ice-candidate'
+    ].includes(msg.payload.type);
+  }
+
+  private _routeWebRTCSignaling(ws: WebSocket, fromPeerId: string, msg: any): void {
+    const targetPeerId = msg.targetPeerId;
+    const signalType = msg.payload.type;
+
+    if (!targetPeerId) {
+      console.warn(`[Server] WebRTC signaling missing targetPeerId:`, msg);
+      return;
+    }
+
+    if (this.verbose) {
+      console.log(`[Server] Routing WebRTC ${signalType} from ${fromPeerId} -> ${targetPeerId}`);
+    }
+
+    for (const [client, id] of this.clients) {
+      if (id === targetPeerId) {
+        this._send(client, { ...msg, fromPeerId });
+        return;
+      }
+    }
+
+    console.warn(`[Server] WebRTC signaling target peer ${targetPeerId} not found!`);
   }
 }
