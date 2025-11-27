@@ -104,6 +104,6 @@ export interface HyperTokenState {
   rules?: IRuleState;
   agents?: Record<string, unknown>;
   version?: string;
-
+  nullifiers?: Record<string, number>; // Map<NullifierHash, Timestamp>
   [key: string]: unknown;
 }
