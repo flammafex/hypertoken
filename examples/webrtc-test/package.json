@@ -1,0 +1,19 @@
+{
+  "name": "hypertoken-webrtc-test",
+  "version": "1.0.0",
+  "description": "WebRTC peer-to-peer connection test for HyperToken",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "server": "node server.js",
+    "client": "node client.js"
+  },
+  "keywords": [
+    "hypertoken",
+    "webrtc",
+    "p2p"
+  ],
+  "dependencies": {
+    "hypertoken": "file:../.."
+  }
+}
