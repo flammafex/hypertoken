@@ -289,10 +289,99 @@ Then update clients:
 SERVER_URL=ws://localhost:8081 npm run client Alice
 ```
 
+## CRDT Synchronization Demo (Phase 3)
+
+The `crdt-sync.js` example demonstrates **real-time state synchronization** over WebRTC using Automerge CRDTs.
+
+### What is CRDT?
+
+**CRDT** (Conflict-free Replicated Data Type) ensures that all peers eventually reach the same state, even when they make concurrent changes. HyperToken uses [Automerge](https://automerge.org/) for automatic state merging.
+
+### Running the CRDT Demo
+
+1. **Terminal 1** - Start server and first player:
+```bash
+npm run crdt Alice --server
+```
+
+2. **Terminal 2** - Start second player:
+```bash
+npm run crdt Bob
+```
+
+3. **Terminal 3** - Start third player (optional):
+```bash
+npm run crdt Charlie
+```
+
+### CRDT Demo Commands
+
+```
+/state          - Show current shared state
+/players        - List all connected players
+/increment      - Increment shared counter
+/set <key> <val>- Set a value in shared state
+```
+
+### What You'll See
+
+**Player 1 (Alice) increments counter:**
+```
+> /increment
+✅ Counter incremented to 1
+   (Change will sync to all peers via CRDT)
+```
+
+**Player 2 (Bob) sees the update automatically:**
+```
+🚀 WebRTC connection established with Alice
+   CRDT sync now using direct P2P DataChannel!
+
+> /state
+📊 Current shared state:
+{
+  "players": {
+    "peer-abc123": { "name": "Alice", "joined": 1701234567890 },
+    "peer-def456": { "name": "Bob", "joined": 1701234567891 }
+  },
+  "counter": 1
+}
+```
+
+**Both players increment simultaneously (no conflicts!):**
+```
+Alice: /increment → counter = 2
+Bob:   /increment → counter = 3  (Automerge merges both changes!)
+```
+
+### How It Works
+
+1. **Engine** creates CRDT document (Automerge)
+2. **ConsensusCore** manages sync state per peer
+3. **HybridPeerManager** sends sync messages via WebRTC (or WebSocket fallback)
+4. **Automerge** automatically merges concurrent changes
+5. All peers converge to the same state
+
+### Benefits of CRDT over WebRTC
+
+✅ **Zero conflicts** - Concurrent edits merge automatically
+✅ **Low latency** - Direct P2P reduces sync delay
+✅ **Eventual consistency** - All peers reach same state
+✅ **Offline-friendly** - Changes queue and sync when reconnected
+✅ **No server logic** - State merging happens on peers
+
+### Use Cases
+
+- **Multiplayer games** - Sync game state (positions, scores, etc.)
+- **Collaborative editing** - Real-time document editing
+- **Shared whiteboards** - Drawing and annotations
+- **Chat applications** - Message history sync
+- **Distributed databases** - Local-first data sync
+
 ## Next Steps
 
-1. **Add TURN server**: For production, add a TURN server for NAT traversal
-2. **Integrate with CRDT**: Connect this to ConsensusCore for state synchronization
+1. **Add TURN server**: For production, add a TURN server for NAT traversal ✅ (Phase 2 complete)
+2. **Integrate with CRDT**: Connect this to ConsensusCore for state synchronization ✅ (Phase 3 complete)
 3. **Add encryption**: Implement end-to-end encryption for WebRTC DataChannels
 4. **Browser support**: Create a web-based version using the same HybridPeerManager
 
