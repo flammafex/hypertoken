@@ -59,7 +59,7 @@ export const DEFAULT_TURN_SERVERS: RTCIceServer[] = [
  * - 'rtc:retrying' - Attempting to reconnect with TURN
  */
 export class WebRTCConnection extends Emitter {
-  private peerConnection: RTCPeerConnection;
+  private peerConnection!: RTCPeerConnection; // Initialized in initializePeerConnection()
   private dataChannel: RTCDataChannel | null = null;
   private remotePeerId: string;
   private config: WebRTCConfig;
