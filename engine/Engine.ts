@@ -10,7 +10,8 @@ import { ActionRegistry } from "./actions.js";
 import { IActionPayload } from "../core/types.js";
 import { Chronicle } from "../core/Chronicle.js";
 import { PeerConnection } from "../network/PeerConnection.js";
-import { ConsensusCore } from "../core/ConsensusCore.js";
+import { HybridPeerManager } from "../network/HybridPeerManager.js";
+import { ConsensusCore, INetworkConnection } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
 import { EventBus } from "../core/EventBus.js";
@@ -20,24 +21,25 @@ export interface EngineOptions {
   stack?: Stack | null;
   space?: Space | null;
   source?: Source | null;
-  autoConnect?: string; 
+  autoConnect?: string;
+  useWebRTC?: boolean; // Enable WebRTC with automatic fallback
 }
 
 export class Engine extends Emitter {
   stack: Stack | null;
   space: Space;
   source: Source | null;
-  
+
   session: Chronicle;
-  network?: PeerConnection;
+  network?: INetworkConnection; // Can be PeerConnection or HybridPeerManager
   sync?: ConsensusCore;
   loop: GameLoop;
 
   // Local event dispatcher for tests and plugins
   eventBus: EventBus;
-  
+
   // Exposed RuleEngine
-  ruleEngine?: RuleEngine; 
+  ruleEngine?: RuleEngine;
 
   history: Action[];
   future: Action[];
@@ -48,15 +50,18 @@ export class Engine extends Emitter {
   _transactions: ITransaction[];
   debug: boolean;
 
-  constructor({ stack = null, space = null, source = null, autoConnect }: EngineOptions = {}) {
+  private useWebRTC: boolean;
+
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false }: EngineOptions = {}) {
     super();
-    
+
     this.session = new Chronicle();
     this.space = space ?? new Space(this.session, "main-space");
     this.stack = stack;
     this.source = source;
     this.loop = new GameLoop(this);
     this.eventBus = new EventBus();
+    this.useWebRTC = useWebRTC;
 
     this.history = [];
     this.future = [];
@@ -81,12 +86,37 @@ export class Engine extends Emitter {
 
   connect(url: string): void {
     if (this.network) return;
-    console.log(`[Engine] Connecting to ${url}...`);
-    this.network = new PeerConnection(url, this);
+
+    if (this.useWebRTC) {
+      console.log(`[Engine] Connecting to ${url} with WebRTC support...`);
+      this.network = new HybridPeerManager({
+        url,
+        autoUpgrade: true,
+        upgradeDelay: 1000
+      });
+    } else {
+      console.log(`[Engine] Connecting to ${url} (WebSocket only)...`);
+      this.network = new PeerConnection(url, this);
+    }
+
     this.sync = new ConsensusCore(this.session, this.network);
     this.network.connect();
+
+    // Forward network events
     this.network.on("net:ready", (e) => this.emit("net:ready", e));
     this.network.on("net:peer:connected", (e) => this.emit("net:peer:connected", e));
+
+    // Forward WebRTC-specific events if using HybridPeerManager
+    if (this.useWebRTC) {
+      this.network.on("rtc:upgraded", (e) => {
+        console.log(`[Engine] WebRTC connection established with peer`);
+        this.emit("rtc:upgraded", e);
+      });
+      this.network.on("rtc:downgraded", (e) => {
+        console.log(`[Engine] WebRTC connection lost, using WebSocket`);
+        this.emit("rtc:downgraded", e);
+      });
+    }
   }
 
   disconnect(): void {

@@ -1,6 +1,8 @@
 /*
  * core/ConsensusCore.ts
  * Fixed Event Unwrapping & Echo Loop
+ *
+ * Now supports both PeerConnection and HybridPeerManager for WebRTC!
  */
 import * as A from "@automerge/automerge";
 import { Chronicle } from "./Chronicle.js";
@@ -8,13 +10,22 @@ import { PeerConnection } from "../network/PeerConnection.js";
 import { Emitter } from "./events.js";
 import { Buffer } from "node:buffer";
 
+// Type for network connections that can be used with ConsensusCore
+// Both PeerConnection and HybridPeerManager satisfy this interface
+export interface INetworkConnection extends Emitter {
+  sendToPeer(targetPeerId: string, payload: any): void;
+  connect(): void;
+  disconnect(): void;
+  getPeerId?(): string | null; // Optional: for getting local peer ID
+}
+
 export class ConsensusCore extends Emitter {
   session: Chronicle;
-  network: PeerConnection;
-  
+  network: INetworkConnection;
+
   private _syncStates: Map<string, A.SyncState> = new Map();
 
-  constructor(session: Chronicle, network: PeerConnection) {
+  constructor(session: Chronicle, network: INetworkConnection) {
     super();
     this.session = session;
     this.network = network;

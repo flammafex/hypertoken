@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "server": "node server.js",
-    "client": "node client.js"
+    "client": "node client.js",
+    "crdt": "node crdt-sync.js"
   },
   "keywords": [
     "hypertoken",
