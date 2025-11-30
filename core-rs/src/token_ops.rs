@@ -50,13 +50,9 @@ impl TokenOps {
                     "meta" => {
                         // Merge meta objects
                         if let serde_json::Value::Object(new_meta) = value {
-                            let current_meta = token.meta.as_object().cloned()
-                                .unwrap_or_else(|| serde_json::Map::new());
-                            let mut merged = current_meta;
                             for (k, v) in new_meta {
-                                merged.insert(k, v);
+                                token.meta.insert(k, v);
                             }
-                            token.meta = serde_json::Value::Object(merged);
                         }
                     }
                     "char" => {
@@ -66,7 +62,7 @@ impl TokenOps {
                     }
                     "kind" => {
                         if let Some(s) = value.as_str() {
-                            token.kind = Some(s.to_string());
+                            token.kind = s.to_string();
                         }
                     }
                     "label" => {
@@ -81,9 +77,7 @@ impl TokenOps {
                     }
                     _ => {
                         // Store other properties in meta
-                        if let serde_json::Value::Object(ref mut meta_obj) = token.meta {
-                            meta_obj.insert(key, value);
-                        }
+                        token.meta.insert(key, value);
                     }
                 }
             }
@@ -119,31 +113,22 @@ impl TokenOps {
         };
 
         // Add _attachments array to host
-        let attachments_value = if let serde_json::Value::Object(ref mut meta) = host.meta {
-            if let Some(serde_json::Value::Array(existing)) = meta.get("_attachments") {
-                let mut arr = existing.clone();
-                arr.push(serde_json::to_value(&attachment_record)
-                    .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?);
-                arr
-            } else {
-                vec![serde_json::to_value(&attachment_record)
-                    .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?]
-            }
+        let attachments_value = if let Some(serde_json::Value::Array(existing)) = host.meta.get("_attachments") {
+            let mut arr = existing.clone();
+            arr.push(serde_json::to_value(&attachment_record)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?);
+            arr
         } else {
             vec![serde_json::to_value(&attachment_record)
                 .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?]
         };
 
         // Update host meta
-        if let serde_json::Value::Object(ref mut meta) = host.meta {
-            meta.insert("_attachments".to_string(), serde_json::Value::Array(attachments_value));
-        }
+        host.meta.insert("_attachments".to_string(), serde_json::Value::Array(attachments_value));
 
         // Update attachment token
-        if let serde_json::Value::Object(ref mut meta) = attachment.meta {
-            meta.insert("_attachedTo".to_string(), serde_json::Value::String(host.id.clone()));
-            meta.insert("_attachmentType".to_string(), serde_json::Value::String(attachment_type.to_string()));
-        }
+        attachment.meta.insert("_attachedTo".to_string(), serde_json::Value::String(host.id.clone()));
+        attachment.meta.insert("_attachmentType".to_string(), serde_json::Value::String(attachment_type.to_string()));
 
         serde_json::to_string(&host)
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
@@ -157,30 +142,30 @@ impl TokenOps {
         let mut host: IToken = serde_json::from_str(host_json)
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
 
-        // Get attachments array
-        if let serde_json::Value::Object(ref mut meta) = host.meta {
-            if let Some(serde_json::Value::Array(ref mut attachments)) = meta.get_mut("_attachments") {
-                // Find and remove the attachment
-                if let Some(index) = attachments.iter().position(|a| {
-                    a.get("id")
-                        .and_then(|id| id.as_str())
-                        .map(|id| id == attachment_id)
-                        .unwrap_or(false)
-                }) {
-                    let removed = attachments.remove(index);
+        // Get attachments array from meta
+        if let Some(serde_json::Value::Array(attachments)) = host.meta.get_mut("_attachments") {
+            // Find and remove the attachment
+            if let Some(index) = attachments.iter().position(|a| {
+                a.get("id")
+                    .and_then(|id| id.as_str())
+                    .map(|id| id == attachment_id)
+                    .unwrap_or(false)
+            }) {
+                let removed = attachments.remove(index);
 
-                    // Extract the token and clean it
-                    if let serde_json::Value::Object(ref obj) = removed {
-                        if let Some(serde_json::Value::Object(mut token_obj)) = obj.get("token").cloned() {
-                            // Remove attachment metadata
-                            if let Some(serde_json::Value::Object(ref mut token_meta)) = token_obj.get_mut("meta") {
-                                token_meta.remove("_attachedTo");
-                                token_meta.remove("_attachmentType");
-                            }
+                // Extract the token and clean it
+                if let serde_json::Value::Object(ref obj) = removed {
+                    if let Some(token_value) = obj.get("token") {
+                        // Deserialize to IToken so we can clean it properly
+                        let mut token: IToken = serde_json::from_value(token_value.clone())
+                            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
 
-                            return serde_json::to_string(&token_obj)
-                                .map_err(|e| HyperTokenError::SerializationError(e.to_string()));
-                        }
+                        // Remove attachment metadata
+                        token.meta.remove("_attachedTo");
+                        token.meta.remove("_attachmentType");
+
+                        return serde_json::to_string(&token)
+                            .map_err(|e| HyperTokenError::SerializationError(e.to_string()));
                     }
                 }
             }
@@ -214,12 +199,9 @@ impl TokenOps {
         let mut merged = tokens[0].clone();
 
         // Merge meta from all tokens
-        let mut merged_meta = serde_json::Map::new();
         for token in &tokens {
-            if let serde_json::Value::Object(ref meta) = token.meta {
-                for (k, v) in meta {
-                    merged_meta.insert(k.clone(), v.clone());
-                }
+            for (k, v) in &token.meta {
+                merged.meta.insert(k.clone(), v.clone());
             }
         }
 
@@ -231,25 +213,23 @@ impl TokenOps {
             if let serde_json::Value::Object(props_obj) = props {
                 for (k, v) in props_obj {
                     if k != "meta" {
-                        merged_meta.insert(k, v);
+                        merged.meta.insert(k, v);
                     }
                 }
             }
         }
 
         // Add merge metadata
-        merged_meta.insert(
+        merged.meta.insert(
             "_mergedFrom".to_string(),
             serde_json::Value::Array(
                 tokens.iter().map(|t| serde_json::Value::String(t.id.clone())).collect()
             )
         );
-        merged_meta.insert(
+        merged.meta.insert(
             "_mergedAt".to_string(),
             serde_json::Value::Number(serde_json::Number::from(chrono::Utc::now().timestamp_millis()))
         );
-
-        merged.meta = serde_json::Value::Object(merged_meta);
 
         // Mark original tokens as merged (if not keeping)
         if !keep_originals {
@@ -298,20 +278,16 @@ impl TokenOps {
             // Apply custom properties if provided
             if i < properties_array.len() {
                 if let serde_json::Value::Object(ref custom_props) = properties_array[i] {
-                    if let serde_json::Value::Object(ref mut meta) = split_token.meta {
-                        for (k, v) in custom_props {
-                            meta.insert(k.clone(), v.clone());
-                        }
+                    for (k, v) in custom_props {
+                        split_token.meta.insert(k.clone(), v.clone());
                     }
                 }
             }
 
             // Add split metadata
-            if let serde_json::Value::Object(ref mut meta) = split_token.meta {
-                meta.insert("_splitFrom".to_string(), serde_json::Value::String(base_token.id.clone()));
-                meta.insert("_splitIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(i)));
-                meta.insert("_splitAt".to_string(), serde_json::Value::Number(serde_json::Number::from(chrono::Utc::now().timestamp_millis())));
-            }
+            split_token.meta.insert("_splitFrom".to_string(), serde_json::Value::String(base_token.id.clone()));
+            split_token.meta.insert("_splitIndex".to_string(), serde_json::Value::Number(serde_json::Number::from(i)));
+            split_token.meta.insert("_splitAt".to_string(), serde_json::Value::Number(serde_json::Number::from(chrono::Utc::now().timestamp_millis())));
 
             split_tokens.push(split_token);
         }
