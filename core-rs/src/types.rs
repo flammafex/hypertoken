@@ -95,8 +95,11 @@ impl Default for ZoneLock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IToken {
     pub id: String,
+    #[serde(default)]
     pub label: Option<String>,
+    #[serde(default)]
     pub group: Option<String>,
+    #[serde(default)]
     pub text: String,
     #[serde(default)]
     pub meta: Metadata,
