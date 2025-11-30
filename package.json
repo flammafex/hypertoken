@@ -47,7 +47,7 @@
     "build:rust": "cd core-rs && ./build.sh",
     "build:rust:dev": "cd core-rs && wasm-pack build --dev --target nodejs --out-dir pkg/nodejs",
     "build:rust:release": "cd core-rs && wasm-pack build --release --target nodejs --out-dir pkg/nodejs",
-    "test:rust": "cd core-rs && cargo test",
+    "test:rust": "cd core-rs && cargo test --lib --target $(rustc -vV | sed -n 's/host: //p')",
     "clean:rust": "cd core-rs && cargo clean && rm -rf pkg"
   }
 }
