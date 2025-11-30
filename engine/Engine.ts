@@ -20,6 +20,7 @@ import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmActionDispatcher 
 import type { StackWasm } from "../core/StackWasm.js";
 import type { SpaceWasm } from "../core/SpaceWasm.js";
 import type { SourceWasm } from "../core/SourceWasm.js";
+import { WasmWorker } from "../core/WasmWorker.js";
 
 export interface EngineOptions {
   stack?: Stack | null;
@@ -27,6 +28,13 @@ export interface EngineOptions {
   source?: Source | null;
   autoConnect?: string;
   useWebRTC?: boolean; // Enable WebRTC with automatic fallback
+  useWorker?: boolean; // Enable multi-threaded WASM worker (Phase 4)
+  workerOptions?: {
+    debug?: boolean;
+    timeout?: number;
+    enableBatching?: boolean;
+    batchWindow?: number;
+  };
 }
 
 export class Engine extends Emitter {
@@ -56,8 +64,10 @@ export class Engine extends Emitter {
 
   private useWebRTC: boolean;
   private _wasmDispatcher: WasmActionDispatcher | null = null;
+  private _wasmWorker: WasmWorker | null = null;
+  private _useWorker: boolean = false;
 
-  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, useWorker = false, workerOptions = {} }: EngineOptions = {}) {
     super();
 
     this.session = new Chronicle();
@@ -79,11 +89,56 @@ export class Engine extends Emitter {
 
     this.session.on("state:changed", (e) => this.emit("state:updated", e));
 
-    // Initialize WASM ActionDispatcher if components support it
-    this._initializeWasmDispatcher();
+    // Initialize worker mode or direct WASM dispatcher
+    this._useWorker = useWorker;
+    if (useWorker) {
+      this._initializeWorker(workerOptions);
+    } else {
+      // Initialize WASM ActionDispatcher if components support it
+      this._initializeWasmDispatcher();
+    }
 
     if (autoConnect) {
       this.connect(autoConnect);
+    }
+  }
+
+  /**
+   * Initialize WasmWorker for multi-threaded execution
+   */
+  private async _initializeWorker(options: EngineOptions['workerOptions'] = {}): Promise<void> {
+    try {
+      this._wasmWorker = new WasmWorker({
+        debug: options.debug ?? this.debug,
+        timeout: options.timeout,
+        enableBatching: options.enableBatching,
+        batchWindow: options.batchWindow,
+      });
+
+      await this._wasmWorker.init();
+
+      // Forward worker events to engine events
+      this._wasmWorker.on('state_changed', (payload) => {
+        this.emit('state:updated', payload);
+      });
+
+      this._wasmWorker.on('action_completed', (payload) => {
+        this.emit('engine:action', { payload });
+      });
+
+      this._wasmWorker.on('error', (error) => {
+        this.emit('engine:error', { payload: { error } });
+      });
+
+      if (this.debug) {
+        console.log('✅ Engine: WasmWorker initialized');
+      }
+    } catch (error) {
+      console.error('❌ Engine: WasmWorker initialization failed:', error);
+      this._useWorker = false;
+      this._wasmWorker = null;
+      // Fall back to direct WASM dispatcher
+      this._initializeWasmDispatcher();
     }
   }
 
@@ -221,6 +276,28 @@ export class Engine extends Emitter {
     this.sync = undefined;
   }
 
+  /**
+   * Shutdown the engine and cleanup resources
+   */
+  async shutdown(): Promise<void> {
+    // Disconnect network
+    this.disconnect();
+
+    // Terminate worker
+    if (this._wasmWorker) {
+      await this._wasmWorker.terminate();
+      this._wasmWorker = null;
+      this._useWorker = false;
+    }
+
+    // Clear policies and history
+    this._policies.clear();
+    this.history = [];
+    this.future = [];
+
+    this.emit('engine:shutdown');
+  }
+
   registerPolicy(name: string, policy: any): this {
     this._policies.set(name, policy);
     this.emit("engine:policy", { payload: { name } });
@@ -239,7 +316,19 @@ export class Engine extends Emitter {
     return this;
   }
 
+  /**
+   * Dispatch an action (synchronous version for backward compatibility)
+   *
+   * @deprecated When using worker mode, prefer dispatchAsync() for better performance
+   */
   dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): any {
+    // If worker mode is enabled, use async dispatch but block
+    if (this._useWorker && this._wasmWorker) {
+      // This is a blocking call - not ideal, but maintains backward compatibility
+      console.warn('⚠️  Synchronous dispatch() called in worker mode. Consider using dispatchAsync() for better performance.');
+      // For now, fall through to sync execution
+    }
+
     const action = new Action(type, payload, opts);
     if (this.debug) console.log("🧩 dispatch:", type, payload);
 
@@ -247,6 +336,50 @@ export class Engine extends Emitter {
     this.history.push(action);
     this.emit("engine:action", { payload: action });
 
+    for (const [, policy] of this._policies) {
+      try {
+        policy.evaluate(this);
+      } catch (err) {
+        this.emit("engine:error", { payload: { policy, err } });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Dispatch an action asynchronously (worker-optimized)
+   *
+   * Use this method when worker mode is enabled for best performance.
+   * Falls back to synchronous execution if worker is not available.
+   */
+  async dispatchAsync(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<any> {
+    const action = new Action(type, payload, opts);
+    if (this.debug) console.log("🧩 dispatchAsync:", type, payload);
+
+    let result: any;
+
+    // Use worker if available
+    if (this._useWorker && this._wasmWorker && this._wasmWorker.ready) {
+      try {
+        result = await this._wasmWorker.dispatch(type, payload);
+        action.result = result;
+      } catch (error) {
+        if (this.debug) {
+          console.log('⚠️  Worker dispatch failed, falling back to sync:', error);
+        }
+        // Fall back to sync execution
+        result = this.apply(action);
+      }
+    } else {
+      // Sync fallback
+      result = this.apply(action);
+    }
+
+    this.history.push(action);
+    this.emit("engine:action", { payload: action });
+
+    // Evaluate policies
     for (const [, policy] of this._policies) {
       try {
         policy.evaluate(this);
