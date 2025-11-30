@@ -118,6 +118,23 @@ impl Stack {
         Ok(())
     }
 
+    /// Static helper: Shuffle an array of tokens without creating a Stack instance
+    ///
+    /// Avoids the overhead of Stack instantiation for standalone shuffle operations.
+    /// This is much faster for Source.ts which just needs to shuffle tokens without
+    /// the full Stack state management.
+    #[wasm_bindgen(js_name = shuffleTokens)]
+    pub fn shuffle_tokens(tokens_json: &str, seed: &str) -> Result<String> {
+        let mut tokens: Vec<Token> = serde_json::from_str(tokens_json)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+
+        let seed_opt = if seed.is_empty() { None } else { Some(seed) };
+        shuffle_vec(&mut tokens, seed_opt);
+
+        serde_json::to_string(&tokens)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+    }
+
     /// Burn (remove) N tokens from the top of the stack
     #[wasm_bindgen(js_name = burn)]
     pub fn burn(&mut self, count: usize) -> Result<String> {
