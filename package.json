@@ -49,6 +49,7 @@
     "build:rust:release": "cd core-rs && wasm-pack build --release --target nodejs --out-dir pkg/nodejs",
     "test:rust": "cd core-rs && cargo test --lib --target $(rustc -vV | sed -n 's/host: //p')",
     "test:wasm": "node --loader ./test/ts-esm-loader.js test/testWasmBridge.ts",
+    "test:wasm:stack": "node --loader ./test/ts-esm-loader.js test/testStackWasm.ts",
     "clean:rust": "cd core-rs && cargo clean && rm -rf pkg"
   }
 }
