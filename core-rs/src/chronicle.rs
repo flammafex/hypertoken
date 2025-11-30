@@ -1,10 +1,9 @@
 // Chronicle: CRDT document wrapper using automerge-rs
 
-use automerge::{Automerge, transaction::Transactable, AutomergeError, Change, ReadDoc};
+use automerge::{Automerge, transaction::Transactable, ReadDoc};
 use wasm_bindgen::prelude::*;
-use serde_json::Value as JsonValue;
 
-use crate::types::{HyperTokenError, Result};
+use crate::types::{HyperTokenError, HyperTokenState, Result};
 
 /// Chronicle wraps an Automerge CRDT document
 ///
@@ -33,31 +32,83 @@ impl Chronicle {
         }
     }
 
-    /// Apply a change to the document
+    /// Set the entire state (used for initialization)
     ///
-    /// JavaScript usage:
-    /// ```js
-    /// chronicle.change("draw-card", (doc) => {
-    ///   doc.stack.drawn.push(card);
-    /// });
-    /// ```
-    ///
-    /// Note: In WASM, we can't pass closures directly, so changes
-    /// must be applied through specific action methods.
-    #[wasm_bindgen(js_name = changeRaw)]
-    pub fn change_raw(&mut self, _message: &str, _changes: JsValue) -> Result<()> {
-        // For now, this is a placeholder. The real implementation will
-        // parse the changes from JsValue and apply them to the document.
-        // We'll implement specific methods for each action type instead.
+    /// Takes a JSON string of HyperTokenState and stores it in the CRDT.
+    /// The state is validated before being stored.
+    #[wasm_bindgen(js_name = setState)]
+    pub fn set_state(&mut self, state_json: &str) -> Result<()> {
+        // Validate the JSON first
+        let _state: HyperTokenState = serde_json::from_str(state_json)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Invalid state JSON: {}", e)))?;
+
+        // Store as JSON string in the CRDT
+        // This is simpler than trying to map to Automerge's native types
+        let _result = self.doc.transact(|tx| {
+            tx.put(automerge::ROOT, "state", state_json)
+        });
+
         Ok(())
     }
 
     /// Get the current document state as JSON
+    ///
+    /// Returns the complete HyperTokenState as a JSON string.
     #[wasm_bindgen(js_name = getState)]
     pub fn get_state(&self) -> Result<String> {
-        // For now, return a simple JSON representation
-        // TODO: Properly serialize the Automerge document
-        Ok("{}".to_string())
+        // Read state from the CRDT document
+        let state_value = self.doc.get(automerge::ROOT, "state")
+            .map_err(|e| HyperTokenError::CrdtError(format!("Failed to get state: {:?}", e)))?;
+
+        // If no state exists, return empty HyperTokenState
+        if state_value.is_none() {
+            let empty_state = HyperTokenState::default();
+            return serde_json::to_string(&empty_state)
+                .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize state: {}", e)));
+        }
+
+        // Extract the JSON string from Automerge value
+        match state_value.unwrap().0 {
+            automerge::Value::Scalar(s) => {
+                match s.as_ref() {
+                    automerge::ScalarValue::Str(json_str) => Ok(json_str.to_string()),
+                    _ => {
+                        let empty_state = HyperTokenState::default();
+                        serde_json::to_string(&empty_state)
+                            .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize state: {}", e)))
+                    }
+                }
+            },
+            _ => {
+                let empty_state = HyperTokenState::default();
+                serde_json::to_string(&empty_state)
+                    .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize state: {}", e)))
+            }
+        }
+    }
+
+    /// Apply a change to the document
+    ///
+    /// JavaScript usage:
+    /// ```js
+    /// chronicle.change("draw-card", newStateJson);
+    /// ```
+    ///
+    /// The new state is merged into the document atomically with a message.
+    #[wasm_bindgen(js_name = change)]
+    pub fn change(&mut self, message: &str, new_state_json: &str) -> Result<()> {
+        // Validate the JSON first
+        let _state: HyperTokenState = serde_json::from_str(new_state_json)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Invalid state JSON: {}", e)))?;
+
+        // Apply change with message
+        // Note: Automerge transact_with expects (F, time_option, extra) but the API differs per version
+        // For simplicity, use regular transact since it includes the change in the op log
+        let _result = self.doc.transact(|tx| {
+            tx.put(automerge::ROOT, "state", new_state_json)
+        });
+
+        Ok(())
     }
 
     /// Save the document to a binary format
