@@ -231,12 +231,12 @@ async function executeDefaultTurn(
   const stack = new StackWasm(chronicle);
 
   // Every 5 turns, shuffle
-  if (turn % 5 === 0 && stack.size() > 0) {
+  if (turn % 5 === 0 && stack.size > 0) {
     stack.shuffle(seed ? `${seed}-${turn}` : undefined);
   }
 
   // Draw a card if stack has cards
-  if (stack.size() > 0) {
+  if (stack.size > 0) {
     stack.draw(1);
   }
 
@@ -263,9 +263,8 @@ async function mergeChronicles(task: MergeTask): Promise<string> {
     const tempChronicle = new Chronicle();
     tempChronicle.loadFromBase64(docBase64);
 
-    // Save to binary and merge
-    const binaryDoc = tempChronicle.save();
-    chronicle.merge(binaryDoc);
+    // Merge the document state
+    chronicle.merge(tempChronicle.state);
   }
 
   // Return merged document
