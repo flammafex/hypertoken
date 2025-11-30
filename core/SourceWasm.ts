@@ -526,4 +526,20 @@ export class SourceWasm extends Emitter {
       reshufflePolicy: state?.reshufflePolicy ?? { threshold: null, mode: "auto" }
     };
   }
+
+  /**
+   * Check if WASM is being used
+   * @returns true if WASM is available and initialized
+   */
+  get isWasmEnabled(): boolean {
+    return this._wasmSource !== null && isWasmAvailable();
+  }
+
+  /**
+   * Get the underlying WASM Source instance
+   * @returns WasmSource instance or null if not initialized
+   */
+  get wasmInstance(): WasmSource | null {
+    return this._wasmSource;
+  }
 }

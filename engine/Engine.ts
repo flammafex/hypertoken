@@ -16,6 +16,10 @@ import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
 import { EventBus } from "../core/EventBus.js";
 import { IEngineAgent, IGameState, ITransaction, IEngineSnapshot, IEngineState } from "./types.js";
+import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmActionDispatcher } from "../core/WasmBridge.js";
+import type { StackWasm } from "../core/StackWasm.js";
+import type { SpaceWasm } from "../core/SpaceWasm.js";
+import type { SourceWasm } from "../core/SourceWasm.js";
 
 export interface EngineOptions {
   stack?: Stack | null;
@@ -51,6 +55,7 @@ export class Engine extends Emitter {
   debug: boolean;
 
   private useWebRTC: boolean;
+  private _wasmDispatcher: WasmActionDispatcher | null = null;
 
   constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false }: EngineOptions = {}) {
     super();
@@ -74,8 +79,99 @@ export class Engine extends Emitter {
 
     this.session.on("state:changed", (e) => this.emit("state:updated", e));
 
+    // Initialize WASM ActionDispatcher if components support it
+    this._initializeWasmDispatcher();
+
     if (autoConnect) {
       this.connect(autoConnect);
+    }
+  }
+
+  /**
+   * Initialize WASM ActionDispatcher if WASM is available
+   */
+  private _initializeWasmDispatcher(): void {
+    if (!isWasmAvailable()) {
+      // Try async load
+      this._tryLoadWasmDispatcherAsync();
+      return;
+    }
+
+    try {
+      const wasm = getWasmModule();
+      if (!wasm) return;
+
+      this._wasmDispatcher = new wasm.ActionDispatcher();
+
+      // Set WASM instances if available
+      if (this.stack && 'wasmInstance' in this.stack) {
+        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        if (wasmStack) {
+          this._wasmDispatcher.setStack(wasmStack);
+        }
+      }
+
+      if (this.space && 'wasmInstance' in this.space) {
+        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        if (wasmSpace) {
+          this._wasmDispatcher.setSpace(wasmSpace);
+        }
+      }
+
+      if (this.source && 'wasmInstance' in this.source) {
+        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        if (wasmSource) {
+          this._wasmDispatcher.setSource(wasmSource);
+        }
+      }
+
+      if (this.debug) {
+        console.log('✅ WASM ActionDispatcher initialized');
+      }
+    } catch (error) {
+      if (this.debug) {
+        console.warn('⚠️  WASM ActionDispatcher initialization failed:', error);
+      }
+    }
+  }
+
+  /**
+   * Try to load WASM dispatcher asynchronously
+   */
+  private async _tryLoadWasmDispatcherAsync(): Promise<void> {
+    try {
+      const wasm = await tryLoadWasm();
+      if (!wasm || this._wasmDispatcher) return;
+
+      this._wasmDispatcher = new wasm.ActionDispatcher();
+
+      // Set WASM instances if available
+      if (this.stack && 'wasmInstance' in this.stack) {
+        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        if (wasmStack) {
+          this._wasmDispatcher.setStack(wasmStack);
+        }
+      }
+
+      if (this.space && 'wasmInstance' in this.space) {
+        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        if (wasmSpace) {
+          this._wasmDispatcher.setSpace(wasmSpace);
+        }
+      }
+
+      if (this.source && 'wasmInstance' in this.source) {
+        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        if (wasmSource) {
+          this._wasmDispatcher.setSource(wasmSource);
+        }
+      }
+
+      if (this.debug) {
+        console.log('✅ WASM ActionDispatcher initialized (async)');
+      }
+    } catch (error) {
+      // Silently fail - fallback to TypeScript
     }
   }
 
@@ -162,7 +258,27 @@ export class Engine extends Emitter {
     return result;
   }
 
+  // Actions implemented in WASM ActionDispatcher
+  private static readonly WASM_ACTIONS = new Set([
+    "stack:draw", "stack:peek", "stack:shuffle", "stack:burn", "stack:reset",
+    "stack:cut", "stack:insertAt", "stack:removeAt", "stack:swap",
+    "space:place", "space:remove", "space:move", "space:flip",
+    "space:createZone", "space:deleteZone", "space:clearZone",
+    "space:lockZone", "space:shuffleZone",
+    "source:draw", "source:shuffle", "source:burn",
+    "debug:log"
+  ]);
+
   apply(action: Action): any {
+    // NOTE: WASM ActionDispatcher is currently disabled because:
+    // 1. StackWasm/SpaceWasm/SourceWasm already bypass Chronicle for WASM ops
+    // 2. ActionDispatcher adds JSON serialization overhead without benefit
+    // 3. The architecture needs rethinking for better integration
+    //
+    // The infrastructure is in place (ActionDispatcher in Rust, WasmBridge types,
+    // wasmInstance getters) for future experimentation with batched operations
+    // or other optimization strategies.
+
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {
