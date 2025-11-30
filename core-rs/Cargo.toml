@@ -61,4 +61,6 @@ opt-level = 0
 lto = false
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-Oz", "--enable-mutable-globals"]
+# Disable wasm-opt for now (can cause build issues on some systems)
+# The Rust compiler already optimizes with opt-level="z" above
+wasm-opt = false
