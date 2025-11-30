@@ -32,7 +32,7 @@ import { SpaceWasm } from '../core/SpaceWasm.js';
 import { Stack } from '../core/Stack.js';
 import { Chronicle } from '../core/Chronicle.js';
 import { Token } from '../core/Token.js';
-import { isWasmAvailable } from '../core/WasmBridge.js';
+import { tryLoadWasm, isWasmAvailable } from '../core/WasmBridge.js';
 
 console.log('🧪 Testing SpaceWasm Integration\n');
 
@@ -44,6 +44,10 @@ function createTokens(count: number): Token[] {
   }
   return tokens;
 }
+
+// Pre-load WASM before creating instances
+console.log('Loading WASM module...');
+await tryLoadWasm();
 
 // Test 1: Basic Initialization
 console.log('Test 1: SpaceWasm initialization...');
