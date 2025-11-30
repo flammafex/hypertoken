@@ -250,7 +250,8 @@ impl ActionDispatcher {
         let token_id = action["tokenId"].as_str()
             .ok_or_else(|| HyperTokenError::InvalidOperation("Missing tokenId".to_string()))?;
 
-        space.flip(zone, token_id)?;
+        // Pass None for face_up to toggle the current state
+        space.flip(zone, token_id, None)?;
         Ok("{}".to_string())
     }
 
