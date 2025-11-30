@@ -48,6 +48,7 @@ export class SourceWasm extends Emitter {
   public readonly session: Chronicle;
   private _wasmSource: WasmSource | null = null;
   private _stacks: Stack[];
+  private _originalTokens: IToken[];
   private _initialized: boolean = false;
 
   /**
@@ -67,13 +68,29 @@ export class SourceWasm extends Emitter {
     this.session = session;
     this._stacks = stacks;
 
+    // Cache original tokens to avoid triggering sync on reset
+    // This is critical for performance - accessing stack.tokens triggers Chronicle sync
+    this._originalTokens = stacks.flatMap(d => {
+      // If it's a StackWasm with WASM enabled, get tokens directly from WASM
+      if ((d as any)._wasmStack && isWasmAvailable()) {
+        try {
+          const wasmStack = (d as any)._wasmStack;
+          const stateJson = wasmStack.getState();
+          const state = JSON.parse(stateJson);
+          return state.stack || [];
+        } catch {
+          // Fall through to normal access
+        }
+      }
+      return d.tokens ?? [];
+    });
+
     // Initialize CRDT state if autoInit is true
     if (autoInit && !this.session.state.source) {
-      const tokens = stacks.flatMap(d => d.tokens ?? []);
       this.session.change("initialize source", (doc) => {
         doc.source = {
           stackIds: stacks.map((_, i) => `stack-${i}`),
-          tokens: tokens.map(t => this._sanitize(t)),
+          tokens: this._originalTokens.map(t => this._sanitize(t)),
           burned: [],
           seed: null,
           reshufflePolicy: { threshold: null, mode: "auto" }
@@ -187,6 +204,7 @@ export class SourceWasm extends Emitter {
 
   /**
    * Add a stack to the source
+   * Optimized to avoid triggering Chronicle sync on StackWasm
    * @throws Error if stack is null/undefined
    */
   addStack(stack: Stack): this {
@@ -195,7 +213,22 @@ export class SourceWasm extends Emitter {
     }
 
     this._stacks.push(stack);
-    const newTokens = stack.tokens ?? [];
+
+    // Get tokens without triggering Chronicle sync if it's a StackWasm
+    let newTokens: IToken[];
+    if ((stack as any)._wasmStack && isWasmAvailable()) {
+      try {
+        const wasmStack = (stack as any)._wasmStack;
+        const stateJson = wasmStack.getState();
+        const state = JSON.parse(stateJson);
+        newTokens = state.stack || [];
+      } catch {
+        newTokens = stack.tokens ?? [];
+      }
+    } else {
+      newTokens = stack.tokens ?? [];
+    }
+
     const stackId = `stack-${this._stacks.length - 1}`;
 
     // Use WASM if available (~88x faster)
@@ -203,6 +236,7 @@ export class SourceWasm extends Emitter {
       try {
         const tokensJson = JSON.stringify(newTokens);
         this._wasmSource.addStack(tokensJson, stackId);
+        // NO SYNC - lazy sync on getter access
         this.emit("source:addStack", { payload: { stackId } });
         return this;
       } catch (error) {
@@ -431,16 +465,19 @@ export class SourceWasm extends Emitter {
   /**
    * Reset source to initial state
    * Uses WASM for ~35x performance improvement
+   * Uses cached _originalTokens to avoid triggering Chronicle sync
    */
   reset(): this {
-    const tokens = this._stacks.flatMap(d => d.tokens ?? []);
+    // Use cached original tokens instead of querying stacks
+    // This avoids triggering Chronicle sync on StackWasm instances
+    const tokens = this._originalTokens;
 
     // Use WASM if available (~35x faster)
     if (this._wasmSource && isWasmAvailable()) {
       try {
         const tokensJson = JSON.stringify(tokens);
         this._wasmSource.reset(tokensJson);
-        // Note: tokens.length getter will trigger sync
+        // NO SYNC - lazy sync on getter access
         this.emit("source:reset", { payload: { size: tokens.length } });
         return this;
       } catch (error) {

@@ -196,6 +196,40 @@ export class StackWasm extends Emitter {
   }
 
   /**
+   * Peek at N tokens from the top of the stack without removing them
+   * @param n - Number of tokens to peek at
+   * @returns Array of tokens
+   * @throws Error if n is invalid
+   */
+  peek(n: number = 1): IToken[] {
+    if (n < 1 || !Number.isInteger(n)) {
+      throw new Error(`Invalid peek count: ${n}. Must be a positive integer.`);
+    }
+
+    let peeked: IToken[] = [];
+
+    // Use WASM if available (direct memory access, no Chronicle overhead)
+    if (this._wasmStack && isWasmAvailable()) {
+      try {
+        const peekedJson = this._wasmStack.peek(n);
+        peeked = JSON.parse(peekedJson);
+        return peeked;
+      } catch (error) {
+        console.error('WASM peek failed, falling back to TypeScript:', error);
+      }
+    }
+
+    // TypeScript fallback - requires sync
+    this._ensureSync();
+    const stack = this.session.state.stack?.stack ?? [];
+    const count = Math.min(n, stack.length);
+    const startIdx = stack.length - count;
+    peeked = this._clone(stack.slice(startIdx));
+
+    return peeked;
+  }
+
+  /**
    * Draw cards from the stack
    * @param n - Number of cards to draw (optional, draws 1 if not specified)
    * @returns Single token if n=1 or undefined, array if n>1
@@ -342,27 +376,37 @@ export class StackWasm extends Emitter {
   }
 
   /**
-   * Reset stack to original state
+   * Reset stack to original state (WASM-accelerated with lazy sync)
    * @returns this for chaining
    */
   reset(): this {
-    // Reset to original state (same for WASM and TypeScript)
+    // Use WASM if available
+    if (this._wasmStack && isWasmAvailable()) {
+      try {
+        // Create reset state
+        const resetState = {
+          stack: this._original.map(t => this._sanitize(t)),
+          drawn: [],
+          discards: []
+        };
+
+        // Set in WASM
+        this._wasmStack.setState(JSON.stringify(resetState));
+        // NO SYNC - lazy sync on getter access
+        this.emit("reset");
+        return this;
+      } catch (error) {
+        console.error('WASM reset failed, falling back to TypeScript:', error);
+      }
+    }
+
+    // TypeScript fallback
     this.session.change("reset stack", (doc) => {
       if (!doc.stack) return;
       doc.stack.stack = this._original.map(t => this._sanitize(t));
       doc.stack.drawn = [];
       doc.stack.discards = [];
     });
-
-    // Sync to WASM if available
-    if (this._wasmStack && isWasmAvailable()) {
-      try {
-        const currentState = JSON.stringify(this.session.state.stack);
-        this._wasmStack.setState(currentState);
-      } catch (error) {
-        console.error('Failed to sync reset to WASM:', error);
-      }
-    }
 
     this.emit("reset");
     return this;
