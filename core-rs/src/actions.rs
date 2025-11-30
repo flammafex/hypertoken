@@ -70,7 +70,13 @@ impl ActionDispatcher {
         self.source.clone()
     }
 
-    /// Dispatch an action
+    /// Dispatch an action (LEGACY - JSON-based, has 19% overhead)
+    ///
+    /// **DEPRECATED**: Use typed methods instead (e.g., stackDraw(), stackShuffle())
+    /// for zero-overhead dispatch.
+    ///
+    /// This method is kept for backward compatibility but adds JSON serialization
+    /// overhead. New code should use the typed methods below.
     ///
     /// Actions are JSON objects with `type` and optional payload fields
     ///
@@ -130,6 +136,179 @@ impl ActionDispatcher {
                 format!("Unknown action type: {}", action_type)
             )),
         }
+    }
+
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // TYPED DISPATCH METHODS (Zero overhead - use these!)
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// Draw cards from stack (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackDraw)]
+    pub fn stack_draw(&mut self, count: usize) -> Result<String> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.draw(count)
+    }
+
+    /// Peek at top cards of stack (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackPeek)]
+    pub fn stack_peek(&self, count: usize) -> Result<String> {
+        let stack = self.stack.as_ref()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.peek(count)
+    }
+
+    /// Shuffle stack with optional seed (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackShuffle)]
+    pub fn stack_shuffle(&mut self, seed: Option<String>) -> Result<()> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.shuffle(seed)
+    }
+
+    /// Burn cards from stack (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackBurn)]
+    pub fn stack_burn(&mut self, count: usize) -> Result<String> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.burn(count)
+    }
+
+    /// Reset stack to initial state (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackReset)]
+    pub fn stack_reset(&mut self) -> Result<()> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.reset();
+        Ok(())
+    }
+
+    /// Cut stack at index (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackCut)]
+    pub fn stack_cut(&mut self, index: usize) -> Result<()> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.cut(index)
+    }
+
+    /// Insert token at index (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackInsertAt)]
+    pub fn stack_insert_at(&mut self, index: usize, token_json: &str) -> Result<()> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.insert_at(index, token_json)
+    }
+
+    /// Remove token at index (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackRemoveAt)]
+    pub fn stack_remove_at(&mut self, index: usize) -> Result<String> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.remove_at(index)
+    }
+
+    /// Swap two tokens (typed, zero overhead)
+    #[wasm_bindgen(js_name = stackSwap)]
+    pub fn stack_swap(&mut self, index_a: usize, index_b: usize) -> Result<()> {
+        let stack = self.stack.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+        stack.swap(index_a, index_b)
+    }
+
+    /// Place token in zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spacePlace)]
+    pub fn space_place(&mut self, zone: &str, token_json: &str, x: Option<f64>, y: Option<f64>) -> Result<String> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.place(zone, token_json, x, y)
+    }
+
+    /// Remove token from zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceRemove)]
+    pub fn space_remove(&mut self, zone: &str, token_id: &str) -> Result<String> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.remove(zone, token_id)
+    }
+
+    /// Move token between zones (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceMove)]
+    pub fn space_move(&mut self, token_id: &str, from_zone: &str, to_zone: &str, x: Option<f64>, y: Option<f64>) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.move_token(token_id, from_zone, to_zone, x, y)
+    }
+
+    /// Flip token in zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceFlip)]
+    pub fn space_flip(&mut self, zone: &str, token_id: &str) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.flip(zone, token_id, None)
+    }
+
+    /// Create new zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceCreateZone)]
+    pub fn space_create_zone(&mut self, name: &str) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.create_zone(name.to_string())
+    }
+
+    /// Delete zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceDeleteZone)]
+    pub fn space_delete_zone(&mut self, name: &str) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.delete_zone(name)
+    }
+
+    /// Clear all tokens from zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceClearZone)]
+    pub fn space_clear_zone(&mut self, name: &str) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.clear_zone(name)
+    }
+
+    /// Lock or unlock zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceLockZone)]
+    pub fn space_lock_zone(&mut self, name: &str, locked: bool) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.lock_zone(name, locked)
+    }
+
+    /// Shuffle tokens in zone (typed, zero overhead)
+    #[wasm_bindgen(js_name = spaceShuffleZone)]
+    pub fn space_shuffle_zone(&mut self, name: &str, seed: Option<String>) -> Result<()> {
+        let space = self.space.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No space available".to_string()))?;
+        space.shuffle_zone(name, seed)
+    }
+
+    /// Draw from source (typed, zero overhead)
+    #[wasm_bindgen(js_name = sourceDraw)]
+    pub fn source_draw(&mut self, count: usize) -> Result<String> {
+        let source = self.source.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
+        source.draw(count)
+    }
+
+    /// Shuffle source (typed, zero overhead)
+    #[wasm_bindgen(js_name = sourceShuffle)]
+    pub fn source_shuffle(&mut self, seed: Option<String>) -> Result<()> {
+        let source = self.source.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
+        source.shuffle(seed)
+    }
+
+    /// Burn from source (typed, zero overhead)
+    #[wasm_bindgen(js_name = sourceBurn)]
+    pub fn source_burn(&mut self, count: usize) -> Result<String> {
+        let source = self.source.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
+        source.burn(count)
     }
 }
 

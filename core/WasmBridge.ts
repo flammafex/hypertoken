@@ -128,7 +128,37 @@ export interface WasmActionDispatcher {
   getStack(): WasmStack | undefined;
   getSpace(): WasmSpace | undefined;
   getSource(): WasmSource | undefined;
+
+  // Legacy JSON-based dispatch (has 19% overhead - deprecated)
   dispatch(actionJson: string): string;
+
+  // Typed dispatch methods (zero overhead - use these!)
+  // Stack actions
+  stackDraw(count: number): string;
+  stackPeek(count: number): string;
+  stackShuffle(seed?: string): void;
+  stackBurn(count: number): string;
+  stackReset(): void;
+  stackCut(index: number): void;
+  stackInsertAt(index: number, tokenJson: string): void;
+  stackRemoveAt(index: number): string;
+  stackSwap(indexA: number, indexB: number): void;
+
+  // Space actions
+  spacePlace(zone: string, tokenJson: string, x?: number, y?: number): string;
+  spaceRemove(zone: string, tokenId: string): string;
+  spaceMove(tokenId: string, fromZone: string, toZone: string, x?: number, y?: number): void;
+  spaceFlip(zone: string, tokenId: string): void;
+  spaceCreateZone(name: string): void;
+  spaceDeleteZone(name: string): void;
+  spaceClearZone(name: string): void;
+  spaceLockZone(name: string, locked: boolean): void;
+  spaceShuffleZone(name: string, seed?: string): void;
+
+  // Source actions
+  sourceDraw(count: number): string;
+  sourceShuffle(seed?: string): void;
+  sourceBurn(count: number): string;
 }
 
 export interface HyperTokenWasm {
