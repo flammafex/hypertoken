@@ -403,15 +403,21 @@ export class Engine extends Emitter {
   ]);
 
   apply(action: Action): any {
-    // NOTE: WASM ActionDispatcher is currently disabled because:
-    // 1. StackWasm/SpaceWasm/SourceWasm already bypass Chronicle for WASM ops
-    // 2. ActionDispatcher adds JSON serialization overhead without benefit
-    // 3. The architecture needs rethinking for better integration
-    //
-    // The infrastructure is in place (ActionDispatcher in Rust, WasmBridge types,
-    // wasmInstance getters) for future experimentation with batched operations
-    // or other optimization strategies.
+    // Try WASM ActionDispatcher first (zero overhead with typed methods)
+    if (this._wasmDispatcher && Engine.WASM_ACTIONS.has(action.type)) {
+      try {
+        const result = this._dispatchWasm(action.type, action.payload);
+        action.result = result;
+        return result;
+      } catch (err) {
+        if (this.debug) {
+          console.log(`⚠️  WASM dispatch failed for ${action.type}, falling back to TypeScript:`, err);
+        }
+        // Fall through to TypeScript implementation
+      }
+    }
 
+    // TypeScript ActionRegistry fallback
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {
@@ -426,6 +432,123 @@ export class Engine extends Emitter {
       this.emit("engine:error", { payload: { action, msg: "Unknown action" } });
       return undefined;
     }
+  }
+
+  /**
+   * Dispatch using typed WASM ActionDispatcher methods (zero overhead)
+   */
+  private _dispatchWasm(type: string, payload: IActionPayload): any {
+    if (!this._wasmDispatcher) {
+      throw new Error("WASM ActionDispatcher not available");
+    }
+
+    const dispatcher = this._wasmDispatcher;
+
+    // Stack actions
+    if (type === "stack:draw") {
+      const result = dispatcher.stackDraw(payload.count ?? 1);
+      return JSON.parse(result);
+    }
+    if (type === "stack:peek") {
+      const result = dispatcher.stackPeek(payload.count ?? 1);
+      return JSON.parse(result);
+    }
+    if (type === "stack:shuffle") {
+      dispatcher.stackShuffle(payload.seed !== undefined ? String(payload.seed) : undefined);
+      return;
+    }
+    if (type === "stack:burn") {
+      const result = dispatcher.stackBurn(payload.count ?? 1);
+      return JSON.parse(result);
+    }
+    if (type === "stack:reset") {
+      dispatcher.stackReset();
+      return;
+    }
+    if (type === "stack:cut") {
+      dispatcher.stackCut(payload.position ?? 0);
+      return;
+    }
+    if (type === "stack:insertAt") {
+      dispatcher.stackInsertAt(payload.position ?? 0, JSON.stringify(payload.card));
+      return;
+    }
+    if (type === "stack:removeAt") {
+      const result = dispatcher.stackRemoveAt(payload.position ?? 0);
+      return JSON.parse(result);
+    }
+    if (type === "stack:swap") {
+      dispatcher.stackSwap(payload.i!, payload.j!);
+      return;
+    }
+
+    // Space actions
+    if (type === "space:place") {
+      const result = dispatcher.spacePlace(
+        payload.zone!,
+        JSON.stringify(payload.token),
+        payload.x,
+        payload.y
+      );
+      return JSON.parse(result);
+    }
+    if (type === "space:remove") {
+      const result = dispatcher.spaceRemove(payload.zone!, payload.placementId!);
+      return JSON.parse(result);
+    }
+    if (type === "space:move") {
+      dispatcher.spaceMove(
+        payload.placementId!,
+        payload.fromZone!,
+        payload.toZone!,
+        payload.x,
+        payload.y
+      );
+      return;
+    }
+    if (type === "space:flip") {
+      dispatcher.spaceFlip(payload.zone!, payload.placementId!);
+      return;
+    }
+    if (type === "space:createZone") {
+      dispatcher.spaceCreateZone(payload.name!);
+      return;
+    }
+    if (type === "space:deleteZone") {
+      dispatcher.spaceDeleteZone(payload.name!);
+      return;
+    }
+    if (type === "space:clearZone") {
+      dispatcher.spaceClearZone(payload.zone!);
+      return;
+    }
+    if (type === "space:lockZone") {
+      dispatcher.spaceLockZone(payload.zone!, payload.locked ?? true);
+      return;
+    }
+    if (type === "space:shuffleZone") {
+      dispatcher.spaceShuffleZone(
+        payload.zone!,
+        payload.seed !== undefined ? String(payload.seed) : undefined
+      );
+      return;
+    }
+
+    // Source actions
+    if (type === "source:draw") {
+      const result = dispatcher.sourceDraw(payload.count ?? 1);
+      return JSON.parse(result);
+    }
+    if (type === "source:shuffle") {
+      dispatcher.sourceShuffle(payload.seed !== undefined ? String(payload.seed) : undefined);
+      return;
+    }
+    if (type === "source:burn") {
+      const result = dispatcher.sourceBurn(payload.count ?? 1);
+      return JSON.parse(result);
+    }
+
+    throw new Error(`Unknown WASM action type: ${type}`);
   }
 
   undo(): Action | null {
