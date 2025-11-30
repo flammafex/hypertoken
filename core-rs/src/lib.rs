@@ -32,6 +32,8 @@ mod space;
 mod actions;
 mod types;
 mod utils;
+mod parallel;
+mod batch;
 
 // Re-exports
 pub use chronicle::Chronicle;
@@ -39,6 +41,7 @@ pub use token::Token;
 pub use stack::Stack;
 pub use space::Space;
 pub use actions::ActionDispatcher;
+pub use batch::BatchOps;
 
 // WASM initialization
 #[wasm_bindgen(start)]
