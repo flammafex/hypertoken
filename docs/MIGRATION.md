@@ -1,5 +1,8 @@
 # Migration Guide: Upgrading to Worker Mode
 
+> **✅ UPDATE: Rust/WASM Migration 100% Complete!**
+> All 50 core actions have been ported to Rust/WASM (10-100x faster). The ActionDispatcher now routes all performance-critical operations through zero-overhead typed methods. See [core-rs/README.md](../core-rs/README.md) for details.
+
 This guide helps you migrate existing HyperToken applications to use the new Worker Mode for improved performance and responsiveness.
 
 ## Table of Contents

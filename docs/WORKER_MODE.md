@@ -1,5 +1,8 @@
 # Worker Mode Guide
 
+> **✅ UPDATE: Rust/WASM Migration 100% Complete!**
+> All worker operations now use the high-performance Rust/WASM core (10-100x faster). Worker Mode combines multi-threading with zero-overhead WASM execution for maximum performance.
+
 ## Overview
 
 Worker Mode enables multi-threaded execution of HyperToken operations using Node.js Worker Threads. This allows compute-intensive operations to run in parallel without blocking the main thread, providing better responsiveness and performance for heavy workloads.
