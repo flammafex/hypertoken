@@ -6,6 +6,7 @@ use serde_json::Value as JsonValue;
 use crate::stack::Stack;
 use crate::space::Space;
 use crate::source::Source;
+use crate::agent::AgentManager;
 use crate::types::{HyperTokenError, Result};
 
 /// Unified action dispatcher for HyperToken operations
@@ -20,6 +21,7 @@ pub struct ActionDispatcher {
     stack: Option<Stack>,
     space: Option<Space>,
     source: Option<Source>,
+    agent_manager: AgentManager,
 }
 
 #[wasm_bindgen]
@@ -31,6 +33,7 @@ impl ActionDispatcher {
             stack: None,
             space: None,
             source: None,
+            agent_manager: AgentManager::new(),
         }
     }
 
@@ -309,6 +312,110 @@ impl ActionDispatcher {
         let source = self.source.as_mut()
             .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
         source.burn(count)
+    }
+
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // AGENT ACTIONS (Zero overhead - typed methods)
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// Create an agent (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentCreate)]
+    pub fn agent_create(&mut self, id: &str, name: &str, meta_json: Option<String>) -> Result<String> {
+        self.agent_manager.create_agent(id, name, meta_json)
+    }
+
+    /// Remove an agent (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentRemove)]
+    pub fn agent_remove(&mut self, name: &str) -> Result<()> {
+        self.agent_manager.remove_agent(name)
+    }
+
+    /// Set agent active state (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentSetActive)]
+    pub fn agent_set_active(&mut self, name: &str, active: bool) -> Result<()> {
+        self.agent_manager.set_agent_active(name, active)
+    }
+
+    /// Give resource to agent (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentGiveResource)]
+    pub fn agent_give_resource(&mut self, name: &str, resource: &str, amount: i64) -> Result<()> {
+        self.agent_manager.give_resource(name, resource, amount)
+    }
+
+    /// Take resource from agent (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentTakeResource)]
+    pub fn agent_take_resource(&mut self, name: &str, resource: &str, amount: i64) -> Result<()> {
+        self.agent_manager.take_resource(name, resource, amount)
+    }
+
+    /// Add token to agent's inventory (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentAddToken)]
+    pub fn agent_add_token(&mut self, name: &str, token_json: &str) -> Result<()> {
+        self.agent_manager.add_token(name, token_json)
+    }
+
+    /// Remove token from agent's inventory (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentRemoveToken)]
+    pub fn agent_remove_token(&mut self, name: &str, token_id: &str) -> Result<String> {
+        self.agent_manager.remove_token(name, token_id)
+    }
+
+    /// Get agent data (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentGet)]
+    pub fn agent_get(&self, name: &str) -> Result<String> {
+        self.agent_manager.get_agent(name)
+    }
+
+    /// Transfer resource between agents (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentTransferResource)]
+    pub fn agent_transfer_resource(
+        &mut self,
+        from: &str,
+        to: &str,
+        resource: &str,
+        amount: i64,
+    ) -> Result<String> {
+        self.agent_manager.transfer_resource(from, to, resource, amount)
+    }
+
+    /// Transfer token between agents (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentTransferToken)]
+    pub fn agent_transfer_token(
+        &mut self,
+        from: &str,
+        to: &str,
+        token_id: &str,
+    ) -> Result<String> {
+        self.agent_manager.transfer_token(from, to, token_id)
+    }
+
+    /// Steal resource from another agent (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentStealResource)]
+    pub fn agent_steal_resource(
+        &mut self,
+        from: &str,
+        to: &str,
+        resource: &str,
+        amount: i64,
+    ) -> Result<String> {
+        self.agent_manager.steal_resource(from, to, resource, amount)
+    }
+
+    /// Steal token from another agent (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentStealToken)]
+    pub fn agent_steal_token(
+        &mut self,
+        from: &str,
+        to: &str,
+        token_id: &str,
+    ) -> Result<String> {
+        self.agent_manager.steal_token(from, to, token_id)
+    }
+
+    /// Get all agents (typed, zero overhead)
+    #[wasm_bindgen(js_name = agentGetAll)]
+    pub fn agent_get_all(&self) -> Result<String> {
+        self.agent_manager.get_all_agents()
     }
 }
 

@@ -31,6 +31,8 @@ mod stack;
 mod space;
 mod source;
 mod actions;
+mod agent;
+mod token_ops;
 mod types;
 mod utils;
 mod parallel;
@@ -43,6 +45,8 @@ pub use stack::Stack;
 pub use space::Space;
 pub use source::Source;
 pub use actions::ActionDispatcher;
+pub use agent::AgentManager;
+pub use token_ops::TokenOps;
 pub use batch::BatchOps;
 
 // WASM initialization
