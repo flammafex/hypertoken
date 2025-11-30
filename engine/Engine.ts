@@ -16,6 +16,11 @@ import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
 import { EventBus } from "../core/EventBus.js";
 import { IEngineAgent, IGameState, ITransaction, IEngineSnapshot, IEngineState } from "./types.js";
+import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmActionDispatcher } from "../core/WasmBridge.js";
+import type { StackWasm } from "../core/StackWasm.js";
+import type { SpaceWasm } from "../core/SpaceWasm.js";
+import type { SourceWasm } from "../core/SourceWasm.js";
+import { WasmWorker } from "../core/WasmWorker.js";
 
 export interface EngineOptions {
   stack?: Stack | null;
@@ -23,6 +28,13 @@ export interface EngineOptions {
   source?: Source | null;
   autoConnect?: string;
   useWebRTC?: boolean; // Enable WebRTC with automatic fallback
+  useWorker?: boolean; // Enable multi-threaded WASM worker (Phase 4)
+  workerOptions?: {
+    debug?: boolean;
+    timeout?: number;
+    enableBatching?: boolean;
+    batchWindow?: number;
+  };
 }
 
 export class Engine extends Emitter {
@@ -51,8 +63,11 @@ export class Engine extends Emitter {
   debug: boolean;
 
   private useWebRTC: boolean;
+  private _wasmDispatcher: WasmActionDispatcher | null = null;
+  private _wasmWorker: WasmWorker | null = null;
+  private _useWorker: boolean = false;
 
-  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, useWorker = false, workerOptions = {} }: EngineOptions = {}) {
     super();
 
     this.session = new Chronicle();
@@ -74,8 +89,144 @@ export class Engine extends Emitter {
 
     this.session.on("state:changed", (e) => this.emit("state:updated", e));
 
+    // Initialize worker mode or direct WASM dispatcher
+    this._useWorker = useWorker;
+    if (useWorker) {
+      this._initializeWorker(workerOptions);
+    } else {
+      // Initialize WASM ActionDispatcher if components support it
+      this._initializeWasmDispatcher();
+    }
+
     if (autoConnect) {
       this.connect(autoConnect);
+    }
+  }
+
+  /**
+   * Initialize WasmWorker for multi-threaded execution
+   */
+  private async _initializeWorker(options: EngineOptions['workerOptions'] = {}): Promise<void> {
+    try {
+      this._wasmWorker = new WasmWorker({
+        debug: options.debug ?? this.debug,
+        timeout: options.timeout,
+        enableBatching: options.enableBatching,
+        batchWindow: options.batchWindow,
+      });
+
+      await this._wasmWorker.init();
+
+      // Forward worker events to engine events
+      this._wasmWorker.on('state_changed', (payload) => {
+        this.emit('state:updated', payload);
+      });
+
+      this._wasmWorker.on('action_completed', (payload) => {
+        this.emit('engine:action', { payload });
+      });
+
+      this._wasmWorker.on('error', (error) => {
+        this.emit('engine:error', { payload: { error } });
+      });
+
+      if (this.debug) {
+        console.log('✅ Engine: WasmWorker initialized');
+      }
+    } catch (error) {
+      console.error('❌ Engine: WasmWorker initialization failed:', error);
+      this._useWorker = false;
+      this._wasmWorker = null;
+      // Fall back to direct WASM dispatcher
+      this._initializeWasmDispatcher();
+    }
+  }
+
+  /**
+   * Initialize WASM ActionDispatcher if WASM is available
+   */
+  private _initializeWasmDispatcher(): void {
+    if (!isWasmAvailable()) {
+      // Try async load
+      this._tryLoadWasmDispatcherAsync();
+      return;
+    }
+
+    try {
+      const wasm = getWasmModule();
+      if (!wasm) return;
+
+      this._wasmDispatcher = new wasm.ActionDispatcher();
+
+      // Set WASM instances if available
+      if (this.stack && 'wasmInstance' in this.stack) {
+        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        if (wasmStack) {
+          this._wasmDispatcher.setStack(wasmStack);
+        }
+      }
+
+      if (this.space && 'wasmInstance' in this.space) {
+        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        if (wasmSpace) {
+          this._wasmDispatcher.setSpace(wasmSpace);
+        }
+      }
+
+      if (this.source && 'wasmInstance' in this.source) {
+        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        if (wasmSource) {
+          this._wasmDispatcher.setSource(wasmSource);
+        }
+      }
+
+      if (this.debug) {
+        console.log('✅ WASM ActionDispatcher initialized');
+      }
+    } catch (error) {
+      if (this.debug) {
+        console.warn('⚠️  WASM ActionDispatcher initialization failed:', error);
+      }
+    }
+  }
+
+  /**
+   * Try to load WASM dispatcher asynchronously
+   */
+  private async _tryLoadWasmDispatcherAsync(): Promise<void> {
+    try {
+      const wasm = await tryLoadWasm();
+      if (!wasm || this._wasmDispatcher) return;
+
+      this._wasmDispatcher = new wasm.ActionDispatcher();
+
+      // Set WASM instances if available
+      if (this.stack && 'wasmInstance' in this.stack) {
+        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        if (wasmStack) {
+          this._wasmDispatcher.setStack(wasmStack);
+        }
+      }
+
+      if (this.space && 'wasmInstance' in this.space) {
+        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        if (wasmSpace) {
+          this._wasmDispatcher.setSpace(wasmSpace);
+        }
+      }
+
+      if (this.source && 'wasmInstance' in this.source) {
+        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        if (wasmSource) {
+          this._wasmDispatcher.setSource(wasmSource);
+        }
+      }
+
+      if (this.debug) {
+        console.log('✅ WASM ActionDispatcher initialized (async)');
+      }
+    } catch (error) {
+      // Silently fail - fallback to TypeScript
     }
   }
 
@@ -125,6 +276,28 @@ export class Engine extends Emitter {
     this.sync = undefined;
   }
 
+  /**
+   * Shutdown the engine and cleanup resources
+   */
+  async shutdown(): Promise<void> {
+    // Disconnect network
+    this.disconnect();
+
+    // Terminate worker
+    if (this._wasmWorker) {
+      await this._wasmWorker.terminate();
+      this._wasmWorker = null;
+      this._useWorker = false;
+    }
+
+    // Clear policies and history
+    this._policies.clear();
+    this.history = [];
+    this.future = [];
+
+    this.emit('engine:shutdown');
+  }
+
   registerPolicy(name: string, policy: any): this {
     this._policies.set(name, policy);
     this.emit("engine:policy", { payload: { name } });
@@ -143,7 +316,19 @@ export class Engine extends Emitter {
     return this;
   }
 
+  /**
+   * Dispatch an action (synchronous version for backward compatibility)
+   *
+   * @deprecated When using worker mode, prefer dispatchAsync() for better performance
+   */
   dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): any {
+    // If worker mode is enabled, use async dispatch but block
+    if (this._useWorker && this._wasmWorker) {
+      // This is a blocking call - not ideal, but maintains backward compatibility
+      console.warn('⚠️  Synchronous dispatch() called in worker mode. Consider using dispatchAsync() for better performance.');
+      // For now, fall through to sync execution
+    }
+
     const action = new Action(type, payload, opts);
     if (this.debug) console.log("🧩 dispatch:", type, payload);
 
@@ -162,7 +347,71 @@ export class Engine extends Emitter {
     return result;
   }
 
+  /**
+   * Dispatch an action asynchronously (worker-optimized)
+   *
+   * Use this method when worker mode is enabled for best performance.
+   * Falls back to synchronous execution if worker is not available.
+   */
+  async dispatchAsync(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<any> {
+    const action = new Action(type, payload, opts);
+    if (this.debug) console.log("🧩 dispatchAsync:", type, payload);
+
+    let result: any;
+
+    // Use worker if available
+    if (this._useWorker && this._wasmWorker && this._wasmWorker.ready) {
+      try {
+        result = await this._wasmWorker.dispatch(type, payload);
+        action.result = result;
+      } catch (error) {
+        if (this.debug) {
+          console.log('⚠️  Worker dispatch failed, falling back to sync:', error);
+        }
+        // Fall back to sync execution
+        result = this.apply(action);
+      }
+    } else {
+      // Sync fallback
+      result = this.apply(action);
+    }
+
+    this.history.push(action);
+    this.emit("engine:action", { payload: action });
+
+    // Evaluate policies
+    for (const [, policy] of this._policies) {
+      try {
+        policy.evaluate(this);
+      } catch (err) {
+        this.emit("engine:error", { payload: { policy, err } });
+      }
+    }
+
+    return result;
+  }
+
+  // Actions implemented in WASM ActionDispatcher
+  private static readonly WASM_ACTIONS = new Set([
+    "stack:draw", "stack:peek", "stack:shuffle", "stack:burn", "stack:reset",
+    "stack:cut", "stack:insertAt", "stack:removeAt", "stack:swap",
+    "space:place", "space:remove", "space:move", "space:flip",
+    "space:createZone", "space:deleteZone", "space:clearZone",
+    "space:lockZone", "space:shuffleZone",
+    "source:draw", "source:shuffle", "source:burn",
+    "debug:log"
+  ]);
+
   apply(action: Action): any {
+    // NOTE: WASM ActionDispatcher is currently disabled because:
+    // 1. StackWasm/SpaceWasm/SourceWasm already bypass Chronicle for WASM ops
+    // 2. ActionDispatcher adds JSON serialization overhead without benefit
+    // 3. The architecture needs rethinking for better integration
+    //
+    // The infrastructure is in place (ActionDispatcher in Rust, WasmBridge types,
+    // wasmInstance getters) for future experimentation with batched operations
+    // or other optimization strategies.
+
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {

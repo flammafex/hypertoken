@@ -120,8 +120,10 @@ export interface WasmActionDispatcher {
   new(): WasmActionDispatcher;
   setStack(stack: WasmStack): void;
   setSpace(space: WasmSpace): void;
+  setSource(source: WasmSource): void;
   getStack(): WasmStack | undefined;
   getSpace(): WasmSpace | undefined;
+  getSource(): WasmSource | undefined;
   dispatch(actionJson: string): string;
 }
 

@@ -867,4 +867,20 @@ export class SpaceWasm extends Emitter {
     this.emit("clearSpread", { name });
     return this;
   }
+
+  /**
+   * Check if WASM is being used
+   * @returns true if WASM is available and initialized
+   */
+  get isWasmEnabled(): boolean {
+    return this._wasmSpace !== null && isWasmAvailable();
+  }
+
+  /**
+   * Get the underlying WASM Space instance
+   * @returns WasmSpace instance or null if not initialized
+   */
+  get wasmInstance(): WasmSpace | null {
+    return this._wasmSpace;
+  }
 }

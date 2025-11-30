@@ -151,19 +151,71 @@ node dist/examples/accordion/accordion.js         # "Impossible" solitaire
 
 ---
 
+## ⚡ Performance & Multi-Threading
+
+### **Rust + WASM Core**
+HyperToken's performance-critical operations run in **Rust compiled to WebAssembly**, delivering:
+
+- **🚀 13.3x faster** - Stack operations (shuffle, draw, etc.)
+- **📦 Zero dependencies** - Pure Rust with wasm-bindgen
+- **🌐 Universal** - Runs in Node.js and browsers
+- **🔒 Type-safe** - Full TypeScript integration
+
+### **Worker Mode (Node.js)**
+For compute-intensive operations, enable multi-threaded execution:
+
+```javascript
+// Enable worker mode for non-blocking execution
+const engine = new Engine({
+  useWorker: true,
+  workerOptions: {
+    enableBatching: true,  // Batch rapid actions
+    timeout: 30000         // 30s timeout
+  }
+});
+
+// Async API - main thread stays responsive
+await engine.dispatchAsync("stack:shuffle", { seed: 42 });
+await engine.dispatchAsync("agent:drawCards", { count: 1000 });
+
+// Sync API still works (backwards compatible)
+engine.dispatch("stack:peek", { count: 1 });
+```
+
+**Performance characteristics:**
+- **Communication overhead:** <0.2ms per action
+- **Concurrent throughput:** 0.11ms per action (5x parallel)
+- **Main thread:** Remains responsive during heavy operations
+- **Use when:** Operations take >10ms, or UI responsiveness is critical
+
+---
+
 ## 🏗️ Architecture
 
 ```
 hypertoken/
 ├── core/                   # Foundation (TypeScript)
 │   ├── Token.ts           # The universal entity
-│   ├── Stack.ts           # Ordered collections  
+│   ├── Stack.ts           # Ordered collections
 │   ├── Space.ts           # Spatial zones
 │   ├── Chronicle.ts       # CRDT state management
-│   └── ConsensusCore.ts   # P2P synchronization
+│   ├── ConsensusCore.ts   # P2P synchronization
+│   ├── StackWasm.ts       # WASM-accelerated stack
+│   ├── SpaceWasm.ts       # WASM-accelerated space
+│   ├── SourceWasm.ts      # WASM-accelerated source
+│   ├── WasmWorker.ts      # Worker thread manager
+│   └── WorkerProtocol.ts  # Worker communication
+│
+├── core-rs/                # High-Performance Core (Rust → WASM)
+│   ├── src/
+│   │   ├── stack.rs       # Stack operations (13.3x faster)
+│   │   ├── space.rs       # Spatial operations
+│   │   ├── source.rs      # Card source/deck management
+│   │   └── actions.rs     # Action dispatcher
+│   └── pkg/               # Compiled WASM modules
 │
 ├── engine/                 # Game Logic (TypeScript)
-│   ├── Engine.ts          # Core coordinator
+│   ├── Engine.ts          # Core coordinator + worker integration
 │   ├── GameLoop.ts        # Turn management
 │   ├── RuleEngine.ts      # Law enforcement
 │   └── actions-extended.ts # 58 built-in actions
@@ -218,11 +270,19 @@ This applies equally to cards in blackjack, shares in a market, or NPCs in a wor
 
 ## 📖 Documentation
 
+### Core Documentation
 - **[Complete Action Reference](./engine/ACTIONS.md)** - All 58 actions documented
+- **[Worker Mode Guide](./docs/WORKER_MODE.md)** - Multi-threading and performance optimization
+- **[WASM Integration](./core-rs/README.md)** - Rust/WASM architecture details
+
+### Use Cases & Examples
 - **[Enterprise Use Cases](./ENTERPRISE_USE_CASES.md)** - AI training, market simulation
 - **[Community Use Cases](./COMMUNITY_USE_CASES.md)** - Serverless multiplayer, persistent worlds
-- **[Network Architecture](./network/README.md)** - P2P synchronization details
 - **[Example Games](./examples/)** - Learn by playing
+
+### Advanced Topics
+- **[Network Architecture](./network/README.md)** - P2P synchronization details
+- **[Migration Guide](./docs/MIGRATION.md)** - Upgrading to worker mode
 
 ---
 

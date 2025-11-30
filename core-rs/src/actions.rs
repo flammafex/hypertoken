@@ -5,6 +5,7 @@ use serde_json::Value as JsonValue;
 
 use crate::stack::Stack;
 use crate::space::Space;
+use crate::source::Source;
 use crate::types::{HyperTokenError, Result};
 
 /// Unified action dispatcher for HyperToken operations
@@ -18,6 +19,7 @@ use crate::types::{HyperTokenError, Result};
 pub struct ActionDispatcher {
     stack: Option<Stack>,
     space: Option<Space>,
+    source: Option<Source>,
 }
 
 #[wasm_bindgen]
@@ -28,6 +30,7 @@ impl ActionDispatcher {
         ActionDispatcher {
             stack: None,
             space: None,
+            source: None,
         }
     }
 
@@ -43,6 +46,12 @@ impl ActionDispatcher {
         self.space = Some(space);
     }
 
+    /// Set the source instance
+    #[wasm_bindgen(js_name = setSource)]
+    pub fn set_source(&mut self, source: Source) {
+        self.source = Some(source);
+    }
+
     /// Get the stack instance
     #[wasm_bindgen(js_name = getStack)]
     pub fn get_stack(&self) -> Option<Stack> {
@@ -53,6 +62,12 @@ impl ActionDispatcher {
     #[wasm_bindgen(js_name = getSpace)]
     pub fn get_space(&self) -> Option<Space> {
         self.space.clone()
+    }
+
+    /// Get the source instance
+    #[wasm_bindgen(js_name = getSource)]
+    pub fn get_source(&self) -> Option<Source> {
+        self.source.clone()
     }
 
     /// Dispatch an action
@@ -78,6 +93,7 @@ impl ActionDispatcher {
         match action_type {
             // Stack actions
             "stack:draw" => self.handle_stack_draw(&action),
+            "stack:peek" => self.handle_stack_peek(&action),
             "stack:shuffle" => self.handle_stack_shuffle(&action),
             "stack:burn" => self.handle_stack_burn(&action),
             "stack:reset" => self.handle_stack_reset(),
@@ -98,6 +114,11 @@ impl ActionDispatcher {
             "space:clearZone" => self.handle_space_clear_zone(&action),
             "space:lockZone" => self.handle_space_lock_zone(&action),
             "space:shuffleZone" => self.handle_space_shuffle_zone(&action),
+
+            // Source actions
+            "source:draw" => self.handle_source_draw(&action),
+            "source:shuffle" => self.handle_source_shuffle(&action),
+            "source:burn" => self.handle_source_burn(&action),
 
             // Debug
             "debug:log" => {
@@ -120,6 +141,14 @@ impl ActionDispatcher {
 
         let count = action["count"].as_u64().unwrap_or(1) as usize;
         stack.draw(count)
+    }
+
+    fn handle_stack_peek(&self, action: &JsonValue) -> Result<String> {
+        let stack = self.stack.as_ref()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No stack available".to_string()))?;
+
+        let count = action["count"].as_u64().unwrap_or(1) as usize;
+        stack.peek(count)
     }
 
     fn handle_stack_shuffle(&mut self, action: &JsonValue) -> Result<String> {
@@ -313,6 +342,34 @@ impl ActionDispatcher {
     }
 }
 
+// Source action handlers
+impl ActionDispatcher {
+    fn handle_source_draw(&mut self, action: &JsonValue) -> Result<String> {
+        let source = self.source.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
+
+        let count = action["count"].as_u64().unwrap_or(1) as usize;
+        source.draw(count)
+    }
+
+    fn handle_source_shuffle(&mut self, action: &JsonValue) -> Result<String> {
+        let source = self.source.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
+
+        let seed = action["seed"].as_str().map(|s| s.to_string());
+        source.shuffle(seed)?;
+        Ok("{}".to_string())
+    }
+
+    fn handle_source_burn(&mut self, action: &JsonValue) -> Result<String> {
+        let source = self.source.as_mut()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No source available".to_string()))?;
+
+        let count = action["count"].as_u64().unwrap_or(1) as usize;
+        source.burn(count)
+    }
+}
+
 impl Default for ActionDispatcher {
     fn default() -> Self {
         Self::new()
@@ -328,6 +385,7 @@ mod tests {
         let dispatcher = ActionDispatcher::new();
         assert!(dispatcher.stack.is_none());
         assert!(dispatcher.space.is_none());
+        assert!(dispatcher.source.is_none());
     }
 
     #[test]

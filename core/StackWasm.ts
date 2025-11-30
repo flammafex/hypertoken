@@ -682,4 +682,12 @@ export class StackWasm extends Emitter {
   get isWasmEnabled(): boolean {
     return this._wasmStack !== null && isWasmAvailable();
   }
+
+  /**
+   * Get the underlying WASM Stack instance
+   * @returns WasmStack instance or null if not initialized
+   */
+  get wasmInstance(): WasmStack | null {
+    return this._wasmStack;
+  }
 }
