@@ -84,6 +84,26 @@ impl Stack {
         self.state.discards.len()
     }
 
+    /// Peek at N tokens from the top of the stack (without removing them)
+    ///
+    /// Returns JSON array of tokens
+    #[wasm_bindgen(js_name = peek)]
+    pub fn peek(&self, count: usize) -> Result<String> {
+        if count == 0 {
+            return Ok("[]".to_string());
+        }
+
+        let available = self.state.stack.len();
+        let to_peek = count.min(available);
+
+        // Get tokens from the end without removing them
+        let start_index = available - to_peek;
+        let peeked: Vec<Token> = self.state.stack[start_index..].to_vec();
+
+        serde_json::to_string(&peeked)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+    }
+
     /// Draw N tokens from the stack
     ///
     /// Returns JSON array of drawn tokens

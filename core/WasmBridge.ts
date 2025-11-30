@@ -46,6 +46,7 @@ export interface WasmStack {
   size(): number;
   drawnCount(): number;
   discardCount(): number;
+  peek(count: number): string;
   draw(count: number): string;
   shuffle(seed?: string): void;
   burn(count: number): string;

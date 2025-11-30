@@ -141,6 +141,7 @@ export class StackWasm extends Emitter {
 
   /**
    * Sync WASM state back to Chronicle after operations
+   * ONLY call this when Chronicle state needs to be accessed by other code
    */
   private _syncToChronicle(): void {
     if (!this._wasmStack) return;
@@ -157,11 +158,76 @@ export class StackWasm extends Emitter {
     }
   }
 
-  // Read directly from CRDT (same as TypeScript Stack)
-  get size(): number { return this.session.state.stack?.stack.length ?? 0; }
-  get tokens(): IToken[] { return this.session.state.stack?.stack ?? []; }
-  get drawn(): IToken[] { return this.session.state.stack?.drawn ?? []; }
-  get discards(): IToken[] { return this.session.state.stack?.discards ?? []; }
+  /**
+   * Ensure WASM state is synced before reading from Chronicle
+   */
+  private _ensureSync(): void {
+    if (this._wasmStack) {
+      this._syncToChronicle();
+    }
+  }
+
+  /**
+   * Get size without triggering Chronicle sync (for internal use)
+   */
+  private _getSize(): number {
+    if (this._wasmStack && isWasmAvailable()) {
+      return this._wasmStack.size();
+    }
+    return this.session.state.stack?.stack.length ?? 0;
+  }
+
+  // Read from CRDT (sync WASM first if needed)
+  get size(): number {
+    this._ensureSync();
+    return this.session.state.stack?.stack.length ?? 0;
+  }
+  get tokens(): IToken[] {
+    this._ensureSync();
+    return this.session.state.stack?.stack ?? [];
+  }
+  get drawn(): IToken[] {
+    this._ensureSync();
+    return this.session.state.stack?.drawn ?? [];
+  }
+  get discards(): IToken[] {
+    this._ensureSync();
+    return this.session.state.stack?.discards ?? [];
+  }
+
+  /**
+   * Peek at N tokens from the top of the stack without removing them
+   * @param n - Number of tokens to peek at
+   * @returns Array of tokens
+   * @throws Error if n is invalid
+   */
+  peek(n: number = 1): IToken[] {
+    if (n < 1 || !Number.isInteger(n)) {
+      throw new Error(`Invalid peek count: ${n}. Must be a positive integer.`);
+    }
+
+    let peeked: IToken[] = [];
+
+    // Use WASM if available (direct memory access, no Chronicle overhead)
+    if (this._wasmStack && isWasmAvailable()) {
+      try {
+        const peekedJson = this._wasmStack.peek(n);
+        peeked = JSON.parse(peekedJson);
+        return peeked;
+      } catch (error) {
+        console.error('WASM peek failed, falling back to TypeScript:', error);
+      }
+    }
+
+    // TypeScript fallback - requires sync
+    this._ensureSync();
+    const stack = this.session.state.stack?.stack ?? [];
+    const count = Math.min(n, stack.length);
+    const startIdx = stack.length - count;
+    peeked = this._clone(stack.slice(startIdx));
+
+    return peeked;
+  }
 
   /**
    * Draw cards from the stack
@@ -180,7 +246,7 @@ export class StackWasm extends Emitter {
   }
 
   private _drawSingle(): IToken | undefined {
-    if (this.size === 0) {
+    if (this._getSize() === 0) {
       this.emit("stack:empty", { operation: "draw" });
       return undefined;
     }
@@ -193,7 +259,7 @@ export class StackWasm extends Emitter {
         const drawnJson = this._wasmStack.draw(1);
         const drawn = JSON.parse(drawnJson);
         drawnCard = drawn[0];
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
       } catch (error) {
         console.error('WASM draw failed, falling back to TypeScript:', error);
         // Fall through to TypeScript implementation
@@ -218,7 +284,7 @@ export class StackWasm extends Emitter {
   }
 
   private _drawMany(n: number): IToken[] {
-    if (this.size === 0) {
+    if (this._getSize() === 0) {
       this.emit("stack:empty", { operation: "draw", requested: n });
       return [];
     }
@@ -230,7 +296,7 @@ export class StackWasm extends Emitter {
       try {
         const drawnJson = this._wasmStack.draw(n);
         drawnCards = JSON.parse(drawnJson);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
       } catch (error) {
         console.error('WASM drawMany failed, falling back to TypeScript:', error);
       }
@@ -285,7 +351,7 @@ export class StackWasm extends Emitter {
       try {
         const seedStr = this._seed !== null ? String(this._seed) : undefined;
         this._wasmStack.shuffle(seedStr);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
         this.emit("shuffle", { seed: this._seed });
         return this;
       } catch (error) {
@@ -310,27 +376,37 @@ export class StackWasm extends Emitter {
   }
 
   /**
-   * Reset stack to original state
+   * Reset stack to original state (WASM-accelerated with lazy sync)
    * @returns this for chaining
    */
   reset(): this {
-    // Reset to original state (same for WASM and TypeScript)
+    // Use WASM if available
+    if (this._wasmStack && isWasmAvailable()) {
+      try {
+        // Create reset state
+        const resetState = {
+          stack: this._original.map(t => this._sanitize(t)),
+          drawn: [],
+          discards: []
+        };
+
+        // Set in WASM
+        this._wasmStack.setState(JSON.stringify(resetState));
+        // NO SYNC - lazy sync on getter access
+        this.emit("reset");
+        return this;
+      } catch (error) {
+        console.error('WASM reset failed, falling back to TypeScript:', error);
+      }
+    }
+
+    // TypeScript fallback
     this.session.change("reset stack", (doc) => {
       if (!doc.stack) return;
       doc.stack.stack = this._original.map(t => this._sanitize(t));
       doc.stack.drawn = [];
       doc.stack.discards = [];
     });
-
-    // Sync to WASM if available
-    if (this._wasmStack && isWasmAvailable()) {
-      try {
-        const currentState = JSON.stringify(this.session.state.stack);
-        this._wasmStack.setState(currentState);
-      } catch (error) {
-        console.error('Failed to sync reset to WASM:', error);
-      }
-    }
 
     this.emit("reset");
     return this;
@@ -352,7 +428,7 @@ export class StackWasm extends Emitter {
       try {
         const burnedJson = this._wasmStack.burn(n);
         burned = JSON.parse(burnedJson);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
       } catch (error) {
         console.error('WASM burn failed, falling back to TypeScript:', error);
       }
@@ -411,7 +487,7 @@ export class StackWasm extends Emitter {
    * @returns this for chaining
    */
   cut(n: number = 0, { topToBottom = true }: { topToBottom?: boolean } = {}): this {
-    const len = this.size;
+    const len = this._getSize();
     if (!Number.isInteger(n) || n <= 0 || n >= len) {
       throw new Error(`Invalid cut position: ${n}. Must be between 1 and ${len - 1}.`);
     }
@@ -419,7 +495,7 @@ export class StackWasm extends Emitter {
     if (this._wasmStack && isWasmAvailable()) {
       try {
         this._wasmStack.cut(n);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
         this.emit("stack:cut", { payload: { n, topToBottom } });
         return this;
       } catch (error) {
@@ -457,7 +533,7 @@ export class StackWasm extends Emitter {
       try {
         const cardJson = JSON.stringify(this._sanitize(card));
         this._wasmStack.insertAt(index, cardJson);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
         this.emit("stack:insert", { payload: { card, index } });
         return this;
       } catch (error) {
@@ -483,8 +559,9 @@ export class StackWasm extends Emitter {
    * @returns Removed token or null if invalid
    */
   removeAt(index: number): IToken | null {
-    if (index < 0 || index >= this.size) {
-      this.emit("stack:invalidIndex", { operation: "removeAt", index, size: this.size });
+    const size = this._getSize();
+    if (index < 0 || index >= size) {
+      this.emit("stack:invalidIndex", { operation: "removeAt", index, size });
       return null;
     }
 
@@ -494,7 +571,7 @@ export class StackWasm extends Emitter {
       try {
         const removedJson = this._wasmStack.removeAt(index);
         removed = JSON.parse(removedJson);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
       } catch (error) {
         console.error('WASM removeAt failed, falling back to TypeScript:', error);
       }
@@ -521,7 +598,7 @@ export class StackWasm extends Emitter {
    * @returns this for chaining
    */
   swap(i: number, j: number): this {
-    const len = this.size;
+    const len = this._getSize();
     if (i < 0 || j < 0 || i >= len || j >= len) {
       throw new Error(`Invalid swap indices: i=${i}, j=${j}. Valid range: 0 to ${len - 1}.`);
     }
@@ -529,7 +606,7 @@ export class StackWasm extends Emitter {
     if (this._wasmStack && isWasmAvailable()) {
       try {
         this._wasmStack.swap(i, j);
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
         this.emit("stack:swap", { payload: { i, j } });
         return this;
       } catch (error) {
@@ -558,7 +635,7 @@ export class StackWasm extends Emitter {
    * @returns this for chaining
    */
   reverseRange(i: number, j: number): this {
-    const len = this.size;
+    const len = this._getSize();
     if (i < 0 || j < 0 || i >= len || j >= len) {
       throw new Error(`Invalid reverse range: i=${i}, j=${j}. Valid range: 0 to ${len - 1}.`);
     }
@@ -568,7 +645,7 @@ export class StackWasm extends Emitter {
       try {
         const [a, b] = i < j ? [i, j] : [j, i];
         this._wasmStack.reverseRange(a, b + 1); // Rust uses exclusive end
-        this._syncToChronicle();
+        // NO SYNC - lazy sync on getter access
         this.emit("stack:reverseRange", { payload: { i, j } });
         return this;
       } catch (error) {

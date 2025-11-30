@@ -50,12 +50,8 @@ export const StackActions = {
   
   "stack:peek": (engine: Engine, { count = 1 }: StackPayload = {}) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
-    const cards: IToken[] = [];
-    const stack = engine.stack.tokens || [];
-    for (let i = 0; i < (count!) && i < stack.length; i++) {
-      cards.push(stack[stack.length - 1 - i]);
-    }
-    return cards;
+    // Use StackWasm's peek() method for direct WASM access (no Chronicle sync)
+    return engine.stack.peek(count!);
   },
   
   "stack:cut": (engine: Engine, { position = null, topToBottom = true }: StackPayload = {}) => {
