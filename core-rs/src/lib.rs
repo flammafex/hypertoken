@@ -29,6 +29,7 @@ mod chronicle;
 mod token;
 mod stack;
 mod space;
+mod source;
 mod actions;
 mod types;
 mod utils;
@@ -40,6 +41,7 @@ pub use chronicle::Chronicle;
 pub use token::Token;
 pub use stack::Stack;
 pub use space::Space;
+pub use source::Source;
 pub use actions::ActionDispatcher;
 pub use batch::BatchOps;
 
