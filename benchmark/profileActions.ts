@@ -14,6 +14,7 @@ import { Space } from '../core/Space.js';
 import { Source } from '../core/Source.js';
 import { RuleEngine } from '../engine/RuleEngine.js';
 import { ActionProfiler } from './ActionProfiler.js';
+import { tryLoadWasm } from '../core/WasmBridge.js';
 import type { IToken } from '../core/types.js';
 
 /**
@@ -52,6 +53,12 @@ async function runBenchmark() {
   console.log('='.repeat(80));
   console.log('HYPERTOKEN ACTION PERFORMANCE BENCHMARK');
   console.log('='.repeat(80));
+  console.log('');
+  console.log('Loading WASM module...');
+
+  // Load WASM before profiling to enable optimized Source shuffles
+  await tryLoadWasm();
+  console.log('✅ WASM loaded');
   console.log('');
   console.log('Testing all 53 actions with realistic workloads...');
   console.log('');
