@@ -12,6 +12,9 @@ crate-type = ["cdylib", "rlib"]
 # CRDT Library - The core of our state management
 automerge = "0.6"
 
+# Parallel processing (with WASM support)
+rayon = "1.10"
+
 # WASM Bindings
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
