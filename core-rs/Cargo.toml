@@ -38,6 +38,9 @@ uuid = { version = "1.18", features = ["v4", "js"] }
 # Error handling
 thiserror = "2.0"
 
+# Time/date handling (WASM-compatible)
+chrono = { version = "0.4", features = ["wasmbind"] }
+
 # Console logging for debugging
 console_error_panic_hook = "0.1"
 
