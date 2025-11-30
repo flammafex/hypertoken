@@ -7,6 +7,8 @@ use crate::stack::Stack;
 use crate::space::Space;
 use crate::source::Source;
 use crate::agent::AgentManager;
+use crate::token_ops::TokenOps;
+use crate::gamestate::GameStateManager;
 use crate::types::{HyperTokenError, Result};
 
 /// Unified action dispatcher for HyperToken operations
@@ -22,6 +24,8 @@ pub struct ActionDispatcher {
     space: Option<Space>,
     source: Option<Source>,
     agent_manager: AgentManager,
+    token_ops: TokenOps,
+    game_state: GameStateManager,
 }
 
 #[wasm_bindgen]
@@ -34,6 +38,8 @@ impl ActionDispatcher {
             space: None,
             source: None,
             agent_manager: AgentManager::new(),
+            token_ops: TokenOps::new(),
+            game_state: GameStateManager::new(),
         }
     }
 
@@ -416,6 +422,101 @@ impl ActionDispatcher {
     #[wasm_bindgen(js_name = agentGetAll)]
     pub fn agent_get_all(&self) -> Result<String> {
         self.agent_manager.get_all_agents()
+    }
+
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // TOKEN OPERATIONS (Zero overhead - typed methods)
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// Transform a token by applying properties (typed, zero overhead)
+    #[wasm_bindgen(js_name = tokenTransform)]
+    pub fn token_transform(&self, token_json: &str, properties_json: &str) -> Result<String> {
+        self.token_ops.transform(token_json, properties_json)
+    }
+
+    /// Attach a token to another token (typed, zero overhead)
+    #[wasm_bindgen(js_name = tokenAttach)]
+    pub fn token_attach(
+        &self,
+        host_json: &str,
+        attachment_json: &str,
+        attachment_type: &str,
+    ) -> Result<String> {
+        self.token_ops.attach(host_json, attachment_json, attachment_type)
+    }
+
+    /// Detach a token from its host (typed, zero overhead)
+    #[wasm_bindgen(js_name = tokenDetach)]
+    pub fn token_detach(&self, host_json: &str, attachment_id: &str) -> Result<String> {
+        self.token_ops.detach(host_json, attachment_id)
+    }
+
+    /// Merge multiple tokens into one (typed, zero overhead)
+    #[wasm_bindgen(js_name = tokenMerge)]
+    pub fn token_merge(
+        &self,
+        tokens_json: &str,
+        result_properties_json: Option<String>,
+        keep_originals: bool,
+    ) -> Result<String> {
+        self.token_ops.merge(tokens_json, result_properties_json, keep_originals)
+    }
+
+    /// Split a token into multiple tokens (typed, zero overhead)
+    #[wasm_bindgen(js_name = tokenSplit)]
+    pub fn token_split(
+        &self,
+        token_json: &str,
+        count: usize,
+        properties_array_json: Option<String>,
+    ) -> Result<String> {
+        self.token_ops.split(token_json, count, properties_array_json)
+    }
+
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // GAME STATE OPERATIONS (Zero overhead - typed methods)
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// Start the game (typed, zero overhead)
+    #[wasm_bindgen(js_name = gameStart)]
+    pub fn game_start(&mut self) -> Result<String> {
+        self.game_state.start()
+    }
+
+    /// End the game (typed, zero overhead)
+    #[wasm_bindgen(js_name = gameEnd)]
+    pub fn game_end(&mut self, winner: Option<String>, reason: Option<String>) -> Result<String> {
+        self.game_state.end(winner, reason)
+    }
+
+    /// Pause the game (typed, zero overhead)
+    #[wasm_bindgen(js_name = gamePause)]
+    pub fn game_pause(&mut self) -> Result<String> {
+        self.game_state.pause()
+    }
+
+    /// Resume the game from pause (typed, zero overhead)
+    #[wasm_bindgen(js_name = gameResume)]
+    pub fn game_resume(&mut self) -> Result<String> {
+        self.game_state.resume()
+    }
+
+    /// Advance to next phase or set specific phase (typed, zero overhead)
+    #[wasm_bindgen(js_name = gameNextPhase)]
+    pub fn game_next_phase(&mut self, phase: Option<String>) -> Result<String> {
+        self.game_state.next_phase(phase)
+    }
+
+    /// Set arbitrary game state property (typed, zero overhead)
+    #[wasm_bindgen(js_name = gameSetProperty)]
+    pub fn game_set_property(&mut self, key: &str, value_json: &str) -> Result<String> {
+        self.game_state.set_property(key, value_json)
+    }
+
+    /// Get current game state (typed, zero overhead)
+    #[wasm_bindgen(js_name = gameGetState)]
+    pub fn game_get_state(&self) -> Result<String> {
+        self.game_state.get_state()
     }
 }
 
