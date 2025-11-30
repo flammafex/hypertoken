@@ -250,7 +250,6 @@ export class SpaceWasm extends Emitter {
     if (this._wasmSpace && isWasmAvailable()) {
       try {
         const tokenJson = JSON.stringify(safeToken);
-        console.log('Sending token to WASM place():', tokenJson.substring(0, 100));
         const placementJson = this._wasmSpace.place(
           zoneName,
           tokenJson,
@@ -263,11 +262,8 @@ export class SpaceWasm extends Emitter {
         if (opts.faceUp !== undefined) placement.faceUp = opts.faceUp;
         if (opts.label !== undefined) placement.label = opts.label;
 
-        // Update WASM and sync to Chronicle
-        this._wasmSpace.setState(JSON.stringify({
-          ...this.session.state.zones,
-          [zoneName]: [...(this.session.state.zones?.[zoneName] || []), placement]
-        }));
+        // Don't call setState - the Rust place() already updated the zone
+        // Just sync back to Chronicle
         this._syncToChronicle();
 
         this.log.push({ type: "place", zoneName, placementId: placement.id, timestamp: Date.now() });
@@ -319,9 +315,12 @@ export class SpaceWasm extends Emitter {
       return;
     }
 
-    // Try WASM first
+    // Try WASM first - sync Chronicle state to WASM before operation
     if (this._wasmSpace && isWasmAvailable()) {
       try {
+        // Ensure WASM has latest state
+        this._syncChronicleToWasm();
+
         this._wasmSpace.move(placementId, fromZone, toZone, opts.x ?? 0, opts.y ?? 0);
         this._syncToChronicle();
 
@@ -382,6 +381,9 @@ export class SpaceWasm extends Emitter {
     // Try WASM first
     if (this._wasmSpace && isWasmAvailable()) {
       try {
+        // Ensure WASM has latest state
+        this._syncChronicleToWasm();
+
         // WASM flip needs to know the current state to toggle
         if (faceUp === undefined) {
           const placement = this.findCard(placementId);
@@ -439,6 +441,9 @@ export class SpaceWasm extends Emitter {
     // Try WASM first
     if (this._wasmSpace && isWasmAvailable()) {
       try {
+        // Ensure WASM has latest state
+        this._syncChronicleToWasm();
+
         this._wasmSpace.remove(zoneName, placementId);
         this._syncToChronicle();
 

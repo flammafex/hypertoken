@@ -181,9 +181,9 @@ impl Space {
         Ok(result_json)
     }
 
-    /// Remove a token from a zone
+    /// Remove a placement from a zone by placement ID
     #[wasm_bindgen(js_name = remove)]
-    pub fn remove(&mut self, zone_name: &str, token_id: &str) -> Result<String> {
+    pub fn remove(&mut self, zone_name: &str, placement_id: &str) -> Result<String> {
         let zone = self.state.zones.get_mut(zone_name)
             .ok_or_else(|| HyperTokenError::ZoneNotFound(zone_name.to_string()))?;
 
@@ -192,8 +192,8 @@ impl Space {
         }
 
         let index = zone.placements.iter()
-            .position(|p| p.tokenId == token_id)
-            .ok_or_else(|| HyperTokenError::TokenNotFound(token_id.to_string()))?;
+            .position(|p| p.id == placement_id)
+            .ok_or_else(|| HyperTokenError::TokenNotFound(placement_id.to_string()))?;
 
         let placement = zone.placements.remove(index);
 
@@ -201,28 +201,59 @@ impl Space {
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
     }
 
-    /// Move a token between zones
+    /// Move a placement between zones by placement ID
     #[wasm_bindgen(js_name = move)]
     pub fn move_token(
         &mut self,
-        token_id: &str,
+        placement_id: &str,
         from_zone: &str,
         to_zone: &str,
         x: Option<f64>,
         y: Option<f64>,
     ) -> Result<()> {
-        // Remove from source zone
-        let token_json = self.remove(from_zone, token_id)?;
+        // Find and remove the placement from source zone
+        let from = self.state.zones.get_mut(from_zone)
+            .ok_or_else(|| HyperTokenError::ZoneNotFound(from_zone.to_string()))?;
 
-        // Place in destination zone
-        self.place(to_zone, &token_json, x, y)?;
+        if from.lock.locked {
+            return Err(HyperTokenError::ZoneLocked(from_zone.to_string()));
+        }
+
+        let index = from.placements.iter()
+            .position(|p| p.id == placement_id)
+            .ok_or_else(|| HyperTokenError::TokenNotFound(placement_id.to_string()))?;
+
+        let mut placement = from.placements.remove(index);
+
+        // Update position if provided
+        if let Some(new_x) = x {
+            placement.x = Some(new_x);
+        }
+        if let Some(new_y) = y {
+            placement.y = Some(new_y);
+        }
+
+        // Ensure destination zone exists
+        if !self.state.zones.contains_key(to_zone) {
+            self.create_zone(to_zone.to_string())?;
+        }
+
+        // Add to destination zone
+        let to = self.state.zones.get_mut(to_zone)
+            .ok_or_else(|| HyperTokenError::ZoneNotFound(to_zone.to_string()))?;
+
+        if to.lock.locked {
+            return Err(HyperTokenError::ZoneLocked(to_zone.to_string()));
+        }
+
+        to.placements.push(placement);
 
         Ok(())
     }
 
-    /// Flip a token in a zone
+    /// Flip a placement in a zone by placement ID
     #[wasm_bindgen(js_name = flip)]
-    pub fn flip(&mut self, zone_name: &str, token_id: &str) -> Result<()> {
+    pub fn flip(&mut self, zone_name: &str, placement_id: &str, face_up: Option<bool>) -> Result<()> {
         let zone = self.state.zones.get_mut(zone_name)
             .ok_or_else(|| HyperTokenError::ZoneNotFound(zone_name.to_string()))?;
 
@@ -231,10 +262,11 @@ impl Space {
         }
 
         let placement = zone.placements.iter_mut()
-            .find(|p| p.tokenId == token_id)
-            .ok_or_else(|| HyperTokenError::TokenNotFound(token_id.to_string()))?;
+            .find(|p| p.id == placement_id)
+            .ok_or_else(|| HyperTokenError::TokenNotFound(placement_id.to_string()))?;
 
-        placement.faceUp = !placement.faceUp;
+        // If explicit face_up value provided, use it; otherwise toggle
+        placement.faceUp = face_up.unwrap_or(!placement.faceUp);
         Ok(())
     }
 
