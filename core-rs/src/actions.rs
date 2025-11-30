@@ -9,6 +9,7 @@ use crate::source::Source;
 use crate::agent::AgentManager;
 use crate::token_ops::TokenOps;
 use crate::gamestate::GameStateManager;
+use crate::batch::BatchOps;
 use crate::types::{HyperTokenError, Result};
 
 /// Unified action dispatcher for HyperToken operations
@@ -26,6 +27,7 @@ pub struct ActionDispatcher {
     agent_manager: AgentManager,
     token_ops: TokenOps,
     game_state: GameStateManager,
+    batch_ops: BatchOps,
 }
 
 #[wasm_bindgen]
@@ -40,6 +42,7 @@ impl ActionDispatcher {
             agent_manager: AgentManager::new(),
             token_ops: TokenOps::new(),
             game_state: GameStateManager::new(),
+            batch_ops: BatchOps::new(),
         }
     }
 
@@ -517,6 +520,81 @@ impl ActionDispatcher {
     #[wasm_bindgen(js_name = gameGetState)]
     pub fn game_get_state(&self) -> Result<String> {
         self.game_state.get_state()
+    }
+
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // BATCH OPERATIONS (Zero overhead - typed methods)
+    //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// Batch shuffle multiple decks (typed, zero overhead)
+    ///
+    /// Takes JSON array of token arrays, returns shuffled arrays.
+    ///
+    /// Example:
+    /// ```js
+    /// const decks = [[token1, token2], [token3, token4]];
+    /// const shuffled = dispatcher.batchShuffle(JSON.stringify(decks), "seed");
+    /// ```
+    #[wasm_bindgen(js_name = batchShuffle)]
+    pub fn batch_shuffle(&self, decks_json: &str, seed_prefix: Option<String>) -> Result<String> {
+        self.batch_ops.batch_shuffle(decks_json, seed_prefix)
+    }
+
+    /// Batch draw from multiple decks (typed, zero overhead)
+    ///
+    /// Takes JSON array of token arrays and array of draw counts.
+    /// Returns drawn cards and updated decks.
+    ///
+    /// Example:
+    /// ```js
+    /// const result = dispatcher.batchDraw(
+    ///   JSON.stringify(decks),
+    ///   JSON.stringify([3, 2, 5])
+    /// );
+    /// // result: { drawn: [[...], [...]], decks: [[...], [...]] }
+    /// ```
+    #[wasm_bindgen(js_name = batchDraw)]
+    pub fn batch_draw(&self, decks_json: &str, counts_json: &str) -> Result<String> {
+        self.batch_ops.batch_draw(decks_json, counts_json)
+    }
+
+    /// Filter tokens with predefined predicate (typed, zero overhead)
+    ///
+    /// Supported predicates:
+    /// - "reversed": Filter reversed tokens
+    /// - "normal": Filter normal (non-reversed) tokens
+    /// - "merged": Filter merged tokens
+    /// - "split": Filter split tokens
+    ///
+    /// Example:
+    /// ```js
+    /// const filtered = dispatcher.batchFilter(
+    ///   JSON.stringify(tokens),
+    ///   "reversed"
+    /// );
+    /// ```
+    #[wasm_bindgen(js_name = batchFilter)]
+    pub fn batch_filter(&self, tokens_json: &str, predicate: &str) -> Result<String> {
+        self.batch_ops.parallel_filter(tokens_json, predicate)
+    }
+
+    /// Map tokens with predefined operation (typed, zero overhead)
+    ///
+    /// Supported operations:
+    /// - "flip": Toggle reversal state
+    /// - "merge": Mark all as merged
+    /// - "unmerge": Mark all as unmerged
+    ///
+    /// Example:
+    /// ```js
+    /// const flipped = dispatcher.batchMap(
+    ///   JSON.stringify(tokens),
+    ///   "flip"
+    /// );
+    /// ```
+    #[wasm_bindgen(js_name = batchMap)]
+    pub fn batch_map(&self, tokens_json: &str, operation: &str) -> Result<String> {
+        self.batch_ops.parallel_map(tokens_json, operation)
     }
 }
 
