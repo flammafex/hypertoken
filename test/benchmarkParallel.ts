@@ -47,10 +47,10 @@ async function sequentialSimulations(
 
     // Simulate turns
     for (let turn = 0; turn < turns; turn++) {
-      if (turn % 5 === 0 && stack.size() > 0) {
+      if (turn % 5 === 0 && stack.size > 0) {
         stack.shuffle();
       }
-      if (stack.size() > 0) {
+      if (stack.size > 0) {
         stack.draw(1);
       }
       if (turn % 10 === 9) {
@@ -94,7 +94,7 @@ async function sequentialMerge(docs: string[]): Promise<number> {
   for (const docBase64 of docs) {
     const temp = new Chronicle();
     temp.loadFromBase64(docBase64);
-    chronicle.merge(temp.save());
+    chronicle.merge(temp.state);
   }
 
   return Date.now() - startTime;
