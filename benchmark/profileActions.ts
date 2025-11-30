@@ -10,7 +10,8 @@
 import { Engine } from '../engine/Engine.js';
 import { Chronicle } from '../core/Chronicle.js';
 import { Stack } from '../core/Stack.js';
-import { Space } from '../core/Space.js';
+import { StackWasm } from '../core/StackWasm.js';
+import { SpaceWasm } from '../core/SpaceWasm.js';
 import { SourceWasm } from '../core/SourceWasm.js';
 import { RuleEngine } from '../engine/RuleEngine.js';
 import { ActionProfiler } from './ActionProfiler.js';
@@ -69,8 +70,8 @@ async function runBenchmark() {
   // Create test environment
   const tokens = createTestTokens(100);
   const chronicle = new Chronicle();
-  const stack = new Stack(chronicle, tokens);
-  const space = new Space(chronicle, 'test-space');
+  const stack = new StackWasm(chronicle, tokens);
+  const space = new SpaceWasm(chronicle, 'test-space');
   const source = new SourceWasm(chronicle);
 
   const engine = new Engine({ stack, space, source });
@@ -158,8 +159,8 @@ async function runBenchmark() {
   console.log('♻️  Scenario 3: Source Operations (200 iterations)...');
 
   // Add stacks to source
-  engine.dispatch('source:addStack', { stack: new Stack(chronicle, createTestTokens(52)) });
-  engine.dispatch('source:addStack', { stack: new Stack(chronicle, createTestTokens(52)) });
+  engine.dispatch('source:addStack', { stack: new StackWasm(chronicle, createTestTokens(52)) });
+  engine.dispatch('source:addStack', { stack: new StackWasm(chronicle, createTestTokens(52)) });
 
   for (let i = 0; i < 200; i++) {
     if (i % 10 === 0) engine.dispatch('source:shuffle');
