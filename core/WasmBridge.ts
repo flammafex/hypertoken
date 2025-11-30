@@ -81,6 +81,27 @@ export interface WasmSpace {
   setState(stateJson: string): void;
 }
 
+export interface WasmSource {
+  new(): WasmSource;
+  initializeWithTokens(tokensJson: string, stackIdsJson: string): void;
+  size(): number;
+  burnedCount(): number;
+  getTokens(): string;
+  getBurned(): string;
+  addStack(tokensJson: string, stackId: string): void;
+  removeStack(stackId: string): void;
+  burn(count: number): string;
+  shuffle(seed?: string): void;
+  draw(count: number): string;
+  setReshufflePolicy(threshold: number, mode: string): void;
+  reset(tokensJson: string): void;
+  getSeed(): number | null;
+  getReshufflePolicy(): string;
+  getStackIds(): string;
+  getState(): string;
+  setState(stateJson: string): void;
+}
+
 export interface WasmToken {
   new(id: string, index: number): WasmToken;
   fromJSON(json: string): WasmToken;
@@ -107,6 +128,7 @@ export interface HyperTokenWasm {
   Chronicle: typeof WasmChronicle;
   Stack: typeof WasmStack;
   Space: typeof WasmSpace;
+  Source: typeof WasmSource;
   Token: typeof WasmToken;
   ActionDispatcher: typeof WasmActionDispatcher;
   version(): string;

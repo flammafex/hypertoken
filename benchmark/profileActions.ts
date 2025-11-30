@@ -11,7 +11,7 @@ import { Engine } from '../engine/Engine.js';
 import { Chronicle } from '../core/Chronicle.js';
 import { Stack } from '../core/Stack.js';
 import { Space } from '../core/Space.js';
-import { Source } from '../core/Source.js';
+import { SourceWasm } from '../core/SourceWasm.js';
 import { RuleEngine } from '../engine/RuleEngine.js';
 import { ActionProfiler } from './ActionProfiler.js';
 import { tryLoadWasm } from '../core/WasmBridge.js';
@@ -71,7 +71,7 @@ async function runBenchmark() {
   const chronicle = new Chronicle();
   const stack = new Stack(chronicle, tokens);
   const space = new Space(chronicle, 'test-space');
-  const source = new Source(chronicle);
+  const source = new SourceWasm(chronicle);
 
   const engine = new Engine({ stack, space, source });
   wrapEngineWithProfiler(engine, profiler);
