@@ -13,6 +13,7 @@
 import { StackWasm } from '../core/StackWasm.js';
 import { Chronicle } from '../core/Chronicle.js';
 import { Token } from '../core/Token.js';
+import { tryLoadWasm } from '../core/WasmBridge.js';
 
 console.log('🧪 Testing WASM-Accelerated Stack\n');
 
@@ -22,6 +23,10 @@ function createTokens(count: number) {
     new Token({ id: `card-${i}`, label: `Card ${i}`, index: i })
   );
 }
+
+// Pre-load WASM before creating instances
+console.log('Loading WASM module...');
+await tryLoadWasm();
 
 // Test 1: Basic Initialization
 console.log('Test 1: Stack initialization with Chronicle...');

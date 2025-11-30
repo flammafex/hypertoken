@@ -7,7 +7,7 @@ import { Chronicle } from "./Chronicle.js";
 import { IPlacementCRDT, IToken } from "./types.js";
 import { Stack } from "./Stack.js";
 import { Source } from "./Source.js";
-import { loadWasm, isWasmAvailable } from './WasmBridge.js';
+import { tryLoadWasm, isWasmAvailable, getWasmModule } from './WasmBridge.js';
 import type { WasmSpace } from './WasmBridge.js';
 import * as crypto from "crypto";
 
@@ -71,20 +71,74 @@ export class SpaceWasm extends Emitter {
     this._initWasm();
   }
 
-  private async _initWasm(): Promise<void> {
-    try {
-      const wasm = await loadWasm();
-      this._wasmSpace = new wasm.Space();
-      this._wasmInitialized = true;
+  private _initWasm(): void {
+    // Try to initialize WASM synchronously if already loaded
+    if (isWasmAvailable()) {
+      try {
+        const wasm = getWasmModule();
+        if (wasm) {
+          this._wasmSpace = new wasm.Space();
+          this._wasmInitialized = true;
 
-      // Sync existing Chronicle state to WASM
-      if (this.session.state.zones) {
-        this._wasmSpace.setState(JSON.stringify(this.session.state.zones));
+          // Sync existing Chronicle state to WASM
+          if (this.session.state.zones) {
+            this._syncChronicleToWasm();
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️  WASM Space initialization failed, using TypeScript fallback');
+        this._wasmSpace = null;
+        this._wasmInitialized = false;
+      }
+    } else {
+      // WASM not loaded yet, try async
+      this._tryLoadWasmAsync();
+    }
+  }
+
+  private async _tryLoadWasmAsync(): Promise<void> {
+    try {
+      const wasm = await tryLoadWasm();
+      if (wasm && !this._wasmSpace) {
+        this._wasmSpace = new wasm.Space();
+        this._wasmInitialized = true;
+
+        // Sync current state to WASM if available
+        if (this.session.state.zones) {
+          this._syncChronicleToWasm();
+        }
       }
     } catch (error) {
-      console.warn('WASM initialization failed, using TypeScript fallback:', error);
-      this._wasmSpace = null;
-      this._wasmInitialized = false;
+      // Silently fall back to TypeScript
+    }
+  }
+
+  // Sync Chronicle state to WASM (transform format)
+  private _syncChronicleToWasm(): void {
+    if (!this._wasmSpace) return;
+
+    try {
+      // Transform Chronicle format to WASM format
+      // Chronicle: { zones: { zoneName: [...] } }
+      // WASM: { zones: { zoneName: { placements: [...], lock: {...} } } }
+      const wasmZones: Record<string, any> = {};
+      if (this.session.state.zones) {
+        for (const [zoneName, placements] of Object.entries(this.session.state.zones)) {
+          wasmZones[zoneName] = {
+            placements: placements || [],
+            lock: {
+              locked: this._lockedZones.has(zoneName),
+              locked_at: null,
+              locked_by: null
+            }
+          };
+        }
+      }
+
+      const wasmState = { zones: wasmZones };
+      this._wasmSpace.setState(JSON.stringify(wasmState));
+    } catch (error) {
+      console.error('Failed to sync Chronicle state to WASM:', error);
     }
   }
 
@@ -96,8 +150,18 @@ export class SpaceWasm extends Emitter {
       const wasmStateJson = this._wasmSpace.getState();
       const wasmState = JSON.parse(wasmStateJson);
 
+      // Transform WASM state structure to Chronicle format
+      // WASM: { zones: { zoneName: { placements: [...], lock: {...} } } }
+      // Chronicle: { zones: { zoneName: [...] } }
+      const chronicleZones: Record<string, any[]> = {};
+      if (wasmState.zones) {
+        for (const [zoneName, zone] of Object.entries(wasmState.zones)) {
+          chronicleZones[zoneName] = (zone as any).placements || [];
+        }
+      }
+
       this.session.change("sync wasm state", (doc) => {
-        doc.zones = wasmState;
+        doc.zones = chronicleZones;
       }, "wasm");
     } catch (error) {
       console.error('Failed to sync WASM state to Chronicle:', error);

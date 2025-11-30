@@ -26,7 +26,7 @@ import { Emitter } from "./events.js";
 import { Token } from "./Token.js";
 import { IToken, ReversalPolicy } from "./types.js";
 import { Chronicle } from "./Chronicle.js";
-import { tryLoadWasm, isWasmAvailable, type WasmStack } from "./WasmBridge.js";
+import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmStack } from "./WasmBridge.js";
 
 export interface StackOptions {
   seed?: number | null;
@@ -68,9 +68,6 @@ export class StackWasm extends Emitter {
     this._seed = seed ?? null;
     this._rev = { enabled: false, chance: 0.18, jitter: 0.04 };
 
-    // Initialize WASM asynchronously
-    this._initializeWasm();
-
     // Initialize CRDT state if autoInit is true
     if (autoInit && !this.session.state.stack) {
       this.session.change("initialize stack", (doc) => {
@@ -84,22 +81,48 @@ export class StackWasm extends Emitter {
     }
 
     this._initialized = true;
+
+    // Initialize WASM after Chronicle state is set
+    this._initializeWasm();
   }
 
-  private async _initializeWasm(): Promise<void> {
+  private _initializeWasm(): void {
+    // Try to initialize WASM synchronously if already loaded
+    if (isWasmAvailable()) {
+      try {
+        const wasm = getWasmModule();
+        if (wasm) {
+          this._wasmStack = new wasm.Stack();
+
+          // Initialize WASM stack with current state if available
+          if (this.session.state.stack) {
+            const currentState = this.session.state.stack;
+            this._wasmStack.setState(JSON.stringify(currentState));
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️  WASM Stack initialization failed, using TypeScript fallback');
+      }
+    } else {
+      // WASM not loaded yet, try async
+      this._tryLoadWasmAsync();
+    }
+  }
+
+  private async _tryLoadWasmAsync(): Promise<void> {
     try {
       const wasm = await tryLoadWasm();
-      if (wasm) {
+      if (wasm && !this._wasmStack) {
         this._wasmStack = new wasm.Stack();
 
-        // Initialize WASM stack with current state if available
-        if (this._initialized && this.session.state.stack) {
+        // Sync current state to WASM if available
+        if (this.session.state.stack) {
           const currentState = this.session.state.stack;
           this._wasmStack.setState(JSON.stringify(currentState));
         }
       }
     } catch (error) {
-      console.warn('⚠️  WASM Stack initialization failed, using TypeScript fallback');
+      // Silently fall back to TypeScript
     }
   }
 
@@ -164,8 +187,8 @@ export class StackWasm extends Emitter {
 
     let drawnCard: IToken | undefined;
 
+    // Use WASM if available (20x faster)
     if (this._wasmStack && isWasmAvailable()) {
-      // Use WASM (20x faster)
       try {
         const drawnJson = this._wasmStack.draw(1);
         const drawn = JSON.parse(drawnJson);
@@ -291,24 +314,24 @@ export class StackWasm extends Emitter {
    * @returns this for chaining
    */
   reset(): this {
-    if (this._wasmStack && isWasmAvailable()) {
-      try {
-        this._wasmStack.reset();
-        this._syncToChronicle();
-        this.emit("reset");
-        return this;
-      } catch (error) {
-        console.error('WASM reset failed, falling back to TypeScript:', error);
-      }
-    }
-
-    // TypeScript fallback
+    // Reset to original state (same for WASM and TypeScript)
     this.session.change("reset stack", (doc) => {
       if (!doc.stack) return;
       doc.stack.stack = this._original.map(t => this._sanitize(t));
       doc.stack.drawn = [];
       doc.stack.discards = [];
     });
+
+    // Sync to WASM if available
+    if (this._wasmStack && isWasmAvailable()) {
+      try {
+        const currentState = JSON.stringify(this.session.state.stack);
+        this._wasmStack.setState(currentState);
+      } catch (error) {
+        console.error('Failed to sync reset to WASM:', error);
+      }
+    }
+
     this.emit("reset");
     return this;
   }
