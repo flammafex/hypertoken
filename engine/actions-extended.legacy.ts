@@ -15,6 +15,24 @@
  */
 
 /**
+ * @deprecated LEGACY FILE - DO NOT USE
+ *
+ * This file has been superseded by the Rust/WASM ActionDispatcher implementation.
+ * All actions in this file have been ported to Rust for 10-100x performance improvement.
+ *
+ * - Agent actions → core-rs/src/agent.rs
+ * - Token operations → core-rs/src/token_ops.rs
+ * - GameState actions → core-rs/src/gamestate.rs
+ * - Batch operations → core-rs/src/batch.rs
+ *
+ * The ActionDispatcher (core-rs/src/actions.rs) integrates all these modules
+ * and is wired through Engine.ts with zero-overhead typed methods.
+ *
+ * This file is preserved for historical reference only.
+ * Removal date: TBD (after full production validation)
+ */
+
+/**
  * Extended ActionRegistry - Comprehensive game actions
  */
 
