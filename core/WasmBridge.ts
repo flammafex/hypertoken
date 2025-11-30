@@ -31,13 +31,17 @@ import { dirname, join } from 'node:path';
 // These match the Rust wasm-bindgen exports
 export interface WasmChronicle {
   new(): WasmChronicle;
+  setState(stateJson: string): void;
   getState(): string;
+  change(message: string, newStateJson: string): void;
   save(): Uint8Array;
   load(data: Uint8Array): void;
   saveToBase64(): string;
   loadFromBase64(base64: string): void;
   merge(otherData: Uint8Array): void;
   changeCount(): number;
+  generateSyncMessage(syncState?: Uint8Array): Uint8Array;
+  receiveSyncMessage(message: Uint8Array): void;
 }
 
 export interface WasmStack {
