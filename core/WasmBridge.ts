@@ -159,6 +159,43 @@ export interface WasmActionDispatcher {
   sourceDraw(count: number): string;
   sourceShuffle(seed?: string): void;
   sourceBurn(count: number): string;
+
+  // Agent actions (13 methods)
+  agentCreate(id: string, name: string, metaJson?: string): string;
+  agentRemove(name: string): void;
+  agentSetActive(name: string, active: boolean): void;
+  agentGiveResource(name: string, resource: string, amount: number): void;
+  agentTakeResource(name: string, resource: string, amount: number): void;
+  agentAddToken(name: string, tokenJson: string): void;
+  agentRemoveToken(name: string, tokenId: string): string;
+  agentGet(name: string): string;
+  agentTransferResource(from: string, to: string, resource: string, amount: number): string;
+  agentTransferToken(from: string, to: string, tokenId: string): string;
+  agentStealResource(from: string, to: string, resource: string, amount: number): string;
+  agentStealToken(from: string, to: string, tokenId: string): string;
+  agentGetAll(): string;
+
+  // Token operations (5 methods)
+  tokenTransform(tokenJson: string, propertiesJson: string): string;
+  tokenAttach(hostJson: string, attachmentJson: string, attachmentType: string): string;
+  tokenDetach(hostJson: string, attachmentId: string): string;
+  tokenMerge(tokensJson: string, resultPropertiesJson?: string, keepOriginals?: boolean): string;
+  tokenSplit(tokenJson: string, count: number, propertiesArrayJson?: string): string;
+
+  // GameState actions (7 methods)
+  gameStart(): string;
+  gameEnd(winner?: string, reason?: string): string;
+  gamePause(): string;
+  gameResume(): string;
+  gameNextPhase(phase?: string): string;
+  gameSetProperty(key: string, valueJson: string): string;
+  gameGetState(): string;
+
+  // Batch operations (4 methods)
+  batchShuffle(decksJson: string, seedPrefix?: string): string;
+  batchDraw(decksJson: string, countsJson: string): string;
+  batchFilter(tokensJson: string, predicate: string): string;
+  batchMap(tokensJson: string, operation: string): string;
 }
 
 export interface HyperTokenWasm {

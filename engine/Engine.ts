@@ -393,12 +393,30 @@ export class Engine extends Emitter {
 
   // Actions implemented in WASM ActionDispatcher
   private static readonly WASM_ACTIONS = new Set([
+    // Stack actions (9)
     "stack:draw", "stack:peek", "stack:shuffle", "stack:burn", "stack:reset",
     "stack:cut", "stack:insertAt", "stack:removeAt", "stack:swap",
+    // Space actions (9)
     "space:place", "space:remove", "space:move", "space:flip",
     "space:createZone", "space:deleteZone", "space:clearZone",
     "space:lockZone", "space:shuffleZone",
+    // Source actions (3)
     "source:draw", "source:shuffle", "source:burn",
+    // Agent actions (13)
+    "agent:create", "agent:remove", "agent:setActive",
+    "agent:giveResource", "agent:takeResource",
+    "agent:addToken", "agent:removeToken", "agent:get",
+    "agent:transferResource", "agent:transferToken",
+    "agent:stealResource", "agent:stealToken", "agent:getAll",
+    // Token operations (5)
+    "token:transform", "token:attach", "token:detach",
+    "token:merge", "token:split",
+    // GameState actions (7)
+    "game:start", "game:end", "game:pause", "game:resume",
+    "game:nextPhase", "game:setProperty", "game:getState",
+    // Batch operations (4)
+    "tokens:shuffle", "tokens:draw", "tokens:filter", "tokens:map",
+    // Debug
     "debug:log"
   ]);
 
@@ -545,6 +563,190 @@ export class Engine extends Emitter {
     }
     if (type === "source:burn") {
       const result = dispatcher.sourceBurn(payload.count ?? 1);
+      return JSON.parse(result);
+    }
+
+    // Agent actions
+    if (type === "agent:create") {
+      const result = dispatcher.agentCreate(
+        payload.id!,
+        payload.name!,
+        payload.meta ? JSON.stringify(payload.meta) : undefined
+      );
+      return JSON.parse(result);
+    }
+    if (type === "agent:remove") {
+      dispatcher.agentRemove(payload.name!);
+      return;
+    }
+    if (type === "agent:setActive") {
+      dispatcher.agentSetActive(payload.name!, payload.active ?? true);
+      return;
+    }
+    if (type === "agent:giveResource") {
+      dispatcher.agentGiveResource(payload.name!, payload.resource!, payload.amount ?? 1);
+      return;
+    }
+    if (type === "agent:takeResource") {
+      dispatcher.agentTakeResource(payload.name!, payload.resource!, payload.amount ?? 1);
+      return;
+    }
+    if (type === "agent:addToken") {
+      dispatcher.agentAddToken(payload.name!, JSON.stringify(payload.token));
+      return;
+    }
+    if (type === "agent:removeToken") {
+      const result = dispatcher.agentRemoveToken(payload.name!, payload.tokenId!);
+      return JSON.parse(result);
+    }
+    if (type === "agent:get") {
+      const result = dispatcher.agentGet(payload.name!);
+      return JSON.parse(result);
+    }
+    if (type === "agent:transferResource") {
+      const result = dispatcher.agentTransferResource(
+        payload.from!,
+        payload.to!,
+        payload.resource!,
+        payload.amount ?? 1
+      );
+      return JSON.parse(result);
+    }
+    if (type === "agent:transferToken") {
+      const result = dispatcher.agentTransferToken(
+        payload.from!,
+        payload.to!,
+        payload.tokenId!
+      );
+      return JSON.parse(result);
+    }
+    if (type === "agent:stealResource") {
+      const result = dispatcher.agentStealResource(
+        payload.from!,
+        payload.to!,
+        payload.resource!,
+        payload.amount ?? 1
+      );
+      return JSON.parse(result);
+    }
+    if (type === "agent:stealToken") {
+      const result = dispatcher.agentStealToken(
+        payload.from!,
+        payload.to!,
+        payload.tokenId!
+      );
+      return JSON.parse(result);
+    }
+    if (type === "agent:getAll") {
+      const result = dispatcher.agentGetAll();
+      return JSON.parse(result);
+    }
+
+    // Token operations
+    if (type === "token:transform") {
+      const result = dispatcher.tokenTransform(
+        JSON.stringify(payload.token),
+        JSON.stringify(payload.properties ?? {})
+      );
+      return JSON.parse(result);
+    }
+    if (type === "token:attach") {
+      const result = dispatcher.tokenAttach(
+        JSON.stringify(payload.host),
+        JSON.stringify(payload.attachment),
+        payload.attachmentType ?? "default"
+      );
+      return JSON.parse(result);
+    }
+    if (type === "token:detach") {
+      const result = dispatcher.tokenDetach(
+        JSON.stringify(payload.host),
+        payload.attachmentId!
+      );
+      return JSON.parse(result);
+    }
+    if (type === "token:merge") {
+      const result = dispatcher.tokenMerge(
+        JSON.stringify(payload.tokens),
+        payload.properties ? JSON.stringify(payload.properties) : undefined,
+        payload.keepOriginals ?? false
+      );
+      return JSON.parse(result);
+    }
+    if (type === "token:split") {
+      const result = dispatcher.tokenSplit(
+        JSON.stringify(payload.token),
+        payload.count ?? 2,
+        payload.propertiesArray ? JSON.stringify(payload.propertiesArray) : undefined
+      );
+      return JSON.parse(result);
+    }
+
+    // GameState actions
+    if (type === "game:start") {
+      const result = dispatcher.gameStart();
+      return JSON.parse(result);
+    }
+    if (type === "game:end") {
+      const result = dispatcher.gameEnd(
+        payload.winner ? String(payload.winner) : undefined,
+        payload.reason ? String(payload.reason) : undefined
+      );
+      return JSON.parse(result);
+    }
+    if (type === "game:pause") {
+      const result = dispatcher.gamePause();
+      return JSON.parse(result);
+    }
+    if (type === "game:resume") {
+      const result = dispatcher.gameResume();
+      return JSON.parse(result);
+    }
+    if (type === "game:nextPhase") {
+      const result = dispatcher.gameNextPhase(
+        payload.phase ? String(payload.phase) : undefined
+      );
+      return JSON.parse(result);
+    }
+    if (type === "game:setProperty") {
+      const result = dispatcher.gameSetProperty(
+        payload.key!,
+        JSON.stringify(payload.value)
+      );
+      return JSON.parse(result);
+    }
+    if (type === "game:getState") {
+      const result = dispatcher.gameGetState();
+      return JSON.parse(result);
+    }
+
+    // Batch operations
+    if (type === "tokens:shuffle") {
+      const result = dispatcher.batchShuffle(
+        JSON.stringify(payload.decks),
+        payload.seed ? String(payload.seed) : undefined
+      );
+      return JSON.parse(result);
+    }
+    if (type === "tokens:draw") {
+      const result = dispatcher.batchDraw(
+        JSON.stringify(payload.decks),
+        JSON.stringify(payload.counts)
+      );
+      return JSON.parse(result);
+    }
+    if (type === "tokens:filter") {
+      const result = dispatcher.batchFilter(
+        JSON.stringify(payload.tokens),
+        payload.predicate ?? "reversed"
+      );
+      return JSON.parse(result);
+    }
+    if (type === "tokens:map") {
+      const result = dispatcher.batchMap(
+        JSON.stringify(payload.tokens),
+        payload.operation ?? "flip"
+      );
       return JSON.parse(result);
     }
 
