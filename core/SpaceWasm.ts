@@ -249,9 +249,11 @@ export class SpaceWasm extends Emitter {
     // Try WASM first
     if (this._wasmSpace && isWasmAvailable()) {
       try {
+        const tokenJson = JSON.stringify(safeToken);
+        console.log('Sending token to WASM place():', tokenJson.substring(0, 100));
         const placementJson = this._wasmSpace.place(
           zoneName,
-          JSON.stringify(safeToken),
+          tokenJson,
           opts.x ?? 0,
           opts.y ?? 0
         );

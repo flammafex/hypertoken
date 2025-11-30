@@ -5,23 +5,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::token::Token;
-use crate::types::{HyperTokenError, Result, Position, ZoneLock};
+use crate::types::{HyperTokenError, Result, Position, ZoneLock, IPlacementCRDT, IToken};
 use crate::utils::{now, shuffle_vec};
-
-/// Placement record for a token in 2D space
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Placement {
-    pub token: Token,
-    pub x: f64,
-    pub y: f64,
-    pub z_index: i32,
-    pub flipped: bool,
-}
 
 /// Zone state (collection of placements)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Zone {
-    pub placements: Vec<Placement>,
+    pub placements: Vec<IPlacementCRDT>,
     pub lock: ZoneLock,
 }
 
@@ -131,6 +121,7 @@ impl Space {
     }
 
     /// Place a token in a zone
+    /// Returns the placement as JSON
     #[wasm_bindgen(js_name = place)]
     pub fn place(
         &mut self,
@@ -138,7 +129,7 @@ impl Space {
         token_json: &str,
         x: Option<f64>,
         y: Option<f64>,
-    ) -> Result<()> {
+    ) -> Result<String> {
         // Ensure zone exists
         if !self.state.zones.contains_key(zone_name) {
             self.create_zone(zone_name.to_string())?;
@@ -151,21 +142,43 @@ impl Space {
             return Err(HyperTokenError::ZoneLocked(zone_name.to_string()));
         }
 
-        // Parse token
-        let token: Token = serde_json::from_str(token_json)
-            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+        // Parse token to IToken
+        let token: IToken = serde_json::from_str(token_json)
+            .map_err(|e| {
+                eprintln!("Failed to deserialize token from JSON: {}", e);
+                eprintln!("Token JSON was: {}", token_json);
+                HyperTokenError::SerializationError(format!("Failed to parse token: {}", e))
+            })?;
 
-        // Create placement
-        let placement = Placement {
-            token,
-            x: x.unwrap_or(0.0),
-            y: y.unwrap_or(0.0),
-            z_index: zone.placements.len() as i32,
-            flipped: false,
+        // Generate unique ID for placement (simple counter-based for now)
+        let placement_id = format!("p-{}-{}", zone.placements.len(), now());
+
+        // Create placement in Chronicle format
+        let placement = IPlacementCRDT {
+            id: placement_id,
+            tokenId: token.id.clone(),
+            tokenSnapshot: token,
+            x: Some(x.unwrap_or(0.0)),
+            y: Some(y.unwrap_or(0.0)),
+            faceUp: true,
+            label: None,
+            ts: now(),
+            reversed: false,
+            tags: Vec::new(),
         };
 
-        zone.placements.push(placement);
-        Ok(())
+        // Add to zone
+        zone.placements.push(placement.clone());
+
+        // Return placement as JSON
+        let result_json = serde_json::to_string(&placement)
+            .map_err(|e| {
+                eprintln!("Failed to serialize placement to JSON: {}", e);
+                HyperTokenError::SerializationError(format!("Failed to serialize placement: {}", e))
+            })?;
+
+        eprintln!("Successfully created placement: {}", &result_json[..result_json.len().min(100)]);
+        Ok(result_json)
     }
 
     /// Remove a token from a zone
@@ -179,12 +192,12 @@ impl Space {
         }
 
         let index = zone.placements.iter()
-            .position(|p| p.token.id == token_id)
+            .position(|p| p.tokenId == token_id)
             .ok_or_else(|| HyperTokenError::TokenNotFound(token_id.to_string()))?;
 
         let placement = zone.placements.remove(index);
 
-        serde_json::to_string(&placement.token)
+        serde_json::to_string(&placement.tokenSnapshot)
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
     }
 
@@ -218,10 +231,10 @@ impl Space {
         }
 
         let placement = zone.placements.iter_mut()
-            .find(|p| p.token.id == token_id)
+            .find(|p| p.tokenId == token_id)
             .ok_or_else(|| HyperTokenError::TokenNotFound(token_id.to_string()))?;
 
-        placement.flipped = !placement.flipped;
+        placement.faceUp = !placement.faceUp;
         Ok(())
     }
 
@@ -245,8 +258,8 @@ impl Space {
         let zone = self.state.zones.get(zone_name)
             .ok_or_else(|| HyperTokenError::ZoneNotFound(zone_name.to_string()))?;
 
-        let tokens: Vec<&Token> = zone.placements.iter()
-            .map(|p| &p.token)
+        let tokens: Vec<&IToken> = zone.placements.iter()
+            .map(|p| &p.tokenSnapshot)
             .collect();
 
         serde_json::to_string(&tokens)
@@ -283,12 +296,6 @@ impl Space {
         }
 
         shuffle_vec(&mut zone.placements, seed.as_deref());
-
-        // Update z-indices
-        for (i, placement) in zone.placements.iter_mut().enumerate() {
-            placement.z_index = i as i32;
-        }
-
         Ok(())
     }
 
