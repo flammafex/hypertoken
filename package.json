@@ -50,6 +50,7 @@
     "test:rust": "cd core-rs && cargo test --lib --target $(rustc -vV | sed -n 's/host: //p')",
     "test:wasm": "node --loader ./test/ts-esm-loader.js test/testWasmBridge.ts",
     "test:wasm:stack": "node --loader ./test/ts-esm-loader.js test/testStackWasm.ts",
+    "test:wasm:space": "node --loader ./test/ts-esm-loader.js test/testSpaceWasm.ts",
     "clean:rust": "cd core-rs && cargo clean && rm -rf pkg"
   }
 }
