@@ -30,6 +30,7 @@
 import { Emitter } from "./events.js";
 import { Stack } from "./Stack.js";
 import { Chronicle } from "./Chronicle.js";
+import type { ChronicleWasm } from "./ChronicleWasm.js";
 import { IToken, ISourceState, ReshufflePolicy } from "./types.js";
 import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmSource } from "./WasmBridge.js";
 import { shuffleArray } from "./random.js";
@@ -45,7 +46,7 @@ export interface SourceOptions {
  * state entirely in Rust/WASM memory.
  */
 export class SourceWasm extends Emitter {
-  public readonly session: Chronicle;
+  public readonly session: Chronicle | ChronicleWasm;
   private _wasmSource: WasmSource | null = null;
   private _stacks: Stack[];
   private _originalTokens: IToken[];
@@ -58,7 +59,7 @@ export class SourceWasm extends Emitter {
    * @param options - Configuration options
    * @throws Error if session is null/undefined
    */
-  constructor(session: Chronicle, stacks: Stack[] = [], { autoInit = true }: SourceOptions = {}) {
+  constructor(session: Chronicle | ChronicleWasm, stacks: Stack[] = [], { autoInit = true }: SourceOptions = {}) {
     super();
 
     if (!session) {
@@ -115,7 +116,7 @@ export class SourceWasm extends Emitter {
           // Initialize WASM source with current state if available
           if (this.session.state.source) {
             const currentState = this.session.state.source;
-            this._wasmSource.setState(JSON.stringify(currentState));
+            this._wasmSource!.setState(JSON.stringify(currentState));
           }
         }
       } catch (error) {
@@ -136,7 +137,7 @@ export class SourceWasm extends Emitter {
         // Sync current state to WASM if available
         if (this.session.state.source) {
           const currentState = this.session.state.source;
-          this._wasmSource.setState(JSON.stringify(currentState));
+          this._wasmSource!.setState(JSON.stringify(currentState));
         }
       }
     } catch (error) {

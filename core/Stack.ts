@@ -146,6 +146,25 @@ export class Stack extends Emitter {
   }
 
   /**
+   * Peek at the top N cards without removing them
+   * @param n - Number of cards to peek at (default: 1)
+   * @returns Array of tokens at the top of the stack
+   */
+  peek(n: number = 1): IToken[] {
+    if (n < 1 || !Number.isInteger(n)) {
+      throw new Error(`Invalid peek count: ${n}. Must be a positive integer.`);
+    }
+
+    const stack = this.session.state.stack?.stack ?? [];
+    const count = Math.min(n, stack.length);
+    if (count === 0) return [];
+
+    // Get the top N cards (end of the array)
+    const peeked = stack.slice(-count);
+    return [...peeked].reverse();
+  }
+
+  /**
    * Draw multiple cards from the stack
    * @param n - Number of cards to draw
    * @returns Array of drawn tokens

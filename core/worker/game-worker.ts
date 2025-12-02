@@ -100,7 +100,7 @@ if (parentPort) {
       }
 
       // Send result back
-      parentPort.postMessage({
+      parentPort!.postMessage({
         type: 'result',
         taskId: message.taskId,
         data: result,
@@ -108,7 +108,7 @@ if (parentPort) {
 
     } catch (error: any) {
       // Send error back
-      parentPort.postMessage({
+      parentPort!.postMessage({
         type: 'error',
         taskId: message.taskId,
         error: error.message,
@@ -211,7 +211,7 @@ async function executeAction(chronicle: Chronicle, action: any): Promise<void> {
     case 'space:move':
       {
         const space = new SpaceWasm(chronicle);
-        space.move(params.placementId, params.fromZone, params.toZone, params.x, params.y);
+        space.move(params.fromZone, params.toZone, params.placementId, { x: params.x, y: params.y });
       }
       break;
 
@@ -232,7 +232,8 @@ async function executeDefaultTurn(
 
   // Every 5 turns, shuffle
   if (turn % 5 === 0 && stack.size > 0) {
-    stack.shuffle(seed ? `${seed}-${turn}` : undefined);
+    const shuffleSeed = seed ? (typeof seed === 'string' ? parseInt(seed) + turn : seed + turn) : turn;
+    stack.shuffle(shuffleSeed);
   }
 
   // Draw a card if stack has cards
@@ -292,7 +293,7 @@ async function batchStackOperations(
     let result = '';
     switch (op.operation) {
       case 'draw':
-        result = stack.draw(op.params.count || 1);
+        result = JSON.stringify(stack.draw(op.params.count || 1));
         break;
 
       case 'shuffle':
@@ -301,7 +302,7 @@ async function batchStackOperations(
         break;
 
       case 'burn':
-        result = stack.burn(op.params.count || 1);
+        result = JSON.stringify(stack.burn(op.params.count || 1));
         break;
 
       case 'discard':
@@ -341,26 +342,27 @@ async function batchSpaceOperations(operations: any[]): Promise<string[]> {
         if (!space.hasZone(op.params.zone)) {
           space.createZone(op.params.zone);
         }
-        result = space.place(
+        const placement = space.place(
           op.params.zone,
           op.params.token,
           op.params.x !== undefined ? { x: op.params.x, y: op.params.y } : undefined
         );
+        result = JSON.stringify(placement);
         break;
 
       case 'move':
         space.move(
-          op.params.placementId,
           op.params.fromZone,
           op.params.toZone,
-          op.params.x,
-          op.params.y
+          op.params.placementId,
+          { x: op.params.x, y: op.params.y }
         );
         result = JSON.stringify({ moved: true });
         break;
 
       case 'remove':
-        result = space.remove(op.params.zone, op.params.placementId);
+        space.remove(op.params.zone, op.params.placementId);
+        result = JSON.stringify({ removed: true });
         break;
 
       case 'flip':

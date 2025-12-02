@@ -23,9 +23,9 @@ import type { SourceWasm } from "../core/SourceWasm.js";
 import { WasmWorker } from "../core/WasmWorker.js";
 
 export interface EngineOptions {
-  stack?: Stack | null;
-  space?: Space | null;
-  source?: Source | null;
+  stack?: Stack | StackWasm | null;
+  space?: Space | SpaceWasm | null;
+  source?: Source | SourceWasm | null;
   autoConnect?: string;
   useWebRTC?: boolean; // Enable WebRTC with automatic fallback
   useWorker?: boolean; // Enable multi-threaded WASM worker (Phase 4)
@@ -38,9 +38,9 @@ export interface EngineOptions {
 }
 
 export class Engine extends Emitter {
-  stack: Stack | null;
-  space: Space;
-  source: Source | null;
+  stack: Stack | StackWasm | null;
+  space: Space | SpaceWasm;
+  source: Source | SourceWasm | null;
 
   session: Chronicle;
   network?: INetworkConnection; // Can be PeerConnection or HybridPeerManager
@@ -160,21 +160,21 @@ export class Engine extends Emitter {
 
       // Set WASM instances if available
       if (this.stack && 'wasmInstance' in this.stack) {
-        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        const wasmStack = (this.stack as unknown as StackWasm).wasmInstance;
         if (wasmStack) {
           this._wasmDispatcher.setStack(wasmStack);
         }
       }
 
       if (this.space && 'wasmInstance' in this.space) {
-        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        const wasmSpace = (this.space as unknown as SpaceWasm).wasmInstance;
         if (wasmSpace) {
           this._wasmDispatcher.setSpace(wasmSpace);
         }
       }
 
       if (this.source && 'wasmInstance' in this.source) {
-        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        const wasmSource = (this.source as unknown as SourceWasm).wasmInstance;
         if (wasmSource) {
           this._wasmDispatcher.setSource(wasmSource);
         }
@@ -202,21 +202,21 @@ export class Engine extends Emitter {
 
       // Set WASM instances if available
       if (this.stack && 'wasmInstance' in this.stack) {
-        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        const wasmStack = (this.stack as unknown as StackWasm).wasmInstance;
         if (wasmStack) {
           this._wasmDispatcher.setStack(wasmStack);
         }
       }
 
       if (this.space && 'wasmInstance' in this.space) {
-        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        const wasmSpace = (this.space as unknown as SpaceWasm).wasmInstance;
         if (wasmSpace) {
           this._wasmDispatcher.setSpace(wasmSpace);
         }
       }
 
       if (this.source && 'wasmInstance' in this.source) {
-        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        const wasmSource = (this.source as unknown as SourceWasm).wasmInstance;
         if (wasmSource) {
           this._wasmDispatcher.setSource(wasmSource);
         }
@@ -405,7 +405,7 @@ export class Engine extends Emitter {
     "space:transferZone", "space:clear",
     // Source actions (7)
     "source:draw", "source:shuffle", "source:burn",
-    "source:addStack", "source:removeStack", "source:reset", "source:inspect"
+    "source:addStack", "source:removeStack", "source:reset", "source:inspect",
     // Agent actions (16)
     "agent:create", "agent:remove", "agent:setActive",
     "agent:giveResource", "agent:takeResource",

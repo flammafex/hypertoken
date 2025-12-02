@@ -70,11 +70,11 @@ export class ChronicleWasm extends Emitter {
 
       // Initialize with state if provided
       if (initialState) {
-        this._wasmChronicle.setState(JSON.stringify(initialState));
+        this._wasmChronicle!.setState(JSON.stringify(initialState));
       } else {
         // Initialize with empty state
         const emptyState: HyperTokenState = {};
-        this._wasmChronicle.setState(JSON.stringify(emptyState));
+        this._wasmChronicle!.setState(JSON.stringify(emptyState));
       }
 
       this._useWasm = true;
@@ -105,6 +105,20 @@ export class ChronicleWasm extends Emitter {
 
   get isWasmEnabled(): boolean {
     return this._useWasm && this._wasmChronicle !== null;
+  }
+
+  changeCount(): number {
+    if (this._useWasm && this._wasmChronicle) {
+      try {
+        return this._wasmChronicle.changeCount();
+      } catch (error) {
+        console.error("❌ Failed to get change count from WASM Chronicle:", error);
+      }
+    }
+
+    // Fallback: Automerge doesn't expose change count directly,
+    // so we return a simple approximation
+    return 0;
   }
 
   change(message: string, callback: (doc: HyperTokenState) => void, source: string = "local"): void {

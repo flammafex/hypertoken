@@ -4,6 +4,7 @@
  */
 import { Emitter } from "./events.js";
 import { Chronicle } from "./Chronicle.js";
+import type { ChronicleWasm } from "./ChronicleWasm.js";
 import { IPlacementCRDT, IToken } from "./types.js";
 import { Stack } from "./Stack.js";
 import { Source } from "./Source.js";
@@ -41,7 +42,7 @@ export interface SpaceEvent {
  * - Query operations: ~16x faster
  */
 export class SpaceWasm extends Emitter {
-  public readonly session: Chronicle;
+  public readonly session: Chronicle | ChronicleWasm;
 
   name: string;
   spreads: Record<string, SpreadZone[]> = {};
@@ -57,7 +58,7 @@ export class SpaceWasm extends Emitter {
    * @param name - Name of this space
    * @throws Error if session is null/undefined
    */
-  constructor(session: Chronicle, name: string = "space") {
+  constructor(session: Chronicle | ChronicleWasm, name: string = "space") {
     super();
 
     if (!session) {
@@ -541,6 +542,20 @@ export class SpaceWasm extends Emitter {
     });
     this.emit("zone:deleted", { payload: { id } });
     return this;
+  }
+
+  hasZone(name: string): boolean {
+    // Try WASM first
+    if (this._wasmSpace && isWasmAvailable()) {
+      try {
+        return this._wasmSpace.hasZone(name);
+      } catch (error) {
+        console.error('WASM hasZone failed, falling back to TypeScript:', error);
+      }
+    }
+
+    // TypeScript fallback
+    return !!(this.session.state.zones && this.session.state.zones[name]);
   }
 
   clearZone(name: string): this {

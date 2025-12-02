@@ -20,12 +20,7 @@ import { Emitter } from "./events.js";
 import { shuffleArray } from "./random.js";
 import { Stack } from "./Stack.js";
 import { Chronicle } from "./Chronicle.js";
-import { IToken, ISourceState } from "./types.js";
-
-export interface ReshufflePolicy {
-  threshold: number | null;
-  mode: "auto" | "manual";
-}
+import { IToken, ISourceState, ReshufflePolicy } from "./types.js";
 
 export interface SourceOptions {
   autoInit?: boolean;

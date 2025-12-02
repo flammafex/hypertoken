@@ -72,15 +72,21 @@ export interface WasmSpace {
   hasZone(name: string): boolean;
   lockZone(name: string, locked: boolean): void;
   isZoneLocked(name: string): boolean;
-  place(zoneName: string, tokenJson: string, x?: number, y?: number): void;
+  place(zoneName: string, tokenJson: string, x?: number, y?: number): string;
   remove(zoneName: string, tokenId: string): string;
   move(tokenId: string, fromZone: string, toZone: string, x?: number, y?: number): void;
-  flip(zoneName: string, tokenId: string): void;
+  flip(zoneName: string, tokenId: string, faceUp?: boolean): void;
+  clear(): void;
   clearZone(zoneName: string): void;
   getTokens(zoneName: string): string;
   getPlacements(zoneName: string): string;
   count(zoneName: string): number;
   shuffleZone(zoneName: string, seed?: string): void;
+  transferZone(fromZone: string, toZone: string): number;
+  stackZone(id: string): void;
+  spreadZone(id: string, angleStep: number, radius: number): void;
+  drawFromZone(name: string, n: number): string;
+  pushToZone(name: string, tokensJson: string): void;
   getZoneNames(): string[];
   getState(): string;
   setState(stateJson: string): void;
@@ -199,12 +205,12 @@ export interface WasmActionDispatcher {
 }
 
 export interface HyperTokenWasm {
-  Chronicle: typeof WasmChronicle;
-  Stack: typeof WasmStack;
-  Space: typeof WasmSpace;
-  Source: typeof WasmSource;
-  Token: typeof WasmToken;
-  ActionDispatcher: typeof WasmActionDispatcher;
+  Chronicle: { new(): WasmChronicle };
+  Stack: { new(): WasmStack };
+  Space: { new(): WasmSpace };
+  Source: { new(): WasmSource };
+  Token: { new(id: string, index: number): WasmToken; fromJSON(json: string): WasmToken };
+  ActionDispatcher: { new(): WasmActionDispatcher };
   version(): string;
   health_check(): boolean;
 }

@@ -26,6 +26,7 @@ import { Emitter } from "./events.js";
 import { Token } from "./Token.js";
 import { IToken, ReversalPolicy } from "./types.js";
 import { Chronicle } from "./Chronicle.js";
+import type { ChronicleWasm } from "./ChronicleWasm.js";
 import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmStack } from "./WasmBridge.js";
 
 export interface StackOptions {
@@ -42,7 +43,7 @@ export interface StackOptions {
  * - Memory: Significantly reduced GC pressure
  */
 export class StackWasm extends Emitter {
-  public readonly session: Chronicle;
+  public readonly session: Chronicle | ChronicleWasm;
   private _wasmStack: WasmStack | null = null;
   private _seed: number | null;
   private _rev: ReversalPolicy;
@@ -56,7 +57,7 @@ export class StackWasm extends Emitter {
    * @param options - Configuration options
    * @throws Error if session is null/undefined
    */
-  constructor(session: Chronicle, tokens: IToken[] = [], { seed, autoInit = true }: StackOptions = {}) {
+  constructor(session: Chronicle | ChronicleWasm, tokens: IToken[] = [], { seed, autoInit = true }: StackOptions = {}) {
     super();
 
     if (!session) {
@@ -97,7 +98,7 @@ export class StackWasm extends Emitter {
           // Initialize WASM stack with current state if available
           if (this.session.state.stack) {
             const currentState = this.session.state.stack;
-            this._wasmStack.setState(JSON.stringify(currentState));
+            this._wasmStack!.setState(JSON.stringify(currentState));
           }
         }
       } catch (error) {
@@ -118,7 +119,7 @@ export class StackWasm extends Emitter {
         // Sync current state to WASM if available
         if (this.session.state.stack) {
           const currentState = this.session.state.stack;
-          this._wasmStack.setState(JSON.stringify(currentState));
+          this._wasmStack!.setState(JSON.stringify(currentState));
         }
       }
     } catch (error) {
