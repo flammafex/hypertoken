@@ -6,6 +6,11 @@
  * for reliable, low-latency P2P communication.
  */
 import { Emitter } from "../core/events.js";
+import {
+  RTCPeerConnection,
+  RTCSessionDescription,
+  RTCIceCandidate
+} from "./webrtc-polyfill.js";
 
 export interface WebRTCConfig {
   iceServers: RTCIceServer[];
