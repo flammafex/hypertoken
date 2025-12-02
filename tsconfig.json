@@ -3,15 +3,18 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "outDir": "./dist",
-    "rootDir": "./",
     "strict": true,            /* The most important setting for stability */
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "allowJs": true,           /* Allows you to migrate file-by-file */
-    "checkJs": false           /* Set to true if you want TS to check .js files too */
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["./**/*.ts"],
-  "exclude": ["node_modules", "dist", "examples/**/*.js", "test/**/*.js"]
+  "include": ["core/**/*.ts", "engine/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "core/EventBus.js",
+    "core/index.js",
+    "core/loaders/tokenSetLoader.js",
+    "engine/testActions.js"
+  ]
 }
