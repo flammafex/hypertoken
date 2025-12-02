@@ -155,7 +155,7 @@ async function runTests() {
     for (let i = 0; i < 8; i++) {
       const chronicle = new Chronicle();
       const stack = new StackWasm(chronicle, createTokens(5));
-      stack.shuffle(`seed-${i}`);
+      stack.shuffle(i);
       docs.push(chronicle.saveToBase64());
     }
 

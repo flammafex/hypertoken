@@ -50,7 +50,7 @@ async function testChronicleWasm() {
   try {
     const initialState: HyperTokenState = {
       stack: {
-        stack: [{ id: 'token1', index: 0, char: '□', group: 'test', kind: 'default', label: 'Test' }],
+        stack: [{ id: 'token1', index: 0, char: '□', group: 'test', kind: 'default', label: 'Test', text: '', meta: {} }],
         drawn: [],
         discards: []
       }
@@ -87,7 +87,7 @@ async function testChronicleWasm() {
 
     chronicle.change('add-token', (doc) => {
       doc.stack = {
-        stack: [{ id: 'token2', index: 0, char: '□', group: 'test', kind: 'default', label: 'Test' }],
+        stack: [{ id: 'token2', index: 0, char: '□', group: 'test', kind: 'default', label: 'Test', text: '', meta: {} }],
         drawn: [],
         discards: []
       };
@@ -117,8 +117,8 @@ async function testChronicleWasm() {
     chronicle1.change('set-state', (doc) => {
       doc.stack = {
         stack: [
-          { id: 'token1', index: 0, char: '□', group: 'test', kind: 'default', label: 'T1' },
-          { id: 'token2', index: 1, char: '□', group: 'test', kind: 'default', label: 'T2' }
+          { id: 'token1', index: 0, char: '□', group: 'test', kind: 'default', label: 'T1', text: '', meta: {} },
+          { id: 'token2', index: 1, char: '□', group: 'test', kind: 'default', label: 'T2', text: '', meta: {} }
         ],
         drawn: [],
         discards: []
@@ -191,7 +191,7 @@ async function testChronicleWasm() {
 
     chronicle1.change('set-state-1', (doc) => {
       doc.stack = {
-        stack: [{ id: 'token1', index: 0, char: '□', group: 'test', kind: 'default', label: 'From1' }],
+        stack: [{ id: 'token1', index: 0, char: '□', group: 'test', kind: 'default', label: 'From1', text: '', meta: {} }],
         drawn: [],
         discards: []
       };
@@ -217,8 +217,9 @@ async function testChronicleWasm() {
     chronicle1.merge(chronicle2.state);
 
     const state = chronicle1.state;
+    const space = state.space as any;
 
-    if (state.stack && state.space && state.space.zones && state.space.zones['zone1']) {
+    if (state.stack && space && space.zones && space.zones['zone1']) {
       console.log('  ✅ Merge successful (both states present)');
       passed++;
     } else {
@@ -288,7 +289,9 @@ async function testChronicleWasm() {
       char: '□',
       group: 'test',
       kind: 'default',
-      label: `Token ${i}`
+      label: `Token ${i}`,
+      text: '',
+      meta: {}
     }));
 
     chronicle.change('populate', (doc) => {

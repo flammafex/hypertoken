@@ -36,7 +36,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '',
+      meta: {}
     }));
 
     const chronicle = new Chronicle();
@@ -72,7 +74,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '',
+      meta: {}
     }));
 
     const chronicle = new Chronicle();
@@ -103,7 +107,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '',
+      meta: {}
     }));
 
     const chronicle = new Chronicle();
@@ -136,7 +142,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '',
+      meta: {}
     }));
 
     // Test ActionDispatcher route
@@ -146,7 +154,7 @@ async function testActionDispatcher() {
 
     const dispatcherStart = performance.now();
     for (let i = 0; i < 100; i++) {
-      engine.apply(new Action('stack:shuffle', { seed: `seed-${i}` }));
+      engine.apply(new Action('stack:shuffle', { seed: i }));
     }
     const dispatcherTime = performance.now() - dispatcherStart;
 
@@ -156,7 +164,7 @@ async function testActionDispatcher() {
 
     const directStart = performance.now();
     for (let i = 0; i < 100; i++) {
-      stack2.shuffle(`seed-${i}`);
+      stack2.shuffle(i);
     }
     const directTime = performance.now() - directStart;
 

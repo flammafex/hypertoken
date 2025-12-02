@@ -169,7 +169,7 @@ async function runBenchmarks() {
   for (let i = 0; i < numDocs; i++) {
     const chronicle = new Chronicle();
     const stack = new StackWasm(chronicle, createTokens(10));
-    stack.shuffle(`seed-${i}`);
+    stack.shuffle(i);
     stack.draw(3);
     docsToMerge.push(chronicle.saveToBase64());
   }
