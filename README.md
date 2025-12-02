@@ -209,14 +209,14 @@ hypertoken/
 │
 ├── core-rs/                # High-Performance Core (Rust → WASM)
 │   ├── src/
-│   │   ├── stack.rs       # Stack operations (9 actions)
-│   │   ├── space.rs       # Spatial operations (9 actions)
-│   │   ├── source.rs      # Card source/deck management (3 actions)
-│   │   ├── agent.rs       # Agent management (13 actions)
-│   │   ├── token_ops.rs   # Token transformations (5 actions)
-│   │   ├── gamestate.rs   # Game lifecycle (7 actions)
-│   │   ├── batch.rs       # Batch operations (4 actions)
-│   │   ├── actions.rs     # Unified ActionDispatcher (50 total)
+│   │   ├── stack.rs       # Stack operations (10 actions)
+│   │   ├── space.rs       # Spatial operations (14 actions)
+│   │   ├── source.rs      # Token source management (7 actions)
+│   │   ├── agent.rs       # Agent management (16 actions)
+│   │   ├── token_ops.rs   # Token transformations (7 actions)
+│   │   ├── gamestate.rs   # Game lifecycle (5 actions)
+│   │   ├── batch.rs       # Batch operations (8 actions)
+│   │   ├── actions.rs     # Unified ActionDispatcher (67 total)
 │   │   ├── chronicle.rs   # CRDT integration
 │   │   ├── token.rs       # Token data structures
 │   │   ├── parallel.rs    # Parallel algorithms
@@ -281,7 +281,7 @@ This applies equally to cards in blackjack, shares in a market, or NPCs in a wor
 ## 📖 Documentation
 
 ### Core Documentation
-- **[Complete Action Reference](./engine/ACTIONS.md)** - All 68 actions documented
+- **[Complete Action Reference](./engine/ACTIONS.md)** - All 67 actions documented
 - **[Worker Mode Guide](./docs/WORKER_MODE.md)** - Multi-threading and performance optimization
 - **[WASM Integration](./core-rs/README.md)** - Rust/WASM architecture details
 
