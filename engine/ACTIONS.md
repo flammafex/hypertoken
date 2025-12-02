@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 68 built-in actions in the HyperToken engine.
+Complete documentation for all 67 built-in actions in the HyperToken engine.
 
 ---
 
