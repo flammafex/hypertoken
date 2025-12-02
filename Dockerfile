@@ -15,27 +15,19 @@ RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 # Set working directory
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY package*.json ./
-COPY packages/quickstart/package*.json ./packages/quickstart/
-
-# Install Node dependencies (skip scripts because tsconfig.json not yet copied)
-RUN npm install --ignore-scripts
-
-# Copy all source code (including root tsconfig.json needed by packages)
+# Copy all source code first (so npm install can run build scripts successfully)
 COPY . .
+
+# Install Node dependencies (build scripts will run but now all config files are present)
+RUN npm install
 
 # Build Rust/WASM core
 WORKDIR /app/core-rs
 RUN chmod +x build.sh && ./build.sh
 
-# Compile TypeScript (root and all packages)
+# Compile TypeScript (root project)
 WORKDIR /app
 RUN npx tsc
-
-# Build quickstart package (now that tsconfig.json is available)
-WORKDIR /app/packages/quickstart
-RUN npm run build
 
 # Stage 2: Runtime environment (smaller image)
 FROM node:20-bookworm-slim
