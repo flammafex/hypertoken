@@ -162,9 +162,6 @@ docker compose up relay
 
 # Or run the interactive quickstart
 docker compose run --rm quickstart
-
-# Run example applications
-docker compose --profile examples up
 ```
 
 For detailed Docker documentation, see **[DOCKER.md](./DOCKER.md)**.
