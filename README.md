@@ -63,7 +63,7 @@ HyperToken treats the **entire game state as a CRDT** (Conflict-Free Replicated 
 
 ## ✨ Core Features
 
-### **Complete Action System** (68 Actions)
+### **Complete Action System** (67 Actions)
 Every action you need for discrete simulations, fully implemented and tested:
 
 ```javascript
