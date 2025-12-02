@@ -45,8 +45,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY packages/quickstart/package*.json ./packages/quickstart/
 
-# Install production dependencies only
-RUN npm install --omit=dev
+# Install production dependencies only (skip build scripts since we copy built artifacts)
+RUN npm install --omit=dev --ignore-scripts
 
 # Copy compiled outputs from builder
 COPY --from=builder /app/dist ./dist
