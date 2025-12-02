@@ -253,6 +253,35 @@ export class HybridPeerManager extends Emitter {
 
       console.log(`[Hybrid] Received WebRTC offer from ${fromPeerId}`);
 
+      // Check for offer collision (both peers sent offers simultaneously)
+      const existingConn = this.rtcConnections.get(fromPeerId);
+      const myPeerId = this.wsConnection.peerId;
+
+      if (existingConn && existingConn.getSignalingState() === 'have-local-offer') {
+        // Offer collision detected! Use tiebreaker
+        console.log(`[Hybrid] Offer collision detected with ${fromPeerId}, resolving...`);
+
+        if (!myPeerId) {
+          console.warn(`[Hybrid] Cannot resolve collision - no local peer ID yet`);
+          return;
+        }
+
+        // Tiebreaker: Lower peer ID wins (keeps their offer)
+        const iAmPolite = myPeerId > fromPeerId;
+
+        if (iAmPolite) {
+          // I lose - rollback my offer and handle theirs
+          console.log(`[Hybrid] I am the polite peer, rolling back my offer to ${fromPeerId}`);
+          existingConn.close();
+          this.rtcConnections.delete(fromPeerId);
+          this.initiatedRTC.delete(fromPeerId);
+        } else {
+          // I win - ignore their offer and continue with mine
+          console.log(`[Hybrid] I am the impolite peer, ignoring offer from ${fromPeerId}`);
+          return;
+        }
+      }
+
       // Create WebRTC connection if it doesn't exist
       let rtcConn = this.rtcConnections.get(fromPeerId);
       if (!rtcConn) {

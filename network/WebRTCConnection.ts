@@ -121,6 +121,13 @@ export class WebRTCConnection extends Emitter {
   }
 
   /**
+   * Get current signaling state (for offer/answer state)
+   */
+  getSignalingState(): RTCSignalingState {
+    return this.peerConnection.signalingState;
+  }
+
+  /**
    * Create an offer to initiate connection (caller side)
    */
   async createOffer(): Promise<RTCSessionDescriptionInit> {
