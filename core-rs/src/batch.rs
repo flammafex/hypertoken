@@ -184,6 +184,66 @@ impl BatchOps {
         serde_json::to_string(&filtered)
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
     }
+    
+    /// Parallel find operation
+    ///
+    /// Returns the first token matching the predicate.
+    #[wasm_bindgen(js_name = parallelFind)]
+    pub fn parallel_find(&self, tokens_json: &str, predicate: &str) -> Result<String> {
+        let tokens: Vec<Token> = serde_json::from_str(tokens_json)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+
+        // Note: For 'find', sequential iteration is often faster due to short-circuiting
+        let found = match predicate {
+            "reversed" => tokens.iter().find(|t| t.rev.unwrap_or(false)),
+            "normal" => tokens.iter().find(|t| !t.rev.unwrap_or(false)),
+            "merged" => tokens.iter().find(|t| t.merged.unwrap_or(false)),
+            "split" => tokens.iter().find(|t| t.split.unwrap_or(false)),
+            // Add basic kind/group checks that might be useful
+            p if p.starts_with("kind:") => {
+                let k = &p[5..];
+                tokens.iter().find(|t| t.kind == k)
+            },
+            p if p.starts_with("group:") => {
+                let g = &p[6..];
+                tokens.iter().find(|t| t.group.as_deref() == Some(g))
+            },
+            _ => None // Return None for unknown predicates to be safe, or Error
+        };
+
+        match found {
+            Some(t) => serde_json::to_string(t)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string())),
+            None => Ok("null".to_string())
+        }
+    }
+
+    /// Parallel count operation
+    ///
+    /// Returns the number of tokens matching the predicate.
+    #[wasm_bindgen(js_name = parallelCount)]
+    pub fn parallel_count(&self, tokens_json: &str, predicate: &str) -> Result<usize> {
+        let tokens: Vec<Token> = serde_json::from_str(tokens_json)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+
+        let count = match predicate {
+            "reversed" => tokens.iter().filter(|t| t.rev.unwrap_or(false)).count(),
+            "normal" => tokens.iter().filter(|t| !t.rev.unwrap_or(false)).count(),
+            "merged" => tokens.iter().filter(|t| t.merged.unwrap_or(false)).count(),
+            "split" => tokens.iter().filter(|t| t.split.unwrap_or(false)).count(),
+            p if p.starts_with("kind:") => {
+                let k = &p[5..];
+                tokens.iter().filter(|t| t.kind == k).count()
+            },
+            p if p.starts_with("group:") => {
+                let g = &p[6..];
+                tokens.iter().filter(|t| t.group.as_deref() == Some(g)).count()
+            },
+            _ => 0
+        };
+
+        Ok(count)
+    }
 }
 
 #[cfg(test)]

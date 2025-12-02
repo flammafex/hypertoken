@@ -19,6 +19,11 @@ pub fn now() -> i64 {
     }
 }
 
+/// Generate a unique ID (UUID v4)
+pub fn generate_id() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
 /// Create a deterministic RNG from a seed string
 pub fn seeded_rng(seed: &str) -> ChaCha8Rng {
     use std::collections::hash_map::DefaultHasher;

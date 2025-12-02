@@ -155,6 +155,27 @@ impl Source {
 
         Ok(())
     }
+    
+    /// Inspect source state (summary for debugging/UI)
+    #[wasm_bindgen(js_name = inspect)]
+    pub fn inspect(&self) -> Result<String> {
+        let summary = serde_json::json!({
+            "size": self.size(),
+            "burned": self.burned_count(),
+            "stackIds": self.state.stackIds,
+            "seed": self.state.seed,
+            "reshufflePolicy": self.state.reshufflePolicy
+        });
+        serde_json::to_string(&summary)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+    }
+
+    /// Restore burned cards to the main tokens list (soft reset)
+    #[wasm_bindgen(js_name = restoreBurned)]
+    pub fn restore_burned(&mut self) -> Result<()> {
+        self.state.tokens.extend(self.state.burned.drain(..));
+        Ok(())
+    }
 
     /// Draw N tokens from the source
     ///

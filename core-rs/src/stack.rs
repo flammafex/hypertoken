@@ -128,6 +128,15 @@ impl Stack {
         serde_json::to_string(&drawn)
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
     }
+    
+    /// Add a specific token to the discard pile (used by agents discarding)
+    #[wasm_bindgen(js_name = addToDiscard)]
+    pub fn add_to_discard(&mut self, token_json: &str) -> Result<()> {
+        let token: Token = serde_json::from_str(token_json)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+        self.state.discards.push(token);
+        Ok(())
+    }
 
     /// Shuffle the stack
     ///
@@ -249,6 +258,13 @@ impl Stack {
         }
 
         self.state.stack[start..end].reverse();
+        Ok(())
+    }
+    
+    /// Reverse the order of the stack
+    #[wasm_bindgen(js_name = reverse)]
+    pub fn reverse(&mut self) -> Result<()> {
+        self.state.stack.reverse();
         Ok(())
     }
 

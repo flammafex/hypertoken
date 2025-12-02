@@ -393,29 +393,35 @@ export class Engine extends Emitter {
 
   // Actions implemented in WASM ActionDispatcher
   private static readonly WASM_ACTIONS = new Set([
-    // Stack actions (9)
+    // Stack actions (10)
     "stack:draw", "stack:peek", "stack:shuffle", "stack:burn", "stack:reset",
     "stack:cut", "stack:insertAt", "stack:removeAt", "stack:swap",
-    // Space actions (9)
+    "stack:reverse",
+    // Space actions (14)
     "space:place", "space:remove", "space:move", "space:flip",
     "space:createZone", "space:deleteZone", "space:clearZone",
     "space:lockZone", "space:shuffleZone",
-    // Source actions (3)
+    "space:fanZone", "space:spreadZone", "space:stackZone", 
+    "space:transferZone", "space:clear",
+    // Source actions (7)
     "source:draw", "source:shuffle", "source:burn",
-    // Agent actions (13)
+    "source:addStack", "source:removeStack", "source:reset", "source:inspect"
+    // Agent actions (16)
     "agent:create", "agent:remove", "agent:setActive",
     "agent:giveResource", "agent:takeResource",
     "agent:addToken", "agent:removeToken", "agent:get",
     "agent:transferResource", "agent:transferToken",
     "agent:stealResource", "agent:stealToken", "agent:getAll",
+    "agent:trade", "agent:drawCards", "agent:discardCards",
     // Token operations (5)
     "token:transform", "token:attach", "token:detach",
     "token:merge", "token:split",
     // GameState actions (7)
     "game:start", "game:end", "game:pause", "game:resume",
     "game:nextPhase", "game:setProperty", "game:getState",
-    // Batch operations (4)
+    // Batch operations (8)
     "tokens:shuffle", "tokens:draw", "tokens:filter", "tokens:map",
+    "tokens:find", "tokens:count", "tokens:collect", "tokens:forEach",
     // Debug
     "debug:log"
   ]);

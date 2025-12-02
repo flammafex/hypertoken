@@ -330,6 +330,156 @@ impl Space {
         shuffle_vec(&mut zone.placements, seed.as_deref());
         Ok(())
     }
+    
+    /// Transfer all tokens from one zone to another
+    #[wasm_bindgen(js_name = transferZone)]
+    pub fn transfer_zone(&mut self, from_zone: &str, to_zone: &str) -> Result<usize> {
+        // We need to move items, so we can't borrow self immutably and mutably at same time.
+        // Strategy: remove from source, then append to dest.
+        
+        if !self.state.zones.contains_key(from_zone) {
+            return Err(HyperTokenError::ZoneNotFound(from_zone.to_string()));
+        }
+        
+        // Ensure destination exists
+        if !self.state.zones.contains_key(to_zone) {
+            self.create_zone(to_zone.to_string())?;
+        }
+
+        // Check locks
+        if self.is_zone_locked(from_zone) {
+            return Err(HyperTokenError::ZoneLocked(from_zone.to_string()));
+        }
+        if self.is_zone_locked(to_zone) {
+            return Err(HyperTokenError::ZoneLocked(to_zone.to_string()));
+        }
+
+        // Extract items
+        let mut tokens_to_move = {
+            let from = self.state.zones.get_mut(from_zone).unwrap();
+            std::mem::take(&mut from.placements)
+        };
+        
+        let count = tokens_to_move.len();
+
+        // Append to destination
+        let to = self.state.zones.get_mut(to_zone).unwrap();
+        to.placements.append(&mut tokens_to_move);
+
+        Ok(count)
+    }
+
+    /// Clear all tokens from ALL zones (Global clear)
+    #[wasm_bindgen(js_name = clear)]
+    pub fn clear(&mut self) -> Result<()> {
+        for (name, zone) in self.state.zones.iter_mut() {
+            if zone.lock.locked {
+                // If any zone is locked, operation fails? Or skip?
+                // Legacy behavior usually implies admin override or fail.
+                // For safety, we fail if any zone is locked.
+                return Err(HyperTokenError::ZoneLocked(name.to_string()));
+            }
+        }
+
+        for zone in self.state.zones.values_mut() {
+            zone.placements.clear();
+        }
+        Ok(())
+    }
+
+    /// Arrange tokens in a fan (arc) layout
+    #[wasm_bindgen(js_name = fan)]
+    pub fn fan(
+        &mut self, 
+        zone_name: &str, 
+        x: f64, 
+        y: f64, 
+        radius: f64, 
+        angle_start: f64, 
+        angle_step: f64
+    ) -> Result<()> {
+        let zone = self.state.zones.get_mut(zone_name)
+            .ok_or_else(|| HyperTokenError::ZoneNotFound(zone_name.to_string()))?;
+
+        if zone.lock.locked {
+            return Err(HyperTokenError::ZoneLocked(zone_name.to_string()));
+        }
+
+        let count = zone.placements.len();
+        if count == 0 { return Ok(()); }
+
+        // Convert degrees to radians
+        let to_rad = std::f64::consts::PI / 180.0;
+        
+        for (i, placement) in zone.placements.iter_mut().enumerate() {
+            let angle_deg = angle_start + (i as f64 * angle_step);
+            let angle_rad = angle_deg * to_rad;
+            
+            // Calculate new position relative to center (x, y)
+            placement.x = Some(x + (radius * angle_rad.cos()));
+            placement.y = Some(y + (radius * angle_rad.sin()));
+            
+            // Optional: Rotate the card to match the arc? 
+            // Legacy implementation usually just sets X/Y.
+        }
+
+        Ok(())
+    }
+
+    /// Arrange tokens in a stack (pile) layout
+    #[wasm_bindgen(js_name = stackLayout)]
+    pub fn stack_layout(
+        &mut self, 
+        zone_name: &str, 
+        x: f64, 
+        y: f64, 
+        offset_x: f64, 
+        offset_y: f64
+    ) -> Result<()> {
+        let zone = self.state.zones.get_mut(zone_name)
+            .ok_or_else(|| HyperTokenError::ZoneNotFound(zone_name.to_string()))?;
+
+        if zone.lock.locked {
+            return Err(HyperTokenError::ZoneLocked(zone_name.to_string()));
+        }
+
+        for (i, placement) in zone.placements.iter_mut().enumerate() {
+            placement.x = Some(x + (i as f64 * offset_x));
+            placement.y = Some(y + (i as f64 * offset_y));
+        }
+
+        Ok(())
+    }
+
+    /// Arrange tokens in a linear spread
+    #[wasm_bindgen(js_name = spread)]
+    pub fn spread(
+        &mut self,
+        zone_name: &str,
+        x: f64,
+        y: f64,
+        spacing: f64,
+        horizontal: bool
+    ) -> Result<()> {
+        let zone = self.state.zones.get_mut(zone_name)
+            .ok_or_else(|| HyperTokenError::ZoneNotFound(zone_name.to_string()))?;
+
+        if zone.lock.locked {
+            return Err(HyperTokenError::ZoneLocked(zone_name.to_string()));
+        }
+
+        for (i, placement) in zone.placements.iter_mut().enumerate() {
+            if horizontal {
+                placement.x = Some(x + (i as f64 * spacing));
+                placement.y = Some(y);
+            } else {
+                placement.x = Some(x);
+                placement.y = Some(y + (i as f64 * spacing));
+            }
+        }
+
+        Ok(())
+    }
 
     /// Get list of all zone names
     #[wasm_bindgen(js_name = getZoneNames)]

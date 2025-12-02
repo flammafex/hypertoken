@@ -20,6 +20,17 @@ pub struct AgentState {
     pub meta: serde_json::Value,
 }
 
+#[derive(Debug, Deserialize)]
+struct TradeOffer {
+    #[serde(default)]
+    resource: Option<String>,
+    #[serde(default)]
+    amount: Option<i64>,
+    #[serde(default)]
+    token: Option<String>, // Token ID
+}
+
+
 /// Agent manager for WASM
 #[wasm_bindgen]
 pub struct AgentManager {
@@ -318,6 +329,76 @@ impl AgentManager {
         let agents: Vec<&AgentState> = self.agents.values().collect();
         serde_json::to_string(&agents)
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+    }
+    
+    #[wasm_bindgen(js_name = trade)]
+    pub fn trade(
+        &mut self,
+        agent1_name: &str,
+        offer1_json: &str,
+        agent2_name: &str,
+        offer2_json: &str,
+    ) -> Result<String> {
+        let offer1: TradeOffer = serde_json::from_str(offer1_json)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+        let offer2: TradeOffer = serde_json::from_str(offer2_json)
+            .map_err(|e| HyperTokenError::SerializationError(e.to_string()))?;
+
+        // 1. Validation Phase
+        {
+            let a1 = self.agents.get(agent1_name)
+                .ok_or_else(|| HyperTokenError::InvalidOperation(format!("Agent {} not found", agent1_name)))?;
+            
+            if let Some(res) = &offer1.resource {
+                let amt = offer1.amount.unwrap_or(1);
+                let has = a1.resources.get(res).unwrap_or(&0);
+                if *has < amt {
+                    return Err(HyperTokenError::InvalidOperation(format!("Agent {} insufficient {}: have {}, need {}", agent1_name, res, has, amt)));
+                }
+            } else if let Some(tid) = &offer1.token {
+                if !a1.inventory.iter().any(|t| t.id == *tid) {
+                    return Err(HyperTokenError::InvalidOperation(format!("Agent {} does not have token {}", agent1_name, tid)));
+                }
+            }
+
+            let a2 = self.agents.get(agent2_name)
+                .ok_or_else(|| HyperTokenError::InvalidOperation(format!("Agent {} not found", agent2_name)))?;
+
+            if let Some(res) = &offer2.resource {
+                let amt = offer2.amount.unwrap_or(1);
+                let has = a2.resources.get(res).unwrap_or(&0);
+                if *has < amt {
+                    return Err(HyperTokenError::InvalidOperation(format!("Agent {} insufficient {}: have {}, need {}", agent2_name, res, has, amt)));
+                }
+            } else if let Some(tid) = &offer2.token {
+                if !a2.inventory.iter().any(|t| t.id == *tid) {
+                    return Err(HyperTokenError::InvalidOperation(format!("Agent {} does not have token {}", agent2_name, tid)));
+                }
+            }
+        }
+
+        // 2. Execution Phase
+        // Move Offer 1: Agent 1 -> Agent 2
+        if let Some(res) = &offer1.resource {
+            let amt = offer1.amount.unwrap_or(1);
+            self.take_resource(agent1_name, res, amt)?;
+            self.give_resource(agent2_name, res, amt)?;
+        } else if let Some(tid) = &offer1.token {
+            let token_json = self.remove_token(agent1_name, tid)?;
+            self.add_token(agent2_name, &token_json)?;
+        }
+
+        // Move Offer 2: Agent 2 -> Agent 1
+        if let Some(res) = &offer2.resource {
+            let amt = offer2.amount.unwrap_or(1);
+            self.take_resource(agent2_name, res, amt)?;
+            self.give_resource(agent1_name, res, amt)?;
+        } else if let Some(tid) = &offer2.token {
+            let token_json = self.remove_token(agent2_name, tid)?;
+            self.add_token(agent1_name, &token_json)?;
+        }
+
+        Ok(serde_json::json!({ "success": true }).to_string())
     }
 }
 
