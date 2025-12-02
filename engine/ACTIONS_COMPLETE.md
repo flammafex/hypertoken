@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 58 built-in actions in the HyperToken engine.
+Complete documentation for all 68 built-in actions in the HyperToken engine.
 
 ---
 
@@ -11,13 +11,13 @@ Complete documentation for all 58 built-in actions in the HyperToken engine.
 | Category | Count | Actions |
 |----------|-------|---------|
 | **Stack** | 10 | shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse |
-| **Space** | 13 | place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone |
+| **Space** | 14 | place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone |
 | **Source** | 7 | draw, shuffle, burn, reset, addStack, removeStack, inspect |
-| **Agent** | 12 | create, remove, setActive, giveResource, takeResource, drawCards, discardCards, get, **transfer, trade, steal** |
-| **Game** | 6 | start, end, pause, resume, nextPhase, setProperty |
+| **Agent** | 16 | create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade |
+| **Game** | 7 | start, end, pause, resume, nextPhase, setProperty, getState |
 | **Token** | 5 | transform, attach, detach, merge, split |
-| **Batch** | 5 | filter, forEach, collect, count, find |
-| **Total** | **58** | **100% Complete** |
+| **Batch** | 8 | filter, map, forEach, collect, count, find, shuffle, draw |
+| **Total** | **67** | **100% Complete** |
 
 ---
 
@@ -844,6 +844,56 @@ engine.dispatch("agent:discardCards", {
 
 ---
 
+## `agent:addToken`
+
+Add a token directly to an agent's inventory (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+dispatcher.agentAddToken("Alice", JSON.stringify(swordToken));
+
+// Using legacy dispatch
+engine.dispatch("agent:addToken", {
+  name: "Alice",
+  token: swordToken
+});
+```
+
+**Parameters:**
+- `name` (string, required): Agent name
+- `token` (Token, required): Token to add to inventory
+
+**Returns:** void
+
+**Use cases:** Giving items, spawning equipment, rewarding agents
+
+---
+
+## `agent:removeToken`
+
+Remove a token from an agent's inventory by ID (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const tokenJson = dispatcher.agentRemoveToken("Alice", "sword-123");
+
+// Using legacy dispatch
+const token = engine.dispatch("agent:removeToken", {
+  name: "Alice",
+  tokenId: "sword-123"
+});
+```
+
+**Parameters:**
+- `name` (string, required): Agent name
+- `tokenId` (string, required): ID of token to remove
+
+**Returns:** Removed token (JSON)
+
+**Use cases:** Dropping items, consuming resources, removing equipment
+
+---
+
 ## `agent:get`
 
 Get agent state.
@@ -860,6 +910,149 @@ const agent = engine.dispatch("agent:get", {
 **Returns:** Agent object
 
 **Use cases:** Querying state, AI decision-making
+
+---
+
+## `agent:getAll`
+
+Get all agents in the game (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const allAgentsJson = dispatcher.agentGetAll();
+const agents = JSON.parse(allAgentsJson);
+
+// Using legacy dispatch
+const agents = engine.dispatch("agent:getAll");
+```
+
+**Parameters:** none
+
+**Returns:** Array of all agent objects (JSON)
+
+**Use cases:** Scoreboard display, game state inspection, turn order determination
+
+---
+
+## `agent:transferResource`
+
+Transfer resources between agents (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const resultJson = dispatcher.agentTransferResource("Alice", "Bob", "gold", 50);
+
+// Using legacy dispatch
+engine.dispatch("agent:transferResource", {
+  from: "Alice",
+  to: "Bob",
+  resource: "gold",
+  amount: 50
+});
+```
+
+**Parameters:**
+- `from` (string, required): Source agent
+- `to` (string, required): Target agent
+- `resource` (string, required): Resource type
+- `amount` (number, required): Amount to transfer
+
+**Returns:** Transfer result object (JSON)
+
+**Use cases:** Gifting resources, tribute, payment, lending
+
+**Events:** Emits `agent:transferResource`
+
+---
+
+## `agent:transferToken`
+
+Transfer a specific token between agents (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const resultJson = dispatcher.agentTransferToken("Alice", "Bob", "sword-123");
+
+// Using legacy dispatch
+engine.dispatch("agent:transferToken", {
+  from: "Alice",
+  to: "Bob",
+  tokenId: "sword-123"
+});
+```
+
+**Parameters:**
+- `from` (string, required): Source agent
+- `to` (string, required): Target agent
+- `tokenId` (string, required): ID of token to transfer
+
+**Returns:** Transfer result object (JSON)
+
+**Use cases:** Gifting items, trading equipment, passing tokens
+
+**Events:** Emits `agent:transferToken`
+
+---
+
+## `agent:stealResource`
+
+Forcibly take resources from another agent (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const resultJson = dispatcher.agentStealResource("Victim", "Thief", "gold", 50);
+
+// Using legacy dispatch
+engine.dispatch("agent:stealResource", {
+  from: "Victim",
+  to: "Thief",
+  resource: "gold",
+  amount: 50
+});
+```
+
+**Parameters:**
+- `from` (string, required): Victim agent
+- `to` (string, required): Thief agent
+- `resource` (string, required): Resource type
+- `amount` (number, required): Amount to steal
+
+**Returns:** Steal result object (JSON)
+
+**Use cases:** Theft mechanics, raiding, piracy, combat loot
+
+**Events:** Emits `agent:stealResource`
+
+**Notes:** Steals as much as possible (up to requested amount)
+
+---
+
+## `agent:stealToken`
+
+Forcibly take a specific token from another agent (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const resultJson = dispatcher.agentStealToken("Victim", "Thief", "sword-123");
+
+// Using legacy dispatch
+engine.dispatch("agent:stealToken", {
+  from: "Victim",
+  to: "Thief",
+  tokenId: "sword-123"
+});
+```
+
+**Parameters:**
+- `from` (string, required): Victim agent
+- `to` (string, required): Thief agent
+- `tokenId` (string, required): ID of token to steal
+
+**Returns:** Steal result object (JSON)
+
+**Use cases:** Pickpocketing, disarming, stealing equipment
+
+**Events:** Emits `agent:stealToken`
 
 ---
 
@@ -1114,6 +1307,35 @@ engine.dispatch("game:setProperty", {
 **Returns:** void
 
 **Use cases:** Custom game state, tracking variables
+
+---
+
+## `game:getState`
+
+Get the current game state (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const stateJson = dispatcher.gameGetState();
+const state = JSON.parse(stateJson);
+
+// Using legacy dispatch
+const state = engine.dispatch("game:getState");
+```
+
+**Parameters:** none
+
+**Returns:** Complete game state object (JSON) including:
+- `started` (boolean): Whether game has started
+- `ended` (boolean): Whether game has ended
+- `paused` (boolean): Whether game is paused
+- `phase` (string): Current game phase
+- `turn` (number): Current turn number
+- `winner` (string, optional): Winner name if game ended
+- `startTime` (timestamp): When game started
+- Custom properties set via `game:setProperty`
+
+**Use cases:** State inspection, UI updates, saving game state, debugging
 
 ---
 
@@ -1506,6 +1728,96 @@ const legendary = engine.dispatch("tokens:find", {
 
 ---
 
+## `tokens:map` / `batch:map`
+
+Map tokens with a predefined operation (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const flippedJson = dispatcher.batchMap(JSON.stringify(tokens), "flip");
+const flipped = JSON.parse(flippedJson);
+
+// Using legacy dispatch
+const modified = engine.dispatch("tokens:map", {
+  tokens: allCards,
+  operation: "flip"
+});
+```
+
+**Supported operations:**
+- `"flip"`: Toggle reversal state on all tokens
+- `"merge"`: Mark all tokens as merged
+- `"unmerge"`: Mark all tokens as unmerged
+
+**Parameters:**
+- `tokens` (Array<Token>, required): Tokens to map
+- `operation` (string, required): Predefined operation name
+
+**Returns:** Array of modified tokens
+
+**Use cases:** Batch state changes, flipping cards, marking tokens
+
+**Events:** Emits `tokens:mapped`
+
+---
+
+## `batch:shuffle`
+
+Shuffle multiple decks in parallel (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const decks = [[token1, token2], [token3, token4]];
+const shuffledJson = dispatcher.batchShuffle(JSON.stringify(decks), "seed");
+const shuffled = JSON.parse(shuffledJson);
+
+// Returns: [[shuffled deck 1], [shuffled deck 2]]
+```
+
+**Parameters:**
+- `decks` (Array<Array<Token>>, required): Array of token arrays to shuffle
+- `seedPrefix` (string, optional): Seed prefix for deterministic shuffling
+
+**Returns:** Array of shuffled decks
+
+**Use cases:** Shuffling multiple player decks simultaneously, parallel deck operations, casino games with multiple shoes
+
+**Performance:** Uses parallel processing for optimal throughput
+
+---
+
+## `batch:draw`
+
+Draw from multiple decks in parallel (typed, zero-overhead).
+
+```javascript
+// Using typed method (recommended)
+const decks = [[token1, token2, token3], [token4, token5, token6]];
+const counts = [2, 1]; // Draw 2 from deck 1, 1 from deck 2
+
+const resultJson = dispatcher.batchDraw(JSON.stringify(decks), JSON.stringify(counts));
+const result = JSON.parse(resultJson);
+
+// result: {
+//   drawn: [[card1, card2], [card4]],
+//   decks: [[card3], [card5, card6]]
+// }
+```
+
+**Parameters:**
+- `decks` (Array<Array<Token>>, required): Array of token arrays
+- `counts` (Array<number>, required): Number of cards to draw from each deck
+
+**Returns:** Object with:
+- `drawn` (Array<Array<Token>>): Drawn cards from each deck
+- `decks` (Array<Array<Token>>): Remaining cards in each deck
+
+**Use cases:** Multi-player simultaneous card draw, dealing from multiple sources, parallel operations
+
+**Performance:** Uses parallel processing for optimal throughput
+
+---
+
 ## Action Index
 
 **Stack (10)**
@@ -1545,26 +1857,32 @@ const legendary = engine.dispatch("tokens:find", {
 - source:removeStack
 - source:inspect
 
-**Agent (12)**
+**Agent (16)**
 - agent:create
 - agent:remove
 - agent:setActive
 - agent:giveResource
 - agent:takeResource
+- agent:addToken
+- agent:removeToken
 - agent:drawCards
 - agent:discardCards
 - agent:get
-- agent:transfer
+- agent:getAll
+- agent:transferResource
+- agent:transferToken
+- agent:stealResource
+- agent:stealToken
 - agent:trade
-- agent:steal
 
-**Game (6)**
+**Game (7)**
 - game:start
 - game:end
 - game:pause
 - game:resume
 - game:nextPhase
 - game:setProperty
+- game:getState
 
 **Token (5)**
 - token:transform
@@ -1573,12 +1891,15 @@ const legendary = engine.dispatch("tokens:find", {
 - token:merge
 - token:split
 
-**Batch (5)**
+**Batch (8)**
 - tokens:filter
+- tokens:map
 - tokens:forEach
 - tokens:collect
 - tokens:count
 - tokens:find
+- batch:shuffle
+- batch:draw
 
 ---
 
@@ -1593,4 +1914,6 @@ const legendary = engine.dispatch("tokens:find", {
 
 ---
 
-**Total: 58 actions - 100% complete**
+**Total: 67 actions - 100% complete and documented**
+
+**Note:** An additional debug action (`debug:log`) exists in the legacy JSON dispatch system, bringing the total to 68 actions. The 67 actions listed here are all available as zero-overhead typed methods in the Rust/WASM core.
