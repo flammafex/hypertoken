@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 58 built-in actions in the HyperToken engine.
+Complete documentation for all 68 built-in actions in the HyperToken engine.
 
 ---
 
@@ -11,13 +11,13 @@ Complete documentation for all 58 built-in actions in the HyperToken engine.
 | Category | Count | Documentation |
 |----------|-------|---------------|
 | **Stack** | 10 | [Stack Actions](./actions/stack.md) |
-| **Space** | 13 | [Space Actions](./actions/TABLE.md) |
+| **Space** | 14 | [Space Actions](./actions/TABLE.md) |
 | **Source** | 7 | [Source Actions](./actions/SHOE.md) |
-| **Agent** | 12 | [Agent Actions](./actions/PLAYER.md) |
-| **Game** | 6 | [Game Actions](./actions/GAME.md) |
+| **Agent** | 16 | [Agent Actions](./actions/PLAYER.md) |
+| **Game** | 7 | [Game Actions](./actions/GAME.md) |
 | **Token** | 5 | [Token Actions](./actions/TOKEN.md) |
-| **Batch** | 5 | [Batch Actions](./actions/BATCH.md) |
-| **Total** | **58** | **100% Complete** |
+| **Batch** | 8 | [Batch Actions](./actions/BATCH.md) |
+| **Total** | **67** | **100% Complete** |
 
 ---
 
@@ -32,7 +32,7 @@ Operations on the primary card stack.
 
 ---
 
-### 🎯 [Space Actions](./actions/TABLE.md) (13)
+### 🎯 [Space Actions](./actions/TABLE.md) (14)
 Operations on the game space and zones.
 
 **Actions:** place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone
@@ -50,19 +50,19 @@ Operations on multi-stack containers.
 
 ---
 
-### 👥 [Agent Actions](./actions/PLAYER.md) (12)
+### 👥 [Agent Actions](./actions/PLAYER.md) (16)
 Agent management and agent-to-agent interactions.
 
-**Actions:** create, remove, setActive, giveResource, takeResource, drawCards, discardCards, get, transfer, trade, steal
+**Actions:** create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade
 
 **Use cases:** Game setup, resource management, trading economies, theft mechanics, agent state
 
 ---
 
-### 🎮 [Game Actions](./actions/GAME.md) (6)
+### 🎮 [Game Actions](./actions/GAME.md) (7)
 High-level game state management and lifecycle.
 
-**Actions:** start, end, pause, resume, nextPhase, setProperty
+**Actions:** start, end, pause, resume, nextPhase, setProperty, getState
 
 **Use cases:** Game flow control, phase transitions, win conditions, custom state tracking
 
@@ -77,12 +77,12 @@ Token transformation and relationship management.
 
 ---
 
-### 📊 [Batch Actions](./actions/BATCH.md) (5)
+### 📊 [Batch Actions](./actions/BATCH.md) (8)
 Collection operations and queries.
 
-**Actions:** filter, forEach, collect, count, find
+**Actions:** filter, map, forEach, collect, count, find, shuffle, draw
 
-**Use cases:** Finding cards, batch modifications, counting resources, state queries
+**Use cases:** Finding cards, batch modifications, counting resources, state queries, parallel operations
 
 ---
 
@@ -308,4 +308,6 @@ Each category file includes:
 
 ---
 
-**Total: 58 actions - 100% complete and documented**
+**Total: 67 actions - 100% complete and documented**
+
+**Note:** An additional debug action (`debug:log`) exists in the legacy JSON dispatch system, bringing the total to 68 actions. The 67 actions listed here are all available as zero-overhead typed methods (e.g., `stackDraw()`, `agentCreate()`).

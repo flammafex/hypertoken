@@ -63,7 +63,7 @@ HyperToken treats the **entire game state as a CRDT** (Conflict-Free Replicated 
 
 ## ✨ Core Features
 
-### **Complete Action System** (58 Actions)
+### **Complete Action System** (68 Actions)
 Every action you need for discrete simulations, fully implemented and tested:
 
 ```javascript
@@ -160,7 +160,7 @@ HyperToken's performance-critical operations run in **Rust compiled to WebAssemb
 - **📦 Zero dependencies** - Pure Rust with wasm-bindgen
 - **🌐 Universal** - Runs in Node.js and browsers
 - **🔒 Type-safe** - Full TypeScript integration
-- **✅ 100% migration complete** - 50/50 actions ported to Rust with zero-overhead dispatch
+- **✅ 100% migration complete** - 67/67 actions ported to Rust with zero-overhead dispatch
 
 ### **Worker Mode (Node.js)**
 For compute-intensive operations, enable multi-threaded execution:
@@ -281,7 +281,7 @@ This applies equally to cards in blackjack, shares in a market, or NPCs in a wor
 ## 📖 Documentation
 
 ### Core Documentation
-- **[Complete Action Reference](./engine/ACTIONS.md)** - All 58 actions documented
+- **[Complete Action Reference](./engine/ACTIONS.md)** - All 68 actions documented
 - **[Worker Mode Guide](./docs/WORKER_MODE.md)** - Multi-threading and performance optimization
 - **[WASM Integration](./core-rs/README.md)** - Rust/WASM architecture details
 

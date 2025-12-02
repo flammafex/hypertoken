@@ -262,15 +262,15 @@ core-rs/
 ├── src/
 │   ├── lib.rs          # Main entry point + re-exports
 │   ├── token.rs        # Token data structure
-│   ├── stack.rs        # Stack operations (9 actions)
-│   ├── space.rs        # Space operations (9 actions)
-│   ├── source.rs       # Source/deck management (3 actions)
-│   ├── agent.rs        # Agent management (13 actions)
+│   ├── stack.rs        # Stack operations (10 actions)
+│   ├── space.rs        # Space operations (14 actions)
+│   ├── source.rs       # Source/deck management (7 actions)
+│   ├── agent.rs        # Agent management (16 actions)
 │   ├── token_ops.rs    # Token transformations (5 actions)
 │   ├── gamestate.rs    # Game lifecycle (7 actions)
-│   ├── batch.rs        # Batch operations (4 actions)
+│   ├── batch.rs        # Batch operations (8 actions)
 │   ├── chronicle.rs    # CRDT wrapper (automerge-rs)
-│   ├── actions.rs      # Unified ActionDispatcher (50 actions)
+│   ├── actions.rs      # Unified ActionDispatcher (67 actions)
 │   ├── parallel.rs     # Parallel algorithms
 │   ├── types.rs        # Shared types and errors
 │   └── utils.rs        # Utility functions
@@ -333,23 +333,23 @@ When adding new features to the Rust core:
 |-----------|---------|--------|-------------|
 | **Core Modules** |
 | Token | - | ✅ Complete | N/A |
-| Stack | 9 | ✅ Complete | 13.3x faster |
-| Space | 9 | ✅ Complete | 10-100x faster |
-| Source | 3 | ✅ Complete | 10-100x faster |
+| Stack | 10 | ✅ Complete | 13.3x faster |
+| Space | 14 | ✅ Complete | 10-100x faster |
+| Source | 7 | ✅ Complete | 10-100x faster |
 | Chronicle | - | ✅ Complete | 7x faster |
 | **Action Modules** |
-| Agent | 13 | ✅ Complete | 10-100x faster |
+| Agent | 16 | ✅ Complete | 10-100x faster |
 | TokenOps | 5 | ✅ Complete | 10-100x faster |
 | GameState | 7 | ✅ Complete | 10-100x faster |
-| Batch | 4 | ✅ Complete | 10-100x faster |
+| Batch | 8 | ✅ Complete | 10-100x faster |
 | **Integration** |
-| ActionDispatcher | 50 | ✅ Complete | Zero overhead (typed methods) |
-| Engine.ts Wiring | 50 | ✅ Complete | -30% overhead (faster!) |
+| ActionDispatcher | 67 | ✅ Complete | Zero overhead (typed methods) |
+| Engine.ts Wiring | 67 | ✅ Complete | -30% overhead (faster!) |
 | Worker Mode (Node.js) | - | ✅ Complete | <0.2ms overhead |
 | **Future** |
 | Worker Mode (Browser) | - | 🚧 Coming soon | TBD |
 | RuleEngine | - | 🚧 Future | TBD |
-| **TOTAL** | **50/50** | **✅ 100% COMPLETE** | **10-100x faster**
+| **TOTAL** | **67/67** | **✅ 100% COMPLETE** | **10-100x faster**
 
 ---
 
@@ -361,7 +361,7 @@ Apache License 2.0 - See LICENSE file in root directory
 
 ## 🎯 Migration Complete! 🎉
 
-**✅ All 50 core actions ported to Rust/WASM**
+**✅ All 67 core actions ported to Rust/WASM**
 
 The Rust/WASM migration is **100% complete** with all performance-critical operations running 10-100x faster than the original TypeScript implementation.
 
