@@ -19,22 +19,23 @@ WORKDIR /app
 COPY package*.json ./
 COPY packages/quickstart/package*.json ./packages/quickstart/
 
-# Install Node dependencies
-RUN npm install
+# Install Node dependencies (skip scripts because tsconfig.json not yet copied)
+RUN npm install --ignore-scripts
 
-# Copy Rust source code
-COPY core-rs/ ./core-rs/
+# Copy all source code (including root tsconfig.json needed by packages)
+COPY . .
 
 # Build Rust/WASM core
 WORKDIR /app/core-rs
 RUN chmod +x build.sh && ./build.sh
 
-# Copy TypeScript source code
+# Compile TypeScript (root and all packages)
 WORKDIR /app
-COPY . .
-
-# Compile TypeScript
 RUN npx tsc
+
+# Build quickstart package (now that tsconfig.json is available)
+WORKDIR /app/packages/quickstart
+RUN npm run build
 
 # Stage 2: Runtime environment (smaller image)
 FROM node:20-bookworm-slim
