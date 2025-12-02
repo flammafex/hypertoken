@@ -405,7 +405,7 @@ export class Engine extends Emitter {
     "space:transferZone", "space:clear",
     // Source actions (7)
     "source:draw", "source:shuffle", "source:burn",
-    "source:addStack", "source:removeStack", "source:reset", "source:inspect"
+    "source:addStack", "source:removeStack", "source:reset", "source:inspect",
     // Agent actions (16)
     "agent:create", "agent:remove", "agent:setActive",
     "agent:giveResource", "agent:takeResource",
