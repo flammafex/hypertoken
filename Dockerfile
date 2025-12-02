@@ -41,17 +41,16 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files for reference
 COPY package*.json ./
-COPY packages/quickstart/package*.json ./packages/quickstart/
 
-# Install production dependencies only (skip build scripts since we copy built artifacts)
-RUN npm install --omit=dev --ignore-scripts
+# Copy node_modules from builder (more efficient than reinstalling)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
 
 # Copy compiled outputs from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/core-rs/pkg ./core-rs/pkg
-COPY --from=builder /app/packages/quickstart/dist ./packages/quickstart/dist
 
 # Copy necessary runtime files
 COPY start-relay.js ./
