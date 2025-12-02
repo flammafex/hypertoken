@@ -563,10 +563,11 @@ mod tests {
         let token = create_test_token("t1", 0);
         let token_json = serde_json::to_string(&token).unwrap();
 
-        space.place("zone1", &token_json, None, None).unwrap();
+        let placement_json = space.place("zone1", &token_json, None, None).unwrap();
+        let placement: IPlacementCRDT = serde_json::from_str(&placement_json).unwrap();
         assert_eq!(space.count("zone1").unwrap(), 1);
 
-        space.remove("zone1", "t1").unwrap();
+        space.remove("zone1", &placement.id).unwrap();
         assert_eq!(space.count("zone1").unwrap(), 0);
     }
 
@@ -576,8 +577,9 @@ mod tests {
         let token = create_test_token("t1", 0);
         let token_json = serde_json::to_string(&token).unwrap();
 
-        space.place("zone1", &token_json, None, None).unwrap();
-        space.move_token("t1", "zone1", "zone2", Some(5.0), Some(5.0)).unwrap();
+        let placement_json = space.place("zone1", &token_json, None, None).unwrap();
+        let placement: IPlacementCRDT = serde_json::from_str(&placement_json).unwrap();
+        space.move_token(&placement.id, "zone1", "zone2", Some(5.0), Some(5.0)).unwrap();
 
         assert_eq!(space.count("zone1").unwrap(), 0);
         assert_eq!(space.count("zone2").unwrap(), 1);

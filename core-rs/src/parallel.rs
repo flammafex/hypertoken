@@ -23,7 +23,7 @@ use crate::utils::seeded_rng;
 ///
 /// In WASM: Uses optimized sequential processing
 /// In native: Could use Rayon for true parallelism
-pub fn batch_shuffle<T: Clone>(
+pub fn batch_shuffle<T: Clone + Send>(
     decks: &mut [Vec<T>],
     seed_prefix: Option<&str>,
 ) {
@@ -101,8 +101,8 @@ pub fn batch_draw<T: Clone>(
 #[inline]
 pub fn parallel_map<T, F, U>(items: &[T], f: F) -> Vec<U>
 where
-    T: Sync,
-    F: Fn(&T) -> U + Sync,
+    T: Sync + Send,
+    F: Fn(&T) -> U + Sync + Send,
     U: Send,
 {
     #[cfg(not(target_arch = "wasm32"))]
@@ -125,8 +125,8 @@ where
 #[inline]
 pub fn parallel_filter<T, F>(items: &[T], predicate: F) -> Vec<T>
 where
-    T: Clone + Sync,
-    F: Fn(&T) -> bool + Sync,
+    T: Clone + Sync + Send,
+    F: Fn(&T) -> bool + Sync + Send,
 {
     #[cfg(not(target_arch = "wasm32"))]
     {
