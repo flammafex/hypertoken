@@ -437,7 +437,7 @@ await test('Game end policy with multiple conditions', () => {
   engine._gameState.turns = 10;
   gameEndPolicy.evaluate(engine);
 
-  assert(engine._gameState.ended, 'Game should end at max turns');
+  assert(engine._gameState.ended === true, 'Game should end at max turns');
 });
 
 await test('Resource management policy', () => {
@@ -449,7 +449,7 @@ await test('Resource management policy', () => {
 
   const taxPolicy = new Policy(
     'tax-collection',
-    (eng) => eng._gameState.turn % 5 === 0,
+    (eng) => (eng._gameState.turn ?? 0) % 5 === 0,
     (eng) => {
       eng._agents.forEach((agent: any) => {
         const tax = Math.floor((agent.resources.gold || 0) * 0.1);

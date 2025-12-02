@@ -768,7 +768,7 @@ export class SpaceWasm extends Emitter {
     return tokens;
   }
 
-  collectAllInto(stack: Stack, { includeEmpty = false } = {}): number {
+  collectAllInto(stack: Stack | any, { includeEmpty = false } = {}): number {
     let total = 0;
     const tokensToReturn: IToken[] = [];
     const zonesToClear: string[] = [];

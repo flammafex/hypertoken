@@ -124,7 +124,7 @@ await test('Script executes all steps', async () => {
 
   await script.run(engine);
 
-  assert(engine._gameState.started, 'Game should be started');
+  assert(engine._gameState.started === true, 'Game should be started');
   assertEquals(engine._agents.length, 2, 'Should have 2 agents');
   assertEquals(engine._agents[0].name, 'Alice', 'First agent should be Alice');
 });
@@ -372,7 +372,7 @@ await test('Script executes complex game scenario', async () => {
 
   await script.run(engine);
 
-  assert(engine._gameState.started, 'Game should be started');
+  assert(engine._gameState.started === true, 'Game should be started');
   assertEquals(engine._agents.length, 2, 'Should have 2 agents');
   assertEquals(engine._agents[0].resources.gold, 100, 'Alice should have gold');
   assertEquals(engine._agents[1].resources.gold, 100, 'Bob should have gold');

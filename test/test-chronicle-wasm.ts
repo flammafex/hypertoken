@@ -218,7 +218,7 @@ async function testChronicleWasm() {
 
     const state = chronicle1.state;
 
-    if (state.stack && state.space && state.space.zones && state.space.zones['zone1']) {
+    if (state.stack && state.space && typeof state.space === 'object' && state.space !== null && 'zones' in state.space && (state.space as any).zones?.['zone1']) {
       console.log('  ✅ Merge successful (both states present)');
       passed++;
     } else {
@@ -288,7 +288,9 @@ async function testChronicleWasm() {
       char: '□',
       group: 'test',
       kind: 'default',
-      label: `Token ${i}`
+      label: `Token ${i}`,
+      text: '□',
+      meta: {}
     }));
 
     chronicle.change('populate', (doc) => {
