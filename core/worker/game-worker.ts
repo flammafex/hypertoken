@@ -100,7 +100,7 @@ if (parentPort) {
       }
 
       // Send result back
-      parentPort.postMessage({
+      parentPort!.postMessage({
         type: 'result',
         taskId: message.taskId,
         data: result,
@@ -108,7 +108,7 @@ if (parentPort) {
 
     } catch (error: any) {
       // Send error back
-      parentPort.postMessage({
+      parentPort!.postMessage({
         type: 'error',
         taskId: message.taskId,
         error: error.message,

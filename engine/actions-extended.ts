@@ -69,6 +69,7 @@ export const StackActions = {
   "stack:peek": (engine: Engine, { count = 1 }: StackPayload = {}) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     // Use StackWasm's peek() method for direct WASM access (no Chronicle sync)
+    // @ts-expect-error - peek() only exists on StackWasm, not base Stack class
     return engine.stack.peek(count!);
   },
   

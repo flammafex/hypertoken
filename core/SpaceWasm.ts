@@ -187,6 +187,10 @@ export class SpaceWasm extends Emitter {
     return this.session.state.zones ? Object.keys(this.session.state.zones) : [];
   }
 
+  hasZone(name: string): boolean {
+    return this.zones.includes(name);
+  }
+
   toJSON(): any {
     return {
       name: this.name,
@@ -624,19 +628,10 @@ export class SpaceWasm extends Emitter {
   stackZone(id: string): this {
     if (this._isLocked(id)) return this;
 
-    // Try WASM first
-    if (this._wasmSpace && isWasmAvailable()) {
-      try {
-        this._wasmSpace.stackZone(id);
-        this._syncToChronicle();
-        this.emit("zone:stacked", { payload: { id } });
-        return this;
-      } catch (error) {
-        console.error('WASM stackZone failed, falling back to TypeScript:', error);
-      }
-    }
+    // WASM method not implemented for this operation, using TypeScript
+    // (WASM has stackLayout with different signature)
 
-    // TypeScript fallback
+    // TypeScript implementation
     this.session.change(`stack zone ${id}`, (doc) => {
       if (!doc.zones) return;
       const arr = doc.zones[id];
@@ -651,19 +646,10 @@ export class SpaceWasm extends Emitter {
   spreadZone(id: string, { pattern = "linear", angleStep = 15, radius = 100 } = {}): this {
     if (this._isLocked(id)) return this;
 
-    // Try WASM first (for arc pattern)
-    if (this._wasmSpace && isWasmAvailable() && pattern === "arc") {
-      try {
-        this._wasmSpace.spreadZone(id, angleStep, radius);
-        this._syncToChronicle();
-        this.emit("zone:spread", { payload: { id, pattern } });
-        return this;
-      } catch (error) {
-        console.error('WASM spreadZone failed, falling back to TypeScript:', error);
-      }
-    }
+    // WASM methods (fan, spread) have different signatures, using TypeScript
+    // TODO: Map to WASM fan() or spread() methods with proper parameters
 
-    // TypeScript fallback (handles both linear and arc)
+    // TypeScript implementation (handles both linear and arc)
     this.session.change(`spread zone ${id}`, (doc) => {
       if (!doc.zones) return;
       const arr = doc.zones[id];
@@ -731,20 +717,10 @@ export class SpaceWasm extends Emitter {
   drawFromZone(name: string, n: number = 1): IPlacementCRDT[] {
     if (this._isLocked(name)) return [];
 
-    // Try WASM first
-    if (this._wasmSpace && isWasmAvailable()) {
-      try {
-        const drawnJson = this._wasmSpace.drawFromZone(name, n);
-        const drawn = JSON.parse(drawnJson);
-        this._syncToChronicle();
-        this.emit("drawFromZone", { zone: name, count: drawn.length });
-        return drawn;
-      } catch (error) {
-        console.error('WASM drawFromZone failed, falling back to TypeScript:', error);
-      }
-    }
+    // WASM doesn't have drawFromZone helper method, using TypeScript
+    // (could be implemented using WASM getTokens + remove if needed)
 
-    // TypeScript fallback
+    // TypeScript implementation
     let drawn: IPlacementCRDT[] = [];
     this.session.change(`draw ${n} from ${name}`, (doc) => {
       if (!doc.zones) return;
@@ -766,17 +742,8 @@ export class SpaceWasm extends Emitter {
     const arr = Array.isArray(cards) ? cards : [cards];
     if (arr.length === 0) return;
 
-    // Try WASM first
-    if (this._wasmSpace && isWasmAvailable()) {
-      try {
-        this._wasmSpace.pushToZone(name, JSON.stringify(arr));
-        this._syncToChronicle();
-        this.emit("pushToZone", { zone: name, count: arr.length });
-        return;
-      } catch (error) {
-        console.error('WASM pushToZone failed, falling back to TypeScript:', error);
-      }
-    }
+    // WASM doesn't have pushToZone helper method, using TypeScript
+    // (could be implemented using WASM place for each card if needed)
 
     // TypeScript fallback
     this.session.change(`push ${arr.length} to ${name}`, (doc) => {

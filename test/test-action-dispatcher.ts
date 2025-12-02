@@ -36,7 +36,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '□',
+      meta: {}
     }));
 
     const chronicle = new Chronicle();
@@ -72,7 +74,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '□',
+      meta: {}
     }));
 
     const chronicle = new Chronicle();
@@ -103,7 +107,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '□',
+      meta: {}
     }));
 
     const chronicle = new Chronicle();
@@ -136,7 +142,9 @@ async function testActionDispatcher() {
       char: '□',
       group: 'cards',
       kind: 'default',
-      label: `Card ${i}`
+      label: `Card ${i}`,
+      text: '□',
+      meta: {}
     }));
 
     // Test ActionDispatcher route
