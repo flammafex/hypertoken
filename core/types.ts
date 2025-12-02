@@ -72,15 +72,17 @@ export interface IStackState {
   discards: IToken[];
 }
 
+export interface ReshufflePolicy {
+  threshold: number | null;
+  mode: "auto" | "manual";
+}
+
 export interface ISourceState {
   stackIds: string[];
   tokens: IToken[];
   burned: IToken[];
   seed: number | null;
-  reshufflePolicy: {
-    threshold: number | null;
-    mode: "auto" | "manual";
-  };
+  reshufflePolicy: ReshufflePolicy;
 }
 
 export interface IGameLoopState {

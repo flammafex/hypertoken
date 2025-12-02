@@ -160,21 +160,21 @@ export class Engine extends Emitter {
 
       // Set WASM instances if available
       if (this.stack && 'wasmInstance' in this.stack) {
-        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        const wasmStack = (this.stack as unknown as StackWasm).wasmInstance;
         if (wasmStack) {
           this._wasmDispatcher.setStack(wasmStack);
         }
       }
 
       if (this.space && 'wasmInstance' in this.space) {
-        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        const wasmSpace = (this.space as unknown as SpaceWasm).wasmInstance;
         if (wasmSpace) {
           this._wasmDispatcher.setSpace(wasmSpace);
         }
       }
 
       if (this.source && 'wasmInstance' in this.source) {
-        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        const wasmSource = (this.source as unknown as SourceWasm).wasmInstance;
         if (wasmSource) {
           this._wasmDispatcher.setSource(wasmSource);
         }
@@ -202,21 +202,21 @@ export class Engine extends Emitter {
 
       // Set WASM instances if available
       if (this.stack && 'wasmInstance' in this.stack) {
-        const wasmStack = (this.stack as StackWasm).wasmInstance;
+        const wasmStack = (this.stack as unknown as StackWasm).wasmInstance;
         if (wasmStack) {
           this._wasmDispatcher.setStack(wasmStack);
         }
       }
 
       if (this.space && 'wasmInstance' in this.space) {
-        const wasmSpace = (this.space as SpaceWasm).wasmInstance;
+        const wasmSpace = (this.space as unknown as SpaceWasm).wasmInstance;
         if (wasmSpace) {
           this._wasmDispatcher.setSpace(wasmSpace);
         }
       }
 
       if (this.source && 'wasmInstance' in this.source) {
-        const wasmSource = (this.source as SourceWasm).wasmInstance;
+        const wasmSource = (this.source as unknown as SourceWasm).wasmInstance;
         if (wasmSource) {
           this._wasmDispatcher.setSource(wasmSource);
         }
