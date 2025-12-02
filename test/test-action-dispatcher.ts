@@ -164,7 +164,7 @@ async function testActionDispatcher() {
 
     const directStart = performance.now();
     for (let i = 0; i < 100; i++) {
-      stack2.shuffle(`seed-${i}`);
+      stack2.shuffle(i);
     }
     const directTime = performance.now() - directStart;
 

@@ -9,7 +9,7 @@
  * - Batch operations: 2-4x speedup
  */
 
-import { Chronicle } from '../core/ChronicleWasm.js';
+import { Chronicle } from '../core/Chronicle.js';
 import { StackWasm } from '../core/StackWasm.js';
 import { SpaceWasm } from '../core/SpaceWasm.js';
 import { ParallelOps } from '../core/ParallelOps.js';
@@ -169,7 +169,7 @@ async function runBenchmarks() {
   for (let i = 0; i < numDocs; i++) {
     const chronicle = new Chronicle();
     const stack = new StackWasm(chronicle, createTokens(10));
-    stack.shuffle(`seed-${i}`);
+    stack.shuffle(i);
     stack.draw(3);
     docsToMerge.push(chronicle.saveToBase64());
   }

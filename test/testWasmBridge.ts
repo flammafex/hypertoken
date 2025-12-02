@@ -53,8 +53,7 @@ try {
   // Create and add tokens
   const tokens = [];
   for (let i = 0; i < 52; i++) {
-    const token = new WasmToken(`card-${i}`, i);
-    tokens.push(JSON.parse(token.toJSON()));
+    tokens.push({ id: `card-${i}`, index: i, char: '□', group: 'test', kind: 'default', label: `Card ${i}`, text: '□', meta: {} });
   }
 
   // Initialize stack with tokens
@@ -100,8 +99,8 @@ try {
 
   // Place tokens
   for (let i = 0; i < 10; i++) {
-    const token = new WasmToken(`token-${i}`, i);
-    const tokenJson = token.toJSON();
+    const token = { id: `token-${i}`, index: i, char: '□', group: 'test', kind: 'default', label: `Token ${i}`, text: '□', meta: {} };
+    const tokenJson = JSON.stringify(token);
     space.place('hand', tokenJson, i * 10, 0);
   }
   console.log(`   Placed 10 tokens in 'hand' zone`);

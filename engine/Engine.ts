@@ -23,9 +23,9 @@ import type { SourceWasm } from "../core/SourceWasm.js";
 import { WasmWorker } from "../core/WasmWorker.js";
 
 export interface EngineOptions {
-  stack?: Stack | null;
-  space?: Space | null;
-  source?: Source | null;
+  stack?: Stack | StackWasm | null;
+  space?: Space | SpaceWasm | null;
+  source?: Source | SourceWasm | null;
   autoConnect?: string;
   useWebRTC?: boolean; // Enable WebRTC with automatic fallback
   useWorker?: boolean; // Enable multi-threaded WASM worker (Phase 4)
@@ -38,9 +38,9 @@ export interface EngineOptions {
 }
 
 export class Engine extends Emitter {
-  stack: Stack | null;
-  space: Space;
-  source: Source | null;
+  stack: Stack | StackWasm | null;
+  space: Space | SpaceWasm;
+  source: Source | SourceWasm | null;
 
   session: Chronicle;
   network?: INetworkConnection; // Can be PeerConnection or HybridPeerManager

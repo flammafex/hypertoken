@@ -459,8 +459,8 @@ try {
   // Draw from stack to space
   const card1 = stack.draw();
   const card2 = stack.draw();
-  if (card1) space.place('hand', card1);
-  if (card2) space.place('table', card2);
+  if (card1 && !Array.isArray(card1)) space.place('hand', card1);
+  if (card2 && !Array.isArray(card2)) space.place('table', card2);
 
   const initialStackSize = stack.size;
 

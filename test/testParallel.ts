@@ -9,7 +9,7 @@
  * 5. Error handling and recovery
  */
 
-import { Chronicle } from '../core/ChronicleWasm.js';
+import { Chronicle } from '../core/Chronicle.js';
 import { StackWasm } from '../core/StackWasm.js';
 import { SpaceWasm } from '../core/SpaceWasm.js';
 import { ParallelOps } from '../core/ParallelOps.js';
@@ -155,7 +155,7 @@ async function runTests() {
     for (let i = 0; i < 8; i++) {
       const chronicle = new Chronicle();
       const stack = new StackWasm(chronicle, createTokens(5));
-      stack.shuffle(`seed-${i}`);
+      stack.shuffle(i);
       docs.push(chronicle.saveToBase64());
     }
 
@@ -175,7 +175,7 @@ async function runTests() {
     chronicle.loadFromBase64(merged);
 
     console.log(`   ✓ Merged document loaded successfully`);
-    console.log(`   ✓ Change count: ${chronicle.changeCount()}`);
+    // console.log(`   ✓ Change count: ${chronicle.changeCount()}`); // Method not available
 
     await parallel.shutdown();
     console.log('✅ Test 4 passed');
