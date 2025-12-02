@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Relay server for P2P synchronization
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-relay
+    command: ["node", "start-relay.js", "3000"]
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+    networks:
+      - hypertoken-network
+
+  # Quickstart CLI (interactive)
+  quickstart:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-quickstart
+    command: ["npx", "hypertoken-quickstart"]
+    stdin_open: true
+    tty: true
+    networks:
+      - hypertoken-network
+    profiles:
+      - cli
+
+  # Blackjack server example
+  blackjack-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-server
+    command: ["node", "dist/examples/blackjack/server.js"]
+    ports:
+      - "9090:9090"
+    environment:
+      - PORT=9090
+    restart: unless-stopped
+    networks:
+      - hypertoken-network
+    profiles:
+      - examples
+
+  # Blackjack client - Alice
+  blackjack-alice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-alice
+    command: ["node", "dist/examples/blackjack/client.js", "Alice"]
+    depends_on:
+      - blackjack-server
+    stdin_open: true
+    tty: true
+    networks:
+      - hypertoken-network
+    profiles:
+      - examples
+
+  # Blackjack client - Bob
+  blackjack-bob:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-bob
+    command: ["node", "dist/examples/blackjack/client.js", "Bob"]
+    depends_on:
+      - blackjack-server
+    stdin_open: true
+    tty: true
+    networks:
+      - hypertoken-network
+    profiles:
+      - examples
+
+networks:
+  hypertoken-network:
+    driver: bridge

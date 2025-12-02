@@ -149,6 +149,26 @@ node dist/examples/tarot-reading/tarot-cli.js    # Divination
 node dist/examples/accordion/accordion.js         # "Impossible" solitaire
 ```
 
+### 🐳 Docker Quickstart
+
+Get HyperToken running in containers without installing Rust or Node.js locally:
+
+```bash
+# Build the image (includes Rust toolchain, WASM compilation, and TypeScript build)
+docker build -t hypertoken:latest .
+
+# Run the relay server
+docker compose up relay
+
+# Or run the interactive quickstart
+docker compose run --rm quickstart
+
+# Run example applications
+docker compose --profile examples up
+```
+
+For detailed Docker documentation, see **[DOCKER.md](./DOCKER.md)**.
+
 ---
 
 ## ⚡ Performance & Multi-Threading
