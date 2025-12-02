@@ -12,6 +12,7 @@
     "templates"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
