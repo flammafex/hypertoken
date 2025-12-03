@@ -53,7 +53,7 @@ COPY examples/ ./examples/
 # 3000 - Relay server
 # 8080 - WebRTC test server
 # 9090 - Blackjack server
-EXPOSE 3000 8080 9090
+EXPOSE 3000 3000 9090
 
 # Default command: run the quickstart CLI
 CMD ["npx", "hypertoken-quickstart"]
