@@ -20,8 +20,8 @@ export function registerBlackjackRules(ruleEngine) {
       const cards = agentHand.map(p => p.card);
       return isBusted(cards);
     },
-    (engine) => {
-      engine.dispatch("blackjack:agent-busted", {});
+    async (engine) => {
+      await engine.dispatch("blackjack:agent-busted", {});
     },
     { priority: 100, once: false }
   );
@@ -36,8 +36,8 @@ export function registerBlackjackRules(ruleEngine) {
       const cards = agentHand.map(p => p.card);
       return isBlackjack(cards);
     },
-    (engine) => {
-      engine.dispatch("blackjack:agent-blackjack", {});
+    async (engine) => {
+      await engine.dispatch("blackjack:agent-blackjack", {});
     },
     { priority: 90, once: false }
   );
@@ -52,8 +52,8 @@ export function registerBlackjackRules(ruleEngine) {
       const value = getBestHandValue(cards);
       return value < 17 && engine._gameState?.dealerTurn === true;
     },
-    (engine) => {
-      engine.dispatch("blackjack:dealer-hit", {});
+    async (engine) => {
+      await engine.dispatch("blackjack:dealer-hit", {});
     },
     { priority: 80, once: false }
   );
@@ -68,8 +68,8 @@ export function registerBlackjackRules(ruleEngine) {
       const value = getBestHandValue(cards);
       return value >= 17 && engine._gameState?.dealerTurn === true;
     },
-    (engine) => {
-      engine.dispatch("blackjack:dealer-stand", {});
+    async (engine) => {
+      await engine.dispatch("blackjack:dealer-stand", {});
     },
     { priority: 70, once: false }
   );
@@ -89,12 +89,12 @@ export class BlackjackPolicy {
     this._fired = false;
   }
   
-  evaluate(engine) {
+  async evaluate(engine) {
     if (!this.enabled || (this.once && this._fired)) return false;
-    
+
     try {
       if (this.condition(engine)) {
-        this.effect(engine);
+        await this.effect(engine);
         this._fired = true;
         return true;
       }

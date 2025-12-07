@@ -72,11 +72,11 @@ async function forceGC(): Promise<void> {
   }
 }
 
-async function measureMemory(name: string, fn: () => void): Promise<void> {
+async function measureMemory(name: string, fn: () => void | Promise<void>): Promise<void> {
   await forceGC();
   const before = getMemoryUsage();
 
-  fn();
+  await fn();
 
   await forceGC();
   const after = getMemoryUsage();
@@ -321,18 +321,18 @@ async function benchmarkEngineMemory(): Promise<void> {
     new Engine({ stack, space });
   });
 
-  await measureMemory('Engine with 100 action dispatches', () => {
+  await measureMemory('Engine with 100 action dispatches', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(100);
     const stack = new Stack(chronicle, tokens);
     const engine = new Engine({ stack });
 
     for (let i = 0; i < 100; i++) {
-      engine.dispatch('stack:draw', { count: 1 });
+      await engine.dispatch('stack:draw', { count: 1 });
     }
   });
 
-  await measureMemory('Engine snapshot (complex state)', () => {
+  await measureMemory('Engine snapshot (complex state)', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(100);
     const stack = new Stack(chronicle, tokens);
@@ -340,7 +340,7 @@ async function benchmarkEngineMemory(): Promise<void> {
     const engine = new Engine({ stack, space });
 
     for (let i = 0; i < 50; i++) {
-      engine.dispatch('stack:draw', { count: 1 });
+      await engine.dispatch('stack:draw', { count: 1 });
     }
 
     engine.snapshot();
@@ -384,7 +384,7 @@ async function benchmarkRealWorldMemory(): Promise<void> {
     }
   });
 
-  await measureMemory('Large simulation (1000 tokens, 500 actions)', () => {
+  await measureMemory('Large simulation (1000 tokens, 500 actions)', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(1000);
     const stack = new Stack(chronicle, tokens);
@@ -393,14 +393,14 @@ async function benchmarkRealWorldMemory(): Promise<void> {
 
     for (let i = 0; i < 500; i++) {
       if (i % 2 === 0) {
-        engine.dispatch('stack:draw', { count: 1 });
+        await engine.dispatch('stack:draw', { count: 1 });
       } else {
-        engine.dispatch('stack:shuffle', {});
+        await engine.dispatch('stack:shuffle', {});
       }
     }
   });
 
-  await measureMemory('Tournament system (10 games, 52 tokens each)', () => {
+  await measureMemory('Tournament system (10 games, 52 tokens each)', async () => {
     const games = [];
     for (let i = 0; i < 10; i++) {
       const chronicle = new Chronicle();
@@ -411,14 +411,14 @@ async function benchmarkRealWorldMemory(): Promise<void> {
 
       stack.shuffle();
       for (let j = 0; j < 20; j++) {
-        engine.dispatch('stack:draw', { count: 1 });
+        await engine.dispatch('stack:draw', { count: 1 });
       }
 
       games.push(engine);
     }
   });
 
-  await measureMemory('Persistent world (large state with history)', () => {
+  await measureMemory('Persistent world (large state with history)', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(500);
     const stack = new Stack(chronicle, tokens);
@@ -429,9 +429,9 @@ async function benchmarkRealWorldMemory(): Promise<void> {
 
     // Simulate activity
     for (let i = 0; i < 200; i++) {
-      engine.dispatch('stack:shuffle', {});
-      engine.dispatch('stack:draw', { count: 5 });
-      engine.dispatch('source:draw', { count: 3 });
+      await engine.dispatch('stack:shuffle', {});
+      await engine.dispatch('stack:draw', { count: 5 });
+      await engine.dispatch('source:draw', { count: 3 });
     }
 
     // Create snapshot

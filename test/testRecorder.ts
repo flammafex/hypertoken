@@ -78,14 +78,14 @@ await test('Recorder starts and stops recording', () => {
   assert(!recorder.enabled, 'Should be disabled after stop');
 });
 
-await test('Recorder captures actions', () => {
+await test('Recorder captures actions', async () => {
   const engine = new Engine();
   const recorder = new Recorder(engine);
 
   recorder.start();
 
-  engine.dispatch('test:action1', { value: 1 });
-  engine.dispatch('test:action2', { value: 2 });
+  await engine.dispatch('test:action1', { value: 1 });
+  await engine.dispatch('test:action2', { value: 2 });
 
   recorder.stop();
 
@@ -94,29 +94,29 @@ await test('Recorder captures actions', () => {
   assertEquals(recorder.log[1].payload.value, 2, 'Second action payload should match');
 });
 
-await test('Recorder does not capture when stopped', () => {
+await test('Recorder does not capture when stopped', async () => {
   const engine = new Engine();
   const recorder = new Recorder(engine);
 
-  engine.dispatch('test:before', {});
+  await engine.dispatch('test:before', {});
 
   recorder.start();
-  engine.dispatch('test:during', {});
+  await engine.dispatch('test:during', {});
   recorder.stop();
 
-  engine.dispatch('test:after', {});
+  await engine.dispatch('test:after', {});
 
   assertEquals(recorder.log.length, 1, 'Should only have 1 action');
   assertEquals(recorder.log[0].type, 'test:during', 'Should only capture during recording');
 });
 
-await test('Recorder clear empties log', () => {
+await test('Recorder clear empties log', async () => {
   const engine = new Engine();
   const recorder = new Recorder(engine);
 
   recorder.start();
-  engine.dispatch('test:action1', {});
-  engine.dispatch('test:action2', {});
+  await engine.dispatch('test:action1', {});
+  await engine.dispatch('test:action2', {});
   recorder.stop();
 
   assertEquals(recorder.log.length, 2, 'Should have 2 actions before clear');
@@ -132,13 +132,13 @@ await test('Recorder clear empties log', () => {
 
 console.log('\n💾 Import/Export Tests\n');
 
-await test('Recorder exports to JSON', () => {
+await test('Recorder exports to JSON', async () => {
   const engine = new Engine();
   const recorder = new Recorder(engine);
 
   recorder.start();
-  engine.dispatch('game:start', {});
-  engine.dispatch('agent:create', { name: 'Alice' });
+  await engine.dispatch('game:start', {});
+  await engine.dispatch('agent:create', { name: 'Alice' });
   recorder.stop();
 
   const json = recorder.exportJSON();
@@ -202,8 +202,8 @@ await test('Recorder replays actions to target engine', async () => {
 
   // Record actions
   recorder.start();
-  engine1.dispatch('agent:create', { name: 'Alice' });
-  engine1.dispatch('agent:create', { name: 'Bob' });
+  await engine1.dispatch('agent:create', { name: 'Alice' });
+  await engine1.dispatch('agent:create', { name: 'Bob' });
   recorder.stop();
 
   // Replay to new engine
@@ -220,8 +220,8 @@ await test('Recorder replay with delay', async () => {
   const recorder = new Recorder(engine1);
 
   recorder.start();
-  engine1.dispatch('test:action', { id: 1 });
-  engine1.dispatch('test:action', { id: 2 });
+  await engine1.dispatch('test:action', { id: 1 });
+  await engine1.dispatch('test:action', { id: 2 });
   recorder.stop();
 
   const engine2 = new Engine();
@@ -274,7 +274,7 @@ await test('Recorder emits replay events', async () => {
   const recorder = new Recorder(engine1);
 
   recorder.start();
-  engine1.dispatch('test:action', {});
+  await engine1.dispatch('test:action', {});
   recorder.stop();
 
   const engine2 = new Engine();

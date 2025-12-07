@@ -185,34 +185,34 @@ function benchmarkEngine(runner: BenchmarkRunner): void {
   console.log('⚙️  Running Engine Benchmarks...\n');
 
   // Simple action dispatch
-  runner.benchmark('Engine: Simple action dispatch (debug:log)', () => {
+  runner.benchmarkAsync('Engine: Simple action dispatch (debug:log)', async () => {
     const engine = new Engine();
-    engine.dispatch('debug:log', { msg: 'test' });
+    await engine.dispatch('debug:log', { msg: 'test' });
   }, 10000);
 
   // Stack creation and dispatch - setup once, benchmark the action
-  runner.benchmark('Engine: Create with Stack and draw action', () => {
+  runner.benchmarkAsync('Engine: Create with Stack and draw action', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(52);
     const stack = new Stack(chronicle, tokens);
     const engine = new Engine({ stack });
-    engine.dispatch('stack:draw', { count: 1 });
+    await engine.dispatch('stack:draw', { count: 1 });
   }, 100); // Reduced from 1000 to avoid CRDT overload
 
   // Multiple action dispatch
-  runner.benchmark('Engine: Dispatch 10 sequential actions', () => {
+  runner.benchmarkAsync('Engine: Dispatch 10 sequential actions', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(52);
     const stack = new Stack(chronicle, tokens);
     const engine = new Engine({ stack });
 
     for (let i = 0; i < 10; i++) {
-      engine.dispatch('stack:draw', { count: 1 });
+      await engine.dispatch('stack:draw', { count: 1 });
     }
   }, 50); // Reduced from 500 to avoid CRDT overload
 
   // Policy evaluation overhead
-  runner.benchmark('Engine: Action dispatch with 5 policies', () => {
+  runner.benchmarkAsync('Engine: Action dispatch with 5 policies', async () => {
     const engine = new Engine();
 
     for (let i = 0; i < 5; i++) {
@@ -221,7 +221,7 @@ function benchmarkEngine(runner: BenchmarkRunner): void {
       });
     }
 
-    engine.dispatch('debug:log', { msg: 'test' });
+    await engine.dispatch('debug:log', { msg: 'test' });
   }, 5000);
 }
 
@@ -558,7 +558,7 @@ function benchmarkLargeScale(runner: BenchmarkRunner): void {
   }, 5); // Reduced to avoid CRDT overload
 
   // Complex engine state snapshot
-  runner.benchmark('Large: Snapshot engine with complex state', () => {
+  runner.benchmarkAsync('Large: Snapshot engine with complex state', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(100);
     const stack = new Stack(chronicle, tokens);
@@ -567,7 +567,7 @@ function benchmarkLargeScale(runner: BenchmarkRunner): void {
 
     // Add some complexity
     for (let i = 0; i < 20; i++) {
-      engine.dispatch('stack:draw', { count: 1 });
+      await engine.dispatch('stack:draw', { count: 1 });
     }
 
     engine.snapshot();
@@ -590,19 +590,19 @@ function benchmarkRealWorld(runner: BenchmarkRunner): void {
   console.log('🎮 Running Real-World Scenario Benchmarks...\n');
 
   // Blackjack hand deal
-  runner.benchmark('Scenario: Deal blackjack hand (2 cards, 2 players)', () => {
+  runner.benchmarkAsync('Scenario: Deal blackjack hand (2 cards, 2 players)', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(52);
     const stack = new Stack(chronicle, tokens);
     const engine = new Engine({ stack });
 
     stack.shuffle();
-    engine.dispatch('stack:draw', { count: 2 });
-    engine.dispatch('stack:draw', { count: 2 });
+    await engine.dispatch('stack:draw', { count: 2 });
+    await engine.dispatch('stack:draw', { count: 2 });
   }, 50); // Reduced to avoid CRDT overload
 
   // Card game round
-  runner.benchmark('Scenario: Complete card game round (4 players, 5 cards each)', () => {
+  runner.benchmarkAsync('Scenario: Complete card game round (4 players, 5 cards each)', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(52);
     const stack = new Stack(chronicle, tokens);
@@ -612,7 +612,7 @@ function benchmarkRealWorld(runner: BenchmarkRunner): void {
     stack.shuffle();
 
     for (let player = 0; player < 4; player++) {
-      const cards = engine.dispatch('stack:draw', { count: 5 });
+      const cards = await engine.dispatch('stack:draw', { count: 5 });
       if (cards) {
         cards.forEach((card: Token) => space.place(`player${player}`, card));
       }
@@ -639,7 +639,7 @@ function benchmarkRealWorld(runner: BenchmarkRunner): void {
   }, 500);
 
   // State persistence
-  runner.benchmark('Scenario: Save and restore complete game state', () => {
+  runner.benchmarkAsync('Scenario: Save and restore complete game state', async () => {
     const chronicle = new Chronicle();
     const tokens = createTestTokens(52);
     const stack = new Stack(chronicle, tokens);
@@ -649,7 +649,7 @@ function benchmarkRealWorld(runner: BenchmarkRunner): void {
     // Simulate game actions
     stack.shuffle();
     for (let i = 0; i < 10; i++) {
-      engine.dispatch('stack:draw', { count: 1 });
+      await engine.dispatch('stack:draw', { count: 1 });
     }
 
     // Save state

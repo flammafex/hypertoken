@@ -42,7 +42,7 @@ engine.describe = function() {
 };
 
 // Initialize game
-engine.dispatch('tictactoe:init');
+await engine.dispatch('tictactoe:init');
 
 // Add event listeners for game events
 engine.on('agent:registered', (evt) => {

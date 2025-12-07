@@ -70,40 +70,40 @@ export class PrisonersDilemmaGame {
   /**
    * Initialize game with two agents
    */
-  initialize(agent1, agent2) {
-    this.engine.dispatch('game:start');
-    
+  async initialize(agent1, agent2) {
+    await this.engine.dispatch('game:start');
+
     // Create agents
-    const p1Result = this.engine.dispatch('agent:create', {
+    const p1Result = await this.engine.dispatch('agent:create', {
       name: agent1.name || 'Agent 1',
       agent: agent1.strategy
     });
-    
-    const p2Result = this.engine.dispatch('agent:create', {
+
+    const p2Result = await this.engine.dispatch('agent:create', {
       name: agent2.name || 'Agent 2',
       agent: agent2.strategy
     });
-    
+
     // Store agent references
     this.agent1 = this.engine._agents.find(p => p.name === (agent1.name || 'Agent 1'));
     this.agent2 = this.engine._agents.find(p => p.name === (agent2.name || 'Agent 2'));
-    
+
     // Initialize scores
-    this.engine.dispatch('agent:giveResource', {
+    await this.engine.dispatch('agent:giveResource', {
       name: this.agent1.name,
       resource: 'score',
       amount: 0
     });
-    
-    this.engine.dispatch('agent:giveResource', {
+
+    await this.engine.dispatch('agent:giveResource', {
       name: this.agent2.name,
       resource: 'score',
       amount: 0
     });
-    
+
     this.currentRound = 0;
     this.history = [];
-    
+
     return this;
   }
   
@@ -123,15 +123,15 @@ export class PrisonersDilemmaGame {
     
     // Calculate payoffs
     const outcome = this.calculatePayoffs(p1Move, p2Move);
-    
+
     // Update scores
-    this.engine.dispatch('agent:giveResource', {
+    await this.engine.dispatch('agent:giveResource', {
       name: this.agent1.name,
       resource: 'score',
       amount: outcome.p1
     });
-    
-    this.engine.dispatch('agent:giveResource', {
+
+    await this.engine.dispatch('agent:giveResource', {
       name: this.agent2.name,
       resource: 'score',
       amount: outcome.p2
@@ -191,8 +191,8 @@ export class PrisonersDilemmaGame {
     
     // End game
     const winner = this.determineWinner();
-    
-    this.engine.dispatch('game:end', {
+
+    await this.engine.dispatch('game:end', {
       winner: winner?.name || null,
       reason: 'rounds_complete',
       finalScores: {
@@ -200,7 +200,7 @@ export class PrisonersDilemmaGame {
         [this.agent2.name]: this.agent2.resources.score
       }
     });
-    
+
     return this.getResults();
   }
   

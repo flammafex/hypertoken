@@ -32,7 +32,6 @@ export interface IEngineAgent {
   active: boolean;
   resources: Record<string, number>;
   inventory: IToken[];
-  hand?: IToken[]; // Alias for inventory (legacy compatibility)
   zones?: Map<string, any>;
   [key: string]: any; // Allow additional properties for extensibility
 }

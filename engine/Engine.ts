@@ -13,8 +13,7 @@ import { PeerConnection } from "../network/PeerConnection.js";
 import { HybridPeerManager } from "../network/HybridPeerManager.js";
 import { ConsensusCore, INetworkConnection } from "../core/ConsensusCore.js";
 import { GameLoop } from "./GameLoop.js";
-import { RuleEngine } from "./RuleEngine.js"; // Added RuleEngine
-import { EventBus } from "../core/EventBus.js";
+import { RuleEngine } from "./RuleEngine.js";
 import { IEngineAgent, IGameState, ITransaction, IEngineSnapshot, IEngineState } from "./types.js";
 import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmActionDispatcher } from "../core/WasmBridge.js";
 import type { StackWasm } from "../core/StackWasm.js";
@@ -48,7 +47,7 @@ export class Engine extends Emitter {
   loop: GameLoop;
 
   // Local event dispatcher for tests and plugins
-  eventBus: EventBus;
+  eventBus: Emitter;
 
   // Exposed RuleEngine
   ruleEngine?: RuleEngine;
@@ -75,7 +74,7 @@ export class Engine extends Emitter {
     this.stack = stack;
     this.source = source;
     this.loop = new GameLoop(this);
-    this.eventBus = new EventBus();
+    this.eventBus = new Emitter();
     this.useWebRTC = useWebRTC;
 
     this.history = [];
@@ -317,45 +316,14 @@ export class Engine extends Emitter {
   }
 
   /**
-   * Dispatch an action (synchronous version for backward compatibility)
+   * Dispatch an action asynchronously
    *
-   * @deprecated When using worker mode, prefer dispatchAsync() for better performance
-   */
-  dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): any {
-    // If worker mode is enabled, use async dispatch but block
-    if (this._useWorker && this._wasmWorker) {
-      // This is a blocking call - not ideal, but maintains backward compatibility
-      console.warn('⚠️  Synchronous dispatch() called in worker mode. Consider using dispatchAsync() for better performance.');
-      // For now, fall through to sync execution
-    }
-
-    const action = new Action(type, payload, opts);
-    if (this.debug) console.log("🧩 dispatch:", type, payload);
-
-    const result = this.apply(action);
-    this.history.push(action);
-    this.emit("engine:action", { payload: action });
-
-    for (const [, policy] of this._policies) {
-      try {
-        policy.evaluate(this);
-      } catch (err) {
-        this.emit("engine:error", { payload: { policy, err } });
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Dispatch an action asynchronously (worker-optimized)
-   *
-   * Use this method when worker mode is enabled for best performance.
+   * Uses worker mode when enabled for best performance.
    * Falls back to synchronous execution if worker is not available.
    */
-  async dispatchAsync(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<any> {
+  async dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<any> {
     const action = new Action(type, payload, opts);
-    if (this.debug) console.log("🧩 dispatchAsync:", type, payload);
+    if (this.debug) console.log("🧩 dispatch:", type, payload);
 
     let result: any;
 
@@ -817,7 +785,7 @@ export class Engine extends Emitter {
     const { stack, space, source } = this;
     const agents = this.state.agents?.map((p: any) => ({
       name: p.name,
-      handCount: p.hand?.length ?? 0,
+      inventoryCount: p.inventory?.length ?? 0,
       discardCount: p.discard?.length ?? 0,
       turns: p.turns ?? 0,
       active: p.active ?? false

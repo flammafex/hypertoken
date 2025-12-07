@@ -56,22 +56,22 @@ async function testEngineWorker() {
 
   // Test 2: Async dispatch (stack:shuffle)
   console.log('Test 2: Async dispatch (stack:shuffle)...');
-  const shuffleResult = await engine.dispatchAsync('stack:shuffle', { seed: 12345 });
+  const shuffleResult = await engine.dispatch('stack:shuffle', { seed: 12345 });
   console.log('✅ Shuffle completed:', shuffleResult);
   console.log('');
 
   // Test 3: Async dispatch (stack:draw)
   console.log('Test 3: Async dispatch (stack:draw)...');
-  const drawResult = await engine.dispatchAsync('stack:draw', { count: 5 });
+  const drawResult = await engine.dispatch('stack:draw', { count: 5 });
   console.log('✅ Draw completed:', Array.isArray(drawResult) ? `${drawResult.length} cards` : drawResult);
   console.log('');
 
   // Test 4: Multiple async dispatches
   console.log('Test 4: Multiple async dispatches...');
   const promises = [
-    engine.dispatchAsync('stack:shuffle'),
-    engine.dispatchAsync('stack:draw', { count: 1 }),
-    engine.dispatchAsync('stack:peek', { count: 3 }),
+    engine.dispatch('stack:shuffle'),
+    engine.dispatch('stack:draw', { count: 1 }),
+    engine.dispatch('stack:peek', { count: 3 }),
   ];
   const results = await Promise.all(promises);
   console.log('✅ All dispatches completed:', results.length, 'actions');
@@ -84,8 +84,8 @@ async function testEngineWorker() {
     eventCount++;
   });
 
-  await engine.dispatchAsync('stack:draw', { count: 1 });
-  await engine.dispatchAsync('stack:shuffle');
+  await engine.dispatch('stack:draw', { count: 1 });
+  await engine.dispatch('stack:shuffle');
 
   console.log('✅ Events received:', eventCount);
   console.log('');
@@ -107,10 +107,10 @@ async function testEngineWorker() {
   // Send multiple actions quickly - they should be batched
   const batchStart = Date.now();
   const batchPromises = [
-    batchEngine.dispatchAsync('stack:shuffle'),
-    batchEngine.dispatchAsync('stack:draw', { count: 1 }),
-    batchEngine.dispatchAsync('stack:shuffle'),
-    batchEngine.dispatchAsync('stack:draw', { count: 1 }),
+    batchEngine.dispatch('stack:shuffle'),
+    batchEngine.dispatch('stack:draw', { count: 1 }),
+    batchEngine.dispatch('stack:shuffle'),
+    batchEngine.dispatch('stack:draw', { count: 1 }),
   ];
   await Promise.all(batchPromises);
   const batchDuration = Date.now() - batchStart;
