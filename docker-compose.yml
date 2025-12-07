@@ -1,18 +1,24 @@
 version: '3.8'
 
 services:
-  # Relay server for P2P synchronization
+  # Universal Relay Server for P2P synchronization
+  # Supports two modes:
+  #   - relay (default): Pure P2P signaling for WebRTC connections
+  #   - authoritative: Game server with engine integration
   relay:
     build:
       context: .
       dockerfile: Dockerfile
     image: hypertoken:latest
     container_name: hypertoken-relay
-    command: ["node", "start-relay.js", "3000"]
+    command: ["node", "start-relay.js"]
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
+      - RELAY_MODE=relay
+      # - GAME_MODULE=./examples/network-tictactoe/game.js  # Uncomment to load a game
+      # - VERBOSE=true
     restart: unless-stopped
     networks:
       - hypertoken-network
