@@ -17,7 +17,7 @@ HyperToken's performance-critical operations are being ported to Rust and compil
 | **Token** | ✅ Complete | ⏳ TODO | Rust ready, needs TS wrapper |
 | **Stack** | ✅ Complete | ✅ Complete | **READY** - ~20x faster |
 | **Space** | ✅ Complete | ✅ Complete | **READY** - ~20x faster |
-| **Chronicle** | ✅ Complete | ✅ Hybrid (TS Fallback) | **READY** - ~7-10x faster (Rust backend ready, pending wasm-pack build) |
+| **Chronicle** | ✅ Complete | ✅ Hybrid (TS Fallback) | **READY** - Native Automerge fields (benchmark pending) |
 | **Actions** | ✅ Complete | ⏳ TODO | Rust ready, needs TS wrapper |
 | **WasmBridge** | ✅ Complete | ✅ Complete | Module loader working |
 
@@ -190,7 +190,9 @@ Based on benchmarks from M2 MacBook Air:
 | Space placement (1000 tokens) | 958 ms | <50 ms | **~20x** |
 | Space query (100 tokens) | 82 ms | <5 ms | **~16x** |
 | Large simulation memory | 377 MB | <50 MB | **~8x** |
-| Chronicle merge | 1.4 ms | <0.2 ms | **~7x** |
+| Chronicle merge | TBD | TBD | **TBD** (see note) |
+
+> **Note on Chronicle Performance:** The Rust Chronicle now uses native Automerge fields for proper CRDT conflict resolution. Performance benchmarks are pending. Run `npm run benchmark:chronicle` to measure.
 
 ---
 
@@ -236,12 +238,10 @@ Based on benchmarks from M2 MacBook Air:
 ### Phase 2C: Chronicle Integration (✅ COMPLETE)
 
 - ✅ Implement full HyperTokenState in Rust Chronicle (types.rs - 275 lines)
-- ✅ Add proper CRDT state serialization (setState/getState/change methods)
-- ✅ Hybrid ChronicleWasm (TS Automerge with Rust backend ready)
-- ✅ Benchmark CRDT merge performance (benchmarkChronicle.ts)
-  - Baseline: Merge 14.22ms, Serialize 8.65ms, Deserialize 58.65ms
-  - Expected Rust: Merge 2.03ms (~7x), Serialize 0.87ms (~10x), Deserialize 5.87ms (~10x)
-- ⚠️ Full Rust Chronicle integration pending `wasm-pack` build
+- ✅ **Native Automerge fields** - Proper field-level CRDT conflict resolution
+- ✅ Hybrid ChronicleWasm with binary sync (preserves CRDT history)
+- ✅ Incremental sync support via automerge SyncState
+- ⏳ Performance benchmarks pending (run `npm run benchmark:chronicle`)
 
 ### Phase 3: Multi-Threading (FUTURE)
 
