@@ -3,7 +3,7 @@
 // This implementation stores HyperTokenState fields as native Automerge types
 // for proper field-level CRDT conflict resolution.
 
-use automerge::{Automerge, AutomergeError, ObjId, ObjType, ReadDoc, Value, transaction::Transactable};
+use automerge::{Automerge, AutomergeError, ObjId, ObjType, ReadDoc, Value, transaction::Transactable, sync, sync::SyncDoc};
 use wasm_bindgen::prelude::*;
 
 use crate::types::{
@@ -133,18 +133,102 @@ impl Chronicle {
         self.doc.get_heads().len()
     }
 
-    /// Get sync state for a peer (incremental sync)
+    /// Generate a sync message for incremental synchronization
+    ///
+    /// Takes an optional serialized SyncState from a previous sync.
+    /// Returns a tuple: (sync_message, new_sync_state) as JSON.
+    ///
+    /// Usage:
+    /// ```js
+    /// // First sync (no prior state)
+    /// const result = chronicle.generateSyncMessage(null);
+    /// const { message, syncState } = JSON.parse(result);
+    ///
+    /// // Subsequent syncs (use saved sync state)
+    /// const result2 = chronicle.generateSyncMessage(syncState);
+    /// ```
     #[wasm_bindgen(js_name = generateSyncMessage)]
-    pub fn generate_sync_message(&self, _sync_state: Option<Vec<u8>>) -> Result<Vec<u8>> {
-        // For now, return the full document
-        // TODO: Implement incremental sync
-        self.save()
+    pub fn generate_sync_message(&self, sync_state_bytes: Option<Vec<u8>>) -> Result<String> {
+        // Deserialize or create new sync state
+        let mut sync_state = if let Some(bytes) = sync_state_bytes {
+            sync::State::decode(&bytes)
+                .map_err(|e| HyperTokenError::CrdtError(format!("Failed to decode sync state: {:?}", e)))?
+        } else {
+            sync::State::new()
+        };
+
+        // Generate sync message
+        let message = self.doc.generate_sync_message(&mut sync_state);
+        let has_message = message.is_some();
+        let message_base64 = message.map(|m| base64_encode(&m.encode()));
+
+        // Serialize the sync state for storage
+        let new_sync_state_bytes = sync_state.encode();
+
+        // Return as JSON with base64-encoded data
+        let result = serde_json::json!({
+            "message": message_base64,
+            "syncState": base64_encode(&new_sync_state_bytes),
+            "hasMessage": has_message
+        });
+
+        serde_json::to_string(&result)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize sync result: {}", e)))
     }
 
-    /// Receive a sync message from a peer
+    /// Receive a sync message and update the document
+    ///
+    /// Takes:
+    /// - message_base64: The sync message from the peer (base64 encoded)
+    /// - sync_state_bytes: Optional serialized SyncState
+    ///
+    /// Returns: JSON with updated sync state and any response message
     #[wasm_bindgen(js_name = receiveSyncMessage)]
-    pub fn receive_sync_message(&mut self, message: &[u8]) -> Result<()> {
-        self.merge(message)
+    pub fn receive_sync_message(&mut self, message_base64: &str, sync_state_bytes: Option<Vec<u8>>) -> Result<String> {
+        // Decode the message
+        let message_bytes = base64_decode(message_base64)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Invalid base64 message: {}", e)))?;
+
+        let message = sync::Message::decode(&message_bytes)
+            .map_err(|e| HyperTokenError::CrdtError(format!("Failed to decode sync message: {:?}", e)))?;
+
+        // Deserialize or create new sync state
+        let mut sync_state = if let Some(bytes) = sync_state_bytes {
+            sync::State::decode(&bytes)
+                .map_err(|e| HyperTokenError::CrdtError(format!("Failed to decode sync state: {:?}", e)))?
+        } else {
+            sync::State::new()
+        };
+
+        // Receive the sync message
+        self.doc.receive_sync_message(&mut sync_state, message)
+            .map_err(|e| HyperTokenError::CrdtError(format!("Failed to receive sync message: {:?}", e)))?;
+
+        // Generate response message if needed
+        let response = self.doc.generate_sync_message(&mut sync_state);
+        let has_response = response.is_some();
+        let response_base64 = response.map(|m| base64_encode(&m.encode()));
+
+        // Serialize the sync state for storage
+        let new_sync_state_bytes = sync_state.encode();
+
+        // Return result as JSON
+        let result = serde_json::json!({
+            "responseMessage": response_base64,
+            "syncState": base64_encode(&new_sync_state_bytes),
+            "hasResponse": has_response
+        });
+
+        serde_json::to_string(&result)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize sync result: {}", e)))
+    }
+
+    /// Simple full-document sync (for backwards compatibility)
+    ///
+    /// Merges the given binary document into this one.
+    #[wasm_bindgen(js_name = syncFull)]
+    pub fn sync_full(&mut self, other_doc_bytes: &[u8]) -> Result<()> {
+        self.merge(other_doc_bytes)
     }
 }
 
@@ -1044,6 +1128,61 @@ mod tests {
 
         assert_eq!(state.version, Some("1.0".to_string()));
         assert!(state.stack.is_some());
+        assert!(state.zones.is_some());
+    }
+
+    #[test]
+    fn test_incremental_sync() {
+        // Create two chronicles that start diverged
+        let mut chronicle1 = Chronicle::new();
+        let mut chronicle2 = Chronicle::new();
+
+        // Chronicle 1 has some initial state
+        chronicle1.set_state(r#"{"version":"1.0","stack":{"stack":[],"drawn":[],"discards":[]}}"#).unwrap();
+
+        // Chronicle 2 has different initial state
+        chronicle2.set_state(r#"{"version":"2.0","zones":{"main":[]}}"#).unwrap();
+
+        // Generate sync message from chronicle1 (no prior sync state)
+        let sync_result1 = chronicle1.generate_sync_message(None).unwrap();
+        let parsed1: serde_json::Value = serde_json::from_str(&sync_result1).unwrap();
+
+        // The sync should produce a message
+        assert!(parsed1["hasMessage"].as_bool().unwrap());
+        assert!(parsed1["syncState"].is_string());
+
+        // Chronicle2 receives the sync message
+        if let Some(msg) = parsed1["message"].as_str() {
+            // Decode the sync state from base64 for receiving
+            let sync_state_base64 = parsed1["syncState"].as_str().unwrap();
+            let sync_state_bytes = base64_decode(sync_state_base64).unwrap();
+
+            let receive_result = chronicle2.receive_sync_message(msg, Some(sync_state_bytes)).unwrap();
+            let parsed_receive: serde_json::Value = serde_json::from_str(&receive_result).unwrap();
+
+            // Should get a response or updated sync state
+            assert!(parsed_receive["syncState"].is_string());
+        }
+    }
+
+    #[test]
+    fn test_sync_full_backwards_compat() {
+        // Test the simple full-document sync method
+        let mut chronicle1 = Chronicle::new();
+        let mut chronicle2 = Chronicle::new();
+
+        chronicle1.set_state(r#"{"version":"1.0"}"#).unwrap();
+        chronicle2.set_state(r#"{"zones":{"zone1":[]}}"#).unwrap();
+
+        // Full sync by saving and merging
+        let data = chronicle2.save().unwrap();
+        chronicle1.sync_full(&data).unwrap();
+
+        let result = chronicle1.get_state().unwrap();
+        let state: HyperTokenState = serde_json::from_str(&result).unwrap();
+
+        // Both fields should be present after sync
+        assert!(state.version.is_some());
         assert!(state.zones.is_some());
     }
 }
