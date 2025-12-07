@@ -117,10 +117,10 @@ async function testEngineWorker() {
   console.log('✅ Batched actions completed in:', batchDuration, 'ms');
   console.log('');
 
-  // Test 7: Backward compatibility (sync dispatch with warning)
-  console.log('Test 7: Backward compatibility (sync dispatch)...');
-  const syncResult = engine.dispatch('stack:peek', { count: 1 });
-  console.log('✅ Sync dispatch completed (with fallback):', syncResult ? 'result returned' : 'no result');
+  // Test 7: Async dispatch
+  console.log('Test 7: Async dispatch...');
+  const asyncResult = await engine.dispatch('stack:peek', { count: 1 });
+  console.log('✅ Async dispatch completed:', asyncResult ? 'result returned' : 'no result');
   console.log('');
 
   // Test 8: Shutdown

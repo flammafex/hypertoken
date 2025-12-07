@@ -690,7 +690,7 @@ async function run(): Promise<void> {
 
   for (let i = 0; i < 10; i++) {
     const chronicle = [chronicle1, chronicle2, chronicle3][i % 3];
-    chronicle.change(`rapid-${i}`, (doc) => {
+    chronicle.change(`rapid-${i}`, (doc: any) => {
       if (!doc.counters) doc.counters = {};
       doc.counters[`count-${i}`] = i;
     });

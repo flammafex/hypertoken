@@ -36,7 +36,6 @@ import { Space } from '../core/Space.js';
 import { Source } from '../core/Source.js';
 import { Token } from '../core/Token.js';
 import { Chronicle } from '../core/Chronicle.js';
-import { BatchActions } from '../engine/actions-extended.js';
 
 // ============================================================
 // Benchmark Infrastructure
@@ -449,88 +448,6 @@ function benchmarkCRDT(runner: BenchmarkRunner): void {
 }
 
 // ============================================================
-// Batch Operation Benchmarks
-// ============================================================
-
-function benchmarkBatchOperations(runner: BenchmarkRunner): void {
-  console.log('🔄 Running Batch Operation Benchmarks...\n');
-
-  // Filter operations
-  runner.benchmark('Batch: Filter 100 tokens', () => {
-    const engine = new Engine();
-    const tokens = createTestTokens(100);
-
-    BatchActions['tokens:filter'](engine, {
-      tokens,
-      predicate: (token: Token) => token.meta.value > 50
-    });
-  }, 1000);
-
-  runner.benchmark('Batch: Filter 1000 tokens', () => {
-    const engine = new Engine();
-    const tokens = createTestTokens(1000);
-
-    BatchActions['tokens:filter'](engine, {
-      tokens,
-      predicate: (token: Token) => token.meta.value > 50
-    });
-  }, 100);
-
-  // ForEach operations
-  runner.benchmark('Batch: forEach on 100 tokens', () => {
-    const engine = new Engine();
-    const tokens = createTestTokens(100);
-
-    BatchActions['tokens:forEach'](engine, {
-      tokens,
-      operation: (token: Token) => {
-        token.meta.processed = true;
-      }
-    });
-  }, 1000);
-
-  runner.benchmark('Batch: forEach on 1000 tokens', () => {
-    const engine = new Engine();
-    const tokens = createTestTokens(1000);
-
-    BatchActions['tokens:forEach'](engine, {
-      tokens,
-      operation: (token: Token) => {
-        token.meta.processed = true;
-      }
-    });
-  }, 100);
-
-  // Count operations
-  runner.benchmark('Batch: Count with predicate (100 tokens)', () => {
-    const engine = new Engine();
-    const chronicle = new Chronicle();
-    const tokens = createTestTokens(100);
-    const stack = new Stack(chronicle, tokens);
-    engine.stack = stack;
-
-    BatchActions['tokens:count'](engine, {
-      source: 'stack',
-      predicate: (token: Token) => token.meta.value > 50
-    });
-  }, 100); // Reduced to avoid CRDT overload
-
-  // Find operations
-  runner.benchmark('Batch: Find in 100 tokens', () => {
-    const engine = new Engine();
-    const chronicle = new Chronicle();
-    const tokens = createTestTokens(100);
-    const stack = new Stack(chronicle, tokens);
-    engine.stack = stack;
-
-    BatchActions['tokens:find'](engine, {
-      source: 'stack',
-      predicate: (token: Token) => token.meta.value > 90
-    });
-  }, 100); // Reduced to avoid CRDT overload
-}
-
-// ============================================================
 // Large-Scale State Benchmarks
 // ============================================================
 
@@ -619,22 +536,15 @@ function benchmarkRealWorld(runner: BenchmarkRunner): void {
     }
   }, 25); // Reduced to avoid CRDT overload
 
-  // Token filtering and manipulation
+  // Token filtering and manipulation (native array operations)
   runner.benchmark('Scenario: Filter and modify 200 tokens', () => {
-    const engine = new Engine();
     const tokens = createTestTokens(200);
 
-    const filtered = BatchActions['tokens:filter'](engine, {
-      tokens,
-      predicate: (token: Token) => token.meta.value > 30
-    });
+    const filtered = tokens.filter((token: Token) => token.meta.value > 30);
 
-    BatchActions['tokens:forEach'](engine, {
-      tokens: filtered,
-      operation: (token: Token) => {
-        token.meta.boosted = true;
-        token.meta.value *= 2;
-      }
+    filtered.forEach((token: Token) => {
+      token.meta.boosted = true;
+      token.meta.value *= 2;
     });
   }, 500);
 
@@ -680,7 +590,6 @@ async function runAllBenchmarks(): Promise<void> {
   benchmarkStack(runner);
   benchmarkSpace(runner);
   benchmarkCRDT(runner);
-  benchmarkBatchOperations(runner);
   benchmarkLargeScale(runner);
   benchmarkRealWorld(runner);
 
