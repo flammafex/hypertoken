@@ -18,11 +18,15 @@
  * ChronicleWasm: Fully Rust-backed Chronicle implementation
  *
  * This implementation uses Rust automerge-rs as the CRDT backend,
- * providing 7x performance improvement for merge/save/load operations.
+ * providing performance improvements for merge/save/load operations.
  *
- * The Rust Chronicle stores the entire HyperTokenState as JSON within
- * the CRDT document, maintaining all conflict-free merge semantics while
- * delivering native performance.
+ * The Rust Chronicle now stores HyperTokenState fields as native Automerge
+ * types (maps, lists, scalars) for proper field-level CRDT conflict resolution.
+ *
+ * CRDT History Preservation:
+ * - Binary format is used for all sync operations to preserve history
+ * - The TypeScript Automerge doc is synced via binary load, not JSON reconstruction
+ * - This ensures merge conflicts are properly resolved at the field level
  */
 
 import * as A from "@automerge/automerge";
@@ -36,6 +40,9 @@ import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmChronicle } from 
  *
  * Maintains the same API as Chronicle.ts but uses automerge-rs internally.
  * Falls back to TypeScript Automerge if WASM is unavailable.
+ *
+ * Key design principle: WASM Chronicle is the source of truth when enabled.
+ * TypeScript doc is synced via binary to preserve CRDT history.
  */
 export class ChronicleWasm extends Emitter {
   private _doc: A.Doc<HyperTokenState>;
@@ -45,7 +52,7 @@ export class ChronicleWasm extends Emitter {
   constructor(initialState?: HyperTokenState) {
     super();
 
-    // Initialize TypeScript doc (fallback)
+    // Initialize TypeScript doc (fallback or initial state)
     this._doc = initialState ? A.from<HyperTokenState>(initialState) : A.init<HyperTokenState>();
 
     // Initialize WASM Chronicle
@@ -86,17 +93,29 @@ export class ChronicleWasm extends Emitter {
     }
   }
 
+  /**
+   * Get the current state as an Automerge document.
+   *
+   * When WASM is enabled, this syncs the TypeScript doc from the WASM binary
+   * to preserve CRDT history. This is essential for proper merge behavior.
+   */
   get state(): A.Doc<HyperTokenState> {
-    // If using WASM, sync from WASM to TypeScript doc
     if (this._useWasm && this._wasmChronicle) {
       try {
-        const stateJson = this._wasmChronicle.getState();
-        const state = JSON.parse(stateJson) as HyperTokenState;
-
-        // Update TypeScript doc to match WASM state
-        this._doc = A.from<HyperTokenState>(state);
+        // Get the binary from WASM and load it to preserve CRDT history
+        const binary = this._wasmChronicle.save();
+        this._doc = A.load<HyperTokenState>(new Uint8Array(binary));
       } catch (error) {
-        console.error("❌ Failed to get state from WASM Chronicle:", error);
+        console.error("❌ Failed to sync state from WASM Chronicle:", error);
+        // Fall back to getting JSON state if binary sync fails
+        try {
+          const stateJson = this._wasmChronicle.getState();
+          const state = JSON.parse(stateJson) as HyperTokenState;
+          // Note: This loses history, but it's better than throwing
+          this._doc = A.from<HyperTokenState>(state);
+        } catch (innerError) {
+          console.error("❌ Failed to get state from WASM Chronicle:", innerError);
+        }
       }
     }
 
@@ -107,6 +126,12 @@ export class ChronicleWasm extends Emitter {
     return this._useWasm && this._wasmChronicle !== null;
   }
 
+  /**
+   * Apply a change to the document with a descriptive message.
+   *
+   * The callback receives the current state and can modify it.
+   * Changes are tracked in the CRDT history.
+   */
   change(message: string, callback: (doc: HyperTokenState) => void, source: string = "local"): void {
     if (this._useWasm && this._wasmChronicle) {
       try {
@@ -114,15 +139,16 @@ export class ChronicleWasm extends Emitter {
         const currentStateJson = this._wasmChronicle.getState();
         const currentState = JSON.parse(currentStateJson) as HyperTokenState;
 
-        // Apply callback to get new state
-        const newState = { ...currentState };
+        // Apply callback to get new state (deep clone to avoid mutation issues)
+        const newState = JSON.parse(JSON.stringify(currentState)) as HyperTokenState;
         callback(newState);
 
-        // Store new state in WASM
+        // Store new state in WASM (this creates a proper CRDT change)
         this._wasmChronicle.change(message, JSON.stringify(newState));
 
-        // Update TypeScript doc for compatibility
-        this._doc = A.from<HyperTokenState>(newState);
+        // Sync TypeScript doc from WASM binary to preserve CRDT history
+        const binary = this._wasmChronicle.save();
+        this._doc = A.load<HyperTokenState>(new Uint8Array(binary));
 
         this.emit("state:changed", { doc: this._doc, source });
       } catch (error) {
@@ -140,13 +166,20 @@ export class ChronicleWasm extends Emitter {
     }
   }
 
+  /**
+   * Update the document directly with a new Automerge doc.
+   *
+   * This syncs the new document to WASM if enabled.
+   */
   update(newDoc: A.Doc<HyperTokenState>, source: string = "local"): void {
     this._doc = newDoc;
 
-    // Sync to WASM if enabled
+    // Sync to WASM if enabled - use binary to preserve CRDT history
     if (this._useWasm && this._wasmChronicle) {
       try {
-        this._wasmChronicle.setState(JSON.stringify(newDoc));
+        // Save TypeScript doc to binary and load into WASM
+        const binary = A.save(newDoc);
+        this._wasmChronicle.load(binary);
       } catch (error) {
         console.error("❌ Failed to sync state to WASM Chronicle:", error);
       }
@@ -155,19 +188,24 @@ export class ChronicleWasm extends Emitter {
     this.emit("state:changed", { doc: this._doc, source });
   }
 
+  /**
+   * Merge a remote document into this one.
+   *
+   * Uses CRDT merge semantics - concurrent changes to different fields
+   * are preserved without conflict.
+   */
   merge(remoteDoc: A.Doc<HyperTokenState>): void {
     if (this._useWasm && this._wasmChronicle) {
       try {
-        // Save remote doc to binary
+        // Save remote doc to binary (preserves CRDT history)
         const remoteBinary = A.save(remoteDoc);
 
-        // Merge in WASM (7x faster than TypeScript)
+        // Merge in WASM
         this._wasmChronicle.merge(remoteBinary);
 
-        // Update TypeScript doc from WASM result
-        const mergedStateJson = this._wasmChronicle.getState();
-        const mergedState = JSON.parse(mergedStateJson) as HyperTokenState;
-        this._doc = A.from<HyperTokenState>(mergedState);
+        // Sync TypeScript doc from WASM binary to get merged result with history
+        const mergedBinary = this._wasmChronicle.save();
+        this._doc = A.load<HyperTokenState>(new Uint8Array(mergedBinary));
 
         this.emit("state:changed", { doc: this._doc, source: "merge" });
       } catch (error) {
@@ -183,10 +221,15 @@ export class ChronicleWasm extends Emitter {
     }
   }
 
+  /**
+   * Save the document to a binary format.
+   *
+   * The binary includes full CRDT history for proper merging.
+   */
   save(): Uint8Array {
     if (this._useWasm && this._wasmChronicle) {
       try {
-        // Use WASM for faster serialization (7x faster)
+        // Use WASM for faster serialization
         const binary = this._wasmChronicle.save();
         return new Uint8Array(binary);
       } catch (error) {
@@ -198,16 +241,21 @@ export class ChronicleWasm extends Emitter {
     return A.save(this._doc);
   }
 
+  /**
+   * Load a document from binary format.
+   *
+   * This replaces the current document with the loaded one,
+   * including its full CRDT history.
+   */
   load(binary: Uint8Array): void {
     if (this._useWasm && this._wasmChronicle) {
       try {
-        // Use WASM for faster deserialization (7x faster)
+        // Load binary into WASM
         this._wasmChronicle.load(binary);
 
-        // Sync to TypeScript doc
-        const stateJson = this._wasmChronicle.getState();
-        const state = JSON.parse(stateJson) as HyperTokenState;
-        this._doc = A.from<HyperTokenState>(state);
+        // Sync TypeScript doc from WASM binary (preserves CRDT history)
+        const savedBinary = this._wasmChronicle.save();
+        this._doc = A.load<HyperTokenState>(new Uint8Array(savedBinary));
 
         this.emit("state:changed", { doc: this._doc, source: "load" });
       } catch (error) {
@@ -221,6 +269,11 @@ export class ChronicleWasm extends Emitter {
     }
   }
 
+  /**
+   * Save the document to a Base64 string.
+   *
+   * Useful for transport over text-based protocols.
+   */
   saveToBase64(): string {
     if (this._useWasm && this._wasmChronicle) {
       try {
@@ -237,16 +290,18 @@ export class ChronicleWasm extends Emitter {
     return Buffer.from(bytes).toString('base64');
   }
 
+  /**
+   * Load a document from a Base64 string.
+   */
   loadFromBase64(base64: string): void {
     if (this._useWasm && this._wasmChronicle) {
       try {
         // Use WASM base64 decoding
         this._wasmChronicle.loadFromBase64(base64);
 
-        // Sync to TypeScript doc
-        const stateJson = this._wasmChronicle.getState();
-        const state = JSON.parse(stateJson) as HyperTokenState;
-        this._doc = A.from<HyperTokenState>(state);
+        // Sync TypeScript doc from WASM binary (preserves CRDT history)
+        const binary = this._wasmChronicle.save();
+        this._doc = A.load<HyperTokenState>(new Uint8Array(binary));
 
         this.emit("state:changed", { doc: this._doc, source: "load" });
       } catch (error) {
