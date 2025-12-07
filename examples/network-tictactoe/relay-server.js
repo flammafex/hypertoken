@@ -106,7 +106,7 @@ export class RelayServer extends Emitter {
   /*───────────────────────────────────────────────
     Command handling
   ───────────────────────────────────────────────*/
-  _handle(ws, msg) {
+  async _handle(ws, msg) {
     try {
       const data = JSON.parse(msg.toString());
       const { cmd, type, payload } = data;
@@ -116,9 +116,9 @@ export class RelayServer extends Emitter {
           const state = this.engine.describe ? this.engine.describe() : { _gameState: this.engine._gameState };
           ws.send(JSON.stringify({ cmd: 'describe', state }));
         } catch (err) {
-          ws.send(JSON.stringify({ 
-            cmd: 'error', 
-            message: `Failed to describe state: ${err.message}` 
+          ws.send(JSON.stringify({
+            cmd: 'error',
+            message: `Failed to describe state: ${err.message}`
           }));
           if (this.verbose) {
             console.error('Error describing state:', err);
@@ -128,23 +128,23 @@ export class RelayServer extends Emitter {
       }
 
       if (cmd === 'dispatch') {
-        this.engine.dispatch(type, payload);
+        await this.engine.dispatch(type, payload);
         if (this.broadcastOnAction) {
           this.broadcastDescribe();
         }
         return;
       }
 
-      ws.send(JSON.stringify({ 
-        cmd: 'error', 
-        message: `Unknown command: ${cmd}` 
+      ws.send(JSON.stringify({
+        cmd: 'error',
+        message: `Unknown command: ${cmd}`
       }));
     } catch (err) {
-      ws.send(JSON.stringify({ 
-        cmd: 'error', 
-        message: err.message 
+      ws.send(JSON.stringify({
+        cmd: 'error',
+        message: err.message
       }));
-      
+
       if (this.verbose) {
         console.error('RelayServer error:', err);
       }

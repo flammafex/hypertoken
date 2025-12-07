@@ -244,8 +244,7 @@ hypertoken/
 │   ├── Engine.ts          # Core coordinator + WASM ActionDispatcher
 │   ├── GameLoop.ts        # Turn management
 │   ├── RuleEngine.ts      # Law enforcement
-│   ├── actions.ts         # Core action handlers
-│   └── actions-extended.legacy.ts # Legacy TypeScript actions (archived)
+│   └── actions.ts         # Core action handlers
 │
 ├── network/                # Distribution (TypeScript)
 │   ├── PeerConnection.ts  # WebSocket client

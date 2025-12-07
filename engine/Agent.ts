@@ -139,7 +139,7 @@ export class Agent extends Emitter {
     try {
       const decision = await this.agent.think(engine, this);
       if (decision) {
-        if (decision.type) engine.dispatch(decision.type, decision.payload);
+        if (decision.type) await engine.dispatch(decision.type, decision.payload);
         else if (typeof decision.run === "function") await decision.run(engine);
       }
       this.emit("agent:decision", { payload: { name: this.name, decision } });
@@ -152,7 +152,7 @@ export class Agent extends Emitter {
     return {
       id: this.id,
       name: this.name,
-      hand: this.inventory.slice(),
+      inventory: this.inventory.slice(),
       discard: this.discard.slice(),
       turns: this.turns,
       active: this.active,
@@ -165,7 +165,7 @@ export class Agent extends Emitter {
   static fromJSON(obj: any): Agent {
     const p = new Agent(obj?.name ?? "Agent");
     p.id = obj?.id ?? p.id;
-    p.inventory = obj?.hand ?? [];
+    p.inventory = obj?.inventory ?? [];
     p.discard = obj?.discard ?? [];
     p.turns = obj?.turns ?? 0;
     p.active = obj?.active ?? true;

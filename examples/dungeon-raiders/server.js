@@ -85,7 +85,7 @@ class DungeonRaidersServer {
   async start() {
     // Initialize the dungeon
     console.log('🎮 Initializing Dungeon Raiders server...');
-    this.engine.dispatch('dungeon:init');
+    await this.engine.dispatch('dungeon:init');
 
     // Create WebSocket server
     this.wss = new WebSocketServer({ port: this.port });
@@ -103,7 +103,7 @@ class DungeonRaidersServer {
         state: this.engine.describe()
       }));
 
-      ws.on('message', (data) => {
+      ws.on('message', async (data) => {
         try {
           const msg = JSON.parse(data.toString());
 
@@ -115,7 +115,7 @@ class DungeonRaidersServer {
             }));
           } else if (msg.cmd === 'dispatch') {
             // Dispatch action to engine
-            this.engine.dispatch(msg.type, msg.payload);
+            await this.engine.dispatch(msg.type, msg.payload);
           }
         } catch (error) {
           console.error('❌ Error handling message:', error.message);
@@ -128,13 +128,13 @@ class DungeonRaidersServer {
         }
       });
 
-      ws.on('close', () => {
+      ws.on('close', async () => {
         console.log(`🔌 Client disconnected: ${clientId}`);
         this.clients.delete(clientId);
 
         // Remove player from game if they were playing
         try {
-          this.engine.dispatch('player:leave', { clientId });
+          await this.engine.dispatch('player:leave', { clientId });
         } catch (error) {
           // Player might not have joined yet
         }

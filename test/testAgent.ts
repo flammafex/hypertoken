@@ -432,7 +432,7 @@ await test('Agent snapshot() captures state', () => {
   const snapshot = agent.snapshot();
 
   assertEquals(snapshot.name, 'Alice', 'Name should match');
-  assertEquals(snapshot.hand.length, 1, 'Hand size should match');
+  assertEquals(snapshot.inventory.length, 1, 'Inventory size should match');
   assertEquals(snapshot.discard.length, 1, 'Discard size should match');
   assertEquals(snapshot.turns, 3, 'Turns should match');
   assertEquals(snapshot.meta.level, 5, 'Meta should match');
@@ -442,7 +442,7 @@ await test('Agent fromJSON() restores state', () => {
   const data = {
     name: 'Bob',
     id: 'custom-id',
-    hand: [{ id: '1', label: 'Card' }],
+    inventory: [{ id: '1', label: 'Card' }],
     discard: [{ id: '2', label: 'Card' }],
     turns: 5,
     active: false,
@@ -453,7 +453,7 @@ await test('Agent fromJSON() restores state', () => {
 
   assertEquals(agent.name, 'Bob', 'Name should match');
   assertEquals(agent.id, 'custom-id', 'ID should match');
-  assertEquals(agent.inventory.length, 1, 'Hand should be restored');
+  assertEquals(agent.inventory.length, 1, 'Inventory should be restored');
   assertEquals(agent.discard.length, 1, 'Discard should be restored');
   assertEquals(agent.turns, 5, 'Turns should match');
   assertEquals(agent.active, false, 'Active state should match');

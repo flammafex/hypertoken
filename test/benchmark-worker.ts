@@ -142,7 +142,7 @@ async function benchmarkWorker() {
     'Single shuffle',
     iterations,
     async (engine) => {
-      await engine.dispatchAsync('stack:shuffle', { seed: Math.random() });
+      await engine.dispatch('stack:shuffle', { seed: Math.random() });
     }
   );
 
@@ -152,7 +152,7 @@ async function benchmarkWorker() {
     'Single shuffle',
     iterations,
     async (engine) => {
-      engine.dispatch('stack:shuffle', { seed: Math.random() });
+      await engine.dispatch('stack:shuffle', { seed: Math.random() });
     }
   );
 
@@ -190,8 +190,8 @@ async function benchmarkWorker() {
     iterations,
     async (engine) => {
       // Reset stack before each draw
-      await engine.dispatchAsync('stack:shuffle', { seed: 12345 });
-      await engine.dispatchAsync('stack:draw', { count: 5 });
+      await engine.dispatch('stack:shuffle', { seed: 12345 });
+      await engine.dispatch('stack:draw', { count: 5 });
     }
   );
 
@@ -201,8 +201,8 @@ async function benchmarkWorker() {
     'Draw 5 cards',
     iterations,
     async (engine) => {
-      engine.dispatch('stack:shuffle', { seed: 12345 });
-      engine.dispatch('stack:draw', { count: 5 });
+      await engine.dispatch('stack:shuffle', { seed: 12345 });
+      await engine.dispatch('stack:draw', { count: 5 });
     }
   );
 
@@ -240,11 +240,11 @@ async function benchmarkWorker() {
     20, // Fewer iterations for concurrent test
     async (engine) => {
       await Promise.all([
-        engine.dispatchAsync('stack:shuffle', { seed: 1 }),
-        engine.dispatchAsync('stack:shuffle', { seed: 2 }),
-        engine.dispatchAsync('stack:shuffle', { seed: 3 }),
-        engine.dispatchAsync('stack:shuffle', { seed: 4 }),
-        engine.dispatchAsync('stack:shuffle', { seed: 5 }),
+        engine.dispatch('stack:shuffle', { seed: 1 }),
+        engine.dispatch('stack:shuffle', { seed: 2 }),
+        engine.dispatch('stack:shuffle', { seed: 3 }),
+        engine.dispatch('stack:shuffle', { seed: 4 }),
+        engine.dispatch('stack:shuffle', { seed: 5 }),
       ]);
     }
   );
@@ -255,11 +255,11 @@ async function benchmarkWorker() {
     'Concurrent shuffles',
     20,
     async (engine) => {
-      engine.dispatch('stack:shuffle', { seed: 1 });
-      engine.dispatch('stack:shuffle', { seed: 2 });
-      engine.dispatch('stack:shuffle', { seed: 3 });
-      engine.dispatch('stack:shuffle', { seed: 4 });
-      engine.dispatch('stack:shuffle', { seed: 5 });
+      await engine.dispatch('stack:shuffle', { seed: 1 });
+      await engine.dispatch('stack:shuffle', { seed: 2 });
+      await engine.dispatch('stack:shuffle', { seed: 3 });
+      await engine.dispatch('stack:shuffle', { seed: 4 });
+      await engine.dispatch('stack:shuffle', { seed: 5 });
     }
   );
 
@@ -299,10 +299,10 @@ async function benchmarkWorker() {
     50,
     async (engine) => {
       await Promise.all([
-        engine.dispatchAsync('stack:shuffle'),
-        engine.dispatchAsync('stack:draw', { count: 1 }),
-        engine.dispatchAsync('stack:shuffle'),
-        engine.dispatchAsync('stack:draw', { count: 1 }),
+        engine.dispatch('stack:shuffle'),
+        engine.dispatch('stack:draw', { count: 1 }),
+        engine.dispatch('stack:shuffle'),
+        engine.dispatch('stack:draw', { count: 1 }),
       ]);
     }
   );
@@ -314,10 +314,10 @@ async function benchmarkWorker() {
     50,
     async (engine) => {
       await Promise.all([
-        engine.dispatchAsync('stack:shuffle'),
-        engine.dispatchAsync('stack:draw', { count: 1 }),
-        engine.dispatchAsync('stack:shuffle'),
-        engine.dispatchAsync('stack:draw', { count: 1 }),
+        engine.dispatch('stack:shuffle'),
+        engine.dispatch('stack:draw', { count: 1 }),
+        engine.dispatch('stack:shuffle'),
+        engine.dispatch('stack:draw', { count: 1 }),
       ]);
     }
   );

@@ -40,7 +40,7 @@ function createTestTokens(count: number): IToken[] {
 function wrapEngineWithProfiler(engine: Engine, profiler: ActionProfiler): Engine {
   const originalDispatch = engine.dispatch.bind(engine);
 
-  engine.dispatch = function(type: string, payload: any = {}, opts: any = {}): any {
+  engine.dispatch = async function(type: string, payload: any = {}, opts: any = {}): Promise<any> {
     return profiler.record(type, () => originalDispatch(type, payload, opts));
   };
 
@@ -87,17 +87,17 @@ async function runBenchmark() {
   console.log('📦 Scenario 1: Stack Operations (500 iterations)...');
   for (let i = 0; i < 500; i++) {
     // Basic operations
-    if (i % 10 === 0) engine.dispatch('stack:shuffle');
-    if (i % 5 === 0) engine.dispatch('stack:draw', { count: 1 });
-    if (i % 20 === 0) engine.dispatch('stack:burn', { count: 2 });
+    if (i % 10 === 0) await engine.dispatch('stack:shuffle');
+    if (i % 5 === 0) await engine.dispatch('stack:draw', { count: 1 });
+    if (i % 20 === 0) await engine.dispatch('stack:burn', { count: 2 });
 
     // Advanced operations
-    if (i % 30 === 0) engine.dispatch('stack:cut', { position: 26 });
-    if (i % 40 === 0) engine.dispatch('stack:reverse', { start: 0, end: 10 });
-    if (i % 50 === 0) engine.dispatch('stack:peek', { count: 5 });
+    if (i % 30 === 0) await engine.dispatch('stack:cut', { position: 26 });
+    if (i % 40 === 0) await engine.dispatch('stack:reverse', { start: 0, end: 10 });
+    if (i % 50 === 0) await engine.dispatch('stack:peek', { count: 5 });
 
     // Reset periodically
-    if (i % 100 === 0) engine.dispatch('stack:reset');
+    if (i % 100 === 0) await engine.dispatch('stack:reset');
   }
   console.log('   ✓ Stack operations complete');
 
@@ -108,13 +108,13 @@ async function runBenchmark() {
 
   // Create zones
   const zones = ['hand', 'field', 'graveyard', 'deck', 'exile'];
-  zones.forEach((zone, i) => {
-    engine.dispatch('space:createZone', { id: zone, label: zone, x: i * 100, y: 0 });
-  });
+  for (let i = 0; i < zones.length; i++) {
+    await engine.dispatch('space:createZone', { id: zones[i], label: zones[i], x: i * 100, y: 0 });
+  }
 
   // Place tokens
   for (let i = 0; i < 100; i++) {
-    engine.dispatch('space:place', {
+    await engine.dispatch('space:place', {
       zone: zones[i % zones.length],
       token: tokens[i],
       x: Math.random() * 500,
@@ -128,27 +128,27 @@ async function runBenchmark() {
     const toZone = zones[(i + 1) % zones.length];
 
     if (i % 10 === 0) {
-      engine.dispatch('space:transferZone', { fromZone, toZone });
+      await engine.dispatch('space:transferZone', { fromZone, toZone });
     }
 
     if (i % 15 === 0) {
-      engine.dispatch('space:shuffleZone', { zone: fromZone });
+      await engine.dispatch('space:shuffleZone', { zone: fromZone });
     }
 
     if (i % 20 === 0) {
-      engine.dispatch('space:spreadZone', { zone: fromZone, pattern: 'linear' });
+      await engine.dispatch('space:spreadZone', { zone: fromZone, pattern: 'linear' });
     }
 
     if (i % 25 === 0) {
-      engine.dispatch('space:fanZone', { zone: fromZone, radius: 100 });
+      await engine.dispatch('space:fanZone', { zone: fromZone, radius: 100 });
     }
 
     if (i % 30 === 0) {
-      engine.dispatch('space:stackZone', { zone: fromZone });
+      await engine.dispatch('space:stackZone', { zone: fromZone });
     }
 
     if (i % 50 === 0) {
-      engine.dispatch('space:clearZone', { zone: fromZone });
+      await engine.dispatch('space:clearZone', { zone: fromZone });
     }
   }
   console.log('   ✓ Space operations complete');
@@ -159,14 +159,14 @@ async function runBenchmark() {
   console.log('♻️  Scenario 3: Source Operations (200 iterations)...');
 
   // Add stacks to source
-  engine.dispatch('source:addStack', { stack: new StackWasm(chronicle, createTestTokens(52)) });
-  engine.dispatch('source:addStack', { stack: new StackWasm(chronicle, createTestTokens(52)) });
+  await engine.dispatch('source:addStack', { stack: new StackWasm(chronicle, createTestTokens(52)) });
+  await engine.dispatch('source:addStack', { stack: new StackWasm(chronicle, createTestTokens(52)) });
 
   for (let i = 0; i < 200; i++) {
-    if (i % 10 === 0) engine.dispatch('source:shuffle');
-    if (i % 20 === 0) engine.dispatch('source:draw', { count: 5 });
-    if (i % 30 === 0) engine.dispatch('source:burn', { count: 3 });
-    if (i % 100 === 0) engine.dispatch('source:reset');
+    if (i % 10 === 0) await engine.dispatch('source:shuffle');
+    if (i % 20 === 0) await engine.dispatch('source:draw', { count: 5 });
+    if (i % 30 === 0) await engine.dispatch('source:burn', { count: 3 });
+    if (i % 100 === 0) await engine.dispatch('source:reset');
   }
   console.log('   ✓ Source operations complete');
 
@@ -177,17 +177,17 @@ async function runBenchmark() {
 
   for (let i = 0; i < 150; i++) {
     if (i % 50 === 0) {
-      engine.dispatch('agent:create', { name: `agent-${i}`, meta: { score: 0 } });
+      await engine.dispatch('agent:create', { name: `agent-${i}`, meta: { score: 0 } });
     }
 
-    engine.dispatch('agent:giveResource', {
+    await engine.dispatch('agent:giveResource', {
       name: `agent-${Math.floor(i / 50) * 50}`,
       resource: 'gold',
       amount: 10,
     });
 
     if (i % 10 === 0) {
-      engine.dispatch('agent:takeResource', {
+      await engine.dispatch('agent:takeResource', {
         name: `agent-${Math.floor(i / 50) * 50}`,
         resource: 'gold',
         amount: 2,
@@ -195,7 +195,7 @@ async function runBenchmark() {
     }
 
     if (i % 20 === 0) {
-      engine.dispatch('agent:giveCards', {
+      await engine.dispatch('agent:giveCards', {
         name: `agent-${Math.floor(i / 50) * 50}`,
         cards: [tokens[i % tokens.length]],
         source: 'deck',
@@ -213,14 +213,14 @@ async function runBenchmark() {
     const token = tokens[i % tokens.length];
 
     if (i % 10 === 0) {
-      engine.dispatch('token:setProperty', {
+      await engine.dispatch('token:setProperty', {
         token,
         properties: { power: Math.random() * 10, toughness: Math.random() * 10 },
       });
     }
 
     if (i % 20 === 0) {
-      engine.dispatch('token:attach', {
+      await engine.dispatch('token:attach', {
         host: token,
         attachment: tokens[(i + 1) % tokens.length],
         attachmentType: 'equipment',
@@ -228,7 +228,7 @@ async function runBenchmark() {
     }
 
     if (i % 30 === 0) {
-      engine.dispatch('token:detach', {
+      await engine.dispatch('token:detach', {
         token,
       });
     }
@@ -242,14 +242,14 @@ async function runBenchmark() {
 
   for (let i = 0; i < 100; i++) {
     if (i % 10 === 0) {
-      engine.dispatch('batch:filterTokens', {
+      await engine.dispatch('batch:filterTokens', {
         tokens,
         predicate: (t: IToken) => parseInt(t.id.split('-')[1]) % 2 === 0,
       });
     }
 
     if (i % 20 === 0) {
-      engine.dispatch('batch:transformTokens', {
+      await engine.dispatch('batch:transformTokens', {
         tokens: tokens.slice(0, 20),
         operation: (t: IToken) => ({ ...t, modified: true }),
       });
@@ -264,15 +264,15 @@ async function runBenchmark() {
 
   for (let i = 0; i < 100; i++) {
     if (i % 10 === 0) {
-      engine.dispatch('game:setPhase', { phase: `phase-${i % 5}` });
+      await engine.dispatch('game:setPhase', { phase: `phase-${i % 5}` });
     }
 
     if (i % 20 === 0) {
-      engine.dispatch('game:setCustomValue', { key: 'turn', value: i });
+      await engine.dispatch('game:setCustomValue', { key: 'turn', value: i });
     }
 
     if (i % 50 === 0) {
-      engine.dispatch('game:declareWinner', { winner: 'player1', reason: 'test' });
+      await engine.dispatch('game:declareWinner', { winner: 'player1', reason: 'test' });
     }
   }
   console.log('   ✓ Game state operations complete');
@@ -285,8 +285,8 @@ async function runBenchmark() {
 
     for (let i = 0; i < 100; i++) {
       // Trigger rule evaluation through actions
-      engine.dispatch('stack:draw', { count: 1 });
-      engine.dispatch('space:place', {
+      await engine.dispatch('stack:draw', { count: 1 });
+      await engine.dispatch('space:place', {
         zone: 'hand',
         token: tokens[i % tokens.length],
         x: i * 10,

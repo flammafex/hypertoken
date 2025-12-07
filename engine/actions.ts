@@ -19,8 +19,6 @@
  */
 
 import { Engine } from "./Engine.js";
-// @ts-ignore
-import { ExtendedActions } from "./actions-extended.js";
 import { IToken } from "../core/types.js";
 
 export type ActionHandler = (engine: Engine, payload: any) => any;
@@ -83,8 +81,7 @@ const BaseActions: ActionRegistryType = {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 export const ActionRegistry: ActionRegistryType = {
-  ...BaseActions,
-  ...(ExtendedActions as any)
+  ...BaseActions
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
