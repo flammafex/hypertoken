@@ -55,9 +55,9 @@ async function run() {
   console.log("\n🃏 Engine A: Placing 'Ace of Spades' on space...");
   const card = new Token({ id: "ace-spades", label: "Ace of Spades" });
   
-  engineA.dispatch("space:place", { 
-    zone: "center", 
-    card: card 
+  await engineA.dispatch("space:place", {
+    zone: "center",
+    card: card
   });
 
   await sleep(500);
@@ -80,7 +80,7 @@ async function run() {
   }
 
   // Draw 1 card on Engine A
-  engineA.dispatch("stack:draw", { count: 1 });
+  await engineA.dispatch("stack:draw", { count: 1 });
 
   console.log("Waiting for stack sync...");
   await sleep(1000);
