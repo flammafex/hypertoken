@@ -40,6 +40,7 @@
  */
 
 import { Emitter } from "../core/events.js";
+import { IActionPayload } from "../core/types.js";
 import { Engine } from "../engine/Engine.js";
 import { WebSocketServer, WebSocket } from "ws";
 
@@ -322,7 +323,7 @@ export class UniversalRelayServer extends Emitter {
     }
   }
 
-  private async _handleDispatch(ws: WebSocket, msg: { type?: string; payload?: unknown }): Promise<void> {
+  private async _handleDispatch(ws: WebSocket, msg: { type?: string; payload?: IActionPayload }): Promise<void> {
     if (!this.engine) {
       this._send(ws, { cmd: "error", message: "No engine available" });
       return;
@@ -336,7 +337,7 @@ export class UniversalRelayServer extends Emitter {
     }
 
     try {
-      await this.engine.dispatch(type, payload);
+      await this.engine.dispatch(type, payload ?? {});
 
       // State broadcast happens automatically via engine:action event
       // But send confirmation to the sender
