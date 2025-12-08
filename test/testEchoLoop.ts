@@ -3,12 +3,10 @@
  *
  * Echo Loop Prevention Test
  *
- * Verifies that Source Parameter Tracking (O(1) Echo Loop Prevention)
- * correctly prevents sync messages from being sent back to their originator.
+ * Verifies that source parameter tracking correctly prevents sync messages
+ * from being sent back to their originator.
  *
- * INCLUDES: Control group demonstrating echo loops WITHOUT source tracking.
- *
- * See: SOURCE_PARAMETER_TRACKING_WHITE_PAPER.md
+ * INCLUDES: Control group demonstrating behavior WITHOUT source tracking.
  */
 import { Chronicle } from "../core/Chronicle.js";
 import { ConsensusCore, INetworkConnection } from "../core/ConsensusCore.js";
@@ -310,8 +308,7 @@ async function sleep(ms: number): Promise<void> {
 
 async function run(): Promise<void> {
   console.log("🔄 Echo Loop Prevention Test\n");
-  console.log("Testing Source Parameter Tracking (O(1) Echo Loop Prevention)");
-  console.log("See: SOURCE_PARAMETER_TRACKING_WHITE_PAPER.md\n");
+  console.log("Testing source parameter tracking in ConsensusCore\n");
 
   // ========================================
   // TEST 0: CONTROL GROUP - Demonstrate Echo Loop Problem
