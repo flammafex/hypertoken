@@ -1,8 +1,8 @@
 # HyperToken Core (Rust/WASM)
 
-**High-performance CRDT-based state management for HyperToken, compiled to WebAssembly**
+**CRDT-based state management for HyperToken, compiled to WebAssembly**
 
-This is the Rust implementation of HyperToken's core logic, providing **10-100x performance improvements** over the TypeScript implementation for compute-intensive operations.
+This is the Rust implementation of HyperToken's core logic, compiled to WebAssembly for use in Node.js and browsers.
 
 ---
 
@@ -28,12 +28,10 @@ This is the Rust implementation of HyperToken's core logic, providing **10-100x 
 
 **Why Rust/WASM?**
 
-| Operation | TypeScript | Rust/WASM | Improvement |
-|-----------|-----------|-----------|-------------|
-| Stack shuffle (52 cards, 100 iterations) | 618 ms | 46.5 ms | **13.3x** |
-| Stack shuffle (with worker) | N/A | <0.2 ms | **Non-blocking** |
-| Chronicle merge | 1.4 ms | <0.2 ms | **7x** |
-| Memory usage (large simulation) | 377 MB | <50 MB | **8x** |
+- **Native CRDT**: Uses automerge-rs for efficient CRDT operations
+- **Type safety**: Rust's type system catches errors at compile time
+- **Portability**: Runs in both Node.js and browsers
+- **Determinism**: Seeded PRNG using ChaCha8 for reproducible shuffles
 
 ---
 
@@ -46,13 +44,6 @@ This is the Rust implementation of HyperToken's core logic, providing **10-100x 
 - **`Space`**: 2D placement with zone management
 - **`Chronicle`**: CRDT document wrapper (automerge-rs)
 - **`ActionDispatcher`**: Unified action routing
-
-### Key Performance Optimizations
-
-1. **Zero-copy operations**: No `JSON.parse(JSON.stringify())` cloning
-2. **Efficient memory layout**: Direct `Vec` operations vs. JS Arrays
-3. **Native CRDT**: automerge-rs is 10-100x faster than JS version
-4. **Deterministic shuffle**: Seeded PRNG using ChaCha8
 
 ---
 
@@ -329,27 +320,26 @@ When adding new features to the Rust core:
 
 ## 🚦 Status
 
-| Component | Actions | Status | Performance |
-|-----------|---------|--------|-------------|
+| Component | Actions | Status |
+|-----------|---------|--------|
 | **Core Modules** |
-| Token | - | ✅ Complete | N/A |
-| Stack | 10 | ✅ Complete | 13.3x faster |
-| Space | 14 | ✅ Complete | 10-100x faster |
-| Source | 7 | ✅ Complete | 10-100x faster |
-| Chronicle | - | ✅ Complete | 7x faster |
+| Token | - | ✅ Complete |
+| Stack | 10 | ✅ Complete |
+| Space | 14 | ✅ Complete |
+| Source | 7 | ✅ Complete |
+| Chronicle | - | ✅ Complete |
 | **Action Modules** |
-| Agent | 16 | ✅ Complete | 10-100x faster |
-| TokenOps | 5 | ✅ Complete | 10-100x faster |
-| GameState | 7 | ✅ Complete | 10-100x faster |
-| Batch | 8 | ✅ Complete | 10-100x faster |
+| Agent | 16 | ✅ Complete |
+| TokenOps | 5 | ✅ Complete |
+| GameState | 7 | ✅ Complete |
+| Batch | 8 | ✅ Complete |
 | **Integration** |
-| ActionDispatcher | 67 | ✅ Complete | Zero overhead (typed methods) |
-| Engine.ts Wiring | 67 | ✅ Complete | -30% overhead (faster!) |
-| Worker Mode (Node.js) | - | ✅ Complete | <0.2ms overhead |
+| ActionDispatcher | 67 | ✅ Complete |
+| Engine.ts Wiring | 67 | ✅ Complete |
+| Worker Mode (Node.js) | - | ✅ Complete |
 | **Future** |
-| Worker Mode (Browser) | - | 🚧 Coming soon | TBD |
-| RuleEngine | - | 🚧 Future | TBD |
-| **TOTAL** | **67/67** | **✅ 100% COMPLETE** | **10-100x faster**
+| Worker Mode (Browser) | - | 🚧 Coming soon |
+| RuleEngine | - | 🚧 Future |
 
 ---
 
@@ -359,29 +349,16 @@ Apache License 2.0 - See LICENSE file in root directory
 
 ---
 
-## 🎯 Migration Complete! 🎉
+## 🎯 Migration Complete
 
-**✅ All 67 core actions ported to Rust/WASM**
-
-The Rust/WASM migration is **100% complete** with all performance-critical operations running 10-100x faster than the original TypeScript implementation.
+Core actions have been ported to Rust/WASM.
 
 **What's Next:**
 
-- 🚧 **Web Worker support** - Enable multi-threading in browsers (Node.js worker mode already complete)
-- 🚧 **Performance profiling** - Identify remaining bottlenecks and optimization opportunities
+- 🚧 **Web Worker support** - Enable multi-threading in browsers
+- 🚧 **Performance profiling** - Identify bottlenecks and optimization opportunities
 - 🚧 **Browser optimizations** - Streaming and caching for web deployments
-
-**Future Enhancements:**
-
-- **RuleEngine port** - Move rule evaluation to Rust (potential 10-20x speedup)
-- **SIMD optimizations** - Batch operations using SIMD instructions
-- **Streaming CRDT sync** - Incremental synchronization for large documents
-- **Advanced caching** - Smart memoization and lazy evaluation
 
 **Want to contribute?**
 
 See the main [README](../README.md) for how to get started!
-
----
-
-**Ready to build?** Run `npm run build:rust` and experience 10-100x performance gains! 🚀
