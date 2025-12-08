@@ -108,3 +108,22 @@ Every HyperToken carries its own history. When tokens are merged, split, or tran
 **Risk Reduction:**
 - **Deterministic Replay**: Every bug can be reproduced 100% of the time by replaying the action log with the same seed.
 - **Edge Case Discovery**: Run millions of automated turns overnight to find "one-in-a-million" exploits before launch.
+
+---
+
+## Additional Use Cases
+
+### A/B Testing for Game Mechanics
+Run parallel simulations with different rule sets to compare player outcomes. The Rule Engine allows hot-swapping mechanics without code changes.
+
+### Digital Twin for Board Games
+Convert physical board games to digital format with rules enforcement. Token metadata tracks piece state; Space manages board positions; Stack handles draw piles.
+
+### Compliance Testing
+Model business rules as engine policies. Run automated scenarios to verify regulatory compliance before deployment. Deterministic replay provides audit trails.
+
+### Smart Contract Prototyping
+Test "if-then" contract logic with tokens representing assets. Validate transfer rules and edge cases before deploying to blockchain.
+
+### Monte Carlo Risk Analysis
+Run millions of simulated scenarios overnight. The Gym interface allows parallel simulation, while deterministic seeds ensure reproducibility.

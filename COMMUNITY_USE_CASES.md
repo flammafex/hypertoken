@@ -48,12 +48,12 @@ Since the game state is just a JSON document, it can be passed around like a tor
 
 ```javascript
 // 1. Current host saves the world state
-engine.saveGame("world-snapshot-v1");
+await engine.saveGame("world-snapshot-v1");
 
 // ... The file 'world-snapshot-v1.json' is shared via Discord/Email ...
 
 // 2. Next host loads it, and the world continues exactly where it left off
-engine.loadGame("world-snapshot-v1");
+await engine.loadGame("world-snapshot-v1");
 ```
 
 ### Pattern 3: The Community Fork (Remixing)
@@ -104,3 +104,22 @@ console.log(engine.analytics.getReport());
 **Privacy First**
 - **P2P Encryption**: Gameplay happens directly between peers.
 - **No Tracking**: No central analytics server harvesting user behavior.
+
+---
+
+## Additional Use Cases
+
+### Tabletop RPG Companion
+Use `Space` for mini positioning on battle maps, `Stack` for encounter/loot decks, and Token metadata for character sheets. The host (GM) runs the authoritative session while players connect as clients.
+
+### Trading Card Game Collection
+Build and test deck lists, run draft simulations, track card collections. The deterministic shuffle means draft picks can be replayed for tournament verification.
+
+### Cooperative Puzzle Games
+Synchronized state for escape room puzzles, cooperative card games, or real-time collaborative challenges. CRDTs ensure all players see consistent state.
+
+### Replay Sharing
+Since all actions are deterministic (seeded PRNG), an entire game session can be saved as just the action log + seed. Share compact replay files that reconstruct full games.
+
+### Tournament Bracket Systems
+Manage multi-game tournaments with persistent standings. Each match is a separate Engine instance; aggregate results in a parent coordinator.
