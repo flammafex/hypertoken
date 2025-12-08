@@ -65,11 +65,9 @@ The performance benchmark suite measures operations per second for:
 - Base64 encoding
 - Document merging
 
-#### Batch Operations
-- Filtering tokens (100, 1000 tokens)
-- ForEach operations
-- Counting with predicates
-- Finding tokens
+#### Collection Operations
+- Filtering tokens with native array methods
+- Counting and querying token collections
 
 #### Large-Scale Operations
 - Multiple stacks (10 stacks × 52 tokens)

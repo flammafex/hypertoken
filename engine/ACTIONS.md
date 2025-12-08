@@ -225,16 +225,11 @@ engine.dispatch("custom:myAction", { ... });
 
 ## Testing
 
-All 58 actions have comprehensive tests:
+Run the test suite:
 
 ```bash
 # Run all tests
 npm test
-
-# Test specific categories
-node test/testTokenActions.js      # 15 tests
-node test/testBatchActions.js      # 19 tests
-node test/testAgentTransfers.js   # 14 tests
 ```
 
 ---

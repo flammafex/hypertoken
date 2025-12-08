@@ -173,11 +173,10 @@ For detailed Docker documentation, see **[DOCKER.md](./DOCKER.md)**.
 ### **Rust + WASM Core**
 HyperToken's performance-critical operations run in **Rust compiled to WebAssembly**, delivering:
 
-- **🚀 10-100x faster** - All core operations (stack, space, agents, tokens, game state)
+- **🚀 Faster core operations** - Stack, space, agents, tokens compiled to WASM
 - **📦 Zero dependencies** - Pure Rust with wasm-bindgen
 - **🌐 Universal** - Runs in Node.js and browsers
 - **🔒 Type-safe** - Full TypeScript integration
-- **✅ 100% migration complete** - 67/67 actions ported to Rust with zero-overhead dispatch
 
 ### **Worker Mode (Node.js)**
 For compute-intensive operations, enable multi-threaded execution:
@@ -193,11 +192,8 @@ const engine = new Engine({
 });
 
 // Async API - main thread stays responsive
-await engine.dispatchAsync("stack:shuffle", { seed: 42 });
-await engine.dispatchAsync("agent:drawCards", { count: 1000 });
-
-// Sync API still works (backwards compatible)
-engine.dispatch("stack:peek", { count: 1 });
+await engine.dispatch("stack:shuffle", { seed: 42 });
+await engine.dispatch("agent:drawCards", { count: 1000 });
 ```
 
 **Performance characteristics:**
