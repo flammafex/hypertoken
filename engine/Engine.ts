@@ -19,7 +19,7 @@ import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmActionDispatcher 
 import type { StackWasm } from "../core/StackWasm.js";
 import type { SpaceWasm } from "../core/SpaceWasm.js";
 import type { SourceWasm } from "../core/SourceWasm.js";
-import { WasmWorker } from "../core/WasmWorker.js";
+import type { UniversalWorker } from "../core/UniversalWorker.js";
 
 export interface EngineOptions {
   stack?: Stack | StackWasm | null;
@@ -33,6 +33,9 @@ export interface EngineOptions {
     timeout?: number;
     enableBatching?: boolean;
     batchWindow?: number;
+    // Browser-specific options
+    workerPath?: string;  // Path to worker script (browser only)
+    wasmPath?: string;    // Path to WASM files (browser only)
   };
 }
 
@@ -63,7 +66,7 @@ export class Engine extends Emitter {
 
   private useWebRTC: boolean;
   private _wasmDispatcher: WasmActionDispatcher | null = null;
-  private _wasmWorker: WasmWorker | null = null;
+  private _wasmWorker: UniversalWorker | null = null;
   private _useWorker: boolean = false;
 
   constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, useWorker = false, workerOptions = {} }: EngineOptions = {}) {
@@ -103,15 +106,25 @@ export class Engine extends Emitter {
   }
 
   /**
-   * Initialize WasmWorker for multi-threaded execution
+   * Initialize UniversalWorker for multi-threaded execution
+   *
+   * Automatically detects the environment (Node.js vs Browser) and uses
+   * the appropriate worker implementation:
+   * - Node.js: WasmWorker (worker_threads)
+   * - Browser: WebWorker (Web Workers API)
    */
   private async _initializeWorker(options: EngineOptions['workerOptions'] = {}): Promise<void> {
     try {
-      this._wasmWorker = new WasmWorker({
+      const { UniversalWorker } = await import('../core/UniversalWorker.js');
+
+      this._wasmWorker = new UniversalWorker({
         debug: options.debug ?? this.debug,
         timeout: options.timeout,
         enableBatching: options.enableBatching,
         batchWindow: options.batchWindow,
+        // Browser-specific options
+        workerPath: options.workerPath,
+        wasmPath: options.wasmPath,
       });
 
       await this._wasmWorker.init();
@@ -130,10 +143,11 @@ export class Engine extends Emitter {
       });
 
       if (this.debug) {
-        console.log('✅ Engine: WasmWorker initialized');
+        const env = this._wasmWorker.environment;
+        console.log(`✅ Engine: UniversalWorker initialized (${env} mode)`);
       }
     } catch (error) {
-      console.error('❌ Engine: WasmWorker initialization failed:', error);
+      console.error('❌ Engine: UniversalWorker initialization failed:', error);
       this._useWorker = false;
       this._wasmWorker = null;
       // Fall back to direct WASM dispatcher
