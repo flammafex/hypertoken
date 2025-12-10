@@ -117,6 +117,13 @@ export class MultiagentBlackjackGame {
 
     this.engine.space.collectAllInto(this.engine.stack);
 
+    // Deduct bets from bankroll before dealing
+    this.engine._agents.forEach(agent => {
+      if (agent.resources.currentBet > 0) {
+        agent.resources.bankroll -= agent.resources.currentBet;
+      }
+    });
+
     // Deal to agents
     for (let i = 0; i < 2; i++) {
       this.engine._agents.forEach(agent => {
