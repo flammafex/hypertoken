@@ -5,7 +5,9 @@
 
 ## Overview
 
-Worker Mode enables multi-threaded execution of HyperToken operations using Node.js Worker Threads. This allows compute-intensive operations to run in parallel without blocking the main thread, providing better responsiveness and performance for heavy workloads.
+Worker Mode enables multi-threaded execution of HyperToken operations using Node.js Worker Threads (server) or Web Workers (browser). This allows compute-intensive operations to run in parallel without blocking the main thread, providing better responsiveness and performance for heavy workloads.
+
+The same `useWorker: true` API works in both environments - HyperToken automatically detects the runtime and uses the appropriate worker implementation.
 
 ## Table of Contents
 
@@ -105,8 +107,8 @@ const engine = new Engine({
 
 1. **Simple Operations** - Actions complete in <1ms
 2. **Single Synchronous Flow** - No parallelization benefit
-3. **Browser Environment** - Not yet supported (coming soon)
-4. **Debugging** - Sync mode easier to debug
+3. **Debugging** - Sync mode easier to debug
+4. **Legacy Browsers** - Older browsers without ES Module Worker support
 
 ---
 
@@ -157,10 +159,15 @@ Example:
 interface EngineOptions {
   useWorker?: boolean;      // Enable worker mode (default: false)
   workerOptions?: {
+    // Common options (Node.js and Browser)
     debug?: boolean;        // Debug logging (default: false)
-    timeout?: number;       // Action timeout in ms (default: 120000)
+    timeout?: number;       // Action timeout in ms (default: 30000)
     enableBatching?: boolean; // Batch rapid actions (default: false)
     batchWindow?: number;   // Batching window in ms (default: 10)
+
+    // Browser-specific options
+    workerPath?: string;    // Path to worker script (default: '/workers/hypertoken.worker.js')
+    wasmPath?: string;      // Path to WASM files (default: '/wasm/')
   };
 }
 ```
@@ -510,34 +517,143 @@ for (const chunk of chunks) {
 
 ## Browser Support
 
-### Status: 🚧 Coming Soon
+### Status: ✅ Available
 
-Browser support via Web Workers is planned but not yet implemented.
+Browser support via Web Workers is now fully implemented! The same `useWorker: true` API works in both Node.js and browsers.
 
-### Current Workaround
-
-For browser environments, use direct WASM integration:
+### Quick Start (Browser)
 
 ```javascript
-import { StackWasm } from './core/StackWasm.js';
-import { SpaceWasm } from './core/SpaceWasm.js';
-import { Chronicle } from './core/Chronicle.js';
+import { Engine } from './engine/Engine.js';
 
-const stack = new StackWasm(new Chronicle(), tokens);
-const shuffled = stack.shuffle({ seed: 42 });
-```
-
-### Planned API (Browser)
-
-```javascript
-// Future browser API
 const engine = new Engine({
-  useWorker: true,  // Will use Web Workers in browser
+  useWorker: true,
   workerOptions: {
-    workerScript: '/workers/hypertoken-worker.js'
+    workerPath: '/workers/hypertoken.worker.js',
+    wasmPath: '/wasm/'
   }
 });
+
+// Wait for worker initialization
+await new Promise(resolve => setTimeout(resolve, 500));
+
+// Use the same API as Node.js
+await engine.dispatch('stack:shuffle', { seed: 42 });
+const cards = await engine.dispatch('stack:draw', { count: 5 });
+
+// Cleanup
+await engine.shutdown();
 ```
+
+### Browser-Specific Options
+
+```typescript
+interface WorkerOptions {
+  // Common options (both Node.js and Browser)
+  debug?: boolean;        // Enable debug logging
+  timeout?: number;       // Request timeout in ms (default: 30000)
+  enableBatching?: boolean; // Batch rapid actions
+  batchWindow?: number;   // Batching window in ms
+
+  // Browser-specific options
+  workerPath?: string;    // Path to worker script (default: '/workers/hypertoken.worker.js')
+  wasmPath?: string;      // Path to WASM files (default: '/wasm/')
+}
+```
+
+### Server Requirements
+
+For the browser demo to work, your server must:
+
+1. **Serve WASM with correct MIME type**:
+   ```
+   Content-Type: application/wasm
+   ```
+
+2. **Support ES Modules in Workers** (modern browsers required)
+
+3. **Optional: Enable SharedArrayBuffer** for maximum performance:
+   ```
+   Cross-Origin-Opener-Policy: same-origin
+   Cross-Origin-Embedder-Policy: require-corp
+   ```
+
+### File Structure
+
+```
+your-app/
+├── workers/
+│   └── hypertoken.worker.js  # Copy from hypertoken/workers/
+├── wasm/                      # Copy from hypertoken/core-rs/pkg/web/
+│   ├── hypertoken_core.js
+│   ├── hypertoken_core_bg.wasm
+│   └── ...
+└── your-app.js
+```
+
+### Architecture
+
+The browser implementation uses three key components:
+
+1. **UniversalWorker** (`core/UniversalWorker.ts`)
+   - Auto-detects Node.js vs Browser environment
+   - Instantiates appropriate worker implementation
+   - Provides unified API
+
+2. **WebWorker** (`core/WebWorker.ts`)
+   - Browser Web Worker manager
+   - Same API as Node.js `WasmWorker`
+   - Uses `Worker` constructor with `{ type: 'module' }`
+
+3. **Worker Script** (`workers/hypertoken.worker.js`)
+   - Runs in Web Worker context
+   - Loads WASM from web build
+   - Processes action requests
+
+### Environment Detection
+
+The `UniversalWorker` automatically detects the environment:
+
+```javascript
+// Check environment programmatically
+import { UniversalWorker, getEnvironment, supportsWorkers } from './core/UniversalWorker.js';
+
+console.log(getEnvironment());    // 'node' or 'browser'
+console.log(supportsWorkers());   // true/false
+
+// UniversalWorker handles this automatically
+const worker = new UniversalWorker({ debug: true });
+await worker.init();
+console.log(worker.environment);  // 'node' or 'browser'
+```
+
+### Browser Demo
+
+A complete browser demo is available at `examples/browser-demo/`:
+
+```bash
+# Build WASM for web
+npm run build:rust
+
+# Serve the project
+npx serve .
+
+# Open http://localhost:3000/examples/browser-demo/
+```
+
+### Browser Compatibility
+
+| Browser | Minimum Version | Notes |
+|---------|-----------------|-------|
+| Chrome | 80+ | Full support |
+| Firefox | 79+ | Full support |
+| Safari | 15+ | Full support |
+| Edge | 80+ | Full support |
+
+Requirements:
+- ES Modules support
+- Web Workers with module support
+- WebAssembly support
 
 ---
 
