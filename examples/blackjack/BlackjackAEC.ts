@@ -215,8 +215,19 @@ export class BlackjackAEC extends AECEnvironment {
       case ACTION_INSURANCE:
         if (this.actionMask(currentAgent)[ACTION_INSURANCE]) {
           this.game.takeInsurance();
+          // After insurance, dealer peeks for blackjack
+          const dealerHasBJ = this.game.checkDealerBlackjack();
+          if (dealerHasBJ) {
+            // Round ended due to dealer blackjack
+            this._roundComplete = true;
+            this.calculateRewards();
+            for (const agent of this._possibleAgents) {
+              this._terminations[agent] = true;
+            }
+            return;
+          }
         }
-        // Insurance doesn't end turn - continue
+        // Insurance doesn't end turn - player can still hit/stand
         return;
       default:
         // Unknown action, treat as stand

@@ -344,6 +344,70 @@ export class MultiagentBlackjackGame {
     console.log(`${agent.name} took insurance for $${insuranceAmount}`);
   }
 
+  /**
+   * Check if dealer has blackjack (peek at hole card).
+   * In American blackjack, this is done after insurance decisions.
+   * If dealer has blackjack, round ends immediately.
+   * @returns {boolean} true if dealer has blackjack and round ended
+   */
+  checkDealerBlackjack() {
+    if (this.variant === 'european') {
+      // European variant doesn't peek
+      return false;
+    }
+
+    // Get all dealer cards (including face-down)
+    const dealerCards = this.engine.space.zone("dealer-hand").map(p => p.tokenSnapshot);
+
+    if (!isBlackjack(dealerCards)) {
+      console.log("Dealer peeks... no blackjack. Play continues.");
+      return false;
+    }
+
+    // Dealer has blackjack!
+    console.log("🃏 Dealer has BLACKJACK!");
+
+    // Reveal the hole card
+    const dealerHand = this.engine.space.zone("dealer-hand");
+    if (dealerHand[0] && !dealerHand[0].faceUp) {
+      this.engine.space.flip("dealer-hand", dealerHand[0].id, true);
+    }
+
+    // Resolve all bets immediately
+    this.engine._agents.forEach(agent => {
+      if (agent.resources.currentBet === 0) return;
+
+      // Resolve insurance first - pays 2:1
+      if (agent.resources.insuranceBet > 0) {
+        const insurancePayout = agent.resources.insuranceBet * 3; // Original + 2:1
+        agent.resources.bankroll += insurancePayout;
+        console.log(`${agent.name}: Insurance WINS! (+$${agent.resources.insuranceBet * 2})`);
+        agent.resources.insuranceBet = 0;
+      }
+
+      // Check if player also has blackjack
+      const agentCards = this.engine.space.zone(agent.handZone).map(p => p.tokenSnapshot);
+      if (isBlackjack(agentCards)) {
+        // Push - return the bet
+        agent.resources.bankroll += agent.resources.currentBet;
+        console.log(`${agent.name}: Also has blackjack - PUSH (bet returned)`);
+      } else {
+        // Player loses main bet (already deducted)
+        console.log(`${agent.name}: Loses to dealer blackjack (-$${agent.resources.currentBet})`);
+      }
+
+      agent.resources.currentBet = 0;
+    });
+
+    // End the round
+    this.engine.session.change("dealer blackjack", (doc) => {
+      doc.gameLoop.running = false;
+      doc.gameLoop.phase = "complete";
+    });
+
+    return true;
+  }
+
   split() {
     const agent = this.engine.loop.activeAgent;
     if (!agent) return;
