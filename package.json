@@ -12,11 +12,13 @@
   },
   "dependencies": {
     "@automerge/automerge": "^3.2.0",
+    "@modelcontextprotocol/sdk": "^0.5.0",
     "@types/ws": "^8.18.1",
     "ws": "^8.18.3"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "mcp:server": "npx tsx mcp/server.ts",
     "bridge:server": "npx tsx bridge/server.ts",
     "bridge:blackjack": "npx tsx bridge/server.ts --env blackjack --port 9999",
     "bridge:blackjack:verbose": "npx tsx bridge/server.ts --env blackjack --port 9999 --verbose",
