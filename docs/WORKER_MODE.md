@@ -1,7 +1,7 @@
 # Worker Mode Guide
 
 > **✅ UPDATE: Rust/WASM Migration 100% Complete!**
-> All worker operations now use the high-performance Rust/WASM core (10-100x faster). Worker Mode combines multi-threading with zero-overhead WASM execution for maximum performance.
+> All worker operations now use the high-performance Rust/WASM core. Worker Mode combines multi-threading with WASM execution for improved performance (benchmarks show ~20x improvement for Stack/Space operations).
 
 ## Overview
 

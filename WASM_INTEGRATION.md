@@ -8,7 +8,7 @@ This document describes the integration of Rust/WASM performance optimizations i
 
 ## 🎯 Overview
 
-HyperToken's performance-critical operations are being ported to Rust and compiled to WebAssembly for **10-100x performance improvements**.
+HyperToken's performance-critical operations are being ported to Rust and compiled to WebAssembly for **significant performance improvements** (benchmarks show ~20x for Stack/Space operations).
 
 ### Current Status
 

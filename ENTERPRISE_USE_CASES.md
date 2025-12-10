@@ -10,7 +10,7 @@ By decoupling **State** (CRDTs), **Logic** (Rules), and **Time** (GameLoop), Hyp
 
 | Sector | Use Case | Mechanism | Primary Benefit |
 | :--- | :--- | :--- | :--- |
-| **AI Research** | [Agent Training](#pattern-1-the-headless-gym-rl-environment) | Gym Interface | Train agents 1000x faster than real-time |
+| **AI Research** | [Agent Training](#pattern-1-the-headless-gym-rl-environment) | Gym Interface | Fast headless simulation for rapid training |
 | **FinTech** | [Market Simulation](#pattern-2-the-sovereign-economy) | CRDT Ledger | Test incentive models before deployment |
 | **Game Dev** | [Mechanic Prototyping](#pattern-3-rapid-logic-prototyping) | Action Registry | Validate fun/balance before coding graphics |
 | **Logistics** | [Asset Tracking](#pattern-4-supply-chain-logic) | Token/Zone | Audit trail with mathematical integrity |
