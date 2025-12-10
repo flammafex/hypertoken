@@ -17,7 +17,9 @@
     "ws": "^8.18.3"
   },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "tsc && npm run build:examples",
+    "build:examples": "cp -r examples/blackjack/*.js dist/examples/blackjack/ && cp -r examples/blackjack/token-sets dist/examples/blackjack/",
+    "blackjack": "node dist/examples/blackjack/cli.js --betting",
     "mcp:server": "npx tsx mcp/server.ts",
     "bridge:server": "npx tsx bridge/server.ts",
     "bridge:blackjack": "npx tsx bridge/server.ts --env blackjack --port 9999",
