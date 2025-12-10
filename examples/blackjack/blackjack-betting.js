@@ -51,7 +51,10 @@ export class BettingManager {
    * @returns {boolean} - Success status
    */
   placeBet(amount) {
-    // Validate bet amount
+    // Validate bet amount is a valid number
+    if (!Number.isFinite(amount)) {
+      throw new Error('Invalid bet amount');
+    }
     if (amount < this.minBet) {
       throw new Error(`Minimum bet is ${this.minBet}`);
     }
