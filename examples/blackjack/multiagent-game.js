@@ -93,6 +93,8 @@ export class MultiagentBlackjackGame {
         agent.resources.insuranceBet = 0;
         agent.resources.hasSplit = 0;
         agent.resources.splitHandZone = null;
+        agent.resources.splitHandBet = 0;
+        agent.resources.playingSplitHand = 0;
         this.engine._agents.push(agent);
       }
       const handZone = `agent-${i}-hand`;
@@ -113,6 +115,9 @@ export class MultiagentBlackjackGame {
     this.engine._agents.forEach(p => {
       p.resources.stood = 0;
       p.resources.busted = 0;
+      p.resources.hasSplit = 0;
+      p.resources.splitHandBet = 0;
+      p.resources.playingSplitHand = 0;
     });
 
     this.engine.space.collectAllInto(this.engine.stack);
@@ -196,6 +201,16 @@ export class MultiagentBlackjackGame {
     // REMOVED MANUAL EMIT
   }
 
+  /**
+   * Get the current hand zone for an agent (handles split hands)
+   */
+  getCurrentHandZone(agent) {
+    if (agent.resources.hasSplit && agent.resources.playingSplitHand) {
+      return agent.resources.splitHandZone;
+    }
+    return agent.handZone;
+  }
+
   hit() {
     const agent = this.engine.loop.activeAgent;
     if (!agent) return;
@@ -206,19 +221,34 @@ export class MultiagentBlackjackGame {
         return;
     }
 
-    this.engine.space.place(agent.handZone, card, { faceUp: true });
+    const currentZone = this.getCurrentHandZone(agent);
+    this.engine.space.place(currentZone, card, { faceUp: true });
 
-    const cards = this.engine.space.zone(agent.handZone).map(p => p.tokenSnapshot);
+    const cards = this.engine.space.zone(currentZone).map(p => p.tokenSnapshot);
     if (isBusted(cards)) {
-      console.log(`💥 ${agent.name} Busted!`);
-      agent.resources.busted = 1;
-      this.nextAgent();
+      const handLabel = agent.resources.playingSplitHand ? " (Split Hand)" : "";
+      console.log(`💥 ${agent.name}${handLabel} Busted!`);
+
+      // If playing first split hand and busted, move to second hand
+      if (agent.resources.hasSplit && !agent.resources.playingSplitHand) {
+        agent.resources.playingSplitHand = 1;
+        console.log(`${agent.name} now playing split hand...`);
+      } else {
+        agent.resources.busted = 1;
+        this.nextAgent();
+      }
     }
   }
 
   stand() {
     const agent = this.engine.loop.activeAgent;
-    if (agent) {
+    if (!agent) return;
+
+    // If we have split and are still on first hand, move to second hand
+    if (agent.resources.hasSplit && !agent.resources.playingSplitHand) {
+      agent.resources.playingSplitHand = 1;
+      console.log(`${agent.name} now playing split hand...`);
+    } else {
       agent.resources.stood = 1;
       this.nextAgent();
     }
@@ -228,21 +258,31 @@ export class MultiagentBlackjackGame {
     const agent = this.engine.loop.activeAgent;
     if (!agent) return;
 
-    const cards = this.engine.space.zone(agent.handZone).map(p => p.tokenSnapshot);
+    const currentZone = this.getCurrentHandZone(agent);
+    const cards = this.engine.space.zone(currentZone).map(p => p.tokenSnapshot);
     if (!canDoubleDown(cards)) {
       console.error("Cannot double down - must have exactly 2 cards");
       return;
     }
 
+    // Determine which bet to double (main hand or split hand)
+    const betToDouble = agent.resources.playingSplitHand
+      ? agent.resources.splitHandBet
+      : agent.resources.currentBet;
+
     // Check if agent can afford to double
-    if (agent.resources.bankroll < agent.resources.currentBet) {
+    if (agent.resources.bankroll < betToDouble) {
       console.error("Insufficient funds to double down");
       return;
     }
 
-    // Double the bet
-    agent.resources.bankroll -= agent.resources.currentBet;
-    agent.resources.currentBet *= 2;
+    // Double the appropriate bet
+    agent.resources.bankroll -= betToDouble;
+    if (agent.resources.playingSplitHand) {
+      agent.resources.splitHandBet *= 2;
+    } else {
+      agent.resources.currentBet *= 2;
+    }
 
     // Take exactly one card
     const card = this.engine.stack.draw();
@@ -251,18 +291,23 @@ export class MultiagentBlackjackGame {
       return;
     }
 
-    this.engine.space.place(agent.handZone, card, { faceUp: true });
+    this.engine.space.place(currentZone, card, { faceUp: true });
 
     // Check for bust
-    const newCards = this.engine.space.zone(agent.handZone).map(p => p.tokenSnapshot);
+    const newCards = this.engine.space.zone(currentZone).map(p => p.tokenSnapshot);
+    const handLabel = agent.resources.playingSplitHand ? " (Split Hand)" : "";
     if (isBusted(newCards)) {
-      console.log(`💥 ${agent.name} Busted after doubling down!`);
-      agent.resources.busted = 1;
+      console.log(`💥 ${agent.name}${handLabel} Busted after doubling down!`);
     }
 
-    // Automatically stand after double down
-    agent.resources.stood = 1;
-    this.nextAgent();
+    // After doubling, move to next hand or next agent
+    if (agent.resources.hasSplit && !agent.resources.playingSplitHand) {
+      agent.resources.playingSplitHand = 1;
+      console.log(`${agent.name} now playing split hand...`);
+    } else {
+      agent.resources.stood = 1;
+      this.nextAgent();
+    }
   }
 
   takeInsurance(amount = null) {
@@ -315,7 +360,10 @@ export class MultiagentBlackjackGame {
       return;
     }
 
-    // Deduct split bet
+    // Store the original bet for the split hand (before any doubling)
+    agent.resources.splitHandBet = agent.resources.currentBet;
+
+    // Deduct split bet from bankroll
     agent.resources.bankroll -= agent.resources.currentBet;
 
     // Create split hand zone for this agent
@@ -337,12 +385,12 @@ export class MultiagentBlackjackGame {
     if (card1) this.engine.space.place(agent.handZone, card1, { faceUp: true });
     if (card2) this.engine.space.place(splitHandZone, card2, { faceUp: true });
 
-    // Mark that this agent has split
+    // Mark that this agent has split, starting with first hand
     agent.resources.hasSplit = 1;
     agent.resources.splitHandZone = splitHandZone;
-    agent.resources.currentSplitHand = 0; // Start with first hand
+    agent.resources.playingSplitHand = 0; // Start with first hand
 
-    console.log(`${agent.name} split their hand!`);
+    console.log(`${agent.name} split their hand! Playing first hand...`);
   }
 
   playDealer() {
@@ -402,27 +450,34 @@ export class MultiagentBlackjackGame {
         const hand1Cards = this.engine.space.zone(agent.handZone).map(p => p.tokenSnapshot);
         const hand2Cards = this.engine.space.zone(agent.resources.splitHandZone).map(p => p.tokenSnapshot);
 
+        // Use tracked bets: currentBet for hand 1, splitHandBet for hand 2
+        const hand1Bet = agent.resources.currentBet;
+        const hand2Bet = agent.resources.splitHandBet;
+
         // Resolve first hand
         if (!isBusted(hand1Cards)) {
           const result1 = determineWinner(hand1Cards, dealerCards);
-          const payout1 = this.calculatePayout(result1, agent.resources.currentBet);
+          const payout1 = this.calculatePayout(result1, hand1Bet);
           if (payout1 > 0) agent.resources.bankroll += payout1;
           console.log(`${agent.name} (Hand 1): ${result1} (+$${payout1})`);
         } else {
-          console.log(`${agent.name} (Hand 1): BUST (-$${agent.resources.currentBet})`);
+          console.log(`${agent.name} (Hand 1): BUST (-$${hand1Bet})`);
         }
 
         // Resolve second hand
         if (!isBusted(hand2Cards)) {
           const result2 = determineWinner(hand2Cards, dealerCards);
-          const payout2 = this.calculatePayout(result2, agent.resources.currentBet);
+          const payout2 = this.calculatePayout(result2, hand2Bet);
           if (payout2 > 0) agent.resources.bankroll += payout2;
           console.log(`${agent.name} (Hand 2): ${result2} (+$${payout2})`);
         } else {
-          console.log(`${agent.name} (Hand 2): BUST (-$${agent.resources.currentBet})`);
+          console.log(`${agent.name} (Hand 2): BUST (-$${hand2Bet})`);
         }
 
+        // Reset split state
         agent.resources.hasSplit = 0;
+        agent.resources.splitHandBet = 0;
+        agent.resources.playingSplitHand = 0;
       } else {
         // Regular single hand
         const agentCards = this.engine.space.zone(agent.handZone).map(p => p.tokenSnapshot);
