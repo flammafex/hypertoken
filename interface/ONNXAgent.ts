@@ -200,12 +200,15 @@ export class ONNXAgent extends Emitter implements IAgent {
     if (isBrowser) {
       // Browser: use onnxruntime-web
       // First check if it's already loaded via script tag
-      if ((window as Record<string, unknown>).ort) {
-        return (window as Record<string, unknown>).ort as OrtModule;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const win = window as any;
+      if (win.ort) {
+        return win.ort as OrtModule;
       }
 
-      // Try dynamic import
+      // Try dynamic import (onnxruntime-web is an optional peer dependency)
       try {
+        // @ts-ignore - optional dependency, may not be installed
         const ort = await import("onnxruntime-web");
         return ort as unknown as OrtModule;
       } catch {
@@ -215,8 +218,9 @@ export class ONNXAgent extends Emitter implements IAgent {
         );
       }
     } else {
-      // Node.js: use onnxruntime-node
+      // Node.js: use onnxruntime-node (optional peer dependency)
       try {
+        // @ts-ignore - optional dependency, may not be installed
         const ort = await import("onnxruntime-node");
         return ort as unknown as OrtModule;
       } catch {
