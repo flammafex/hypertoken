@@ -20,3 +20,10 @@ export {
   ParallelEnvironment,
   ParallelStepResult,
 } from "./PettingZooParallel.js";
+
+// ONNX inference agent (browser/Node.js)
+export {
+  ONNXAgent,
+  ONNXAgentOptions,
+  ONNXMetadata,
+} from "./ONNXAgent.js";

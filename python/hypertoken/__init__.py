@@ -37,12 +37,26 @@ For more examples, see the `examples/` directory.
 from .env import HyperTokenEnv, HyperTokenAECEnv, HyperTokenParallelEnv
 from .client import HyperTokenClient
 from .spaces import convert_space
+from .export import (
+    export_sb3_to_onnx,
+    export_pytorch_to_onnx,
+    verify_onnx,
+    load_onnx_metadata,
+    create_action_map_from_metadata,
+)
 
 __version__ = "0.1.0"
 __all__ = [
+    # Environments
     "HyperTokenEnv",
     "HyperTokenAECEnv",
     "HyperTokenParallelEnv",
     "HyperTokenClient",
     "convert_space",
+    # Export utilities
+    "export_sb3_to_onnx",
+    "export_pytorch_to_onnx",
+    "verify_onnx",
+    "load_onnx_metadata",
+    "create_action_map_from_metadata",
 ]
