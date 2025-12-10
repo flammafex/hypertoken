@@ -47,8 +47,8 @@ HyperToken treats the **entire game state as a CRDT** (Conflict-Free Replicated 
 > "Any game is automatically a training environment"
 
 - **OpenAI Gym compatible** - Works with any RL framework
-- **1000x real-time** - Train agents faster than humanly possible
-- **Multi-agent scenarios** - Native support for competitive/cooperative AI
+- **Fast simulation** - No graphics overhead means rapid training
+- **Multi-agent scenarios** - Native support for competitive/cooperative AI via PettingZoo
 - **Deterministic replay** - Perfect reproducibility for papers
 
 ### **For Communities** 🌐
@@ -118,35 +118,27 @@ class MyGameEnv extends GymEnvironment {
 
 ## 🚀 Quick Start
 
-### ⚡ 5-Minute Interactive Quickstart
-
-```bash
-npx hypertoken-quickstart
-```
-
-**New!** Try HyperToken in 5 minutes with our interactive CLI:
-- 🎮 **Play & Learn** - Experience multiplayer sync in 30 seconds
-- 🏗️ **Create New Game** - Scaffold a project with templates
-- 📚 **Explore Examples** - Tour Blackjack, Tic-Tac-Toe, and more
-
-### 📦 Manual Installation
+### 📦 Installation
 
 ```bash
 # Clone and install
 git clone https://github.com/flammafex/hypertoken.git
 cd hypertoken
 npm install
-npx tsc
+npm run build
 
-# Run multiplayer Blackjack
-node dist/examples/blackjack/server.js
-node dist/examples/blackjack/client.js Alice  # Terminal 2
-node dist/examples/blackjack/client.js Bob    # Terminal 3
+# Run single-player Blackjack with betting
+npm run blackjack
+
+# Or run multiplayer Blackjack
+node dist/examples/blackjack/server.js           # Terminal 1
+node dist/examples/blackjack/client.js Alice     # Terminal 2
+node dist/examples/blackjack/client.js Bob       # Terminal 3
 
 # Explore other examples
-node dist/examples/prisoners-dilemma/pd-cli.js  # Game theory
+node dist/examples/prisoners-dilemma/pd-cli.js   # Game theory
 node dist/examples/tarot-reading/tarot-cli.js    # Divination
-node dist/examples/accordion/accordion.js         # "Impossible" solitaire
+node dist/examples/accordion/accordion.js        # Solitaire
 ```
 
 ### 🐳 Docker Quickstart
@@ -204,6 +196,63 @@ await engine.dispatch("agent:drawCards", { count: 1000 });
 
 ---
 
+## 🤖 AI & ML Integration
+
+### **MCP Server for LLM Integration**
+HyperToken includes a [Model Context Protocol](https://modelcontextprotocol.io/) server, allowing LLMs to play games through natural language:
+
+```bash
+# Start the MCP server
+npm run mcp:server
+```
+
+Games can be exposed as MCP tools, enabling Claude and other LLMs to interact with game state directly.
+
+### **ONNX Policy Export**
+Train policies with any framework, export to ONNX, and run inference in browser or Node.js:
+
+```typescript
+import { ONNXAgent } from "./interface/ONNXAgent.js";
+
+const agent = new ONNXAgent();
+await agent.load("/models/blackjack_policy.onnx");
+
+// Agent makes decisions via ONNX inference
+const action = await agent.act(observation);
+```
+
+### **Python Bridge for PettingZoo**
+Train multi-agent policies using Python's PettingZoo ecosystem:
+
+```bash
+# Start the bridge server
+npm run bridge:blackjack
+
+# Connect from Python
+# See docs/PYTHON_BRIDGE.md for details
+```
+
+---
+
+## 🌐 Browser Support
+
+### **Web Playground**
+An interactive web-based playground for experimenting with HyperToken:
+- Real-time state visualization
+- Interactive action dispatch
+- CRDT synchronization demos
+
+### **Browser Demo**
+A standalone browser example showing HyperToken running entirely client-side with Web Workers for WASM execution.
+
+```bash
+# Serve the browser demo
+cd examples/browser-demo
+npx serve .
+```
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -244,19 +293,36 @@ hypertoken/
 │
 ├── network/                # Distribution (TypeScript)
 │   ├── PeerConnection.ts  # WebSocket client
-│   └── RelayServer.ts     # Minimal relay
+│   ├── RelayServer.ts     # Minimal relay
+│   ├── WebRTCConnection.ts # WebRTC peer connections
+│   └── HybridPeerManager.ts # WebSocket + WebRTC hybrid
 │
 ├── interface/              # Adapters
 │   ├── Gym.ts             # OpenAI Gym compatible
+│   ├── PettingZoo.ts      # Multi-agent RL interface
+│   ├── ONNXAgent.ts       # ONNX inference for trained policies
 │   ├── OpenAIAgent.js     # LLM integration
 │   └── CLIInterface.js    # Terminal UI
 │
+├── mcp/                    # Model Context Protocol
+│   ├── server.ts          # MCP server for LLM interaction
+│   └── games/             # Game-specific MCP tools
+│
+├── bridge/                 # Python/External Integration
+│   ├── server.ts          # JSON-RPC bridge server
+│   └── protocol.ts        # Bridge protocol definitions
+│
+├── playground/             # Interactive Web Playground
+│   └── playground.js      # Browser-based experimentation
+│
 └── examples/              # Complete Games
-    ├── blackjack/         # Casino with AI
+    ├── blackjack/         # Casino with AI & betting
     ├── prisoners-dilemma/ # 14 strategies
     ├── network-tictactoe/ # P2P example
     ├── tarot-reading/     # 8 spreads
-    └── accordion/         # AI challenge
+    ├── accordion/         # Solitaire
+    ├── dungeon-raiders/   # Multiplayer dungeon
+    └── browser-demo/      # Client-side browser example
 ```
 
 ---
@@ -295,7 +361,13 @@ This applies equally to cards in blackjack, shares in a market, or NPCs in a wor
 ### Core Documentation
 - **[Complete Action Reference](./engine/ACTIONS.md)** - All 67 actions documented
 - **[Worker Mode Guide](./docs/WORKER_MODE.md)** - Multi-threading and performance optimization
-- **[WASM Integration](./core-rs/README.md)** - Rust/WASM architecture details
+- **[WASM Integration](./WASM_INTEGRATION.md)** - Rust/WASM architecture details
+- **[Docker Guide](./DOCKER.md)** - Container deployment
+
+### AI & ML Integration
+- **[ONNX Export Guide](./docs/ONNX_EXPORT.md)** - Export and deploy trained policies
+- **[Python Bridge](./docs/PYTHON_BRIDGE.md)** - PettingZoo integration
+- **[MCP Server](./mcp/README.md)** - LLM integration via Model Context Protocol
 
 ### Use Cases & Examples
 - **[Enterprise Use Cases](./ENTERPRISE_USE_CASES.md)** - AI training, market simulation
@@ -379,6 +451,6 @@ With inspiration from:
 
 **HyperToken: Where relationships create meaning, and meaning creates worlds.** 🌍✨
 
-[Website](https://hypertoken.ai)
+[GitHub](https://github.com/flammafex/hypertoken)
 
 </div>
