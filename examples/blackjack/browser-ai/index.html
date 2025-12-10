@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HyperToken Blackjack - Play vs Trained AI</title>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #e94560;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 30px;
+    }
+
+    .game-area {
+      display: grid;
+      gap: 20px;
+    }
+
+    .hand-section {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .hand-section h3 {
+      margin: 0 0 15px 0;
+      color: #4ade80;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hand-section.dealer h3 {
+      color: #fbbf24;
+    }
+
+    .hand-section.ai h3 {
+      color: #60a5fa;
+    }
+
+    .cards {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      min-height: 80px;
+      align-items: center;
+    }
+
+    .card {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 50px;
+      height: 70px;
+      background: white;
+      color: #1a1a2e;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+    }
+
+    .card.red {
+      color: #e94560;
+    }
+
+    .card.hidden {
+      background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+      color: transparent;
+    }
+
+    .card.hidden::after {
+      content: "?";
+      color: #4ade80;
+      font-size: 24px;
+    }
+
+    .hand-value {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #888;
+    }
+
+    .hand-value strong {
+      color: #eee;
+      font-size: 18px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      padding: 25px 0;
+    }
+
+    button {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background: #e94560;
+      color: white;
+      transition: all 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #ff6b6b;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
+    }
+
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button.secondary {
+      background: #16213e;
+      border: 2px solid #4ade80;
+      color: #4ade80;
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: #4ade80;
+      color: #16213e;
+    }
+
+    .status-bar {
+      padding: 15px 20px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .model-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fbbf24;
+    }
+
+    .status-dot.ready {
+      background: #4ade80;
+    }
+
+    .status-dot.error {
+      background: #e94560;
+    }
+
+    .ai-thinking {
+      color: #60a5fa;
+      font-style: italic;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .result-banner {
+      padding: 20px;
+      margin: 20px 0;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      text-align: center;
+      display: none;
+    }
+
+    .result-banner.show {
+      display: block;
+    }
+
+    .result-banner h2 {
+      margin: 0 0 15px 0;
+    }
+
+    .result-banner .win {
+      color: #4ade80;
+    }
+
+    .result-banner .lose {
+      color: #e94560;
+    }
+
+    .result-banner .push {
+      color: #fbbf24;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .result-item {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .result-item .label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .result-item .value {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    #log {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 15px;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    #log .entry {
+      margin: 2px 0;
+    }
+
+    #log .entry.ai {
+      color: #60a5fa;
+    }
+
+    #log .entry.player {
+      color: #4ade80;
+    }
+
+    #log .entry.dealer {
+      color: #fbbf24;
+    }
+
+    #log .entry.system {
+      color: #888;
+    }
+
+    .probs-display {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+    }
+
+    .prob-bar {
+      height: 4px;
+      background: #333;
+      border-radius: 2px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .prob-bar .fill {
+      height: 100%;
+      background: #60a5fa;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <h1>Blackjack vs Trained AI</h1>
+  <p class="subtitle">Play against a neural network trained with reinforcement learning!</p>
+
+  <div class="status-bar">
+    <div class="model-status">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="model-status">Loading model...</span>
+    </div>
+    <div>
+      <span id="stats">Wins: 0 | Losses: 0 | Pushes: 0</span>
+    </div>
+  </div>
+
+  <div class="game-area">
+    <!-- Dealer Section -->
+    <div class="hand-section dealer">
+      <h3>Dealer</h3>
+      <div class="cards" id="dealer-hand"></div>
+      <div class="hand-value" id="dealer-value"></div>
+    </div>
+
+    <!-- Player Section -->
+    <div class="hand-section player">
+      <h3>Your Hand</h3>
+      <div class="cards" id="player-hand"></div>
+      <div class="hand-value" id="player-value"></div>
+    </div>
+
+    <!-- AI Section -->
+    <div class="hand-section ai">
+      <h3>AI Opponent</h3>
+      <div class="cards" id="ai-hand"></div>
+      <div class="hand-value" id="ai-value"></div>
+      <div class="probs-display" id="ai-probs"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btn-hit" onclick="playerHit()">Hit</button>
+    <button id="btn-stand" onclick="playerStand()">Stand</button>
+    <button id="btn-deal" class="secondary" onclick="deal()">New Hand</button>
+  </div>
+
+  <div class="result-banner" id="result">
+    <h2>Round Complete</h2>
+    <div class="results-grid">
+      <div class="result-item">
+        <div class="label">You</div>
+        <div class="value" id="result-player">-</div>
+      </div>
+      <div class="result-item">
+        <div class="label">AI</div>
+        <div class="value" id="result-ai">-</div>
+      </div>
+      <div class="result-item">
+        <div class="label">Dealer</div>
+        <div class="value" id="result-dealer">-</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Game Log</h3>
+  <div id="log"></div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
