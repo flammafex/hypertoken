@@ -14,7 +14,7 @@ Power to the players. For real.
 | :--- | :--- | :--- | :--- |
 | **Gaming** | [Serverless Multiplayer](#pattern-1-the-pop-up-game) | P2P / Relay | Zero hosting costs; play anywhere |
 | **Gaming** | [Anti-Cheat P2P](#pattern-1-the-pop-up-game) | Rule Engine | Fair play without a central server |
-| **Web3** | ["Headless" Worlds](#pattern-2-the-infinite-space) | CRDT Sync | Persistent worlds that live in the swarm |
+| **Persistent** | ["Headless" Worlds](#pattern-2-the-infinite-space) | CRDT Sync | Persistent worlds that live in the swarm |
 | **Education** | [Probability Labs](#pattern-4-the-classroom-lab) | Stack / Gym | Interactive stats teaching tools |
 | **Narrative** | [Emergent Storytelling](#pattern-3-the-community-fork) | Token Metadata | Items that "remember" their history |
 
@@ -102,7 +102,7 @@ console.log(engine.analytics.getReport());
 - **Moddability**: The engine logic is transparent and extensible via plugins.
 
 **Privacy First**
-- **P2P Encryption**: Gameplay happens directly between peers.
+- **Direct P2P**: Gameplay happens directly between peers without central servers.
 - **No Tracking**: No central analytics server harvesting user behavior.
 
 ---
