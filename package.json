@@ -7,6 +7,7 @@
   ],
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "tsx": "^4.7.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
@@ -16,6 +17,9 @@
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "bridge:server": "npx tsx bridge/server.ts",
+    "bridge:blackjack": "npx tsx bridge/server.ts --env blackjack --port 9999",
+    "bridge:blackjack:verbose": "npx tsx bridge/server.ts --env blackjack --port 9999 --verbose",
     "test:core": "node --loader ./test/ts-esm-loader.js test/testCore.js",
     "test:engine": "node --loader ./test/ts-esm-loader.js test/testEngine.js",
     "test:exporters": "node --loader ./test/ts-esm-loader.js test/testExporters.js",
