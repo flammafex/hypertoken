@@ -46,7 +46,6 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/core-rs/pkg ./core-rs/pkg
 
 # Copy necessary runtime files
-COPY start-relay.js ./
 COPY examples/ ./examples/
 
 # Expose default ports

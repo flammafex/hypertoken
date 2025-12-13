@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile
     image: hypertoken:latest
     container_name: hypertoken-relay
-    command: ["node", "start-relay.js"]
+    command: ["node", "dist/cli/index.js", "relay"]
     ports:
       - "3000:3000"
     environment:

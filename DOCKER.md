@@ -74,7 +74,7 @@ docker compose run blackjack-bob
 
 ```bash
 # Run the relay server on custom port
-docker run -p 8080:8080 -e PORT=8080 hypertoken:latest node start-relay.js 8080
+docker run -p 8080:8080 -e PORT=8080 hypertoken:latest node dist/cli/index.js relay --port 8080
 
 # Run Prisoner's Dilemma example
 docker run -it hypertoken:latest node dist/examples/prisoners-dilemma/pd-cli.js
@@ -93,7 +93,8 @@ docker run -it hypertoken:latest node dist/examples/accordion/accordion.js
 docker run -it hypertoken:latest bash
 
 # Now you can run any commands:
-node start-relay.js
+node dist/cli/index.js relay
+node dist/cli/index.js bridge --env blackjack
 npx hypertoken-quickstart
 node dist/examples/blackjack/server.js
 ```
@@ -108,7 +109,7 @@ docker run -it \
   -v $(pwd)/core-rs/pkg:/app/core-rs/pkg \
   -p 3000:3000 \
   hypertoken:latest \
-  node start-relay.js
+  node dist/cli/index.js relay
 ```
 
 This mounts your local `dist/` and `core-rs/pkg/` directories so you can rebuild code outside Docker and see changes immediately.
@@ -192,14 +193,14 @@ docker build --no-cache -t hypertoken:latest .
 docker compose logs relay
 
 # Run with interactive mode to see errors
-docker run -it hypertoken:latest node start-relay.js
+docker run -it hypertoken:latest node dist/cli/index.js relay
 ```
 
 **Issue**: Port already in use
 ```bash
 # Change port mapping in docker-compose.yml or use:
 docker compose up --scale relay=0
-docker run -p 3001:3000 hypertoken:latest node start-relay.js
+docker run -p 3001:3000 hypertoken:latest node dist/cli/index.js relay
 ```
 
 ### Performance Issues
@@ -300,7 +301,7 @@ spec:
       containers:
       - name: relay
         image: hypertoken:latest
-        command: ["node", "start-relay.js"]
+        command: ["node", "dist/cli/index.js", "relay"]
         ports:
         - containerPort: 3000
         env:

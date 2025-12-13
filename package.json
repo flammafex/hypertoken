@@ -5,6 +5,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "bin": {
+    "hypertoken": "./dist/cli/index.js"
+  },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "tsx": "^4.7.0",
@@ -20,10 +23,10 @@
     "build": "tsc && npm run build:examples",
     "build:examples": "cp -r examples/blackjack/*.js dist/examples/blackjack/ && cp -r examples/blackjack/token-sets dist/examples/blackjack/ && mkdir -p dist/core-rs && cp -r core-rs/pkg dist/core-rs/",
     "blackjack": "node dist/examples/blackjack/cli.js --betting",
-    "mcp:server": "npx tsx mcp/server.ts",
-    "bridge:server": "npx tsx bridge/server.ts",
-    "bridge:blackjack": "npx tsx bridge/server.ts --env blackjack --port 9999",
-    "bridge:blackjack:verbose": "npx tsx bridge/server.ts --env blackjack --port 9999 --verbose",
+    "cli": "npx tsx cli/index.ts",
+    "relay": "npx tsx cli/index.ts relay",
+    "bridge": "npx tsx cli/index.ts bridge",
+    "mcp": "npx tsx cli/index.ts mcp",
     "test:core": "node --loader ./test/ts-esm-loader.js test/testCore.js",
     "test:engine": "node --loader ./test/ts-esm-loader.js test/testEngine.js",
     "test:exporters": "node --loader ./test/ts-esm-loader.js test/testExporters.js",
