@@ -14,9 +14,11 @@
  *   await server.start();
  */
 
+import { createServer, IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { AECEnvironment } from "../interface/PettingZoo.js";
 import { BlackjackAEC, BlackjackAECConfig } from "../examples/blackjack/BlackjackAEC.js";
+import { RateLimiter, RateLimitConfig } from "../network/RateLimiter.js";
 import type { Command, Response, EnvInfoResponse } from "./protocol.js";
 import type { Space } from "../interface/Gym.js";
 
@@ -35,6 +37,8 @@ export interface EnvServerOptions {
   verbose?: boolean;
   /** Host to bind to (default: 0.0.0.0) */
   host?: string;
+  /** Rate limiting config (optional, enabled by default) */
+  rateLimit?: Partial<RateLimitConfig> | false;
 }
 
 interface ResolvedOptions {
@@ -64,10 +68,14 @@ const ENV_REGISTRY: Record<string, EnvFactory> = {
 // ============================================================================
 
 export class EnvServer {
+  private httpServer: ReturnType<typeof createServer> | null = null;
   private wss: WebSocketServer | null = null;
   private env: AECEnvironment | null = null;
   private options: ResolvedOptions;
   private clientCount: number = 0;
+  private rateLimiter: RateLimiter | null = null;
+  private clientIds: Map<WebSocket, string> = new Map();
+  private startTime: number = Date.now();
 
   constructor(options: EnvServerOptions = {}) {
     this.options = {
@@ -77,35 +85,84 @@ export class EnvServer {
       verbose: options.verbose ?? false,
       host: options.host ?? "0.0.0.0",
     };
+
+    // Initialize rate limiter unless explicitly disabled
+    if (options.rateLimit !== false) {
+      this.rateLimiter = new RateLimiter(options.rateLimit ?? {});
+    }
   }
 
   /**
-   * Start the WebSocket server.
+   * Start the WebSocket server with HTTP health endpoint.
    */
   async start(): Promise<void> {
+    this.startTime = Date.now();
+
     // Create the environment
     this.env = this.createEnvironment(
       this.options.envType,
       this.options.envOptions
     );
 
-    // Start WebSocket server
-    this.wss = new WebSocketServer({
-      port: this.options.port,
-      host: this.options.host,
-    });
+    // Create HTTP server with health check endpoint
+    this.httpServer = createServer((req, res) => this.handleHttpRequest(req, res));
+
+    // Attach WebSocket server to HTTP server
+    this.wss = new WebSocketServer({ server: this.httpServer });
 
     console.log(
       `🎮 HyperToken EnvServer running on ws://${this.options.host}:${this.options.port}`
     );
     console.log(`   Environment: ${this.options.envType}`);
     console.log(`   Options: ${JSON.stringify(this.options.envOptions)}`);
+    console.log(`   Health check: http://${this.options.host}:${this.options.port}/health`);
+    if (this.rateLimiter) {
+      console.log(`   Rate limiting: enabled`);
+    }
 
     this.wss.on("connection", (ws, req) => this.handleConnection(ws, req));
 
     this.wss.on("error", (error) => {
       console.error("[EnvServer] Server error:", error);
     });
+
+    // Start listening
+    return new Promise((resolve) => {
+      this.httpServer!.listen(this.options.port, this.options.host, () => {
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Handle HTTP requests (health check endpoint).
+   */
+  private handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
+    if (req.url === "/health" || req.url === "/health/") {
+      const health = {
+        status: "healthy",
+        uptime: Math.floor((Date.now() - this.startTime) / 1000),
+        environment: this.options.envType,
+        connections: this.clientIds.size,
+        rateLimit: this.rateLimiter?.getStats() ?? null,
+      };
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(health));
+      return;
+    }
+
+    if (req.url === "/ready" || req.url === "/ready/") {
+      // Readiness check - is the environment initialized?
+      const ready = this.env !== null;
+      res.writeHead(ready ? 200 : 503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ready }));
+      return;
+    }
+
+    // For any other HTTP request, return 426 Upgrade Required
+    res.writeHead(426, { "Content-Type": "text/plain" });
+    res.end("WebSocket connection required. Use ws:// protocol.");
   }
 
   /**
@@ -118,8 +175,13 @@ export class EnvServer {
 
     this.env?.close();
     this.wss?.close();
+    this.httpServer?.close();
+    this.rateLimiter?.destroy();
+
     this.wss = null;
+    this.httpServer = null;
     this.env = null;
+    this.clientIds.clear();
 
     console.log("[EnvServer] Server stopped.");
   }
@@ -146,19 +208,27 @@ export class EnvServer {
    */
   private handleConnection(ws: WebSocket, req: any): void {
     this.clientCount++;
-    const clientId = this.clientCount;
+    const clientId = `client-${this.clientCount}`;
+    this.clientIds.set(ws, clientId);
 
     if (this.options.verbose) {
       const addr = req.socket.remoteAddress;
-      console.log(`[EnvServer] Client ${clientId} connected from ${addr}`);
+      console.log(`[EnvServer] ${clientId} connected from ${addr}`);
     }
 
     ws.on("message", async (data) => {
+      // Rate limiting check
+      if (this.rateLimiter && !this.rateLimiter.check(clientId)) {
+        console.warn(`[EnvServer] ${clientId} rate limited, closing connection`);
+        ws.close(1008, "Rate limit exceeded");
+        return;
+      }
+
       try {
         const msg = JSON.parse(data.toString()) as Command;
 
         if (this.options.verbose) {
-          console.log(`[EnvServer] Client ${clientId} -> ${JSON.stringify(msg)}`);
+          console.log(`[EnvServer] ${clientId} -> ${JSON.stringify(msg)}`);
         }
 
         const response = await this.handleCommand(msg);
@@ -167,26 +237,29 @@ export class EnvServer {
           const respPreview =
             JSON.stringify(response).slice(0, 200) +
             (JSON.stringify(response).length > 200 ? "..." : "");
-          console.log(`[EnvServer] Client ${clientId} <- ${respPreview}`);
+          console.log(`[EnvServer] ${clientId} <- ${respPreview}`);
         }
 
         ws.send(JSON.stringify(response));
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Unknown error";
-        console.error(`[EnvServer] Client ${clientId} error:`, errorMsg);
+        console.error(`[EnvServer] ${clientId} error:`, errorMsg);
         ws.send(JSON.stringify({ error: errorMsg }));
       }
     });
 
     ws.on("close", () => {
+      this.clientIds.delete(ws);
+      this.rateLimiter?.remove(clientId);
+
       if (this.options.verbose) {
-        console.log(`[EnvServer] Client ${clientId} disconnected`);
+        console.log(`[EnvServer] ${clientId} disconnected`);
       }
     });
 
     ws.on("error", (error) => {
-      console.error(`[EnvServer] Client ${clientId} WebSocket error:`, error);
+      console.error(`[EnvServer] ${clientId} WebSocket error:`, error);
     });
   }
 
