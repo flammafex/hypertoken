@@ -39,9 +39,11 @@
  *   const server = new UniversalRelayServer({ port: 3000, engine });
  */
 
+import { createServer, IncomingMessage, ServerResponse } from "http";
 import { Emitter } from "../core/events.js";
 import { IActionPayload } from "../core/types.js";
 import { Engine } from "../engine/Engine.js";
+import { RateLimiter, RateLimitConfig } from "./RateLimiter.js";
 import { WebSocketServer, WebSocket } from "ws";
 
 export type RelayMode = "relay" | "authoritative";
@@ -57,6 +59,8 @@ export interface UniversalRelayServerOptions {
   broadcastOnAction?: boolean;
   /** Server mode - auto-detected if engine is provided */
   mode?: RelayMode;
+  /** Rate limiting config (optional, enabled by default) */
+  rateLimit?: Partial<RateLimitConfig> | false;
 }
 
 export interface ClientInfo {
@@ -66,8 +70,11 @@ export interface ClientInfo {
 }
 
 export class UniversalRelayServer extends Emitter {
+  private httpServer: ReturnType<typeof createServer> | null = null;
   private wss: WebSocketServer | null = null;
   private clients: Map<WebSocket, ClientInfo> = new Map();
+  private rateLimiter: RateLimiter | null = null;
+  private startTime: number = Date.now();
 
   readonly port: number;
   readonly mode: RelayMode;
@@ -87,6 +94,11 @@ export class UniversalRelayServer extends Emitter {
     // Auto-detect mode based on engine presence
     this.mode = options.mode ?? (this.engine ? "authoritative" : "relay");
 
+    // Initialize rate limiter unless explicitly disabled
+    if (options.rateLimit !== false) {
+      this.rateLimiter = new RateLimiter(options.rateLimit ?? {});
+    }
+
     // Set up engine event listeners for authoritative mode
     if (this.engine && this.broadcastOnAction) {
       this.engine.on("engine:action", () => this.broadcastState());
@@ -94,22 +106,61 @@ export class UniversalRelayServer extends Emitter {
   }
 
   /**
-   * Start the relay server
+   * Start the relay server with HTTP health endpoint
    */
   async start(): Promise<void> {
+    this.startTime = Date.now();
+
+    // Create HTTP server with health check endpoint
+    this.httpServer = createServer((req, res) => this._handleHttpRequest(req, res));
+
+    // Attach WebSocket server to HTTP server
+    this.wss = new WebSocketServer({ server: this.httpServer });
+
+    const modeLabel = this.mode === "authoritative" ? "Authoritative" : "Relay";
+    console.log(`[UniversalRelay] ${modeLabel} server running on ws://localhost:${this.port}`);
+    console.log(`[UniversalRelay] Health check: http://localhost:${this.port}/health`);
+    if (this.rateLimiter) {
+      console.log(`[UniversalRelay] Rate limiting: enabled`);
+    }
+
+    this.wss.on("connection", (ws: WebSocket) => this._handleConnection(ws));
+
     return new Promise((resolve) => {
-      this.wss = new WebSocketServer({ port: this.port });
-
-      const modeLabel = this.mode === "authoritative" ? "Authoritative" : "Relay";
-      console.log(`[UniversalRelay] ${modeLabel} server running on ws://localhost:${this.port}`);
-
-      this.wss.on("listening", () => {
+      this.httpServer!.listen(this.port, () => {
         this.emit("server:start", { payload: { port: this.port, mode: this.mode } });
         resolve();
       });
-
-      this.wss.on("connection", (ws: WebSocket) => this._handleConnection(ws));
     });
+  }
+
+  /**
+   * Handle HTTP requests (health check endpoint)
+   */
+  private _handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
+    if (req.url === "/health" || req.url === "/health/") {
+      const health = {
+        status: "healthy",
+        uptime: Math.floor((Date.now() - this.startTime) / 1000),
+        mode: this.mode,
+        connections: this.clients.size,
+        rateLimit: this.rateLimiter?.getStats() ?? null,
+      };
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(health));
+      return;
+    }
+
+    if (req.url === "/ready" || req.url === "/ready/") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ready: true }));
+      return;
+    }
+
+    // For any other HTTP request, return 426 Upgrade Required
+    res.writeHead(426, { "Content-Type": "text/plain" });
+    res.end("WebSocket connection required. Use ws:// protocol.");
   }
 
   /**
@@ -139,6 +190,13 @@ export class UniversalRelayServer extends Emitter {
       });
       this.wss = null;
     }
+
+    // Close HTTP server
+    this.httpServer?.close();
+    this.httpServer = null;
+
+    // Cleanup rate limiter
+    this.rateLimiter?.destroy();
 
     this.emit("server:stop");
   }
@@ -234,6 +292,7 @@ export class UniversalRelayServer extends Emitter {
     // Set up close handler
     ws.on("close", () => {
       this.clients.delete(ws);
+      this.rateLimiter?.remove(peerId);
       this._broadcast({ type: "peer:left", peerId });
 
       if (this.verbose) {
@@ -258,9 +317,19 @@ export class UniversalRelayServer extends Emitter {
   ───────────────────────────────────────────────*/
 
   private async _handleMessage(ws: WebSocket, clientInfo: ClientInfo, rawData: Buffer): Promise<void> {
+    const fromPeerId = clientInfo.peerId;
+
+    // Rate limiting check
+    if (this.rateLimiter && !this.rateLimiter.check(fromPeerId)) {
+      if (this.verbose) {
+        console.warn(`[UniversalRelay] Rate limit exceeded for ${fromPeerId}, closing connection`);
+      }
+      ws.close(1008, "Rate limit exceeded");
+      return;
+    }
+
     try {
       const msg = JSON.parse(rawData.toString());
-      const fromPeerId = clientInfo.peerId;
 
       // Handle authoritative commands (describe, dispatch)
       if (this.mode === "authoritative") {
