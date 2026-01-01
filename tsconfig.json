@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,            /* The most important setting for stability */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,           /* Allows you to migrate file-by-file */
+    "checkJs": false           /* Set to true if you want TS to check .js files too */
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules", "dist", "examples/**/*.js", "test/**/*.js"]
+}

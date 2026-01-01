@@ -1,0 +1,50 @@
+{
+  "name": "hypertoken-quickstart",
+  "version": "0.1.0",
+  "description": "Interactive quickstart CLI for HyperToken - Distributed Simulation Engine",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "hypertoken-quickstart": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "prepare": "npm run build",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "test": "node dist/cli.js"
+  },
+  "keywords": [
+    "hypertoken",
+    "quickstart",
+    "game-engine",
+    "crdt",
+    "multiplayer",
+    "cli",
+    "scaffold"
+  ],
+  "author": "The Carpocratian Church of Commonality and Equality",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "prompts": "^2.4.2",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "boxen": "^7.1.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/prompts": "^2.4.9",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flammafex/hypertoken.git",
+    "directory": "packages/quickstart"
+  }
+}

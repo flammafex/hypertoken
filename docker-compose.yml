@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # Universal Relay Server for P2P synchronization
+  # Supports two modes:
+  #   - relay (default): Pure P2P signaling for WebRTC connections
+  #   - authoritative: Game server with engine integration
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-relay
+    command: ["node", "dist/cli/index.js", "relay"]
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - RELAY_MODE=relay
+      # - GAME_MODULE=./examples/network-tictactoe/game.js  # Uncomment to load a game
+      # - VERBOSE=true
+    restart: unless-stopped
+    networks:
+      - hypertoken-network
+
+  # Quickstart CLI (interactive)
+  quickstart:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-quickstart
+    command: ["npx", "hypertoken-quickstart"]
+    stdin_open: true
+    tty: true
+    networks:
+      - hypertoken-network
+    profiles:
+      - cli
+
+  # Poker RL Bridge Server (Gym/PettingZoo compatible)
+  poker-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-poker-bridge
+    command: ["node", "dist/cli/index.js", "bridge", "poker", "--rich", "--extended", "--shaped", "--port", "9999", "--host", "0.0.0.0"]
+    ports:
+      - "9999:9999"
+    environment:
+      - PORT=9999
+    restart: unless-stopped
+    networks:
+      - hypertoken-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Blackjack Bridge Server
+  blackjack-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-bridge
+    command: ["node", "dist/cli/index.js", "bridge", "blackjack", "-a", "2", "--port", "9998", "--host", "0.0.0.0"]
+    ports:
+      - "9998:9998"
+    restart: unless-stopped
+    networks:
+      - hypertoken-network
+    profiles:
+      - bridge
+
+  # Blackjack server example
+  blackjack-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-server
+    command: ["node", "dist/examples/blackjack/server.js"]
+    ports:
+      - "9090:9090"
+    environment:
+      - PORT=9090
+    restart: unless-stopped
+    networks:
+      - hypertoken-network
+    profiles:
+      - examples
+
+  # Blackjack client - Alice
+  blackjack-alice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-alice
+    command: ["node", "dist/examples/blackjack/client.js", "Alice"]
+    depends_on:
+      - blackjack-server
+    stdin_open: true
+    tty: true
+    networks:
+      - hypertoken-network
+    profiles:
+      - examples
+
+  # Blackjack client - Bob
+  blackjack-bob:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hypertoken:latest
+    container_name: hypertoken-blackjack-bob
+    command: ["node", "dist/examples/blackjack/client.js", "Bob"]
+    depends_on:
+      - blackjack-server
+    stdin_open: true
+    tty: true
+    networks:
+      - hypertoken-network
+    profiles:
+      - examples
+
+networks:
+  hypertoken-network:
+    driver: bridge

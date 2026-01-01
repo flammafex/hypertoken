@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HyperToken Session State Schema v1.0",
+  "description": "Serialized runtime state for a single HyperToken session.",
+  "type": "object",
+  "required": ["version", "timestamp", "stack", "zones"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Runtime version that produced this snapshot (e.g. '5.5')."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the snapshot was created."
+    },
+    "seed": {
+      "type": ["string", "integer", "null"],
+      "description": "Seed used for deterministic shuffles, if any."
+    },
+    "stack": {
+      "type": "object",
+      "description": "Metadata about the current stack.",
+      "required": ["name", "kind", "remaining"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "type": "string" },
+        "remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tokens remaining in the draw stack."
+        }
+      },
+      "additionalProperties": true
+    },
+    "zones": {
+      "type": "object",
+      "description": "Serialized space zones and placements.",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "array",
+          "description": "Each zone contains an array of placement objects.",
+          "items": {
+            "type": "object",
+            "required": ["token"],
+            "properties": {
+              "id": { "type": "string" },
+              "token": {
+                "type": "object",
+                "required": ["id"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "group": { "type": ["string", "null"] },
+                  "label": { "type": ["string", "null"] },
+                  "text": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "x": { "type": ["number", "null"] },
+              "y": { "type": ["number", "null"] },
+              "faceUp": { "type": "boolean" },
+              "label": { "type": ["string", "null"] },
+              "ts": { "type": ["integer", "null"] },
+              "reversed": { "type": "boolean" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "registry": {
+      "type": ["array", "null"],
+      "description": "Optional list of logged events.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t": { "type": "string", "description": "Event type" },
+          "ts": { "type": ["string", "number"], "description": "Timestamp" },
+          "payload": { "type": ["object", "string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "meta": {
+      "type": "object",
+      "description": "Optional user or environment metadata (e.g. spread, layout, author).",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HyperToken Playground</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: rgba(0,0,0,0.3);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .game-select {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+      color: white;
+      cursor: pointer;
+    }
+
+    .game-select option {
+      background: #1a1a2e;
+      color: white;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+
+    .main-area {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #state-inspector-container {
+      flex-shrink: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #peer-monitor-container {
+      flex-shrink: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.5rem;
+      padding: 1.5rem;
+      max-width: 1600px;
+      margin: 0 auto;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    #rule-composer-container {
+      min-height: 400px;
+      max-height: 600px;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    #action-timeline-container {
+      flex-shrink: 0;
+      width: 100%;
+    }
+
+    @media (max-width: 1400px) {
+      .main { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 1000px) {
+      .main { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 1400px) {
+      #peer-monitor-container {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-area { flex-direction: column; }
+      #state-inspector-container {
+        width: 100% !important;
+        height: auto;
+        max-height: 300px;
+      }
+      #peer-monitor-container {
+        display: none;
+      }
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .panel h2 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #888;
+      margin-bottom: 1rem;
+    }
+
+    .game-area {
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 60px;
+      height: 84px;
+      background: white;
+      color: #333;
+      border-radius: 8px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .card.red { color: #e94560; }
+    .card.hidden {
+      background: linear-gradient(135deg, #2a4a7a 0%, #1a3a6a 100%);
+      color: transparent;
+    }
+
+    .hand { margin: 1rem 0; text-align: center; }
+    .hand-label {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      background: #e94560;
+      color: white;
+    }
+    .btn-primary:hover { background: #ff6b6b; }
+    .btn-primary:disabled { background: #444; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+    .btn-secondary:disabled { background: rgba(255,255,255,0.05); cursor: not-allowed; }
+
+    .btn-train {
+      background: #4ade80;
+      color: #000;
+    }
+    .btn-train:hover { background: #6ee7a0; }
+    .btn-train:disabled { background: #444; color: #888; cursor: not-allowed; }
+
+    .training-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80, #22c55e);
+      transition: width 0.3s;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #4ade80;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .chart-container {
+      height: 200px;
+      margin-top: 1rem;
+    }
+
+    .console {
+      background: #0a0a12;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.8rem;
+      max-height: 150px;
+      overflow-y: auto;
+      color: #888;
+    }
+
+    .console-line { margin: 2px 0; }
+    .console-line.success { color: #4ade80; }
+    .console-line.error { color: #f87171; }
+    .console-line.info { color: #60a5fa; }
+
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+      font-size: 0.875rem;
+    }
+
+    .footer a {
+      color: #888;
+      text-decoration: none;
+    }
+    .footer a:hover { color: #fff; }
+
+    /* Game-specific styles */
+    .ttt-board {
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      gap: 4px;
+    }
+
+    .ttt-cell {
+      width: 80px;
+      height: 80px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 8px;
+      font-size: 2.5rem;
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .ttt-cell:hover { background: rgba(255,255,255,0.2); }
+    .ttt-cell:disabled { cursor: not-allowed; }
+    .ttt-cell.x { color: #60a5fa; }
+    .ttt-cell.o { color: #f472b6; }
+
+    .pd-matrix {
+      display: grid;
+      grid-template-columns: auto repeat(2, 100px);
+      gap: 4px;
+      text-align: center;
+    }
+
+    .pd-cell {
+      padding: 1rem;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+    }
+    .pd-header { font-weight: bold; color: #888; }
+    .pd-highlight { background: rgba(74, 222, 128, 0.2); }
+
+    /* Result display */
+    #result {
+      margin-top: 1rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      min-height: 1.5em;
+    }
+
+    /* Training Dashboard Container */
+    #training-dashboard-container {
+      grid-column: span 1;
+      min-height: 400px;
+    }
+
+    #token-canvas-container {
+      grid-column: span 1;
+      min-height: 350px;
+      max-height: 450px;
+    }
+
+    @media (max-width: 1400px) {
+      #training-dashboard-container {
+        grid-column: span 2;
+      }
+      #token-canvas-container {
+        grid-column: span 2;
+      }
+    }
+
+    @media (max-width: 1000px) {
+      #training-dashboard-container {
+        grid-column: span 1;
+      }
+      #token-canvas-container {
+        grid-column: span 1;
+      }
+    }
+
+    /* Console Panel */
+    .console-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .console-panel .console {
+      flex: 1;
+      min-height: 100px;
+    }
+
+    /* Cuttle game styles */
+    .cuttle-game {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .cuttle-opponent,
+    .cuttle-player {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .cuttle-label {
+      font-size: 0.875rem;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .cuttle-field {
+      display: flex;
+      gap: 1rem;
+      min-height: 60px;
+    }
+
+    .cuttle-permanents,
+    .cuttle-points {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 100px;
+    }
+
+    .cuttle-hand {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 84px;
+    }
+
+    .cuttle-hand.opponent-hand .card {
+      background: linear-gradient(135deg, #2a4a7a 0%, #1a3a6a 100%);
+    }
+
+    .cuttle-center {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      padding: 1rem 0;
+    }
+
+    .cuttle-deck,
+    .cuttle-scrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .cuttle-deck-count,
+    .cuttle-scrap-count {
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .cuttle-score {
+      font-size: 1rem;
+      font-weight: bold;
+      color: #4ade80;
+    }
+
+    .cuttle-message {
+      text-align: center;
+      font-size: 1rem;
+      padding: 0.5rem;
+      min-height: 2rem;
+    }
+
+    .cuttle-message.win { color: #4ade80; }
+    .cuttle-message.lose { color: #f87171; }
+    .cuttle-message.draw { color: #fbbf24; }
+
+    .cuttle-card {
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .cuttle-card.playable:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+    }
+
+    .cuttle-card.selected {
+      transform: translateY(-8px);
+      box-shadow: 0 4px 12px rgba(74, 222, 128, 0.5);
+      border: 2px solid #4ade80;
+    }
+
+    .cuttle-card.small {
+      width: 40px;
+      height: 56px;
+      font-size: 1rem;
+    }
+
+    .jack-count {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      font-size: 0.6rem;
+      background: #e94560;
+      color: white;
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+
+    .cuttle-card.small {
+      position: relative;
+    }
+
+    /* Poker game styles */
+    .poker-game {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    .poker-opponent, .poker-player {
+      text-align: center;
+    }
+
+    .poker-label {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    .poker-hand {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      min-height: 84px;
+    }
+
+    .poker-table {
+      background: #1a5a2a;
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .poker-community {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      min-height: 84px;
+    }
+
+    .poker-pot {
+      color: #ffd700;
+      font-weight: bold;
+      font-size: 1.2rem;
+      margin-top: 0.5rem;
+    }
+
+    .poker-chips {
+      font-size: 0.9rem;
+      color: #4ade80;
+    }
+
+    .poker-message {
+      text-align: center;
+      font-size: 1rem;
+      padding: 0.5rem;
+    }
+    .poker-message.win { color: #4ade80; }
+    .poker-message.lose { color: #f87171; }
+
+    /* Coup game styles */
+    .coup-game {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .coup-opponent, .coup-player {
+      text-align: center;
+    }
+
+    .coup-label {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    .coup-cards {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      min-height: 80px;
+    }
+
+    .coup-card {
+      width: 60px;
+      height: 80px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .coup-card.hidden {
+      background: #444;
+    }
+
+    .coup-card.revealed {
+      opacity: 0.5;
+    }
+
+    .coup-role {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+    }
+
+    .coup-symbol {
+      font-size: 1.5rem;
+    }
+
+    .coup-coins {
+      color: #ffd700;
+      font-size: 1rem;
+    }
+
+    .coup-message {
+      text-align: center;
+      padding: 0.5rem;
+    }
+    .coup-message.win { color: #4ade80; }
+    .coup-message.lose { color: #f87171; }
+
+    /* Hanabi game styles */
+    .hanabi-game {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    .hanabi-fireworks {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .hanabi-stack {
+      width: 50px;
+      height: 60px;
+      border: 2px solid;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .hanabi-stack-label {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .hanabi-stack-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .hanabi-info {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .hanabi-tokens { color: #60a5fa; }
+    .hanabi-lives { color: #f87171; }
+    .hanabi-deck { color: #888; }
+
+    .hanabi-partner, .hanabi-player {
+      text-align: center;
+    }
+
+    .hanabi-label {
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    .hanabi-hand {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .hanabi-card {
+      width: 45px;
+      height: 65px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .hanabi-card.hidden {
+      background: #555;
+      color: white;
+    }
+
+    .hanabi-card.selected {
+      transform: translateY(-8px);
+      box-shadow: 0 4px 12px rgba(74, 222, 128, 0.5);
+    }
+
+    .hanabi-num {
+      font-size: 1.2rem;
+    }
+
+    .hint-marker {
+      position: absolute;
+      font-size: 0.5rem;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 1px 3px;
+      border-radius: 2px;
+    }
+    .hint-marker.color { top: 2px; left: 2px; }
+    .hint-marker.number { top: 2px; right: 2px; }
+
+    .hint-info {
+      position: absolute;
+      bottom: 2px;
+      font-size: 0.6rem;
+      color: #4ade80;
+    }
+
+    .hanabi-message {
+      text-align: center;
+      padding: 0.5rem;
+    }
+    .hanabi-message.win { color: #4ade80; }
+    .hanabi-message.lose { color: #f87171; }
+
+    /* Liar's Dice game styles */
+    .dice-game {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .dice-opponent, .dice-player {
+      text-align: center;
+    }
+
+    .dice-label {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+
+    .dice-container {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      min-height: 50px;
+    }
+
+    .die {
+      font-size: 2rem;
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      color: #333;
+      border-radius: 6px;
+    }
+
+    .die.hidden {
+      background: #444;
+      color: #888;
+    }
+
+    .dice-count {
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    .dice-bid-area {
+      text-align: center;
+      padding: 1rem;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+    }
+
+    .dice-current-bid {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    .bid-controls {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .bid-input {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .bid-input label {
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    .qty-display, .face-display {
+      font-size: 1.2rem;
+      min-width: 2rem;
+      text-align: center;
+    }
+
+    .dice-message {
+      text-align: center;
+      padding: 0.5rem;
+    }
+    .dice-message.win { color: #4ade80; }
+    .dice-message.lose { color: #f87171; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>HyperToken Playground</h1>
+    <select id="game-select" class="game-select">
+      <option value="blackjack">Blackjack</option>
+      <option value="prisoners">Prisoner's Dilemma</option>
+      <option value="cuttle">Cuttle</option>
+      <option value="poker">Texas Hold'em</option>
+      <option value="coup">Coup</option>
+      <option value="hanabi">Hanabi</option>
+      <option value="liars-dice">Liar's Dice</option>
+    </select>
+  </header>
+
+  <div class="app-container">
+    <!-- Main Area (Inspector + Game Panels) -->
+    <div class="main-area">
+      <!-- State Inspector Panel -->
+      <div id="state-inspector-container"></div>
+
+      <main class="main">
+      <!-- Game Panel -->
+      <section class="panel">
+        <h2>Game</h2>
+        <div id="game-area" class="game-area">
+          <!-- Game-specific UI injected here -->
+        </div>
+        <div id="game-controls" class="controls">
+          <!-- Game-specific controls injected here -->
+        </div>
+      </section>
+
+      <!-- Token Canvas Panel -->
+      <div id="token-canvas-container"></div>
+
+      <!-- AI Training Dashboard -->
+      <div id="training-dashboard-container"></div>
+
+      <!-- Console Panel -->
+      <section class="panel console-panel">
+        <h2>Console</h2>
+        <div id="console" class="console">
+          <div class="console-line info">Welcome to HyperToken Playground!</div>
+          <div class="console-line">Select a game and click "Train" in the dashboard to begin.</div>
+        </div>
+      </section>
+
+      <!-- Rule Composer Panel -->
+      <div id="rule-composer-container"></div>
+      </main>
+
+      <!-- Peer Monitor Panel -->
+      <div id="peer-monitor-container"></div>
+    </div>
+
+    <!-- Action Timeline Panel -->
+    <div id="action-timeline-container"></div>
+  </div>
+
+  <footer class="footer">
+    <p>
+      Built with care by
+      <a href="https://github.com/flammafex/hypertoken" target="_blank">HyperToken</a>
+      &middot; Apache 2.0 License
+    </p>
+  </footer>
+
+  <script type="module" src="playground.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+[Unit]
+Description=Cuttle Multiplayer Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=cuttle
+Group=cuttle
+WorkingDirectory=/opt/cuttle/dist/examples/cuttle
+ExecStart=/usr/bin/node server.js 8080
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cuttle-server
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/cuttle
+
+# Environment
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

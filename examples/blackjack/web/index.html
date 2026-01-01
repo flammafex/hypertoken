@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a6b1a">
+  <meta name="description" content="Classic Blackjack card game - beat the dealer to 21">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Blackjack">
+  <title>Blackjack</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" role="application" aria-label="Blackjack Card Game">
+    <!-- Screen reader announcements -->
+    <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Header -->
+    <header id="header">
+      <h1 id="logo">♠ Blackjack</h1>
+      <div id="game-info" aria-label="Game status">
+        <span id="bankroll-display" aria-label="Current bankroll">$1000</span>
+        <span id="bet-display" aria-label="Current bet">Bet: $10</span>
+        <button id="sound-btn" class="btn-icon" aria-label="Toggle sound" title="Toggle Sound">Sound: On</button>
+        <button id="stats-btn" class="btn-icon" aria-label="View statistics" title="View Statistics">Stats</button>
+      </div>
+    </header>
+
+    <!-- Main game area -->
+    <main id="game-area" aria-label="Game board">
+      <!-- Dealer area -->
+      <section id="dealer-section" role="region" aria-label="Dealer's cards">
+        <div class="dealer-area-content">
+          <div id="deck-visual" class="deck-visual" aria-hidden="true">
+            <div class="card card-back"></div>
+            <span class="deck-count-label" id="deck-count-label">312</span>
+          </div>
+          <div id="card-count-display" class="card-count-display hidden">
+            <div class="count-label">Count</div>
+            <div class="count-values">
+              <span class="count-item"><span class="count-key">RC:</span> <span id="running-count" class="count-value">0</span></span>
+              <span class="count-item"><span class="count-key">TC:</span> <span id="true-count" class="count-value">0</span></span>
+            </div>
+          </div>
+          <div class="dealer-cards-area">
+            <div class="player-header">
+              <span class="player-name">Dealer</span>
+              <span id="dealer-value" class="hand-value"></span>
+            </div>
+            <div id="dealer-hand" class="hand dealer-hand" role="list" aria-label="Dealer's hand"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center area: result banner and side bet results -->
+      <section id="center-area" aria-label="Central area">
+        <div id="result-banner" class="result-banner hidden" role="alert" aria-live="assertive"></div>
+        <div id="sidebet-results" class="sidebet-results hidden">
+          <div id="perfect-pairs-result" class="sidebet-result"></div>
+          <div id="twentyone-plus3-result" class="sidebet-result"></div>
+          <div id="lucky-ladies-result" class="sidebet-result"></div>
+          <div id="buster-blackjack-result" class="sidebet-result"></div>
+        </div>
+      </section>
+
+      <!-- Player area -->
+      <section id="player-section" role="region" aria-label="Your cards">
+        <div class="player-header">
+          <span class="player-name">Your Hand</span>
+          <span id="player-value" class="hand-value"></span>
+        </div>
+        <div id="player-hand" class="hand player-hand" role="list" aria-label="Your hand"></div>
+
+        <!-- Split hands container (hidden initially) -->
+        <div id="split-hands-container" class="split-hands-container hidden">
+          <div id="split-hands" class="split-hands"></div>
+        </div>
+      </section>
+
+      <!-- Action buttons -->
+      <section id="action-area" aria-label="Game actions">
+        <!-- Betting phase buttons -->
+        <div id="betting-controls" class="action-controls">
+          <div class="betting-layout">
+            <div class="main-bet-section">
+              <div class="bet-label">Main Bet <span id="bet-limits" class="bet-limits">($5 - $500)</span></div>
+              <div class="bet-adjuster">
+                <button id="bet-decrease" class="btn-chip" aria-label="Decrease bet">-</button>
+                <span id="bet-amount">$10</span>
+                <button id="bet-increase" class="btn-chip" aria-label="Increase bet">+</button>
+              </div>
+            </div>
+            <div class="side-bets-wrapper" id="side-bets-wrapper">
+              <button class="side-bets-toggle" id="side-bets-toggle" type="button" aria-expanded="false" aria-controls="side-bets-content">
+                Side Bets <span id="side-bets-count" class="side-bets-active-count" style="display: none;">0</span>
+                <span class="toggle-icon" aria-hidden="true">▼</span>
+              </button>
+              <div class="side-bets-section" id="side-bets-content">
+                <div class="side-bet" data-tooltip="Bet on your first 2 cards being a pair&#10;&#10;Mixed Pair: 5:1&#10;Colored Pair: 10:1&#10;Perfect Pair: 30:1">
+                  <label class="side-bet-label">
+                    <input type="checkbox" id="perfect-pairs-check">
+                    <span>Perfect Pairs</span>
+                  </label>
+                  <div class="side-bet-amount">
+                    <button class="btn-chip-small" id="pp-decrease" type="button">-</button>
+                    <span id="pp-amount">$5</span>
+                    <button class="btn-chip-small" id="pp-increase" type="button">+</button>
+                  </div>
+                </div>
+                <div class="side-bet" data-tooltip="Your 2 cards + dealer's up card form a poker hand&#10;&#10;Flush: 5:1&#10;Straight: 10:1&#10;Three of a Kind: 30:1&#10;Straight Flush: 40:1&#10;Suited Trips: 100:1">
+                  <label class="side-bet-label">
+                    <input type="checkbox" id="twentyone-plus3-check">
+                    <span>21+3</span>
+                  </label>
+                  <div class="side-bet-amount">
+                    <button class="btn-chip-small" id="tp-decrease" type="button">-</button>
+                    <span id="tp-amount">$5</span>
+                    <button class="btn-chip-small" id="tp-increase" type="button">+</button>
+                  </div>
+                </div>
+                <div class="side-bet" data-tooltip="Bet on your first 2 cards totaling 20&#10;&#10;Any 20: 4:1&#10;Suited 20: 9:1&#10;Matched 20: 19:1&#10;Q♥ Pair: 125:1&#10;Q♥ Pair + Dealer BJ: 1000:1">
+                  <label class="side-bet-label">
+                    <input type="checkbox" id="lucky-ladies-check">
+                    <span>Lucky Ladies</span>
+                  </label>
+                  <div class="side-bet-amount">
+                    <button class="btn-chip-small" id="ll-decrease" type="button">-</button>
+                    <span id="ll-amount">$5</span>
+                    <button class="btn-chip-small" id="ll-increase" type="button">+</button>
+                  </div>
+                </div>
+                <div class="side-bet" data-tooltip="Bet on dealer busting&#10;&#10;3-card bust: 2:1&#10;4-card bust: 4:1&#10;5-card bust: 12:1&#10;6-card bust: 50:1&#10;7-card bust: 100:1&#10;8+ cards: 250:1">
+                  <label class="side-bet-label">
+                    <input type="checkbox" id="buster-blackjack-check">
+                    <span>Buster BJ</span>
+                  </label>
+                  <div class="side-bet-amount">
+                    <button class="btn-chip-small" id="bb-decrease" type="button">-</button>
+                    <span id="bb-amount">$5</span>
+                    <button class="btn-chip-small" id="bb-increase" type="button">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button id="deal-btn" class="btn-primary">Deal</button>
+        </div>
+
+        <!-- Playing phase buttons -->
+        <div id="playing-controls" class="action-controls hidden">
+          <button id="hit-btn" class="btn-action" data-action="hit">Hit (H)</button>
+          <button id="stand-btn" class="btn-action" data-action="stand">Stand (S)</button>
+          <button id="double-btn" class="btn-action" data-action="double">Double (D)</button>
+          <button id="split-btn" class="btn-action" data-action="split">Split (P)</button>
+          <button id="surrender-btn" class="btn-action btn-surrender" data-action="surrender">Surrender (R)</button>
+        </div>
+
+        <!-- Insurance buttons -->
+        <div id="insurance-controls" class="action-controls hidden">
+          <span class="insurance-prompt">Insurance?</span>
+          <button id="insurance-yes" class="btn-action">Yes</button>
+          <button id="insurance-no" class="btn-action">No</button>
+        </div>
+
+        <!-- Result phase buttons -->
+        <div id="result-controls" class="action-controls hidden">
+          <button id="new-hand-btn" class="btn-primary">New Hand (N)</button>
+          <button id="change-bet-btn" class="btn-secondary">Change Bet</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Status bar -->
+    <footer id="status-bar" role="region" aria-label="Game status">
+      <div id="message" role="status" aria-live="polite">Place your bet and click Deal to start!</div>
+    </footer>
+
+    <!-- Start screen modal -->
+    <div id="start-screen" class="modal" role="dialog" aria-labelledby="start-title" aria-modal="true">
+      <div class="modal-content">
+        <h2 id="start-title">Blackjack</h2>
+        <p>Beat the dealer to 21!</p>
+        <div class="start-options">
+          <div class="option-row">
+            <label for="starting-bankroll">Starting Bankroll:</label>
+            <select id="starting-bankroll">
+              <option value="100">$100</option>
+              <option value="500">$500</option>
+              <option value="1000" selected>$1000</option>
+              <option value="5000">$5000</option>
+            </select>
+          </div>
+          <div class="option-row">
+            <label for="variant-select">Variant:</label>
+            <select id="variant-select">
+              <option value="american" selected>American (2 cards)</option>
+              <option value="european">European (1 card)</option>
+            </select>
+          </div>
+          <div class="option-row">
+            <label for="num-decks">Number of Decks:</label>
+            <select id="num-decks">
+              <option value="1">1 Deck</option>
+              <option value="2">2 Decks</option>
+              <option value="4">4 Decks</option>
+              <option value="6" selected>6 Decks</option>
+              <option value="8">8 Decks</option>
+            </select>
+          </div>
+          <div class="option-row">
+            <label for="strategy-select">Betting Strategy:</label>
+            <select id="strategy-select">
+              <option value="manual" selected>Manual</option>
+              <option value="flat">Flat ($10)</option>
+              <option value="martingale">Martingale</option>
+              <option value="progressive">Progressive</option>
+              <option value="percentage">2% Bankroll</option>
+            </select>
+          </div>
+          <div class="option-row">
+            <label for="seed-input">Seed (optional):</label>
+            <input type="number" id="seed-input" placeholder="Random" min="0" max="999999999">
+          </div>
+          <div class="option-divider">House Rules</div>
+          <div class="option-row checkbox-row">
+            <label>
+              <input type="checkbox" id="hit-soft-17">
+              Dealer hits soft 17
+            </label>
+          </div>
+          <div class="option-row checkbox-row">
+            <label>
+              <input type="checkbox" id="allow-surrender">
+              Late surrender allowed
+            </label>
+          </div>
+          <div class="option-row checkbox-row">
+            <label>
+              <input type="checkbox" id="resplit-aces" checked>
+              Re-split aces allowed
+            </label>
+          </div>
+          <div class="option-divider">Tools</div>
+          <div class="option-row checkbox-row">
+            <label>
+              <input type="checkbox" id="show-card-count">
+              Show card count (Hi-Lo)
+            </label>
+          </div>
+        </div>
+        <button id="start-game" class="btn-primary">Start Game</button>
+        <button id="show-rules" class="btn-secondary">View Rules</button>
+      </div>
+    </div>
+
+    <!-- Rules modal -->
+    <div id="rules-modal" class="modal hidden" role="dialog" aria-labelledby="rules-title" aria-modal="true">
+      <div class="modal-content rules-content">
+        <h2 id="rules-title">Blackjack Rules</h2>
+        <div id="rules-text">
+          <h3>Objective</h3>
+          <p>Get closer to 21 than the dealer without going over (busting).</p>
+
+          <h3>Card Values</h3>
+          <ul>
+            <li><strong>Number cards (2-10):</strong> Face value</li>
+            <li><strong>Face cards (J, Q, K):</strong> 10 points</li>
+            <li><strong>Aces:</strong> 1 or 11 points (whichever is better)</li>
+          </ul>
+
+          <h3>Gameplay</h3>
+          <ul>
+            <li><strong>Hit:</strong> Take another card</li>
+            <li><strong>Stand:</strong> Keep your current hand</li>
+            <li><strong>Double Down:</strong> Double your bet and take exactly one more card</li>
+            <li><strong>Split:</strong> Split a pair into two hands (requires matching bet)</li>
+            <li><strong>Insurance:</strong> Side bet when dealer shows an Ace (pays 2:1 if dealer has blackjack)</li>
+          </ul>
+
+          <h3>Winning</h3>
+          <ul>
+            <li><strong>Blackjack (A + 10-value card):</strong> Pays 3:2</li>
+            <li><strong>Regular win:</strong> Pays 1:1</li>
+            <li><strong>Push (tie):</strong> Bet returned</li>
+          </ul>
+
+          <h3>Dealer Rules</h3>
+          <p>Dealer must hit on 16 or less, stand on 17 or more.</p>
+
+          <h3>Side Bets</h3>
+          <p><strong>Perfect Pairs</strong> - Bet on your first 2 cards being a pair:</p>
+          <ul>
+            <li><strong>Mixed Pair</strong> (different colors): 5:1</li>
+            <li><strong>Colored Pair</strong> (same color): 10:1</li>
+            <li><strong>Perfect Pair</strong> (same suit): 30:1</li>
+          </ul>
+          <p><strong>21+3</strong> - Bet on your 2 cards + dealer's up card forming a poker hand:</p>
+          <ul>
+            <li><strong>Flush</strong>: 5:1</li>
+            <li><strong>Straight</strong>: 10:1</li>
+            <li><strong>Three of a Kind</strong>: 30:1</li>
+            <li><strong>Straight Flush</strong>: 40:1</li>
+            <li><strong>Suited Three of a Kind</strong>: 100:1</li>
+          </ul>
+          <p><strong>Lucky Ladies</strong> - Bet on your first 2 cards totaling 20:</p>
+          <ul>
+            <li><strong>Any 20</strong>: 4:1</li>
+            <li><strong>Suited 20</strong>: 9:1</li>
+            <li><strong>Matched 20</strong> (same rank &amp; suit): 19:1</li>
+            <li><strong>Queen of Hearts Pair</strong>: 125:1</li>
+            <li><strong>Q&#9829; Pair + Dealer BJ</strong>: 1000:1</li>
+          </ul>
+          <p><strong>Buster Blackjack</strong> - Bet on dealer busting:</p>
+          <ul>
+            <li><strong>3-card bust</strong>: 2:1</li>
+            <li><strong>4-card bust</strong>: 4:1</li>
+            <li><strong>5-card bust</strong>: 12:1</li>
+            <li><strong>6-card bust</strong>: 50:1</li>
+            <li><strong>7-card bust</strong>: 100:1</li>
+            <li><strong>8+ card bust</strong>: 250:1</li>
+          </ul>
+        </div>
+        <button id="close-rules" class="btn-primary">Close</button>
+      </div>
+    </div>
+
+    <!-- Game over modal -->
+    <div id="game-over-modal" class="modal hidden" role="dialog" aria-labelledby="game-over-title" aria-modal="true">
+      <div class="modal-content">
+        <h2 id="game-over-title">Game Over</h2>
+        <p id="game-over-message">You've run out of chips!</p>
+        <p id="final-stats"></p>
+        <button id="restart-game" class="btn-primary">Play Again</button>
+      </div>
+    </div>
+
+    <!-- Card preview tooltip -->
+    <div id="card-preview" class="card-preview hidden">
+      <div id="preview-card" class="preview-card-slot"></div>
+      <div id="preview-info" class="preview-info">
+        <div id="preview-name" class="preview-name"></div>
+        <div id="preview-value" class="preview-value"></div>
+      </div>
+    </div>
+
+    <!-- Stats modal -->
+    <div id="stats-modal" class="modal hidden" role="dialog" aria-labelledby="stats-title" aria-modal="true">
+      <div class="modal-content stats-content">
+        <h2 id="stats-title">Session Statistics</h2>
+
+        <div class="stats-grid">
+          <div class="stats-section">
+            <h3>Hands</h3>
+            <div class="stat-row">
+              <span class="stat-label">Played:</span>
+              <span id="stat-hands-played" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Won:</span>
+              <span id="stat-hands-won" class="stat-value win">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Lost:</span>
+              <span id="stat-hands-lost" class="stat-value lose">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Pushed:</span>
+              <span id="stat-pushes" class="stat-value">0</span>
+            </div>
+            <div class="stat-row highlight">
+              <span class="stat-label">Win Rate:</span>
+              <span id="stat-win-rate" class="stat-value">0%</span>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3>Special Plays</h3>
+            <div class="stat-row">
+              <span class="stat-label">Blackjacks:</span>
+              <span id="stat-blackjacks" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Doubles:</span>
+              <span id="stat-doubles" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Splits:</span>
+              <span id="stat-splits" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Insurances:</span>
+              <span id="stat-insurances" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Side Bets Won:</span>
+              <span id="stat-side-bets" class="stat-value">0</span>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3>Money</h3>
+            <div class="stat-row">
+              <span class="stat-label">Total Wagered:</span>
+              <span id="stat-total-wagered" class="stat-value">$0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Total Won:</span>
+              <span id="stat-total-won" class="stat-value win">$0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Total Lost:</span>
+              <span id="stat-total-lost" class="stat-value lose">$0</span>
+            </div>
+            <div class="stat-row highlight">
+              <span class="stat-label">Net Profit:</span>
+              <span id="stat-net-profit" class="stat-value">$0</span>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3>Records</h3>
+            <div class="stat-row">
+              <span class="stat-label">Biggest Win:</span>
+              <span id="stat-biggest-win" class="stat-value win">$0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Biggest Loss:</span>
+              <span id="stat-biggest-loss" class="stat-value lose">$0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Peak Bankroll:</span>
+              <span id="stat-max-bankroll" class="stat-value">$0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Lowest Bankroll:</span>
+              <span id="stat-min-bankroll" class="stat-value">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <button id="close-stats" class="btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="blackjack-web.js"></script>
+  <script>
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registered'))
+          .catch(err => console.log('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

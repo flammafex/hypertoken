@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Green background with rounded corners for maskable -->
+  <rect width="512" height="512" rx="80" fill="#1a6b1a"/>
+
+  <!-- Spade symbol -->
+  <path d="M256 60
+           C256 60 120 180 120 280
+           C120 340 170 380 230 380
+           C230 380 200 420 180 460
+           L332 460
+           C312 420 282 380 282 380
+           C342 380 392 340 392 280
+           C392 180 256 60 256 60 Z"
+        fill="white"/>
+</svg>

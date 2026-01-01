@@ -1,0 +1,72 @@
+[package]
+name = "hypertoken-core"
+version = "0.1.0"
+authors = ["HyperToken Contributors"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# CRDT Library - The core of our state management
+automerge = "0.6"
+
+# Parallel processing (with WASM support)
+rayon = "1.10"
+
+# WASM Bindings
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.6"
+
+# JavaScript Interop
+js-sys = "0.3"
+
+# Random number generation (WASM-compatible)
+getrandom = { version = "0.2", features = ["js"] }
+rand = { version = "0.8", features = ["small_rng"] }
+rand_chacha = "0.3"
+
+# UUID with WASM support (required by automerge)
+uuid = { version = "1.18", features = ["v4", "js"] }
+
+# Error handling
+thiserror = "2.0"
+
+# Time/date handling (WASM-compatible)
+chrono = { version = "0.4", features = ["wasmbind"] }
+
+# Console logging for debugging
+console_error_panic_hook = "0.1"
+
+# Optional: WebAssembly optimizations
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "console",
+]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+# Optimize for small WASM binary size
+opt-level = "z"     # Optimize for size
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Better optimization, slower compile
+panic = "abort"     # Don't include unwinding infrastructure
+
+[profile.dev]
+# Faster compile times during development
+opt-level = 0
+lto = false
+
+[package.metadata.wasm-pack.profile.release]
+# Disable wasm-opt for now (can cause build issues on some systems)
+# The Rust compiler already optimizes with opt-level="z" above
+wasm-opt = false

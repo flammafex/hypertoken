@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hypertoken"
+version = "0.1.0"
+description = "Python bridge for HyperToken distributed simulation engine"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "HyperToken Contributors"}
+]
+keywords = [
+    "reinforcement-learning",
+    "pettingzoo",
+    "gymnasium",
+    "multi-agent",
+    "game-engine",
+    "simulation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "websocket-client>=1.0.0",
+    "numpy>=1.20.0",
+]
+
+[project.optional-dependencies]
+gymnasium = ["gymnasium>=0.28.0"]
+gym = ["gym>=0.26.0"]
+sb3 = [
+    "gymnasium>=0.28.0",
+    "stable-baselines3>=2.0.0",
+]
+rllib = [
+    "gymnasium>=0.28.0",
+    "ray[rllib]>=2.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.20.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "gymnasium>=0.28.0",
+    "stable-baselines3>=2.0.0",
+    "ray[rllib]>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/hypertoken/hypertoken"
+Documentation = "https://hypertoken.ai/docs"
+Repository = "https://github.com/hypertoken/hypertoken"
+"Bug Tracker" = "https://github.com/hypertoken/hypertoken/issues"
+
+[tool.setuptools]
+packages = ["hypertoken"]
+
+[tool.setuptools.package-data]
+hypertoken = ["py.typed"]
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]  # Line too long (handled by black)
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

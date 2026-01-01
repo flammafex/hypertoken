@@ -1,0 +1,25 @@
+{
+  "name": "dungeon-raiders",
+  "version": "1.0.0",
+  "description": "Terminal Dungeon Raiders - A cooperative multiplayer roguelike built with HyperToken",
+  "type": "module",
+  "scripts": {
+    "server": "node server.js",
+    "client": "node client.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "hypertoken",
+    "game",
+    "multiplayer",
+    "dungeon",
+    "roguelike",
+    "terminal",
+    "cli"
+  ],
+  "author": "HyperToken",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.13.0"
+  }
+}

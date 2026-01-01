@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HyperToken Set Schema v1.0",
+  "description": "Schema for stacks and symbolic token sets used in HyperToken.",
+  "type": "object",
+  "required": ["name", "kind", "tokens"],
+  "properties": {
+    "name": { "type": "string" },
+    "kind": {
+      "type": "string",
+      "description": "Semantic type of this token set, e.g. tarot, poker, rune, sigil, oracle, story."
+    },
+    "tokens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id":     { "type": "string" },
+          "group":  { "type": ["string", "null"], "description": "Suit, category, or grouping key." },
+          "label":  { "type": ["string", "null"], "description": "Readable name or rank for the token." },
+          "text":   { "type": "string", "description": "Descriptive or interpretive text." },
+          "meta":   { "type": "object" },
+          "char":   { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
