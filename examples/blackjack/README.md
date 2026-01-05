@@ -8,9 +8,10 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - Deterministic simulation with seedable RNG
 - AI agents with different strategies
 - Event-driven architecture
+- **🌐 Browser-based Web UI with PWA support**
 - **💰 Comprehensive betting system with 6 betting strategies**
-- **🎰 Full casino features: Double Down, Split, Insurance, Re-Split**
-- **🎲 Side bets: Perfect Pairs, 21+3 (poker hands)**
+- **🎰 Full casino features: Double Down, Split, Insurance, Re-Split, Surrender**
+- **🎲 Side bets: Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack**
 - **🇪🇺 European blackjack variant with delayed hole card**
 - **📊 Card counting agents: Hi-Lo, Hi-Opt I, Omega II, Zen Count**
 - **👥 Multi-agent support (2-6 agents at one space)**
@@ -23,6 +24,30 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 cd examples/blackjack
 node --loader ../../test/ts-esm-loader.js <command>
 ```
+
+### Play in Browser (Web UI)
+```bash
+# Build the web bundle (if not already built)
+node web/build.js
+
+# Serve the web directory (use any static server)
+npx serve web
+# or
+python3 -m http.server 8000 --directory web
+```
+
+Open `http://localhost:8000` (or the serve URL) in your browser to play!
+
+**Web UI Features:**
+- Full casino experience with animated cards and sound effects
+- 4 side bets: Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack
+- Multiple betting strategies (Manual, Flat, Martingale, Progressive, Percentage)
+- Configurable house rules (dealer hits soft 17, late surrender, re-split aces)
+- American and European variants
+- Hi-Lo card counting display
+- Session statistics tracking
+- PWA support (installable, works offline)
+- Keyboard shortcuts (H=Hit, S=Stand, D=Double, P=Split, R=Surrender)
 
 ### Play Single-Agent Blackjack
 ```bash
@@ -103,11 +128,23 @@ blackjack/
 ├── agents/
 │   ├── basic-strategy.js           # AI agent implementations
 │   └── tournament.js               # AI vs AI simulation
+├── web/                            # Browser-based Web UI
+│   ├── index.html                  # Main HTML page
+│   ├── blackjack-web.js            # Web UI JavaScript
+│   ├── styles.css                  # Styling
+│   ├── build.js                    # Bundle build script
+│   ├── BlackjackGame.bundle.js     # Bundled game logic
+│   ├── cards-sprite.webp           # Card sprite sheet
+│   ├── manifest.json               # PWA manifest
+│   ├── sw.js                       # Service worker for offline
+│   └── icons/                      # PWA icons (72-512px)
 ├── blackjack-utils.js              # Hand evaluation utilities
 ├── blackjack-rules.js              # RuleEngine rules
 ├── game.js                         # Single-player game (simple)
 ├── multiagent-game.js              # Multi-agent game (advanced)
 ├── blackjack-betting.js            # Betting system & strategies
+├── blackjack-game-browser.js       # Browser-compatible game wrapper
+├── side-bets.js                    # Side bet logic (Perfect Pairs, 21+3, etc.)
 ├── card-counting-agents.js         # Hi-Lo card counting agents
 ├── cli.js                          # Interactive CLI (supports --betting flag)
 ├── multiagent-cli.js               # Multi-agent CLI (2-6 players)
@@ -359,9 +396,10 @@ while (!gameState.allAgentsFinished) {
 ✅ **RuleEngine** - Declarative game logic  
 ✅ **Determinism** - Seedable shuffle for replay  
 ✅ **Serialization** - Game state can be saved/loaded  
-✅ **Events** - Observable state transitions  
-✅ **Betting Actions** - Money management primitives *(NEW!)*  
-✅ **Multi-agent Zones** - Per-agent token containers *(NEW!)*  
+✅ **Events** - Observable state transitions
+✅ **Betting Actions** - Money management primitives
+✅ **Multi-agent Zones** - Per-agent token containers
+✅ **Browser Bundling** - Web UI with PWA support  
 
 ### Patterns You Can Reuse
 
@@ -371,9 +409,11 @@ while (!gameState.allAgentsFinished) {
 4. **Agent Interface** - Building AI that plays your game
 5. **CLI Integration** - Making your simulation interactive
 6. **Tournament Mode** - Running bulk simulations for analysis
-7. **Betting Systems** - Money management and bankroll tracking *(NEW!)*
-8. **Card Counting** - Adaptive strategy based on game state *(NEW!)*
-9. **Multi-agent Architecture** - Sequential turn-based multiagent *(NEW!)*
+7. **Betting Systems** - Money management and bankroll tracking
+8. **Card Counting** - Adaptive strategy based on game state
+9. **Multi-agent Architecture** - Sequential turn-based multiagent
+10. **Web UI** - Browser bundling and PWA integration
+11. **Side Bets** - Extensible bonus bet system
 
 ## Casino Features (Fully Implemented!) 🎰
 
@@ -454,6 +494,37 @@ const sideBetResults = game.resolveSideBets();
 // - Suited Three of a Kind: 100:1
 ```
 
+**Lucky Ladies** - Bet on your first two cards totaling 20:
+```javascript
+game.placeLuckyLadiesBet(10); // Place $10 side bet
+game.deal();
+// Resolved after hand ends (needs to check for dealer blackjack)
+const results = game.resolveDealerDependentSideBets();
+
+// Payouts:
+// - Any 20: 4:1
+// - Suited 20: 9:1
+// - Matched 20 (same rank & suit): 19:1
+// - Queen of Hearts Pair: 125:1
+// - Q♥ Pair + Dealer Blackjack: 1000:1
+```
+
+**Buster Blackjack** - Bet on the dealer busting:
+```javascript
+game.placeBusterBlackjackBet(10); // Place $10 side bet
+game.deal();
+// Resolved after dealer plays
+const results = game.resolveDealerDependentSideBets();
+
+// Payouts:
+// - 3-card bust: 2:1
+// - 4-card bust: 4:1
+// - 5-card bust: 12:1
+// - 6-card bust: 50:1
+// - 7-card bust: 100:1
+// - 8+ card bust: 250:1
+```
+
 ### ♻️ Re-Splitting
 Split again when you receive another matching card:
 ```javascript
@@ -490,7 +561,7 @@ The bottleneck is rule evaluation. For high-performance sims, cache hand values.
 
 ## Architecture Notes
 
-This example provides **two complementary implementations**:
+This example provides **three complementary implementations**:
 
 ### 1. Simple Single-Player (`game.js`)
 - **Purpose**: Learning and simple use cases
@@ -504,27 +575,30 @@ This example provides **two complementary implementations**:
 - **Best for**: Multiplayer games, networked play, complex scenarios
 - **Complexity**: Higher - uses full Engine/Agent/CRDT architecture
 
+### 3. Web UI (`web/`)
+- **Purpose**: Browser-based play experience
+- **Features**: Full casino experience, all side bets, PWA support, sound effects
+- **Best for**: End users, demos, playing without setup
+- **Complexity**: Medium - uses bundled game logic with vanilla JS UI
+
 Choose the right one for your needs:
 - **Learning HyperToken?** Start with `game.js`
 - **Building a multiplayer game?** Use `multiagent-game.js`
-- **Just want to play?** Use `cli.js` or `multiagent-cli.js`
+- **Just want to play?** Use `cli.js`, `multiagent-cli.js`, or the Web UI
 
 ## Future Enhancements
 
 ### Planned Features
 
-- **Web UI** - Canvas-based visualization with interactive controls
 - **AI Training** - Reinforcement learning integration (partial support via `BlackjackEnv.ts`)
 - **Tournament Modes** - Elimination, sit-and-go formats
-- **Surrender** - Early surrender and late surrender options
+- **Early Surrender** - Surrender before dealer checks for blackjack
 
 ### Community Contributions Welcome
 
-- Mobile/web clients using the network server
 - Additional betting strategies (e.g., Labouchere, D'Alembert, Fibonacci)
 - More card counting systems (e.g., Wong Halves, Red Seven, KO Count)
-- Additional side bets (Lucky Ladies, Royal Match, Super Sevens)
-- Late surrender and early surrender options
+- Additional side bets (Royal Match, Super Sevens)
 - Blackjack tournaments and elimination formats
 
 ## License
@@ -533,4 +607,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Side Bets, and European variant. Showcases token-based game design, AI agents with professional card counting systems, advanced betting strategies, and multiagent architecture. A comprehensive example of building complex card games with HyperToken.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, and multiagent architecture. A comprehensive example of building complex card games with HyperToken.
