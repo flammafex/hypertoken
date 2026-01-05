@@ -17,6 +17,7 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - **👥 Multi-agent support (2-6 agents at one space)**
 - **🤖 OpenAI Gym-compatible RL training environment**
 - **🏆 Elimination tournaments with shared table play**
+- **🎰 Sit-and-Go tournaments with escalating blinds and prize pools**
 
 ## Quick Start
 
@@ -153,6 +154,8 @@ blackjack/
 ├── tournament.js                   # Betting strategy tournament
 ├── elimination-tournament.js       # Elimination tournament class
 ├── elimination-cli.js              # Elimination tournament CLI
+├── sit-and-go-tournament.js        # Sit-and-Go tournament class
+├── sit-and-go-cli.js               # Sit-and-Go tournament CLI
 ├── server.js                       # Network server for multiplayer
 ├── client.js                       # Network client for multiplayer
 ├── BlackjackEnv.ts                 # Gym environment for RL training
@@ -420,6 +423,7 @@ while (!gameState.allAgentsFinished) {
 11. **Side Bets** - Extensible bonus bet system
 12. **Gym Environment** - OpenAI Gym-compatible RL training
 13. **Elimination Tournaments** - Multi-agent competitive play
+14. **Sit-and-Go Tournaments** - Escalating blinds and prize pools
 
 ## Casino Features (Fully Implemented!) 🎰
 
@@ -784,11 +788,143 @@ const tournament = new EliminationTournament(agents, {
 await tournament.run();
 ```
 
+## Sit-and-Go Tournaments
+
+Poker-style tournaments with escalating blinds, forced bets, and prize pool distribution.
+
+### Quick Start
+
+```bash
+# Run a 6-player Sit-and-Go
+node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js
+
+# Turbo structure (faster blind increases)
+node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js --turbo
+
+# Hyper-turbo for quick games
+node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js --hyper -p 4
+
+# Custom buy-in and chip stack
+node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js -b 50 -c 1000 -p 9
+```
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --players <n>` | Number of players (2-10) | 6 |
+| `-b, --buy-in <n>` | Buy-in amount in dollars | 100 |
+| `-c, --chips <n>` | Starting chip count | 1500 |
+| `-l, --level-time <n>` | Hands per blind level | 10 |
+| `--turbo` | Turbo structure (5 hands/level) | - |
+| `--hyper` | Hyper-turbo (3 hands/level) | - |
+| `-r, --max-rounds <n>` | Maximum hands | 500 |
+| `-s, --seed <n>` | Random seed | random |
+| `-v, --verbose` | Show hand-by-hand detail | false |
+
+### Features
+
+- **Escalating Blinds**: Small blind/big blind increase every N hands
+- **Forced Bets**: Small blind, big blind, and antes rotate around the table
+- **Prize Pool**: Buy-in based pool distributed to top finishers
+- **Payout Structure**: Automatic payouts (e.g., 60%/25%/15% for top 3)
+- **Position Play**: Dealer button, SB, and BB positions rotate each hand
+- **Tournament-Aware Agents**: Agents that adjust strategy near the bubble
+
+### Payout Structure
+
+Payouts are automatically calculated based on player count:
+
+| Players | Paid Places | Distribution |
+|---------|-------------|--------------|
+| 2 | 1 | 100% |
+| 3 | 2 | 65% / 35% |
+| 4-6 | 3 | 60% / 25% / 15% |
+| 7-8 | 4 | 45% / 27% / 18% / 10% |
+| 9-10 | 5 | 40% / 25% / 18% / 10% / 7% |
+
+### Blind Structure
+
+Default blind levels (10 hands per level):
+
+| Level | Small | Big | Ante |
+|-------|-------|-----|------|
+| 1 | 10 | 20 | - |
+| 2 | 15 | 30 | - |
+| 3 | 25 | 50 | - |
+| 4 | 50 | 100 | - |
+| 5 | 75 | 150 | - |
+| 6 | 100 | 200 | 25 |
+| 7 | 150 | 300 | 25 |
+| ... | | | |
+
+### Programmatic Usage
+
+```javascript
+import { SitAndGoTournament } from './sit-and-go-tournament.js';
+import { BasicStrategyAgent } from './agents/basic-strategy.js';
+
+const agents = [
+  new BasicStrategyAgent("Player 1"),
+  new BasicStrategyAgent("Player 2"),
+  // ...more agents
+];
+
+const tournament = new SitAndGoTournament(agents, {
+  buyIn: 100,
+  startingChips: 1500,
+  blindLevels: [
+    { small: 10, big: 20, ante: 0, duration: 10 },
+    { small: 25, big: 50, ante: 0, duration: 10 },
+    { small: 50, big: 100, ante: 10, duration: 10 },
+    // ...escalating levels
+  ],
+  payoutStructure: [0.5, 0.3, 0.2],  // Top 3 paid
+  verbose: true
+});
+
+await tournament.run();
+```
+
+### Tournament Agent Interface
+
+Agents can implement tournament-aware betting:
+
+```javascript
+class TournamentAgent {
+  constructor(name) {
+    this.name = name;
+  }
+
+  decide(gameState) {
+    // gameState includes tournament info:
+    // - blindLevel: current level number
+    // - smallBlind, bigBlind, ante: current blinds
+    // - playersRemaining: players still in tournament
+
+    if (gameState.agentHand.value >= 17) return "stand";
+    return "hit";
+  }
+
+  getBetSize({ bankroll, minBet, maxBet, bigBlind }) {
+    // Adjust strategy based on stack size
+    const chipsToBB = bankroll / bigBlind;
+
+    if (chipsToBB < 10) {
+      // Short stack: all-in or fold
+      return bankroll;
+    }
+
+    // Standard raise: 2.5x big blind
+    return Math.min(bigBlind * 2.5, maxBet, bankroll);
+  }
+}
+```
+
 ## Future Enhancements
 
 ### Planned Features
 
-- **Sit-and-Go Tournaments** - Escalating blinds and prize pool distribution
 - **Multi-Table Tournaments** - Multiple tables with balancing and final table
 
 ### Community Contributions Welcome
@@ -803,4 +939,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, OpenAI Gym-compatible RL training environment, and elimination tournaments. A comprehensive example of building complex card games with HyperToken.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, OpenAI Gym-compatible RL training environment, elimination tournaments, and Sit-and-Go tournaments with escalating blinds and prize pools. A comprehensive example of building complex card games with HyperToken.
