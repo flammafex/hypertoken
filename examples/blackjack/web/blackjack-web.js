@@ -1,10 +1,12 @@
 /**
  * Blackjack Web UI
  *
- * A browser-based single-player blackjack game.
+ * A browser-based blackjack game with single-player and multiplayer modes.
  */
 
 import { BlackjackGame } from './BlackjackGame.bundle.min.js';
+import { MultiplayerBlackjackGame } from './multiplayer-blackjack-game.js';
+import { BasicStrategyAgent, AI_PERSONALITIES, createAIAgent, getPersonality } from './ai-agents-browser.js';
 
 // ============================================================================
 // State Management
@@ -51,6 +53,22 @@ class GameState {
   animateDealerFlip = false;
   lastHitCardId = null;
 }
+
+// Multiplayer state
+class MultiplayerGameState {
+  game = null;                    // MultiplayerBlackjackGame instance
+  mode = 'multiplayer';
+  numPlayers = 4;
+  humanPlayerIndex = null;        // Randomly assigned
+  aiAgents = [];                  // AI agent instances
+  phase = 'betting';              // betting | dealing | player-turns | dealer | results
+  aiTurnDelay = 800;              // ms between AI decisions
+  isAnimating = false;            // Prevent actions during animations
+}
+
+// Game mode: 'single' or 'multiplayer'
+let gameMode = 'single';
+const mpState = new MultiplayerGameState();
 
 // ============================================================================
 // Betting Strategies
@@ -544,6 +562,7 @@ const elements = {
   // Controls
   bettingControls: document.getElementById('betting-controls'),
   playingControls: document.getElementById('playing-controls'),
+  earlySurrenderControls: document.getElementById('early-surrender-controls'),
   insuranceControls: document.getElementById('insurance-controls'),
   resultControls: document.getElementById('result-controls'),
 
@@ -560,13 +579,16 @@ const elements = {
   splitBtn: document.getElementById('split-btn'),
   surrenderBtn: document.getElementById('surrender-btn'),
 
+  // Early Surrender
+  earlySurrenderYes: document.getElementById('early-surrender-yes'),
+  earlySurrenderNo: document.getElementById('early-surrender-no'),
+
   // Insurance
   insuranceYes: document.getElementById('insurance-yes'),
   insuranceNo: document.getElementById('insurance-no'),
 
   // Result
   newHandBtn: document.getElementById('new-hand-btn'),
-  changeBetBtn: document.getElementById('change-bet-btn'),
 
   // Status
   message: document.getElementById('message'),
@@ -672,6 +694,19 @@ const elements = {
   showCardCountCheck: document.getElementById('show-card-count'),
   countingSystemRow: document.getElementById('counting-system-row'),
   countingSystemSelect: document.getElementById('counting-system'),
+
+  // Multiplayer elements
+  gameModeSelect: document.getElementById('game-mode'),
+  multiplayerOptions: document.getElementById('multiplayer-options'),
+  numPlayersSelect: document.getElementById('num-players'),
+  phaseBanner: document.getElementById('phase-banner'),
+  phaseText: document.getElementById('phase-text'),
+  seatsContainer: document.getElementById('seats-container'),
+  playerSeats: document.querySelectorAll('.player-seat'),
+  mobileCarousel: document.getElementById('mobile-carousel'),
+  carouselTrack: document.getElementById('carousel-track'),
+  carouselDots: document.getElementById('carousel-dots'),
+  playerSection: document.getElementById('player-section'),
 };
 
 // ============================================================================
@@ -750,6 +785,19 @@ function updateSideBetsCount() {
       countEl.style.display = 'none';
     }
   }
+}
+
+/**
+ * Update side bet amount displays without full re-render.
+ * Works in both single-player and multiplayer modes.
+ */
+function updateSideBetAmounts() {
+  elements.ppAmount.textContent = `$${state.perfectPairsBet}`;
+  elements.tpAmount.textContent = `$${state.twentyOnePlus3Bet}`;
+  elements.llAmount.textContent = `$${state.luckyLadiesBet}`;
+  elements.bbAmount.textContent = `$${state.busterBlackjackBet}`;
+  elements.rmAmount.textContent = `$${state.royalMatchBet}`;
+  elements.ssAmount.textContent = `$${state.superSevensBet}`;
 }
 
 function render() {
@@ -1087,7 +1135,10 @@ function updateSideBetUI() {
 function updateCardCountDisplay(gameState) {
   if (!elements.cardCountDisplay) return;
 
-  if (state.showCardCount && gameState.countInfo) {
+  // Only show if card counting is explicitly enabled and count info is available
+  const shouldShow = state.showCardCount === true && gameState && gameState.countInfo;
+
+  if (shouldShow) {
     elements.cardCountDisplay.classList.remove('hidden');
 
     const { runningCount, trueCount } = gameState.countInfo;
@@ -1912,11 +1963,1224 @@ function adjustBet(delta) {
   const step = delta > 0 ? 5 : -5;
   const newBet = state.currentBet + step;
 
-  if (newBet >= state.minBet && newBet <= state.maxBet && newBet <= state.game.bankroll) {
+  // Get the correct bankroll based on game mode
+  let bankroll;
+  if (gameMode === 'multiplayer' && mpState.game) {
+    const human = mpState.game.players[mpState.humanPlayerIndex];
+    bankroll = human ? human.bankroll : state.initialBankroll;
+  } else if (state.game) {
+    bankroll = state.game.bankroll;
+  } else {
+    bankroll = state.initialBankroll;
+  }
+
+  if (newBet >= state.minBet && newBet <= state.maxBet && newBet <= bankroll) {
     state.currentBet = newBet;
     sounds.chipClick();
-    render();
+
+    if (gameMode === 'multiplayer') {
+      elements.betAmount.textContent = `$${state.currentBet}`;
+      renderMultiplayer();
+    } else {
+      render();
+    }
   }
+}
+
+// ============================================================================
+// Multiplayer Functions
+// ============================================================================
+
+function initMultiplayerGame() {
+  gameMode = 'multiplayer';
+
+  // Start stats session for multiplayer
+  stats.startSession(state.initialBankroll);
+
+  const numPlayers = mpState.numPlayers;
+
+  // Create the multiplayer game
+  mpState.game = new MultiplayerBlackjackGame({
+    numPlayers,
+    numDecks: state.numDecks,
+    seed: state.seed,
+    initialBankroll: state.initialBankroll,
+    minBet: state.minBet,
+    maxBet: state.maxBet,
+    variant: state.variant,
+    dealerHitsSoft17: state.dealerHitsSoft17,
+    allowEarlySurrender: state.allowEarlySurrender,
+    allowLateSurrender: state.allowLateSurrender,
+    allowResplitAces: state.resplitAces
+  });
+
+  mpState.humanPlayerIndex = mpState.game.humanPlayerIndex;
+
+  // Create AI agents for non-human players
+  mpState.aiAgents = [];
+  let aiIndex = 0;
+  for (let i = 0; i < numPlayers; i++) {
+    if (i === mpState.humanPlayerIndex) {
+      mpState.aiAgents.push(null);
+    } else {
+      const agent = createAIAgent(aiIndex);
+      mpState.aiAgents.push(agent);
+      // Update player name from personality
+      mpState.game.players[i].name = agent.name;
+      aiIndex++;
+    }
+  }
+
+  // Switch to multiplayer UI
+  switchToMultiplayerUI();
+
+  // Start betting phase
+  mpState.phase = 'betting';
+  showPhaseBanner('Place Your Bets');
+
+  // Auto-bet for AI players
+  autoPlaceAIBets();
+
+  renderMultiplayer();
+}
+
+function switchToMultiplayerUI() {
+  // Hide single-player section
+  elements.playerSection.classList.add('hidden');
+  elements.splitHandsContainer.classList.add('hidden');
+
+  // Show multiplayer seats (desktop) and carousel (mobile)
+  // CSS media queries will control which one is actually visible
+  elements.seatsContainer.classList.remove('hidden');
+  elements.mobileCarousel.classList.remove('hidden');
+
+  // Hide unused seats
+  const numPlayers = mpState.numPlayers;
+  elements.playerSeats.forEach((seat, i) => {
+    if (i < numPlayers) {
+      seat.style.display = '';
+    } else {
+      seat.style.display = 'none';
+    }
+  });
+
+  // Update header to show "Multiplayer"
+  elements.betDisplay.textContent = 'Multiplayer';
+}
+
+function switchToSinglePlayerUI() {
+  // Show single-player section
+  elements.playerSection.classList.remove('hidden');
+
+  // Hide multiplayer elements
+  elements.seatsContainer.classList.add('hidden');
+  elements.mobileCarousel.classList.add('hidden');
+  elements.phaseBanner.classList.add('hidden');
+}
+
+function showPhaseBanner(text) {
+  elements.phaseText.textContent = text;
+  elements.phaseBanner.classList.remove('hidden');
+}
+
+function hidePhaseBanner() {
+  elements.phaseBanner.classList.add('hidden');
+}
+
+function autoPlaceAIBets() {
+  const gameState = mpState.game.getGameState();
+
+  for (let i = 0; i < gameState.players.length; i++) {
+    const player = gameState.players[i];
+    if (player.type === 'ai' && mpState.aiAgents[i]) {
+      const agent = mpState.aiAgents[i];
+      const bet = agent.getBetAmount(player.bankroll, mpState.game.minBet, mpState.game.maxBet);
+      if (bet > 0 && bet <= player.bankroll) {
+        mpState.game.setPlayerBet(i, bet);
+      }
+    }
+  }
+}
+
+function renderMultiplayer() {
+  const gameState = mpState.game.getGameState();
+
+  // Update each seat
+  gameState.players.forEach((player, i) => {
+    renderPlayerSeat(i, player, gameState);
+  });
+
+  // Update dealer (reuse existing dealer rendering)
+  renderDealerHandMP(gameState.dealer);
+
+  // Update bankroll display for human player
+  const human = gameState.players[mpState.humanPlayerIndex];
+  elements.bankrollDisplay.textContent = `$${human.bankroll}`;
+
+  // Update deck count
+  if (elements.deckCountLabel) {
+    elements.deckCountLabel.textContent = gameState.deckCount;
+  }
+
+  // Update card count display
+  updateCardCountDisplay(gameState);
+
+  // Update controls
+  updateMultiplayerControls();
+
+  // Update mobile carousel if visible
+  if (window.innerWidth <= 768) {
+    renderMobileCarousel(gameState);
+  }
+}
+
+function renderPlayerSeat(index, player, gameState) {
+  const seat = elements.playerSeats[index];
+  if (!seat) return;
+
+  const isHuman = index === mpState.humanPlayerIndex;
+  const isActive = (index === gameState.activePlayerIndex && mpState.phase === 'player-turns') ||
+                   (index === gameState.insurancePlayerIndex && mpState.phase === 'insurance');
+
+  // Update classes
+  seat.classList.toggle('active', isActive);
+  seat.classList.toggle('human', isHuman);
+
+  // Update name and badge
+  const nameEl = seat.querySelector('.seat-name');
+  const badgeEl = seat.querySelector('.seat-badge');
+  if (nameEl) nameEl.textContent = player.name;
+  if (badgeEl) {
+    badgeEl.textContent = isHuman ? 'YOU' : 'AI';
+    badgeEl.classList.toggle('you', isHuman);
+  }
+
+  // Update bankroll and bet
+  const bankrollEl = seat.querySelector('.seat-bankroll');
+  const betEl = seat.querySelector('.seat-bet');
+  if (bankrollEl) bankrollEl.textContent = `$${player.bankroll}`;
+  if (betEl) {
+    let betText = player.currentBet > 0 ? `Bet: $${player.currentBet}` : 'No bet';
+    if (player.insuranceBet > 0) {
+      betText += ` (Ins: $${player.insuranceBet})`;
+    }
+    // Show side bets if any
+    const sideBetTotal = Object.values(player.sideBets || {}).reduce((sum, b) => sum + b, 0);
+    if (sideBetTotal > 0) {
+      betText += ` +$${sideBetTotal} sides`;
+    }
+    betEl.textContent = betText;
+  }
+
+  // Update side bet results display
+  const sideBetResultsEl = seat.querySelector('.seat-sidebets');
+  if (sideBetResultsEl) {
+    sideBetResultsEl.innerHTML = '';
+    if (player.sideBetResults) {
+      const results = player.sideBetResults;
+      const resultItems = [];
+
+      if (results.perfectPairs) {
+        if (results.perfectPairs.won) {
+          resultItems.push(`<span class="sidebet-win">PP: +$${Math.floor(results.perfectPairs.payout)}</span>`);
+        } else if (player.sideBets?.perfectPairs > 0) {
+          resultItems.push(`<span class="sidebet-lose">PP: Lost</span>`);
+        }
+      }
+      if (results.twentyOnePlus3) {
+        if (results.twentyOnePlus3.won) {
+          resultItems.push(`<span class="sidebet-win">21+3: +$${Math.floor(results.twentyOnePlus3.payout)}</span>`);
+        } else if (player.sideBets?.twentyOnePlus3 > 0) {
+          resultItems.push(`<span class="sidebet-lose">21+3: Lost</span>`);
+        }
+      }
+      if (results.luckyLadies) {
+        if (results.luckyLadies.won) {
+          resultItems.push(`<span class="sidebet-win">LL: +$${Math.floor(results.luckyLadies.payout)}</span>`);
+        } else if (player.sideBets?.luckyLadies > 0) {
+          resultItems.push(`<span class="sidebet-lose">LL: Lost</span>`);
+        }
+      }
+      if (results.busterBlackjack) {
+        if (results.busterBlackjack.won) {
+          resultItems.push(`<span class="sidebet-win">BB: +$${Math.floor(results.busterBlackjack.payout)}</span>`);
+        } else if (player.sideBets?.busterBlackjack > 0) {
+          resultItems.push(`<span class="sidebet-lose">BB: Lost</span>`);
+        }
+      }
+
+      if (resultItems.length > 0) {
+        sideBetResultsEl.innerHTML = resultItems.join(' ');
+      }
+    }
+  }
+
+  // Update hand - handle split hands
+  const handEl = seat.querySelector('.seat-hand');
+  const valueEl = seat.querySelector('.seat-value');
+
+  if (handEl) {
+    handEl.innerHTML = '';
+
+    if (player.splitHands && player.splitHands.length > 0) {
+      // Render split hands
+      player.splitHands.forEach((splitHand, idx) => {
+        const splitDiv = document.createElement('div');
+        splitDiv.className = 'seat-split-hand';
+        if (splitHand.active) {
+          splitDiv.classList.add('active');
+        }
+        if (splitHand.busted) {
+          splitDiv.classList.add('busted');
+        }
+
+        // Cards for this split hand
+        const cardsDiv = document.createElement('div');
+        cardsDiv.className = 'seat-split-cards';
+        splitHand.cards.forEach(card => {
+          const cardEl = createCardElement(card);
+          cardEl.classList.add('mini-card');
+          cardsDiv.appendChild(cardEl);
+        });
+        splitDiv.appendChild(cardsDiv);
+
+        // Value for this split hand
+        const valSpan = document.createElement('span');
+        valSpan.className = 'seat-split-value';
+        valSpan.textContent = splitHand.value;
+        if (splitHand.busted) valSpan.classList.add('busted');
+        if (splitHand.blackjack) valSpan.classList.add('blackjack');
+        splitDiv.appendChild(valSpan);
+
+        handEl.appendChild(splitDiv);
+      });
+
+      // Hide main value element when showing split hands
+      if (valueEl) {
+        valueEl.textContent = '';
+        valueEl.classList.remove('blackjack', 'busted');
+      }
+    } else if (player.hand.cards.length > 0) {
+      // Render regular hand
+      player.hand.cards.forEach(card => {
+        const cardEl = createCardElement(card);
+        cardEl.classList.add('mini-card');
+        handEl.appendChild(cardEl);
+      });
+
+      // Update value
+      if (valueEl) {
+        valueEl.textContent = player.hand.value;
+        valueEl.classList.toggle('blackjack', player.hand.blackjack);
+        valueEl.classList.toggle('busted', player.hand.busted);
+      }
+    } else {
+      // No cards
+      if (valueEl) {
+        valueEl.textContent = '';
+        valueEl.classList.remove('blackjack', 'busted');
+      }
+    }
+  }
+
+  // Update status
+  const statusEl = seat.querySelector('.seat-status');
+  if (statusEl) {
+    let statusText = '';
+    let statusClass = '';
+
+    if (mpState.phase === 'results' && player.result) {
+      if (typeof player.result === 'string') {
+        if (player.result === 'player' || player.result === 'player-blackjack') {
+          statusText = `Won $${player.payout}`;
+          statusClass = 'won';
+        } else if (player.result === 'dealer') {
+          statusText = 'Lost';
+          statusClass = 'lost';
+        } else if (player.result === 'push') {
+          statusText = 'Push';
+          statusClass = 'push';
+        }
+      }
+    } else if (player.status === 'busted') {
+      statusText = 'Busted';
+      statusClass = 'lost';
+    } else if (player.status === 'blackjack') {
+      statusText = 'Blackjack!';
+      statusClass = 'won';
+    } else if (player.status === 'stood') {
+      statusText = 'Stand';
+    } else if (isActive) {
+      statusText = 'Playing...';
+    }
+
+    statusEl.textContent = statusText;
+    statusEl.className = 'seat-status ' + statusClass;
+  }
+}
+
+function renderDealerHandMP(dealer) {
+  elements.dealerHand.innerHTML = '';
+
+  dealer.visibleCards.forEach((card, i) => {
+    const cardEl = createCardElement(card);
+    elements.dealerHand.appendChild(cardEl);
+  });
+
+  // Show hidden card indicator if needed
+  if (dealer.cards.length > dealer.visibleCards.length) {
+    const hiddenEl = document.createElement('div');
+    hiddenEl.className = 'card card-back';
+    elements.dealerHand.insertBefore(hiddenEl, elements.dealerHand.firstChild);
+  }
+
+  // Update dealer value
+  if (dealer.value !== null) {
+    elements.dealerValue.textContent = dealer.value;
+    elements.dealerValue.classList.toggle('busted', dealer.busted);
+    elements.dealerValue.classList.toggle('blackjack', dealer.blackjack);
+  } else if (dealer.visibleValue) {
+    elements.dealerValue.textContent = dealer.visibleValue;
+    elements.dealerValue.classList.remove('busted', 'blackjack');
+  } else {
+    elements.dealerValue.textContent = '';
+  }
+}
+
+function updateMultiplayerControls() {
+  const gameState = mpState.game.getGameState();
+  const isHumanTurn = gameState.isHumanTurn;
+
+  // Hide insurance, early surrender, and side bets by default
+  elements.insuranceControls.classList.add('hidden');
+  if (elements.earlySurrenderControls) {
+    elements.earlySurrenderControls.classList.add('hidden');
+  }
+  if (elements.sideBetsWrapper) {
+    elements.sideBetsWrapper.classList.add('hidden');
+  }
+
+  if (mpState.phase === 'betting') {
+    // Show betting controls
+    elements.bettingControls.classList.remove('hidden');
+    elements.playingControls.classList.add('hidden');
+    elements.resultControls.classList.add('hidden');
+
+    // Show side bets wrapper during betting phase
+    if (elements.sideBetsWrapper) {
+      elements.sideBetsWrapper.classList.remove('hidden');
+    }
+
+    // Update bet amount display
+    const human = gameState.players[mpState.humanPlayerIndex];
+    elements.betAmount.textContent = `$${state.currentBet}`;
+
+    // Enable deal button if human has placed bet
+    elements.dealBtn.disabled = false;
+    elements.dealBtn.textContent = 'Place Bet & Deal';
+
+  } else if (mpState.phase === 'early-surrender') {
+    // Early surrender phase - show early surrender controls for human
+    elements.bettingControls.classList.add('hidden');
+    elements.playingControls.classList.add('hidden');
+    elements.resultControls.classList.add('hidden');
+
+    if (gameState.isHumanEarlySurrenderTurn && elements.earlySurrenderControls) {
+      elements.earlySurrenderControls.classList.remove('hidden');
+    }
+
+  } else if (mpState.phase === 'insurance') {
+    // Insurance phase - show insurance controls for human
+    elements.bettingControls.classList.add('hidden');
+    elements.playingControls.classList.add('hidden');
+    elements.resultControls.classList.add('hidden');
+
+    if (gameState.isHumanInsuranceTurn) {
+      elements.insuranceControls.classList.remove('hidden');
+    }
+
+  } else if (mpState.phase === 'player-turns' && isHumanTurn) {
+    // Show playing controls for human
+    elements.bettingControls.classList.add('hidden');
+    elements.playingControls.classList.remove('hidden');
+    elements.resultControls.classList.add('hidden');
+
+    // Update button states based on available actions
+    const actions = mpState.game.getAvailableActions(mpState.humanPlayerIndex);
+    elements.hitBtn.disabled = !actions.includes('hit');
+    elements.standBtn.disabled = !actions.includes('stand');
+    elements.doubleBtn.disabled = !actions.includes('double');
+    elements.splitBtn.disabled = !actions.includes('split');
+
+    // Show surrender button if available
+    if (actions.includes('surrender')) {
+      elements.surrenderBtn.classList.remove('hidden');
+      elements.surrenderBtn.disabled = false;
+    } else {
+      elements.surrenderBtn.classList.add('hidden');
+    }
+
+  } else if (mpState.phase === 'player-turns') {
+    // AI is playing - disable all controls
+    elements.bettingControls.classList.add('hidden');
+    elements.playingControls.classList.remove('hidden');
+    elements.resultControls.classList.add('hidden');
+
+    elements.hitBtn.disabled = true;
+    elements.standBtn.disabled = true;
+    elements.doubleBtn.disabled = true;
+    elements.splitBtn.disabled = true;
+
+  } else if (mpState.phase === 'results') {
+    // Show result controls
+    elements.bettingControls.classList.add('hidden');
+    elements.playingControls.classList.add('hidden');
+    elements.resultControls.classList.remove('hidden');
+  }
+}
+
+function renderMobileCarousel(gameState) {
+  if (!elements.carouselTrack || !elements.carouselDots) return;
+
+  // Clear existing
+  elements.carouselTrack.innerHTML = '';
+  elements.carouselDots.innerHTML = '';
+
+  gameState.players.forEach((player, i) => {
+    const isHuman = i === mpState.humanPlayerIndex;
+    const isActive = (i === gameState.activePlayerIndex && mpState.phase === 'player-turns') ||
+                     (i === gameState.insurancePlayerIndex && mpState.phase === 'insurance');
+
+    // Build bet text with insurance and side bet info
+    let betText = player.currentBet > 0 ? `Bet: $${player.currentBet}` : 'No bet';
+    if (player.insuranceBet > 0) {
+      betText += ` (Ins: $${player.insuranceBet})`;
+    }
+    const sideBetTotal = Object.values(player.sideBets || {}).reduce((sum, b) => sum + b, 0);
+    if (sideBetTotal > 0) {
+      betText += ` +$${sideBetTotal} sides`;
+    }
+
+    // Build side bet results HTML
+    let sideBetsHtml = '';
+    if (player.sideBetResults) {
+      const results = player.sideBetResults;
+      const items = [];
+      if (results.perfectPairs?.won) {
+        items.push(`<span class="sidebet-win">PP: +$${Math.floor(results.perfectPairs.payout)}</span>`);
+      } else if (player.sideBets?.perfectPairs > 0 && results.perfectPairs) {
+        items.push(`<span class="sidebet-lose">PP: Lost</span>`);
+      }
+      if (results.twentyOnePlus3?.won) {
+        items.push(`<span class="sidebet-win">21+3: +$${Math.floor(results.twentyOnePlus3.payout)}</span>`);
+      } else if (player.sideBets?.twentyOnePlus3 > 0 && results.twentyOnePlus3) {
+        items.push(`<span class="sidebet-lose">21+3: Lost</span>`);
+      }
+      if (results.luckyLadies?.won) {
+        items.push(`<span class="sidebet-win">LL: +$${Math.floor(results.luckyLadies.payout)}</span>`);
+      } else if (player.sideBets?.luckyLadies > 0 && results.luckyLadies) {
+        items.push(`<span class="sidebet-lose">LL: Lost</span>`);
+      }
+      if (results.busterBlackjack?.won) {
+        items.push(`<span class="sidebet-win">BB: +$${Math.floor(results.busterBlackjack.payout)}</span>`);
+      } else if (player.sideBets?.busterBlackjack > 0 && results.busterBlackjack) {
+        items.push(`<span class="sidebet-lose">BB: Lost</span>`);
+      }
+      if (items.length > 0) {
+        sideBetsHtml = items.join(' ');
+      }
+    }
+
+    // Create carousel card
+    const card = document.createElement('div');
+    card.className = 'carousel-card';
+    if (isHuman) card.classList.add('human');
+    if (isActive) card.classList.add('active');
+
+    // Determine if we show split hands or regular hand
+    const hasSplitHands = player.splitHands && player.splitHands.length > 0;
+    const valueDisplay = hasSplitHands ? '' : (player.hand.value || '');
+    const valueClasses = hasSplitHands ? '' : `${player.hand.blackjack ? 'blackjack' : ''} ${player.hand.busted ? 'busted' : ''}`;
+
+    card.innerHTML = `
+      <div class="seat-header">
+        <span class="seat-name">${player.name}</span>
+        <span class="seat-badge ${isHuman ? 'you' : ''}">${isHuman ? 'YOU' : 'AI'}</span>
+      </div>
+      <div class="seat-bankroll">$${player.bankroll}</div>
+      <div class="seat-bet">${betText}</div>
+      <div class="seat-hand"></div>
+      <div class="seat-value ${valueClasses}">${valueDisplay}</div>
+      <div class="seat-sidebets">${sideBetsHtml}</div>
+    `;
+
+    // Add cards to hand - handle split hands
+    const handEl = card.querySelector('.seat-hand');
+    if (hasSplitHands) {
+      player.splitHands.forEach((splitHand, idx) => {
+        const splitDiv = document.createElement('div');
+        splitDiv.className = 'seat-split-hand';
+        if (splitHand.active) splitDiv.classList.add('active');
+        if (splitHand.busted) splitDiv.classList.add('busted');
+
+        const cardsDiv = document.createElement('div');
+        cardsDiv.className = 'seat-split-cards';
+        splitHand.cards.forEach(cardData => {
+          const cardEl = createCardElement(cardData);
+          cardEl.classList.add('mini-card');
+          cardsDiv.appendChild(cardEl);
+        });
+        splitDiv.appendChild(cardsDiv);
+
+        const valSpan = document.createElement('span');
+        valSpan.className = 'seat-split-value';
+        valSpan.textContent = splitHand.value;
+        if (splitHand.busted) valSpan.classList.add('busted');
+        if (splitHand.blackjack) valSpan.classList.add('blackjack');
+        splitDiv.appendChild(valSpan);
+
+        handEl.appendChild(splitDiv);
+      });
+    } else {
+      player.hand.cards.forEach(cardData => {
+        const cardEl = createCardElement(cardData);
+        handEl.appendChild(cardEl);
+      });
+    }
+
+    elements.carouselTrack.appendChild(card);
+
+    // Create dot
+    const dot = document.createElement('div');
+    dot.className = 'carousel-dot';
+    if (isHuman) dot.classList.add('human');
+    if (isActive) dot.classList.add('active');
+    dot.addEventListener('click', () => scrollToCarouselCard(i));
+    elements.carouselDots.appendChild(dot);
+  });
+
+  // Scroll to active player
+  if (gameState.activePlayerIndex >= 0) {
+    scrollToCarouselCard(gameState.activePlayerIndex);
+  }
+}
+
+function scrollToCarouselCard(index) {
+  const cards = elements.carouselTrack.querySelectorAll('.carousel-card');
+  if (cards[index]) {
+    cards[index].scrollIntoView({ behavior: 'smooth', inline: 'center' });
+  }
+}
+
+// Multiplayer game flow
+async function startMultiplayerRound() {
+  mpState.phase = 'betting';
+  showPhaseBanner('Place Your Bets');
+
+  // Auto-bet for AI
+  autoPlaceAIBets();
+
+  renderMultiplayer();
+}
+
+async function multiplayerDeal() {
+  if (!mpState.game) return;
+
+  // Place human bet
+  const human = mpState.game.players[mpState.humanPlayerIndex];
+  if (human.currentBet === 0) {
+    mpState.game.setPlayerBet(mpState.humanPlayerIndex, state.currentBet);
+  }
+
+  // Record main bet in stats
+  stats.recordBet(state.currentBet);
+
+  // Transfer human's side bets from global state to multiplayer game
+  const humanIdx = mpState.humanPlayerIndex;
+  if (state.perfectPairsEnabled && state.perfectPairsBet > 0) {
+    try {
+      mpState.game.setPlayerSideBet(humanIdx, 'perfectPairs', state.perfectPairsBet);
+      stats.recordSideBet(state.perfectPairsBet);
+    } catch (e) { console.warn('Could not place Perfect Pairs bet:', e.message); }
+  }
+  if (state.twentyOnePlus3Enabled && state.twentyOnePlus3Bet > 0) {
+    try {
+      mpState.game.setPlayerSideBet(humanIdx, 'twentyOnePlus3', state.twentyOnePlus3Bet);
+      stats.recordSideBet(state.twentyOnePlus3Bet);
+    } catch (e) { console.warn('Could not place 21+3 bet:', e.message); }
+  }
+  if (state.luckyLadiesEnabled && state.luckyLadiesBet > 0) {
+    try {
+      mpState.game.setPlayerSideBet(humanIdx, 'luckyLadies', state.luckyLadiesBet);
+      stats.recordSideBet(state.luckyLadiesBet);
+    } catch (e) { console.warn('Could not place Lucky Ladies bet:', e.message); }
+  }
+  if (state.busterBlackjackEnabled && state.busterBlackjackBet > 0) {
+    try {
+      mpState.game.setPlayerSideBet(humanIdx, 'busterBlackjack', state.busterBlackjackBet);
+      stats.recordSideBet(state.busterBlackjackBet);
+    } catch (e) { console.warn('Could not place Buster Blackjack bet:', e.message); }
+  }
+
+  // Deal cards
+  const gameState = mpState.game.deal();
+
+  sounds.cardDeal();
+  hidePhaseBanner();
+  renderMultiplayer();
+
+  // Wait a moment
+  await delay(500);
+
+  // Check if early surrender is offered (before dealer blackjack check)
+  if (gameState.phase === 'early-surrender') {
+    mpState.phase = 'early-surrender';
+    await handleMultiplayerEarlySurrender();
+  } else if (gameState.phase === 'insurance') {
+    mpState.phase = 'insurance';
+    await handleMultiplayerInsurance();
+  } else if (gameState.phase === 'player-turns') {
+    mpState.phase = 'player-turns';
+    // Start player turns
+    await playAllPlayerTurns();
+  } else if (gameState.phase === 'results') {
+    // All players have blackjack or surrendered
+    mpState.phase = 'results';
+    showMultiplayerResults();
+  }
+}
+
+async function handleMultiplayerEarlySurrender() {
+  showPhaseBanner('Early Surrender?');
+  renderMultiplayer();
+
+  // Process each player's early surrender decision
+  while (mpState.game.phase === 'early-surrender') {
+    const gameState = mpState.game.getGameState();
+    const playerIndex = gameState.earlySurrenderPlayerIndex;
+
+    if (playerIndex < 0) break;
+
+    const player = mpState.game.players[playerIndex];
+
+    if (player.type === 'ai') {
+      // AI uses basic strategy - generally decline early surrender
+      // (Early surrender is very favorable, AI might take it vs 10/A)
+      const dealerUpCard = mpState.game.getDealerUpCard();
+      const dealerValue = dealerUpCard?.meta?.value?.[0] || 10;
+      const playerState = mpState.game.getPlayerState(playerIndex);
+      const playerValue = playerState.hand.value;
+
+      // Basic strategy: early surrender 16 vs 10/A, 15 vs 10
+      let shouldSurrender = false;
+      if (playerValue === 16 && (dealerValue === 10 || dealerUpCard?.meta?.rank === 'A')) {
+        shouldSurrender = true;
+      } else if (playerValue === 15 && dealerValue === 10) {
+        shouldSurrender = true;
+      }
+
+      await delay(400);
+      if (shouldSurrender) {
+        mpState.game.takeEarlySurrender(playerIndex);
+      } else {
+        mpState.game.declineEarlySurrender(playerIndex);
+      }
+      renderMultiplayer();
+    } else {
+      // Human turn - show early surrender controls and wait
+      showPhaseBanner('Early Surrender?');
+      renderMultiplayer();
+      return; // Exit and wait for human input
+    }
+  }
+
+  // Early surrender phase complete - continue to next phase
+  await finishEarlySurrenderPhase();
+}
+
+async function finishEarlySurrenderPhase() {
+  const gameState = mpState.game.getGameState();
+
+  hidePhaseBanner();
+
+  // Check next phase
+  if (gameState.phase === 'insurance') {
+    mpState.phase = 'insurance';
+    await handleMultiplayerInsurance();
+  } else if (gameState.phase === 'player-turns') {
+    mpState.phase = 'player-turns';
+    await playAllPlayerTurns();
+  } else if (gameState.phase === 'results') {
+    mpState.phase = 'results';
+    showMultiplayerResults();
+  }
+}
+
+async function handleMultiplayerInsurance() {
+  showPhaseBanner('Insurance?');
+  renderMultiplayer();
+
+  // Process each player's insurance decision
+  while (mpState.game.phase === 'insurance') {
+    const gameState = mpState.game.getGameState();
+    const playerIndex = gameState.insurancePlayerIndex;
+
+    if (playerIndex < 0) break;
+
+    const player = mpState.game.players[playerIndex];
+
+    if (player.type === 'ai') {
+      // AI always declines insurance (basic strategy)
+      await delay(400);
+      mpState.game.declineInsurance(playerIndex);
+      renderMultiplayer();
+    } else {
+      // Human turn - show insurance controls and wait
+      showPhaseBanner('Insurance?');
+      renderMultiplayer();
+      return; // Exit and wait for human input
+    }
+  }
+
+  // Insurance phase complete - check result
+  await finishInsurancePhase();
+}
+
+async function finishInsurancePhase() {
+  const gameState = mpState.game.getGameState();
+  const dealerHasBlackjack = gameState.phase === 'results';
+
+  // Record insurance stats for human if they took insurance
+  const humanPlayer = mpState.game.players[mpState.humanPlayerIndex];
+  if (humanPlayer.insuranceDecision === true) {
+    stats.recordInsurance(dealerHasBlackjack);
+  }
+
+  // Check if dealer had blackjack - if phase is 'results', dealer had blackjack
+  if (dealerHasBlackjack) {
+    // Dealer has blackjack - show result
+    sounds.cardFlip();
+    showPhaseBanner('Dealer Blackjack!');
+    mpState.phase = 'results';
+    renderMultiplayer();
+    await delay(2000);
+    showMultiplayerResults();
+  } else {
+    // No dealer blackjack - continue to player turns
+    hidePhaseBanner();
+    mpState.phase = 'player-turns';
+    renderMultiplayer();
+    await delay(500);
+    await playAllPlayerTurns();
+  }
+}
+
+function multiplayerTakeInsurance() {
+  if (mpState.game.phase !== 'insurance') return;
+
+  const humanIndex = mpState.humanPlayerIndex;
+  sounds.chipClick();
+  const result = mpState.game.takeInsurance(humanIndex);
+  renderMultiplayer();
+
+  // Continue insurance phase
+  continueInsurancePhase();
+}
+
+function multiplayerDeclineInsurance() {
+  if (mpState.game.phase !== 'insurance') return;
+
+  const humanIndex = mpState.humanPlayerIndex;
+  mpState.game.declineInsurance(humanIndex);
+  renderMultiplayer();
+
+  // Continue insurance phase
+  continueInsurancePhase();
+}
+
+async function continueInsurancePhase() {
+  // Check if more players need to decide
+  const gameState = mpState.game.getGameState();
+
+  if (gameState.phase === 'insurance') {
+    // Continue with AI decisions
+    await handleMultiplayerInsurance();
+  } else {
+    // Insurance resolved
+    await finishInsurancePhase();
+  }
+}
+
+async function playAllPlayerTurns() {
+  const gameState = mpState.game.getGameState();
+
+  while (mpState.game.activePlayerIndex >= 0) {
+    const playerIndex = mpState.game.activePlayerIndex;
+    const player = mpState.game.players[playerIndex];
+
+    // Skip players who are already done
+    if (player.status !== 'playing') {
+      mpState.game.nextPlayerTurn();
+      continue;
+    }
+
+    showPhaseBanner(`${player.name}'s Turn`);
+    renderMultiplayer();
+
+    if (player.type === 'ai') {
+      await playAITurn(playerIndex);
+    } else {
+      // Human turn - wait for input
+      hidePhaseBanner();
+      renderMultiplayer();
+      return; // Exit and wait for human action
+    }
+  }
+
+  // All players done - dealer's turn
+  await playDealerTurn();
+}
+
+async function playAITurn(playerIndex) {
+  const agent = mpState.aiAgents[playerIndex];
+  if (!agent) return;
+
+  await delay(mpState.aiTurnDelay);
+
+  while (mpState.game.canPlayerAct(playerIndex)) {
+    const gameState = mpState.game.getGameState();
+    const player = gameState.players[playerIndex];
+    const dealerUpCard = mpState.game.getDealerUpCard();
+    const availableActions = mpState.game.getAvailableActions(playerIndex);
+
+    const action = agent.decide(player, dealerUpCard, availableActions);
+
+    // Execute action and check for bust immediately after
+    // (status may change to 'done' if AI is last player and game resolves)
+    let didBust = false;
+
+    switch (action) {
+      case 'hit':
+        mpState.game.hit(playerIndex);
+        sounds.cardDeal();
+        // Check bust immediately
+        const hitPlayerState = mpState.game.getPlayerState(playerIndex);
+        didBust = hitPlayerState.hand.busted;
+        break;
+      case 'stand':
+        mpState.game.stand(playerIndex);
+        break;
+      case 'double':
+        mpState.game.doubleDown(playerIndex);
+        sounds.cardDeal();
+        // Check bust immediately
+        const doublePlayerState = mpState.game.getPlayerState(playerIndex);
+        didBust = doublePlayerState.hand.busted;
+        break;
+      case 'split':
+        mpState.game.split(playerIndex);
+        sounds.chipClick();
+        break;
+      case 'surrender':
+        mpState.game.surrender(playerIndex);
+        sounds.lose();
+        break;
+    }
+
+    renderMultiplayer();
+
+    if (didBust) {
+      sounds.bust();
+    }
+
+    await delay(mpState.aiTurnDelay);
+
+    // Exit loop if game has already resolved (AI was last player)
+    if (mpState.game.phase !== 'player-turns') {
+      break;
+    }
+  }
+
+  // Advance to next player only if still in player-turns phase
+  if (mpState.game.phase === 'player-turns' && mpState.game.activePlayerIndex === playerIndex) {
+    mpState.game.nextPlayerTurn();
+  }
+}
+
+async function playDealerTurn() {
+  mpState.phase = 'dealer';
+  showPhaseBanner("Dealer's Turn");
+  renderMultiplayer();
+
+  await delay(500);
+
+  // Dealer plays automatically in the game engine
+  // Just need to update display
+  mpState.phase = 'results';
+
+  const gameState = mpState.game.getGameState();
+  renderDealerHandMP(gameState.dealer);
+
+  // Update AI agents with results
+  gameState.players.forEach((player, i) => {
+    if (mpState.aiAgents[i]) {
+      mpState.aiAgents[i].updateResult(player.result);
+    }
+  });
+
+  await delay(500);
+
+  // Show results
+  showMultiplayerResults();
+}
+
+function showMultiplayerResults() {
+  hidePhaseBanner();
+  mpState.phase = 'results';
+
+  const gameState = mpState.game.getGameState();
+  const human = gameState.players[mpState.humanPlayerIndex];
+
+  // Show result banner for human
+  let resultText = '';
+  let resultClass = '';
+
+  if (typeof human.result === 'string') {
+    if (human.result === 'player-blackjack') {
+      resultText = 'BLACKJACK!';
+      resultClass = 'blackjack';
+      sounds.blackjack();
+    } else if (human.result === 'player') {
+      resultText = 'YOU WIN!';
+      resultClass = 'win';
+      sounds.win();
+    } else if (human.result === 'dealer') {
+      resultText = 'YOU LOSE';
+      resultClass = 'lose';
+      sounds.lose();
+    } else if (human.result === 'push') {
+      resultText = 'PUSH';
+      resultClass = 'push';
+    } else if (human.result === 'surrender') {
+      resultText = 'SURRENDERED';
+      resultClass = 'lose';
+    }
+  }
+
+  if (resultText) {
+    elements.resultBanner.textContent = resultText;
+    elements.resultBanner.className = `result-banner ${resultClass}`;
+    elements.resultBanner.classList.remove('hidden');
+  }
+
+  // Calculate side bet winnings
+  let sideBetWinnings = 0;
+  let sideBetMessages = [];
+  if (human.sideBetResults) {
+    const sbr = human.sideBetResults;
+    if (sbr.perfectPairs?.won) {
+      sideBetWinnings += sbr.perfectPairs.payout;
+      sideBetMessages.push(`PP +$${Math.floor(sbr.perfectPairs.payout)}`);
+    }
+    if (sbr.twentyOnePlus3?.won) {
+      sideBetWinnings += sbr.twentyOnePlus3.payout;
+      sideBetMessages.push(`21+3 +$${Math.floor(sbr.twentyOnePlus3.payout)}`);
+    }
+    if (sbr.luckyLadies?.won) {
+      sideBetWinnings += sbr.luckyLadies.payout;
+      sideBetMessages.push(`LL +$${Math.floor(sbr.luckyLadies.payout)}`);
+    }
+    if (sbr.busterBlackjack?.won) {
+      sideBetWinnings += sbr.busterBlackjack.payout;
+      sideBetMessages.push(`BB +$${Math.floor(sbr.busterBlackjack.payout)}`);
+    }
+  }
+
+  // Update message
+  let message = '';
+  if (human.payout > 0 && human.result !== 'surrender') {
+    message = `You won $${human.payout}!`;
+  } else if (human.result === 'push') {
+    message = 'Push - bet returned.';
+  } else if (human.result === 'surrender') {
+    message = `Surrendered - half bet ($${human.payout}) returned.`;
+  } else {
+    message = 'Better luck next time!';
+  }
+
+  // Add side bet results to message
+  if (sideBetMessages.length > 0) {
+    message += ' Side bets: ' + sideBetMessages.join(', ');
+  }
+
+  elements.message.textContent = message;
+
+  // Record stats for human player
+  const humanPlayerData = mpState.game.players[mpState.humanPlayerIndex];
+
+  if (Array.isArray(human.result)) {
+    // Split hands - record each split hand result
+    for (let i = 0; i < human.result.length; i++) {
+      const splitResult = human.result[i];
+      const splitBet = humanPlayerData.splitBets[i] || state.currentBet;
+
+      // Map result values: player/player-blackjack → agent/agent-blackjack
+      let mappedResult = splitResult;
+      if (splitResult === 'player') mappedResult = 'agent';
+      if (splitResult === 'player-blackjack') mappedResult = 'agent-blackjack';
+
+      // Calculate payout for this split hand
+      let splitPayout = 0;
+      if (splitResult === 'player-blackjack') {
+        splitPayout = splitBet + (splitBet * 1.5);
+      } else if (splitResult === 'player') {
+        splitPayout = splitBet * 2;
+      } else if (splitResult === 'push') {
+        splitPayout = splitBet;
+      }
+
+      stats.recordHandResult(mappedResult, splitBet, splitPayout, humanPlayerData.bankroll);
+    }
+  } else if (human.result) {
+    // Single hand result
+    // Map result values
+    let mappedResult = human.result;
+    if (human.result === 'player') mappedResult = 'agent';
+    if (human.result === 'player-blackjack') mappedResult = 'agent-blackjack';
+    if (human.result === 'surrender') mappedResult = 'dealer'; // Count surrender as loss
+
+    stats.recordHandResult(mappedResult, state.currentBet, human.payout, humanPlayerData.bankroll);
+  }
+
+  // Record side bet wins
+  if (human.sideBetResults) {
+    const sbr = human.sideBetResults;
+    if (sbr.perfectPairs?.won) stats.recordSideBetWin(sbr.perfectPairs.payout);
+    if (sbr.twentyOnePlus3?.won) stats.recordSideBetWin(sbr.twentyOnePlus3.payout);
+    if (sbr.luckyLadies?.won) stats.recordSideBetWin(sbr.luckyLadies.payout);
+    if (sbr.busterBlackjack?.won) stats.recordSideBetWin(sbr.busterBlackjack.payout);
+    if (sbr.royalMatch?.won) stats.recordSideBetWin(sbr.royalMatch.payout);
+    if (sbr.superSevens?.won) stats.recordSideBetWin(sbr.superSevens.payout);
+  }
+
+  renderMultiplayer();
+}
+
+function multiplayerNewRound() {
+  elements.resultBanner.classList.add('hidden');
+
+  // Check for reshuffle
+  if (mpState.game.shouldReshuffle()) {
+    elements.resultBanner.textContent = 'SHUFFLING...';
+    elements.resultBanner.className = 'result-banner shuffle';
+    elements.resultBanner.classList.remove('hidden');
+    sounds.shuffle();
+
+    setTimeout(() => {
+      mpState.game.reshuffle();
+      elements.resultBanner.classList.add('hidden');
+      mpState.game.newRound();
+      startMultiplayerRound();
+    }, 1000);
+  } else {
+    mpState.game.newRound();
+    startMultiplayerRound();
+  }
+}
+
+// Human multiplayer actions
+function multiplayerHit() {
+  if (!mpState.game.isHumanTurn()) return;
+
+  mpState.game.hit(mpState.humanPlayerIndex);
+
+  // Check if player busted IMMEDIATELY after hit
+  // (status may already be 'done' if human was last player and game resolved)
+  const player = mpState.game.players[mpState.humanPlayerIndex];
+  const playerState = mpState.game.getPlayerState(mpState.humanPlayerIndex);
+  const didBust = player.status === 'busted' || (player.status === 'done' && playerState.hand.busted);
+
+  sounds.cardDeal();
+  renderMultiplayer();
+
+  if (didBust) {
+    sounds.bust();
+  }
+
+  // Check if turn is over (game engine may have already advanced)
+  if (!mpState.game.canPlayerAct(mpState.humanPlayerIndex)) {
+    // Only call nextPlayerTurn if game hasn't already processed it
+    if (mpState.game.phase === 'player-turns') {
+      mpState.game.nextPlayerTurn();
+    }
+    continueAfterHumanTurn();
+  }
+}
+
+function multiplayerStand() {
+  if (!mpState.game.isHumanTurn()) return;
+
+  mpState.game.stand(mpState.humanPlayerIndex);
+  renderMultiplayer();
+  continueAfterHumanTurn();
+}
+
+function multiplayerDouble() {
+  if (!mpState.game.isHumanTurn()) return;
+
+  // Record stats before doubling
+  stats.recordDouble();
+  stats.recordBet(state.currentBet); // Record the additional bet
+
+  mpState.game.doubleDown(mpState.humanPlayerIndex);
+
+  // Check if player busted IMMEDIATELY after double
+  // (status may already be 'done' if human was last player and game resolved)
+  const player = mpState.game.players[mpState.humanPlayerIndex];
+  const playerState = mpState.game.getPlayerState(mpState.humanPlayerIndex);
+  const didBust = player.status === 'busted' || (player.status === 'done' && playerState.hand.busted);
+
+  sounds.cardDeal();
+  renderMultiplayer();
+
+  if (didBust) {
+    sounds.bust();
+  }
+
+  continueAfterHumanTurn();
+}
+
+function multiplayerSplit() {
+  if (!mpState.game.isHumanTurn()) return;
+
+  mpState.game.split(mpState.humanPlayerIndex);
+  sounds.chipClick();
+
+  // Record split in stats
+  stats.recordSplit();
+  stats.recordBet(state.currentBet); // Splitting requires additional bet
+
+  renderMultiplayer();
+}
+
+function multiplayerSurrender() {
+  if (!mpState.game.isHumanTurn()) return;
+  if (!mpState.game.canSurrender(mpState.humanPlayerIndex)) return;
+
+  mpState.game.surrender(mpState.humanPlayerIndex);
+  sounds.lose();
+  renderMultiplayer();
+  continueAfterHumanTurn();
+}
+
+async function continueAfterHumanTurn() {
+  // Continue with remaining players
+  await delay(300);
+  await playAllPlayerTurns();
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ============================================================================
@@ -1943,12 +3207,37 @@ function setupEventListeners() {
     state.resplitAces = elements.resplitAcesCheck.checked;
 
     // Tools
-    state.showCardCount = elements.showCardCountCheck.checked;
+    state.showCardCount = elements.showCardCountCheck ? elements.showCardCountCheck.checked === true : false;
     state.countingSystem = elements.countingSystemSelect ? elements.countingSystemSelect.value : 'hilo';
 
     elements.startScreen.classList.add('hidden');
-    initGame();
+
+    // Check game mode
+    const selectedMode = elements.gameModeSelect ? elements.gameModeSelect.value : 'single';
+    if (selectedMode === 'multiplayer') {
+      // Get number of players
+      mpState.numPlayers = elements.numPlayersSelect ? parseInt(elements.numPlayersSelect.value) : 4;
+      gameMode = 'multiplayer';
+      initMultiplayerGame();
+    } else {
+      gameMode = 'single';
+      switchToSinglePlayerUI();
+      initGame();
+    }
   });
+
+  // Game mode toggle - show/hide multiplayer options
+  if (elements.gameModeSelect) {
+    elements.gameModeSelect.addEventListener('change', (e) => {
+      if (elements.multiplayerOptions) {
+        if (e.target.value === 'multiplayer') {
+          elements.multiplayerOptions.classList.remove('hidden');
+        } else {
+          elements.multiplayerOptions.classList.add('hidden');
+        }
+      }
+    });
+  }
 
   // Show/hide counting system selector based on checkbox
   elements.showCardCountCheck.addEventListener('change', (e) => {
@@ -1981,7 +3270,13 @@ function setupEventListeners() {
   // Betting controls
   elements.betDecrease.addEventListener('click', () => adjustBet(-1));
   elements.betIncrease.addEventListener('click', () => adjustBet(1));
-  elements.dealBtn.addEventListener('click', deal);
+  elements.dealBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerDeal();
+    } else {
+      deal();
+    }
+  });
 
   // Side bets toggle for mobile
   elements.sideBetsToggle.addEventListener('click', () => {
@@ -2000,143 +3295,197 @@ function setupEventListeners() {
     }
   });
 
-  // Side bet controls
+  // Side bet controls - use updateSideBetAmounts() to work in both modes
   elements.perfectPairsCheck.addEventListener('change', (e) => {
     state.perfectPairsEnabled = e.target.checked;
     updateSideBetsCount();
-    render();
   });
 
   elements.ppDecrease.addEventListener('click', () => {
     if (state.perfectPairsBet > state.minBet) {
       state.perfectPairsBet -= 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.ppIncrease.addEventListener('click', () => {
     if (state.perfectPairsBet < 50) {
       state.perfectPairsBet += 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.twentyOnePlus3Check.addEventListener('change', (e) => {
     state.twentyOnePlus3Enabled = e.target.checked;
     updateSideBetsCount();
-    render();
   });
 
   elements.tpDecrease.addEventListener('click', () => {
     if (state.twentyOnePlus3Bet > state.minBet) {
       state.twentyOnePlus3Bet -= 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.tpIncrease.addEventListener('click', () => {
     if (state.twentyOnePlus3Bet < 50) {
       state.twentyOnePlus3Bet += 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.luckyLadiesCheck.addEventListener('change', (e) => {
     state.luckyLadiesEnabled = e.target.checked;
     updateSideBetsCount();
-    render();
   });
 
   elements.llDecrease.addEventListener('click', () => {
     if (state.luckyLadiesBet > state.minBet) {
       state.luckyLadiesBet -= 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.llIncrease.addEventListener('click', () => {
     if (state.luckyLadiesBet < 50) {
       state.luckyLadiesBet += 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.busterBlackjackCheck.addEventListener('change', (e) => {
     state.busterBlackjackEnabled = e.target.checked;
     updateSideBetsCount();
-    render();
   });
 
   elements.bbDecrease.addEventListener('click', () => {
     if (state.busterBlackjackBet > state.minBet) {
       state.busterBlackjackBet -= 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.bbIncrease.addEventListener('click', () => {
     if (state.busterBlackjackBet < 50) {
       state.busterBlackjackBet += 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.royalMatchCheck.addEventListener('change', (e) => {
     state.royalMatchEnabled = e.target.checked;
     updateSideBetsCount();
-    render();
   });
 
   elements.rmDecrease.addEventListener('click', () => {
     if (state.royalMatchBet > state.minBet) {
       state.royalMatchBet -= 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.rmIncrease.addEventListener('click', () => {
     if (state.royalMatchBet < 50) {
       state.royalMatchBet += 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.superSevensCheck.addEventListener('change', (e) => {
     state.superSevensEnabled = e.target.checked;
     updateSideBetsCount();
-    render();
   });
 
   elements.ssDecrease.addEventListener('click', () => {
     if (state.superSevensBet > state.minBet) {
       state.superSevensBet -= 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   elements.ssIncrease.addEventListener('click', () => {
     if (state.superSevensBet < 50) {
       state.superSevensBet += 5;
-      render();
+      updateSideBetAmounts();
     }
   });
 
   // Playing controls
-  elements.hitBtn.addEventListener('click', hit);
-  elements.standBtn.addEventListener('click', stand);
-  elements.doubleBtn.addEventListener('click', double);
-  elements.splitBtn.addEventListener('click', split);
-  elements.surrenderBtn.addEventListener('click', surrender);
+  elements.hitBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerHit();
+    } else {
+      hit();
+    }
+  });
+  elements.standBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerStand();
+    } else {
+      stand();
+    }
+  });
+  elements.doubleBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerDouble();
+    } else {
+      double();
+    }
+  });
+  elements.splitBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerSplit();
+    } else {
+      split();
+    }
+  });
+  elements.surrenderBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerSurrender();
+    } else {
+      surrender();
+    }
+  });
 
   // Insurance controls
-  elements.insuranceYes.addEventListener('click', () => takeInsurance(true));
-  elements.insuranceNo.addEventListener('click', () => takeInsurance(false));
+  elements.insuranceYes.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerTakeInsurance();
+    } else {
+      takeInsurance(true);
+    }
+  });
+  elements.insuranceNo.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerDeclineInsurance();
+    } else {
+      takeInsurance(false);
+    }
+  });
+
+  // Early surrender controls (multiplayer only)
+  elements.earlySurrenderYes.addEventListener('click', () => {
+    if (gameMode === 'multiplayer' && mpState.phase === 'early-surrender' && mpState.game.isHumanEarlySurrenderTurn()) {
+      mpState.game.takeEarlySurrender(mpState.humanPlayerIndex);
+      renderMultiplayer();
+      handleMultiplayerEarlySurrender();
+    }
+  });
+  elements.earlySurrenderNo.addEventListener('click', () => {
+    if (gameMode === 'multiplayer' && mpState.phase === 'early-surrender' && mpState.game.isHumanEarlySurrenderTurn()) {
+      mpState.game.declineEarlySurrender(mpState.humanPlayerIndex);
+      renderMultiplayer();
+      handleMultiplayerEarlySurrender();
+    }
+  });
 
   // Result controls
-  elements.newHandBtn.addEventListener('click', newHand);
-  elements.changeBetBtn.addEventListener('click', () => {
-    state.phase = 'betting';
-    render();
+  elements.newHandBtn.addEventListener('click', () => {
+    if (gameMode === 'multiplayer') {
+      multiplayerNewRound();
+    } else {
+      newHand();
+    }
   });
 
   // Game over
@@ -2152,6 +3501,62 @@ function setupEventListeners() {
 
     const key = e.key.toLowerCase();
 
+    // Multiplayer keyboard shortcuts
+    if (gameMode === 'multiplayer') {
+      if (mpState.phase === 'betting') {
+        if (key === 'enter' || key === ' ') {
+          e.preventDefault();
+          multiplayerDeal();
+        }
+      } else if (mpState.phase === 'player-turns' && mpState.game && mpState.game.isHumanTurn()) {
+        switch (key) {
+          case 'h':
+            e.preventDefault();
+            if (!elements.hitBtn.disabled) multiplayerHit();
+            break;
+          case 's':
+            e.preventDefault();
+            if (!elements.standBtn.disabled) multiplayerStand();
+            break;
+          case 'd':
+            e.preventDefault();
+            if (!elements.doubleBtn.disabled) multiplayerDouble();
+            break;
+          case 'p':
+            e.preventDefault();
+            if (!elements.splitBtn.disabled) multiplayerSplit();
+            break;
+        }
+      } else if (mpState.phase === 'insurance' && mpState.game && mpState.game.isHumanInsuranceTurn()) {
+        if (key === 'y') {
+          e.preventDefault();
+          multiplayerTakeInsurance();
+        } else if (key === 'n') {
+          e.preventDefault();
+          multiplayerDeclineInsurance();
+        }
+      } else if (mpState.phase === 'early-surrender' && mpState.game && mpState.game.isHumanEarlySurrenderTurn()) {
+        if (key === 'r' || key === 'y') {
+          e.preventDefault();
+          mpState.game.takeEarlySurrender(mpState.humanPlayerIndex);
+          renderMultiplayer();
+          handleMultiplayerEarlySurrender();
+        } else if (key === 'n') {
+          e.preventDefault();
+          mpState.game.declineEarlySurrender(mpState.humanPlayerIndex);
+          renderMultiplayer();
+          handleMultiplayerEarlySurrender();
+        }
+      } else if (mpState.phase === 'results') {
+        if (key === 'n' || key === 'enter' || key === ' ') {
+          e.preventDefault();
+          multiplayerNewRound();
+        }
+      }
+      return;
+    }
+
+    // Single-player keyboard shortcuts
     if (state.phase === 'betting') {
       if (key === 'enter' || key === ' ') {
         e.preventDefault();

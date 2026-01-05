@@ -40,10 +40,10 @@
             <span class="deck-count-label" id="deck-count-label">312</span>
           </div>
           <div id="card-count-display" class="card-count-display hidden">
-            <div class="count-label">Count</div>
+            <div class="count-label">Card Count</div>
             <div class="count-values">
-              <span class="count-item"><span class="count-key">RC:</span> <span id="running-count" class="count-value">0</span></span>
-              <span class="count-item"><span class="count-key">TC:</span> <span id="true-count" class="count-value">0</span></span>
+              <span class="count-item"><span class="count-key">Running:</span> <span id="running-count" class="count-value">0</span></span>
+              <span class="count-item"><span class="count-key">True:</span> <span id="true-count" class="count-value">0</span></span>
             </div>
           </div>
           <div class="dealer-cards-area">
@@ -55,6 +55,11 @@
           </div>
         </div>
       </section>
+
+      <!-- Phase banner (multiplayer) -->
+      <div id="phase-banner" class="phase-banner hidden" role="status" aria-live="polite">
+        <span id="phase-text">Place Your Bets</span>
+      </div>
 
       <!-- Center area: result banner and side bet results -->
       <section id="center-area" aria-label="Central area">
@@ -81,6 +86,88 @@
         <div id="split-hands-container" class="split-hands-container hidden">
           <div id="split-hands" class="split-hands"></div>
         </div>
+      </section>
+
+      <!-- Multiplayer: Player seats (hidden by default) -->
+      <section id="seats-container" class="seats-container hidden" role="region" aria-label="Player seats">
+        <div class="player-seat" data-seat="0">
+          <div class="seat-header">
+            <span class="seat-name">Player 1</span>
+            <span class="seat-badge">AI</span>
+          </div>
+          <div class="seat-bankroll">$1000</div>
+          <div class="seat-bet">Bet: $0</div>
+          <div class="seat-hand"></div>
+          <div class="seat-value"></div>
+          <div class="seat-status"></div>
+          <div class="seat-sidebets"></div>
+        </div>
+        <div class="player-seat" data-seat="1">
+          <div class="seat-header">
+            <span class="seat-name">Player 2</span>
+            <span class="seat-badge">AI</span>
+          </div>
+          <div class="seat-bankroll">$1000</div>
+          <div class="seat-bet">Bet: $0</div>
+          <div class="seat-hand"></div>
+          <div class="seat-value"></div>
+          <div class="seat-status"></div>
+          <div class="seat-sidebets"></div>
+        </div>
+        <div class="player-seat" data-seat="2">
+          <div class="seat-header">
+            <span class="seat-name">Player 3</span>
+            <span class="seat-badge">AI</span>
+          </div>
+          <div class="seat-bankroll">$1000</div>
+          <div class="seat-bet">Bet: $0</div>
+          <div class="seat-hand"></div>
+          <div class="seat-value"></div>
+          <div class="seat-status"></div>
+          <div class="seat-sidebets"></div>
+        </div>
+        <div class="player-seat" data-seat="3">
+          <div class="seat-header">
+            <span class="seat-name">Player 4</span>
+            <span class="seat-badge">AI</span>
+          </div>
+          <div class="seat-bankroll">$1000</div>
+          <div class="seat-bet">Bet: $0</div>
+          <div class="seat-hand"></div>
+          <div class="seat-value"></div>
+          <div class="seat-status"></div>
+          <div class="seat-sidebets"></div>
+        </div>
+        <div class="player-seat" data-seat="4">
+          <div class="seat-header">
+            <span class="seat-name">Player 5</span>
+            <span class="seat-badge">AI</span>
+          </div>
+          <div class="seat-bankroll">$1000</div>
+          <div class="seat-bet">Bet: $0</div>
+          <div class="seat-hand"></div>
+          <div class="seat-value"></div>
+          <div class="seat-status"></div>
+          <div class="seat-sidebets"></div>
+        </div>
+        <div class="player-seat" data-seat="5">
+          <div class="seat-header">
+            <span class="seat-name">Player 6</span>
+            <span class="seat-badge">AI</span>
+          </div>
+          <div class="seat-bankroll">$1000</div>
+          <div class="seat-bet">Bet: $0</div>
+          <div class="seat-hand"></div>
+          <div class="seat-value"></div>
+          <div class="seat-status"></div>
+          <div class="seat-sidebets"></div>
+        </div>
+      </section>
+
+      <!-- Multiplayer: Mobile carousel (hidden by default) -->
+      <section id="mobile-carousel" class="mobile-carousel hidden" role="region" aria-label="Player carousel">
+        <div class="carousel-track" id="carousel-track"></div>
+        <div class="carousel-dots" id="carousel-dots"></div>
       </section>
 
       <!-- Action buttons -->
@@ -186,6 +273,13 @@
           </button>
         </div>
 
+        <!-- Early Surrender buttons -->
+        <div id="early-surrender-controls" class="action-controls hidden">
+          <span class="surrender-prompt">Early Surrender?</span>
+          <button id="early-surrender-yes" class="btn-action">Yes (R)</button>
+          <button id="early-surrender-no" class="btn-action">No</button>
+        </div>
+
         <!-- Insurance buttons -->
         <div id="insurance-controls" class="action-controls hidden">
           <span class="insurance-prompt">Insurance?</span>
@@ -195,8 +289,7 @@
 
         <!-- Result phase buttons -->
         <div id="result-controls" class="action-controls hidden">
-          <button id="new-hand-btn" class="btn-primary">New Hand (N)</button>
-          <button id="change-bet-btn" class="btn-secondary">Change Bet</button>
+          <button id="new-hand-btn" class="btn-primary">Continue (N)</button>
         </div>
       </section>
     </main>
@@ -212,6 +305,25 @@
         <h2 id="start-title">Blackjack</h2>
         <p>Beat the dealer to 21!</p>
         <div class="start-options">
+          <div class="option-row">
+            <label for="game-mode">Game Mode:</label>
+            <select id="game-mode">
+              <option value="single">Single Player</option>
+              <option value="multiplayer">Multiplayer (vs AI)</option>
+            </select>
+          </div>
+          <div id="multiplayer-options" class="multiplayer-options hidden">
+            <div class="option-row">
+              <label for="num-players">Number of Players:</label>
+              <select id="num-players">
+                <option value="2">2 Players</option>
+                <option value="3">3 Players</option>
+                <option value="4" selected>4 Players</option>
+                <option value="5">5 Players</option>
+                <option value="6">6 Players</option>
+              </select>
+            </div>
+          </div>
           <div class="option-row">
             <label for="starting-bankroll">Starting Bankroll:</label>
             <select id="starting-bankroll">
