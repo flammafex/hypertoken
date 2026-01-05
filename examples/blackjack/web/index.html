@@ -64,6 +64,8 @@
           <div id="twentyone-plus3-result" class="sidebet-result"></div>
           <div id="lucky-ladies-result" class="sidebet-result"></div>
           <div id="buster-blackjack-result" class="sidebet-result"></div>
+          <div id="royal-match-result" class="sidebet-result"></div>
+          <div id="super-sevens-result" class="sidebet-result"></div>
         </div>
       </section>
 
@@ -144,6 +146,28 @@
                     <button class="btn-chip-small" id="bb-increase" type="button">+</button>
                   </div>
                 </div>
+                <div class="side-bet" data-tooltip="Bet on your first 2 cards being suited&#10;&#10;Any suited: 2.5:1&#10;King-Queen suited: 25:1">
+                  <label class="side-bet-label">
+                    <input type="checkbox" id="royal-match-check">
+                    <span>Royal Match</span>
+                  </label>
+                  <div class="side-bet-amount">
+                    <button class="btn-chip-small" id="rm-decrease" type="button">-</button>
+                    <span id="rm-amount">$5</span>
+                    <button class="btn-chip-small" id="rm-increase" type="button">+</button>
+                  </div>
+                </div>
+                <div class="side-bet" data-tooltip="Bet on getting 7s&#10;&#10;One 7: 3:1&#10;Two unsuited 7s: 50:1&#10;Two suited 7s: 100:1&#10;Three unsuited 7s: 500:1&#10;Three suited 7s: 5000:1">
+                  <label class="side-bet-label">
+                    <input type="checkbox" id="super-sevens-check">
+                    <span>Super 7s</span>
+                  </label>
+                  <div class="side-bet-amount">
+                    <button class="btn-chip-small" id="ss-decrease" type="button">-</button>
+                    <span id="ss-amount">$5</span>
+                    <button class="btn-chip-small" id="ss-increase" type="button">+</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -222,6 +246,9 @@
               <option value="martingale">Martingale</option>
               <option value="progressive">Progressive</option>
               <option value="percentage">2% Bankroll</option>
+              <option value="dalembert">D'Alembert</option>
+              <option value="fibonacci">Fibonacci</option>
+              <option value="labouchere">Labouchere</option>
             </select>
           </div>
           <div class="option-row">
@@ -259,8 +286,17 @@
           <div class="option-row checkbox-row">
             <label>
               <input type="checkbox" id="show-card-count">
-              Show card count (Hi-Lo)
+              Show card count
             </label>
+          </div>
+          <div class="option-row" id="counting-system-row" style="display: none;">
+            <label for="counting-system">Counting System:</label>
+            <select id="counting-system">
+              <option value="hilo" selected>Hi-Lo</option>
+              <option value="ko">KO Count</option>
+              <option value="redseven">Red Seven</option>
+              <option value="wonghalves">Wong Halves</option>
+            </select>
           </div>
         </div>
         <button id="start-game" class="btn-primary">Start Game</button>
@@ -333,6 +369,19 @@
             <li><strong>6-card bust</strong>: 50:1</li>
             <li><strong>7-card bust</strong>: 100:1</li>
             <li><strong>8+ card bust</strong>: 250:1</li>
+          </ul>
+          <p><strong>Royal Match</strong> - Bet on your first 2 cards being suited:</p>
+          <ul>
+            <li><strong>Any suited cards</strong>: 2.5:1</li>
+            <li><strong>King-Queen suited</strong>: 25:1</li>
+          </ul>
+          <p><strong>Super Sevens</strong> - Bet on getting 7s:</p>
+          <ul>
+            <li><strong>One 7</strong>: 3:1</li>
+            <li><strong>Two unsuited 7s</strong>: 50:1</li>
+            <li><strong>Two suited 7s</strong>: 100:1</li>
+            <li><strong>Three unsuited 7s</strong>: 500:1</li>
+            <li><strong>Three suited 7s</strong>: 5000:1</li>
           </ul>
         </div>
         <button id="close-rules" class="btn-primary">Close</button>

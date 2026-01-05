@@ -768,3 +768,276 @@ export class OscarsGrindStrategy extends BettingStrategy {
     this.sessionProfit = 0;
   }
 }
+
+/**
+ * D'Alembert Strategy - Linear progression system
+ *
+ * A safer alternative to Martingale that uses linear instead of exponential
+ * progression. After each loss, increase bet by one unit. After each win,
+ * decrease bet by one unit (but never below base bet).
+ *
+ * The system is based on the gambler's fallacy that wins and losses will
+ * eventually balance out. While mathematically flawed, it's much safer
+ * than Martingale due to slower bet growth.
+ *
+ * Example (base bet = $10, unit = $10):
+ * - Bet $10, lose → next bet $20
+ * - Bet $20, lose → next bet $30
+ * - Bet $30, win  → next bet $20
+ * - Bet $20, win  → next bet $10
+ */
+export class DAlembertStrategy extends BettingStrategy {
+  constructor(baseBet = 10, unit = null) {
+    super("D'Alembert");
+    this.baseBet = baseBet;
+    this.unit = unit || baseBet; // Default unit equals base bet
+    this.currentBet = baseBet;
+  }
+
+  getBetSize(gameState, bettingManager, lastResult = null) {
+    if (lastResult === null) {
+      // First bet of session
+      this.currentBet = this.baseBet;
+    } else if (lastResult.result === "dealer") {
+      // Lost - increase bet by one unit
+      this.currentBet += this.unit;
+    } else if (lastResult.result === "agent" || lastResult.result === "agent-blackjack") {
+      // Won - decrease bet by one unit (but not below base)
+      this.currentBet = Math.max(this.baseBet, this.currentBet - this.unit);
+    }
+    // Push - keep same bet
+
+    // Clamp to table limits and bankroll
+    return Math.max(
+      bettingManager.minBet,
+      Math.min(
+        this.currentBet,
+        bettingManager.maxBet,
+        bettingManager.bankroll
+      )
+    );
+  }
+
+  /**
+   * Reset to base bet (useful for starting a new session)
+   */
+  reset() {
+    this.currentBet = this.baseBet;
+  }
+
+  /**
+   * Get current strategy state
+   */
+  getStats() {
+    return {
+      currentBet: this.currentBet,
+      baseBet: this.baseBet,
+      unit: this.unit,
+      levelsAboveBase: Math.floor((this.currentBet - this.baseBet) / this.unit)
+    };
+  }
+}
+
+/**
+ * Fibonacci Strategy - Fibonacci sequence progression
+ *
+ * Uses the Fibonacci sequence (1, 1, 2, 3, 5, 8, 13, 21, 34, ...) for bet
+ * progression. After a loss, move one step forward in the sequence. After
+ * a win, move two steps back (or to the beginning if less than 2 steps in).
+ *
+ * Less aggressive than Martingale but can still reach high bet amounts.
+ * The sequence grows more slowly (exponential but with smaller base).
+ *
+ * Example (unit = $10):
+ * - Position 0: Bet $10 (1×), lose → move to position 1
+ * - Position 1: Bet $10 (1×), lose → move to position 2
+ * - Position 2: Bet $20 (2×), lose → move to position 3
+ * - Position 3: Bet $30 (3×), win  → move back to position 1
+ * - Position 1: Bet $10 (1×), win  → stay at position 0
+ */
+export class FibonacciStrategy extends BettingStrategy {
+  constructor(unitBet = 10) {
+    super("Fibonacci");
+    this.unitBet = unitBet;
+    this.position = 0;
+    // Pre-calculate Fibonacci sequence (enough for practical use)
+    this.sequence = this._generateSequence(20);
+  }
+
+  /**
+   * Generate Fibonacci sequence up to n terms
+   */
+  _generateSequence(n) {
+    const seq = [1, 1];
+    for (let i = 2; i < n; i++) {
+      seq.push(seq[i - 1] + seq[i - 2]);
+    }
+    return seq;
+  }
+
+  getBetSize(gameState, bettingManager, lastResult = null) {
+    if (lastResult === null) {
+      // First bet of session - start at beginning
+      this.position = 0;
+    } else if (lastResult.result === "dealer") {
+      // Lost - move one step forward in sequence
+      this.position = Math.min(this.position + 1, this.sequence.length - 1);
+    } else if (lastResult.result === "agent" || lastResult.result === "agent-blackjack") {
+      // Won - move two steps back (or to beginning)
+      this.position = Math.max(0, this.position - 2);
+    }
+    // Push - keep same position
+
+    // Calculate bet amount
+    const multiplier = this.sequence[this.position];
+    const betAmount = this.unitBet * multiplier;
+
+    // Clamp to table limits and bankroll
+    return Math.max(
+      bettingManager.minBet,
+      Math.min(
+        betAmount,
+        bettingManager.maxBet,
+        bettingManager.bankroll
+      )
+    );
+  }
+
+  /**
+   * Reset to beginning of sequence
+   */
+  reset() {
+    this.position = 0;
+  }
+
+  /**
+   * Get current strategy state
+   */
+  getStats() {
+    return {
+      position: this.position,
+      currentMultiplier: this.sequence[this.position],
+      currentBetUnits: this.sequence[this.position],
+      unitBet: this.unitBet,
+      sequence: this.sequence.slice(0, 10) // First 10 for display
+    };
+  }
+}
+
+/**
+ * Labouchere Strategy - Cancellation/Split Martingale system
+ *
+ * Also known as the "cancellation system" or "split Martingale". The player
+ * starts with a sequence of numbers (default: 1-2-3-4). Each bet is the sum
+ * of the first and last numbers. On a win, cross off both numbers. On a loss,
+ * add the lost amount to the end of the sequence. The cycle completes when
+ * all numbers are crossed off, resulting in a profit equal to the sum of
+ * the original sequence.
+ *
+ * Example (unit = $5, sequence = [1, 2, 3, 4]):
+ * - Bet $25 (1+4=5 units), lose → sequence becomes [1, 2, 3, 4, 5]
+ * - Bet $30 (1+5=6 units), win  → sequence becomes [2, 3, 4]
+ * - Bet $30 (2+4=6 units), win  → sequence becomes [3]
+ * - Bet $15 (3 units), win      → sequence empty, cycle complete!
+ * - Total profit = (1+2+3+4) × $5 = $50
+ *
+ * Risk: Losing streaks can make the sequence grow very long.
+ */
+export class LabouchereStrategy extends BettingStrategy {
+  constructor(unitBet = 5, initialSequence = [1, 2, 3, 4]) {
+    super("Labouchere");
+    this.unitBet = unitBet;
+    this.initialSequence = [...initialSequence];
+    this.sequence = [...initialSequence];
+    this.cycleCount = 0;
+    this.lastBetUnits = 0;
+  }
+
+  getBetSize(gameState, bettingManager, lastResult = null) {
+    // Process previous result
+    if (lastResult !== null && lastResult.result !== "push") {
+      if (lastResult.result === "agent" || lastResult.result === "agent-blackjack") {
+        // Won - remove first and last numbers from sequence
+        if (this.sequence.length > 1) {
+          this.sequence.shift(); // Remove first
+          this.sequence.pop();   // Remove last
+        } else if (this.sequence.length === 1) {
+          this.sequence.shift(); // Remove the only number
+        }
+
+        // Check if cycle is complete
+        if (this.sequence.length === 0) {
+          this.cycleCount++;
+          this.sequence = [...this.initialSequence]; // Start new cycle
+        }
+      } else if (lastResult.result === "dealer") {
+        // Lost - add the bet amount (in units) to end of sequence
+        this.sequence.push(this.lastBetUnits);
+      }
+    }
+
+    // Calculate bet: sum of first and last numbers (or just the number if only one)
+    let betUnits;
+    if (this.sequence.length === 0) {
+      // Shouldn't happen, but handle gracefully
+      this.sequence = [...this.initialSequence];
+      betUnits = this.sequence[0] + this.sequence[this.sequence.length - 1];
+    } else if (this.sequence.length === 1) {
+      betUnits = this.sequence[0];
+    } else {
+      betUnits = this.sequence[0] + this.sequence[this.sequence.length - 1];
+    }
+
+    this.lastBetUnits = betUnits;
+    const betAmount = betUnits * this.unitBet;
+
+    // Clamp to table limits and bankroll
+    return Math.max(
+      bettingManager.minBet,
+      Math.min(
+        betAmount,
+        bettingManager.maxBet,
+        bettingManager.bankroll
+      )
+    );
+  }
+
+  /**
+   * Reset to initial sequence
+   */
+  reset() {
+    this.sequence = [...this.initialSequence];
+    this.lastBetUnits = 0;
+  }
+
+  /**
+   * Get current strategy state
+   */
+  getStats() {
+    const targetProfit = this.initialSequence.reduce((a, b) => a + b, 0) * this.unitBet;
+    return {
+      sequence: [...this.sequence],
+      sequenceLength: this.sequence.length,
+      cycleCount: this.cycleCount,
+      unitBet: this.unitBet,
+      targetProfitPerCycle: targetProfit,
+      nextBetUnits: this.sequence.length === 1
+        ? this.sequence[0]
+        : (this.sequence[0] + this.sequence[this.sequence.length - 1])
+    };
+  }
+
+  /**
+   * Set a custom sequence (for advanced users)
+   */
+  setSequence(newSequence) {
+    if (!Array.isArray(newSequence) || newSequence.length === 0) {
+      throw new Error("Sequence must be a non-empty array of positive numbers");
+    }
+    if (!newSequence.every(n => Number.isFinite(n) && n > 0)) {
+      throw new Error("All sequence values must be positive numbers");
+    }
+    this.initialSequence = [...newSequence];
+    this.sequence = [...newSequence];
+  }
+}

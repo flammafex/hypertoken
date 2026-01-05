@@ -538,3 +538,427 @@ export class ZenCountAgent {
     };
   }
 }
+
+/**
+ * KO Count (Knock-Out) Card Counting Agent
+ *
+ * An UNBALANCED counting system - the running count itself is used
+ * for betting decisions, eliminating the need for true count conversion.
+ * This makes it easier to use in real casino conditions.
+ *
+ * Card Values:
+ * - 2, 3, 4, 5, 6, 7: +1
+ * - 8, 9: 0
+ * - 10, J, Q, K, A: -1
+ *
+ * Key Concept: Uses "key count" and "pivot point" instead of true count.
+ * For a 6-deck shoe, the Initial Running Count (IRC) starts at -20.
+ * When RC >= 4 (the "pivot"), the player has an advantage.
+ *
+ * Advantages: No true count conversion needed, simpler to use
+ * Disadvantages: Less precise than balanced counts for bet sizing
+ */
+export class KOCountAgent {
+  constructor(name = "KO Count", baseBet = 10, spreadMultiplier = 8, numDecks = 6) {
+    this.name = name;
+    this.baseBet = baseBet;
+    this.spreadMultiplier = spreadMultiplier;
+    this.numDecks = numDecks;
+    // KO starts with Initial Running Count (IRC) = -4 × (decks - 1)
+    // For 6 decks: IRC = -4 × 5 = -20
+    this.initialRunningCount = -4 * (numDecks - 1);
+    this.runningCount = this.initialRunningCount;
+    this.cardsDealt = 0;
+    this.pivotPoint = 4; // When RC >= pivot, player has advantage
+  }
+
+  updateCount(card) {
+    const rank = card.meta.rank;
+
+    // KO Count: 2-7 = +1, 8-9 = 0, 10-A = -1
+    if (['2', '3', '4', '5', '6', '7'].includes(rank)) {
+      this.runningCount += 1;
+    } else if (['10', 'J', 'Q', 'K', 'A'].includes(rank)) {
+      this.runningCount -= 1;
+    }
+    // 8, 9 are neutral (0)
+
+    this.cardsDealt++;
+  }
+
+  updateFromGameState(gameState) {
+    for (const card of gameState.agentHand.cards) {
+      this.updateCount(card);
+    }
+    const dealerCards = gameState.dealerHand.cards;
+    if (gameState.gameOver || gameState.dealerHand.value !== null) {
+      for (const card of dealerCards) {
+        this.updateCount(card);
+      }
+    } else if (dealerCards.length > 1) {
+      this.updateCount(dealerCards[1]);
+    }
+  }
+
+  getBetSize(gameState, bettingManager, lastResult) {
+    // Reset after shuffle (approximated by cards dealt)
+    if (this.cardsDealt > 280) {
+      this.resetCount();
+    }
+
+    // KO betting ramp based on running count (no true count needed!)
+    let betMultiplier = 1;
+
+    // Pivot point is 4 for 6-deck. Above pivot = advantage
+    if (this.runningCount >= this.pivotPoint + 8) betMultiplier = this.spreadMultiplier;
+    else if (this.runningCount >= this.pivotPoint + 6) betMultiplier = 6;
+    else if (this.runningCount >= this.pivotPoint + 4) betMultiplier = 4;
+    else if (this.runningCount >= this.pivotPoint + 2) betMultiplier = 2;
+    else if (this.runningCount >= this.pivotPoint) betMultiplier = 1.5;
+    // Below pivot - minimum bet
+
+    const betSize = this.baseBet * betMultiplier;
+    return Math.min(Math.max(betSize, bettingManager.minBet), bettingManager.maxBet, bettingManager.bankroll);
+  }
+
+  decide(gameState) {
+    const agentValue = gameState.agentHand.value;
+    const dealerUpCard = gameState.dealerHand.cards[1];
+    const dealerValue = this.getCardValue(dealerUpCard);
+
+    this.updateFromGameState(gameState);
+
+    if (agentValue >= 17) return "stand";
+    if (agentValue <= 11) return "hit";
+
+    // KO deviation: Stand 16 vs 10 when RC >= pivot
+    if (agentValue === 16 && dealerValue === 10) {
+      return this.runningCount >= this.pivotPoint ? "stand" : "hit";
+    }
+
+    if (agentValue >= 13 && agentValue <= 16 && dealerValue >= 2 && dealerValue <= 6) {
+      return "stand";
+    }
+
+    if (agentValue === 12 && dealerValue >= 4 && dealerValue <= 6) {
+      return "stand";
+    }
+
+    return "hit";
+  }
+
+  getCardValue(card) {
+    const rank = card.meta.rank;
+    if (rank === 'A') return 11;
+    if (['J', 'Q', 'K'].includes(rank)) return 10;
+    return parseInt(rank);
+  }
+
+  resetCount() {
+    this.runningCount = this.initialRunningCount;
+    this.cardsDealt = 0;
+  }
+
+  getCountStats() {
+    return {
+      runningCount: this.runningCount,
+      pivotPoint: this.pivotPoint,
+      advantageStatus: this.runningCount >= this.pivotPoint ? "ADVANTAGE" : "no advantage",
+      cardsDealt: this.cardsDealt,
+      system: "KO Count (unbalanced)"
+    };
+  }
+}
+
+/**
+ * Red Seven Card Counting Agent
+ *
+ * A variant of Hi-Lo that counts red 7s as +1 (like low cards) while
+ * black 7s are neutral. This creates an unbalanced count that's
+ * slightly more powerful than Hi-Lo while remaining easy to use.
+ *
+ * Card Values:
+ * - 2, 3, 4, 5, 6: +1
+ * - Red 7 (hearts, diamonds): +1
+ * - Black 7 (spades, clubs): 0
+ * - 8, 9: 0
+ * - 10, J, Q, K, A: -1
+ *
+ * Like KO, this is unbalanced - uses running count with a pivot point.
+ * For 6 decks, IRC = -12 (since there are 12 extra +1 cards from red 7s)
+ *
+ * Advantages: Simple like Hi-Lo but unbalanced (no true count needed)
+ * Disadvantages: Requires noting card color for 7s
+ */
+export class RedSevenAgent {
+  constructor(name = "Red Seven", baseBet = 10, spreadMultiplier = 8, numDecks = 6) {
+    this.name = name;
+    this.baseBet = baseBet;
+    this.spreadMultiplier = spreadMultiplier;
+    this.numDecks = numDecks;
+    // IRC = -2 × number of decks (accounts for the extra +1 from red 7s)
+    this.initialRunningCount = -2 * numDecks;
+    this.runningCount = this.initialRunningCount;
+    this.cardsDealt = 0;
+    this.pivotPoint = 0; // Pivot is 0 for Red Seven
+  }
+
+  updateCount(card) {
+    const rank = card.meta.rank;
+    const suit = card.meta.suit;
+
+    // Red Seven Count
+    if (['2', '3', '4', '5', '6'].includes(rank)) {
+      this.runningCount += 1;
+    } else if (rank === '7') {
+      // Red 7s count +1, black 7s count 0
+      if (suit === 'hearts' || suit === 'diamonds') {
+        this.runningCount += 1;
+      }
+      // Black 7s (spades, clubs) are neutral
+    } else if (['10', 'J', 'Q', 'K', 'A'].includes(rank)) {
+      this.runningCount -= 1;
+    }
+    // 8, 9, black 7s are neutral (0)
+
+    this.cardsDealt++;
+  }
+
+  updateFromGameState(gameState) {
+    for (const card of gameState.agentHand.cards) {
+      this.updateCount(card);
+    }
+    const dealerCards = gameState.dealerHand.cards;
+    if (gameState.gameOver || gameState.dealerHand.value !== null) {
+      for (const card of dealerCards) {
+        this.updateCount(card);
+      }
+    } else if (dealerCards.length > 1) {
+      this.updateCount(dealerCards[1]);
+    }
+  }
+
+  getBetSize(gameState, bettingManager, lastResult) {
+    if (this.cardsDealt > 280) {
+      this.resetCount();
+    }
+
+    // Red Seven betting ramp based on running count
+    let betMultiplier = 1;
+
+    if (this.runningCount >= this.pivotPoint + 10) betMultiplier = this.spreadMultiplier;
+    else if (this.runningCount >= this.pivotPoint + 7) betMultiplier = 6;
+    else if (this.runningCount >= this.pivotPoint + 5) betMultiplier = 4;
+    else if (this.runningCount >= this.pivotPoint + 3) betMultiplier = 2;
+    else if (this.runningCount >= this.pivotPoint + 1) betMultiplier = 1.5;
+
+    const betSize = this.baseBet * betMultiplier;
+    return Math.min(Math.max(betSize, bettingManager.minBet), bettingManager.maxBet, bettingManager.bankroll);
+  }
+
+  decide(gameState) {
+    const agentValue = gameState.agentHand.value;
+    const dealerUpCard = gameState.dealerHand.cards[1];
+    const dealerValue = this.getCardValue(dealerUpCard);
+
+    this.updateFromGameState(gameState);
+
+    if (agentValue >= 17) return "stand";
+    if (agentValue <= 11) return "hit";
+
+    // Red Seven deviation: Stand 16 vs 10 when RC >= pivot + 2
+    if (agentValue === 16 && dealerValue === 10) {
+      return this.runningCount >= this.pivotPoint + 2 ? "stand" : "hit";
+    }
+
+    if (agentValue >= 13 && agentValue <= 16 && dealerValue >= 2 && dealerValue <= 6) {
+      return "stand";
+    }
+
+    if (agentValue === 12 && dealerValue >= 4 && dealerValue <= 6) {
+      return "stand";
+    }
+
+    return "hit";
+  }
+
+  getCardValue(card) {
+    const rank = card.meta.rank;
+    if (rank === 'A') return 11;
+    if (['J', 'Q', 'K'].includes(rank)) return 10;
+    return parseInt(rank);
+  }
+
+  resetCount() {
+    this.runningCount = this.initialRunningCount;
+    this.cardsDealt = 0;
+  }
+
+  getCountStats() {
+    return {
+      runningCount: this.runningCount,
+      pivotPoint: this.pivotPoint,
+      advantageStatus: this.runningCount >= this.pivotPoint ? "ADVANTAGE" : "no advantage",
+      cardsDealt: this.cardsDealt,
+      system: "Red Seven (unbalanced)"
+    };
+  }
+}
+
+/**
+ * Wong Halves Card Counting Agent
+ *
+ * One of the most accurate counting systems, using half-point values
+ * for maximum precision. Balanced count requiring true count conversion.
+ *
+ * Card Values:
+ * - 2: +0.5
+ * - 3, 4, 6: +1
+ * - 5: +1.5
+ * - 7: +0.5
+ * - 8: 0
+ * - 9: -0.5
+ * - 10, J, Q, K, A: -1
+ *
+ * Implementation: Internally uses doubled values to avoid floating point:
+ * 2=+1, 3=+2, 4=+2, 5=+3, 6=+2, 7=+1, 8=0, 9=-1, 10-A=-2
+ * Then divides by 2 when calculating true count.
+ *
+ * Advantages: Highest accuracy of single-level counts
+ * Disadvantages: Half values are harder to track mentally
+ */
+export class WongHalvesAgent {
+  constructor(name = "Wong Halves", baseBet = 10, spreadMultiplier = 8) {
+    this.name = name;
+    this.baseBet = baseBet;
+    this.spreadMultiplier = spreadMultiplier;
+    // Use doubled values internally to avoid floating point
+    this.runningCountDoubled = 0;
+    this.cardsDealt = 0;
+    this.stacksRemaining = 6;
+    this.trueCount = 0;
+  }
+
+  updateCount(card) {
+    const rank = card.meta.rank;
+
+    // Wong Halves (doubled to avoid fractions)
+    // Actual: 2=+0.5, 3=+1, 4=+1, 5=+1.5, 6=+1, 7=+0.5, 8=0, 9=-0.5, 10-A=-1
+    // Doubled: 2=+1, 3=+2, 4=+2, 5=+3, 6=+2, 7=+1, 8=0, 9=-1, 10-A=-2
+    switch (rank) {
+      case '2':
+        this.runningCountDoubled += 1;  // +0.5 doubled
+        break;
+      case '3':
+      case '4':
+      case '6':
+        this.runningCountDoubled += 2;  // +1 doubled
+        break;
+      case '5':
+        this.runningCountDoubled += 3;  // +1.5 doubled
+        break;
+      case '7':
+        this.runningCountDoubled += 1;  // +0.5 doubled
+        break;
+      case '9':
+        this.runningCountDoubled -= 1;  // -0.5 doubled
+        break;
+      case '10':
+      case 'J':
+      case 'Q':
+      case 'K':
+      case 'A':
+        this.runningCountDoubled -= 2;  // -1 doubled
+        break;
+      // 8 is neutral (0)
+    }
+
+    this.cardsDealt++;
+    this.stacksRemaining = Math.max(1, (312 - this.cardsDealt) / 52);
+    // Divide by 2 to get actual running count, then by decks for true count
+    const actualRunningCount = this.runningCountDoubled / 2;
+    this.trueCount = Math.floor(actualRunningCount / this.stacksRemaining);
+  }
+
+  updateFromGameState(gameState) {
+    for (const card of gameState.agentHand.cards) {
+      this.updateCount(card);
+    }
+    const dealerCards = gameState.dealerHand.cards;
+    if (gameState.gameOver || gameState.dealerHand.value !== null) {
+      for (const card of dealerCards) {
+        this.updateCount(card);
+      }
+    } else if (dealerCards.length > 1) {
+      this.updateCount(dealerCards[1]);
+    }
+  }
+
+  getBetSize(gameState, bettingManager, lastResult) {
+    if (this.cardsDealt > 280) {
+      this.resetCount();
+    }
+
+    // Wong Halves betting ramp
+    let betMultiplier = 1;
+
+    if (this.trueCount >= 5) betMultiplier = this.spreadMultiplier;
+    else if (this.trueCount >= 4) betMultiplier = 6;
+    else if (this.trueCount >= 3) betMultiplier = 4;
+    else if (this.trueCount >= 2) betMultiplier = 2;
+    else if (this.trueCount >= 1) betMultiplier = 1.5;
+
+    const betSize = this.baseBet * betMultiplier;
+    return Math.min(Math.max(betSize, bettingManager.minBet), bettingManager.maxBet, bettingManager.bankroll);
+  }
+
+  decide(gameState) {
+    const agentValue = gameState.agentHand.value;
+    const dealerUpCard = gameState.dealerHand.cards[1];
+    const dealerValue = this.getCardValue(dealerUpCard);
+
+    this.updateFromGameState(gameState);
+
+    if (agentValue >= 17) return "stand";
+    if (agentValue <= 11) return "hit";
+
+    // Wong Halves deviation: Stand 16 vs 10 at TC >= 0 (more sensitive due to precision)
+    if (agentValue === 16 && dealerValue === 10) {
+      return this.trueCount >= 0 ? "stand" : "hit";
+    }
+
+    if (agentValue >= 13 && agentValue <= 16 && dealerValue >= 2 && dealerValue <= 6) {
+      return "stand";
+    }
+
+    if (agentValue === 12 && dealerValue >= 4 && dealerValue <= 6) {
+      return "stand";
+    }
+
+    return "hit";
+  }
+
+  getCardValue(card) {
+    const rank = card.meta.rank;
+    if (rank === 'A') return 11;
+    if (['J', 'Q', 'K'].includes(rank)) return 10;
+    return parseInt(rank);
+  }
+
+  resetCount() {
+    this.runningCountDoubled = 0;
+    this.cardsDealt = 0;
+    this.stacksRemaining = 6;
+    this.trueCount = 0;
+  }
+
+  getCountStats() {
+    return {
+      runningCount: (this.runningCountDoubled / 2).toFixed(1),
+      trueCount: this.trueCount,
+      cardsDealt: this.cardsDealt,
+      stacksRemaining: this.stacksRemaining.toFixed(1),
+      system: "Wong Halves (half-point precision)"
+    };
+  }
+}

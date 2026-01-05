@@ -34,6 +34,10 @@ class GameState {
   luckyLadiesBet = 5;
   busterBlackjackEnabled = false;
   busterBlackjackBet = 5;
+  royalMatchEnabled = false;
+  royalMatchBet = 5;
+  superSevensEnabled = false;
+  superSevensBet = 5;
   // House rules
   dealerHitsSoft17 = false;
   allowEarlySurrender = false;
@@ -41,6 +45,7 @@ class GameState {
   resplitAces = true;
   // Tools
   showCardCount = false;
+  countingSystem = 'hilo'; // hilo | ko | redseven | wonghalves
   // Animation state
   animateDealing = false;
   animateDealerFlip = false;
@@ -112,6 +117,94 @@ const BettingStrategies = {
     description: 'Bet 2% of current bankroll each hand',
     getNextBet: (state, stats) => {
       const bet = Math.floor(state.game.bankroll * 0.02);
+      return Math.max(state.minBet, Math.min(bet, state.maxBet, state.game.bankroll));
+    }
+  },
+
+  dalembert: {
+    name: "D'Alembert",
+    description: 'Increase by $10 after loss, decrease by $10 after win',
+    baseBet: 10,
+    unit: 10,
+    currentBet: 10,
+    getNextBet: function(state, stats) {
+      if (state.lastResult === null) {
+        this.currentBet = this.baseBet;
+      } else if (state.lastResult === 'dealer') {
+        // Lost - increase bet by one unit
+        this.currentBet = Math.min(this.currentBet + this.unit, state.maxBet, state.game.bankroll);
+      } else if (state.lastResult === 'agent' || state.lastResult === 'agent-blackjack') {
+        // Won - decrease bet by one unit (but not below base)
+        this.currentBet = Math.max(this.baseBet, this.currentBet - this.unit);
+      }
+      // Push - keep same bet
+      return Math.min(this.currentBet, state.game.bankroll);
+    }
+  },
+
+  fibonacci: {
+    name: 'Fibonacci',
+    description: 'Follow Fibonacci sequence on losses, back 2 on wins',
+    unitBet: 10,
+    position: 0,
+    sequence: [1, 1, 2, 3, 5, 8, 13, 21, 34, 55],
+    getNextBet: function(state, stats) {
+      if (state.lastResult === null) {
+        this.position = 0;
+      } else if (state.lastResult === 'dealer') {
+        // Lost - move forward in sequence
+        this.position = Math.min(this.position + 1, this.sequence.length - 1);
+      } else if (state.lastResult === 'agent' || state.lastResult === 'agent-blackjack') {
+        // Won - move back 2 positions
+        this.position = Math.max(0, this.position - 2);
+      }
+      // Push - keep same position
+      const bet = this.unitBet * this.sequence[this.position];
+      return Math.max(state.minBet, Math.min(bet, state.maxBet, state.game.bankroll));
+    }
+  },
+
+  labouchere: {
+    name: 'Labouchere',
+    description: 'Cancellation system with 1-2-3-4 sequence',
+    unitBet: 5,
+    initialSequence: [1, 2, 3, 4],
+    sequence: [1, 2, 3, 4],
+    lastBetUnits: 0,
+    getNextBet: function(state, stats) {
+      // Process previous result
+      if (state.lastResult !== null && state.lastResult !== 'push') {
+        if (state.lastResult === 'agent' || state.lastResult === 'agent-blackjack') {
+          // Won - remove first and last from sequence
+          if (this.sequence.length > 1) {
+            this.sequence.shift();
+            this.sequence.pop();
+          } else if (this.sequence.length === 1) {
+            this.sequence.shift();
+          }
+          // If sequence empty, restart cycle
+          if (this.sequence.length === 0) {
+            this.sequence = [...this.initialSequence];
+          }
+        } else if (state.lastResult === 'dealer') {
+          // Lost - add bet units to end
+          this.sequence.push(this.lastBetUnits);
+        }
+      }
+
+      // Calculate bet: sum of first and last (or just the one if only one left)
+      let betUnits;
+      if (this.sequence.length === 0) {
+        this.sequence = [...this.initialSequence];
+        betUnits = this.sequence[0] + this.sequence[this.sequence.length - 1];
+      } else if (this.sequence.length === 1) {
+        betUnits = this.sequence[0];
+      } else {
+        betUnits = this.sequence[0] + this.sequence[this.sequence.length - 1];
+      }
+
+      this.lastBetUnits = betUnits;
+      const bet = betUnits * this.unitBet;
       return Math.max(state.minBet, Math.min(bet, state.maxBet, state.game.bankroll));
     }
   }
@@ -551,6 +644,14 @@ const elements = {
   bbAmount: document.getElementById('bb-amount'),
   bbDecrease: document.getElementById('bb-decrease'),
   bbIncrease: document.getElementById('bb-increase'),
+  royalMatchCheck: document.getElementById('royal-match-check'),
+  rmAmount: document.getElementById('rm-amount'),
+  rmDecrease: document.getElementById('rm-decrease'),
+  rmIncrease: document.getElementById('rm-increase'),
+  superSevensCheck: document.getElementById('super-sevens-check'),
+  ssAmount: document.getElementById('ss-amount'),
+  ssDecrease: document.getElementById('ss-decrease'),
+  ssIncrease: document.getElementById('ss-increase'),
 
   // Side bet results
   sidebetResults: document.getElementById('sidebet-results'),
@@ -558,6 +659,8 @@ const elements = {
   twentyOnePlus3Result: document.getElementById('twentyone-plus3-result'),
   luckyLadiesResult: document.getElementById('lucky-ladies-result'),
   busterBlackjackResult: document.getElementById('buster-blackjack-result'),
+  royalMatchResult: document.getElementById('royal-match-result'),
+  superSevensResult: document.getElementById('super-sevens-result'),
 
   // Deck count in dealer area
   deckCountLabel: document.getElementById('deck-count-label'),
@@ -567,6 +670,8 @@ const elements = {
   runningCount: document.getElementById('running-count'),
   trueCount: document.getElementById('true-count'),
   showCardCountCheck: document.getElementById('show-card-count'),
+  countingSystemRow: document.getElementById('counting-system-row'),
+  countingSystemSelect: document.getElementById('counting-system'),
 };
 
 // ============================================================================
@@ -631,7 +736,9 @@ function updateSideBetsCount() {
     state.perfectPairsEnabled,
     state.twentyOnePlus3Enabled,
     state.luckyLadiesEnabled,
-    state.busterBlackjackEnabled
+    state.busterBlackjackEnabled,
+    state.royalMatchEnabled,
+    state.superSevensEnabled
   ].filter(Boolean).length;
 
   const countEl = elements.sideBetsCount;
@@ -912,18 +1019,24 @@ function updateSideBetUI() {
   elements.tpAmount.textContent = `$${state.twentyOnePlus3Bet}`;
   elements.llAmount.textContent = `$${state.luckyLadiesBet}`;
   elements.bbAmount.textContent = `$${state.busterBlackjackBet}`;
+  elements.rmAmount.textContent = `$${state.royalMatchBet}`;
+  elements.ssAmount.textContent = `$${state.superSevensBet}`;
 
   // Update checkbox states
   elements.perfectPairsCheck.checked = state.perfectPairsEnabled;
   elements.twentyOnePlus3Check.checked = state.twentyOnePlus3Enabled;
   elements.luckyLadiesCheck.checked = state.luckyLadiesEnabled;
   elements.busterBlackjackCheck.checked = state.busterBlackjackEnabled;
+  elements.royalMatchCheck.checked = state.royalMatchEnabled;
+  elements.superSevensCheck.checked = state.superSevensEnabled;
 
   // Update active class on side bet containers
   const ppContainer = elements.perfectPairsCheck.closest('.side-bet');
   const tpContainer = elements.twentyOnePlus3Check.closest('.side-bet');
   const llContainer = elements.luckyLadiesCheck.closest('.side-bet');
   const bbContainer = elements.busterBlackjackCheck.closest('.side-bet');
+  const rmContainer = elements.royalMatchCheck.closest('.side-bet');
+  const ssContainer = elements.superSevensCheck.closest('.side-bet');
 
   if (ppContainer) {
     ppContainer.classList.toggle('active', state.perfectPairsEnabled);
@@ -937,6 +1050,12 @@ function updateSideBetUI() {
   if (bbContainer) {
     bbContainer.classList.toggle('active', state.busterBlackjackEnabled);
   }
+  if (rmContainer) {
+    rmContainer.classList.toggle('active', state.royalMatchEnabled);
+  }
+  if (ssContainer) {
+    ssContainer.classList.toggle('active', state.superSevensEnabled);
+  }
 
   // Disable side bet buttons based on bankroll
   const bankroll = state.game ? state.game.bankroll : state.initialBankroll;
@@ -944,7 +1063,9 @@ function updateSideBetUI() {
     (state.perfectPairsEnabled ? state.perfectPairsBet : 0) +
     (state.twentyOnePlus3Enabled ? state.twentyOnePlus3Bet : 0) +
     (state.luckyLadiesEnabled ? state.luckyLadiesBet : 0) +
-    (state.busterBlackjackEnabled ? state.busterBlackjackBet : 0);
+    (state.busterBlackjackEnabled ? state.busterBlackjackBet : 0) +
+    (state.royalMatchEnabled ? state.royalMatchBet : 0) +
+    (state.superSevensEnabled ? state.superSevensBet : 0);
 
   elements.ppDecrease.disabled = state.perfectPairsBet <= state.minBet;
   elements.ppIncrease.disabled = state.perfectPairsBet >= 50 || (totalBets + 5) > bankroll;
@@ -954,6 +1075,10 @@ function updateSideBetUI() {
   elements.llIncrease.disabled = state.luckyLadiesBet >= 50 || (totalBets + 5) > bankroll;
   elements.bbDecrease.disabled = state.busterBlackjackBet <= state.minBet;
   elements.bbIncrease.disabled = state.busterBlackjackBet >= 50 || (totalBets + 5) > bankroll;
+  elements.rmDecrease.disabled = state.royalMatchBet <= state.minBet;
+  elements.rmIncrease.disabled = state.royalMatchBet >= 50 || (totalBets + 5) > bankroll;
+  elements.ssDecrease.disabled = state.superSevensBet <= state.minBet;
+  elements.ssIncrease.disabled = state.superSevensBet >= 50 || (totalBets + 5) > bankroll;
 
   // Update deal button disabled state to account for side bets
   elements.dealBtn.disabled = totalBets > bankroll;
@@ -1299,6 +1424,14 @@ function performDeal() {
     state.game.placeBusterBlackjackBet(state.busterBlackjackBet);
     stats.recordSideBet(state.busterBlackjackBet);
   }
+  if (state.royalMatchEnabled && state.game.placeRoyalMatchBet) {
+    state.game.placeRoyalMatchBet(state.royalMatchBet);
+    stats.recordSideBet(state.royalMatchBet);
+  }
+  if (state.superSevensEnabled && state.game.placeSuperSevensBet) {
+    state.game.placeSuperSevensBet(state.superSevensBet);
+    stats.recordSideBet(state.superSevensBet);
+  }
 
   // Deal cards with animation
   state.game.deal();
@@ -1441,6 +1574,49 @@ function displaySideBetResults(results) {
     }
   } else {
     elements.busterBlackjackResult.textContent = '';
+  }
+
+  // Royal Match result
+  if (results.royalMatch) {
+    if (results.royalMatch.win) {
+      const typeLabels = {
+        'royal-match': 'Royal Match (K-Q)',
+        'suited': 'Suited Cards'
+      };
+      elements.royalMatchResult.textContent = `Royal Match: ${typeLabels[results.royalMatch.type]} - Won $${results.royalMatch.payout}!`;
+      elements.royalMatchResult.className = 'sidebet-result win';
+      hasResults = true;
+      stats.recordSideBetWin(results.royalMatch.payout);
+    } else {
+      elements.royalMatchResult.textContent = 'Royal Match - Not suited';
+      elements.royalMatchResult.className = 'sidebet-result lose';
+      hasResults = true;
+    }
+  } else {
+    elements.royalMatchResult.textContent = '';
+  }
+
+  // Super Sevens result
+  if (results.superSevens) {
+    if (results.superSevens.win) {
+      const typeLabels = {
+        'three-suited-sevens': 'Three Suited 7s',
+        'three-unsuited-sevens': 'Three 7s',
+        'two-suited-sevens': 'Two Suited 7s',
+        'two-unsuited-sevens': 'Two 7s',
+        'one-seven': 'One 7'
+      };
+      elements.superSevensResult.textContent = `Super 7s: ${typeLabels[results.superSevens.type]} - Won $${results.superSevens.payout}!`;
+      elements.superSevensResult.className = 'sidebet-result win';
+      hasResults = true;
+      stats.recordSideBetWin(results.superSevens.payout);
+    } else {
+      elements.superSevensResult.textContent = 'Super 7s - No 7s';
+      elements.superSevensResult.className = 'sidebet-result lose';
+      hasResults = true;
+    }
+  } else {
+    elements.superSevensResult.textContent = '';
   }
 
   if (hasResults) {
@@ -1768,9 +1944,17 @@ function setupEventListeners() {
 
     // Tools
     state.showCardCount = elements.showCardCountCheck.checked;
+    state.countingSystem = elements.countingSystemSelect ? elements.countingSystemSelect.value : 'hilo';
 
     elements.startScreen.classList.add('hidden');
     initGame();
+  });
+
+  // Show/hide counting system selector based on checkbox
+  elements.showCardCountCheck.addEventListener('change', (e) => {
+    if (elements.countingSystemRow) {
+      elements.countingSystemRow.style.display = e.target.checked ? 'flex' : 'none';
+    }
   });
 
   elements.showRules.addEventListener('click', () => {
@@ -1893,6 +2077,46 @@ function setupEventListeners() {
   elements.bbIncrease.addEventListener('click', () => {
     if (state.busterBlackjackBet < 50) {
       state.busterBlackjackBet += 5;
+      render();
+    }
+  });
+
+  elements.royalMatchCheck.addEventListener('change', (e) => {
+    state.royalMatchEnabled = e.target.checked;
+    updateSideBetsCount();
+    render();
+  });
+
+  elements.rmDecrease.addEventListener('click', () => {
+    if (state.royalMatchBet > state.minBet) {
+      state.royalMatchBet -= 5;
+      render();
+    }
+  });
+
+  elements.rmIncrease.addEventListener('click', () => {
+    if (state.royalMatchBet < 50) {
+      state.royalMatchBet += 5;
+      render();
+    }
+  });
+
+  elements.superSevensCheck.addEventListener('change', (e) => {
+    state.superSevensEnabled = e.target.checked;
+    updateSideBetsCount();
+    render();
+  });
+
+  elements.ssDecrease.addEventListener('click', () => {
+    if (state.superSevensBet > state.minBet) {
+      state.superSevensBet -= 5;
+      render();
+    }
+  });
+
+  elements.ssIncrease.addEventListener('click', () => {
+    if (state.superSevensBet < 50) {
+      state.superSevensBet += 5;
       render();
     }
   });

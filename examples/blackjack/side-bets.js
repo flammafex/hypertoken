@@ -150,12 +150,123 @@ function checkStraight(sortedValues) {
 }
 
 /**
+ * Check and evaluate Royal Match side bet
+ *
+ * Royal Match pays when the player's first two cards are suited,
+ * with a bonus for a suited King and Queen ("Royal Match").
+ *
+ * Payouts:
+ * - Royal Match (suited K-Q): 25:1
+ * - Suited cards (any two suited): 2.5:1 (pays 5:2)
+ *
+ * @param {Array} playerCards - Player's first two cards
+ * @returns {object} - { hasWin: boolean, type: string, payout: number }
+ */
+export function evaluateRoyalMatch(playerCards) {
+  if (playerCards.length !== 2) {
+    return { hasWin: false, type: null, payout: 0 };
+  }
+
+  const card1 = playerCards[0];
+  const card2 = playerCards[1];
+
+  const rank1 = card1.meta.rank;
+  const rank2 = card2.meta.rank;
+  const suit1 = card1.meta.suit;
+  const suit2 = card2.meta.suit;
+
+  // Must be suited for any payout
+  if (suit1 !== suit2) {
+    return { hasWin: false, type: null, payout: 0 };
+  }
+
+  // Check for Royal Match (K-Q suited)
+  const isKingQueen = (rank1 === 'K' && rank2 === 'Q') ||
+                      (rank1 === 'Q' && rank2 === 'K');
+
+  if (isKingQueen) {
+    return { hasWin: true, type: 'royal-match', payout: 25 };
+  }
+
+  // Any other suited pair pays 2.5:1 (we'll use 2.5 as multiplier)
+  return { hasWin: true, type: 'suited', payout: 2.5 };
+}
+
+/**
+ * Check and evaluate Super Sevens side bet
+ *
+ * Super Sevens pays based on the number of 7s in the player's hand.
+ * The bet is evaluated progressively as cards are dealt.
+ * For simplicity, this evaluates at initial deal (2 cards) or after hit (3 cards).
+ *
+ * Payouts (2-card evaluation):
+ * - One 7: 3:1
+ * - Two unsuited 7s: 50:1
+ * - Two suited 7s: 100:1
+ *
+ * Payouts (3-card evaluation - if dealer has 7 up):
+ * - Three unsuited 7s: 500:1
+ * - Three suited 7s: 5000:1
+ *
+ * @param {Array} playerCards - Player's cards (first 2 or 3)
+ * @param {object} dealerUpCard - Dealer's up card (optional, for 3-card eval)
+ * @returns {object} - { hasWin: boolean, type: string, payout: number }
+ */
+export function evaluateSuperSevens(playerCards, dealerUpCard = null) {
+  if (playerCards.length < 2) {
+    return { hasWin: false, type: null, payout: 0 };
+  }
+
+  // Find all 7s in player's hand
+  const sevens = playerCards.filter(card => card.meta.rank === '7');
+  const numSevens = sevens.length;
+
+  // No 7s = no win
+  if (numSevens === 0) {
+    return { hasWin: false, type: null, payout: 0 };
+  }
+
+  // Check if dealer's up card is also a 7 (for three 7s bonus)
+  const dealerHasSeven = dealerUpCard && dealerUpCard.meta.rank === '7';
+
+  // Three 7s (player has 2 sevens + dealer up card is 7)
+  if (numSevens === 2 && dealerHasSeven) {
+    const allSevens = [...sevens, dealerUpCard];
+    const allSameSuit = allSevens.every(card => card.meta.suit === allSevens[0].meta.suit);
+
+    if (allSameSuit) {
+      return { hasWin: true, type: 'three-suited-sevens', payout: 5000 };
+    }
+    return { hasWin: true, type: 'three-unsuited-sevens', payout: 500 };
+  }
+
+  // Two 7s in player's hand
+  if (numSevens === 2) {
+    const sameSuit = sevens[0].meta.suit === sevens[1].meta.suit;
+
+    if (sameSuit) {
+      return { hasWin: true, type: 'two-suited-sevens', payout: 100 };
+    }
+    return { hasWin: true, type: 'two-unsuited-sevens', payout: 50 };
+  }
+
+  // One 7 in player's hand
+  if (numSevens === 1) {
+    return { hasWin: true, type: 'one-seven', payout: 3 };
+  }
+
+  return { hasWin: false, type: null, payout: 0 };
+}
+
+/**
  * Side Bet Manager - tracks and resolves side bets
  */
 export class SideBetManager {
   constructor() {
     this.perfectPairsBet = 0;
     this.twentyOnePlus3Bet = 0;
+    this.royalMatchBet = 0;
+    this.superSevensBet = 0;
     this.stats = {
       perfectPairsPlaced: 0,
       perfectPairsWon: 0,
@@ -164,7 +275,15 @@ export class SideBetManager {
       twentyOnePlus3Placed: 0,
       twentyOnePlus3Won: 0,
       twentyOnePlus3TotalWagered: 0,
-      twentyOnePlus3TotalWon: 0
+      twentyOnePlus3TotalWon: 0,
+      royalMatchPlaced: 0,
+      royalMatchWon: 0,
+      royalMatchTotalWagered: 0,
+      royalMatchTotalWon: 0,
+      superSevensPlaced: 0,
+      superSevensWon: 0,
+      superSevensTotalWagered: 0,
+      superSevensTotalWon: 0
     };
   }
 
@@ -186,6 +305,26 @@ export class SideBetManager {
     this.twentyOnePlus3Bet = amount;
     this.stats.twentyOnePlus3Placed++;
     this.stats.twentyOnePlus3TotalWagered += amount;
+  }
+
+  /**
+   * Place Royal Match side bet
+   * @param {number} amount - Bet amount
+   */
+  placeRoyalMatchBet(amount) {
+    this.royalMatchBet = amount;
+    this.stats.royalMatchPlaced++;
+    this.stats.royalMatchTotalWagered += amount;
+  }
+
+  /**
+   * Place Super Sevens side bet
+   * @param {number} amount - Bet amount
+   */
+  placeSuperSevensBet(amount) {
+    this.superSevensBet = amount;
+    this.stats.superSevensPlaced++;
+    this.stats.superSevensTotalWagered += amount;
   }
 
   /**
@@ -254,11 +393,78 @@ export class SideBetManager {
   }
 
   /**
+   * Resolve Royal Match bet
+   * @param {Array} playerCards - Player's first two cards
+   * @returns {object} - Resolution details
+   */
+  resolveRoyalMatch(playerCards) {
+    if (this.royalMatchBet === 0) {
+      return { win: false, payout: 0, type: null };
+    }
+
+    const result = evaluateRoyalMatch(playerCards);
+
+    if (result.hasWin) {
+      const payout = this.royalMatchBet * result.payout;
+      this.stats.royalMatchWon++;
+      this.stats.royalMatchTotalWon += payout;
+
+      const bet = this.royalMatchBet;
+      this.royalMatchBet = 0;
+
+      return {
+        win: true,
+        payout: payout + bet, // Return bet + winnings
+        type: result.type,
+        multiplier: result.payout
+      };
+    }
+
+    this.royalMatchBet = 0;
+    return { win: false, payout: 0, type: null };
+  }
+
+  /**
+   * Resolve Super Sevens bet
+   * @param {Array} playerCards - Player's cards (first 2)
+   * @param {object} dealerUpCard - Dealer's up card (for 3-seven bonus)
+   * @returns {object} - Resolution details
+   */
+  resolveSuperSevens(playerCards, dealerUpCard = null) {
+    if (this.superSevensBet === 0) {
+      return { win: false, payout: 0, type: null };
+    }
+
+    const result = evaluateSuperSevens(playerCards, dealerUpCard);
+
+    if (result.hasWin) {
+      const payout = this.superSevensBet * result.payout;
+      this.stats.superSevensWon++;
+      this.stats.superSevensTotalWon += payout;
+
+      const bet = this.superSevensBet;
+      this.superSevensBet = 0;
+
+      return {
+        win: true,
+        payout: payout + bet, // Return bet + winnings
+        type: result.type,
+        multiplier: result.payout
+      };
+    }
+
+    this.superSevensBet = 0;
+    return { win: false, payout: 0, type: null };
+  }
+
+  /**
    * Clear all bets (called at start of new round)
    */
   clearBets() {
     this.perfectPairsBet = 0;
     this.twentyOnePlus3Bet = 0;
+    this.royalMatchBet = 0;
+    this.superSevensBet = 0;
   }
 
   /**
@@ -279,6 +485,18 @@ export class SideBetManager {
         : 0,
       twentyOnePlus3ROI: this.stats.twentyOnePlus3TotalWagered > 0
         ? ((this.stats.twentyOnePlus3TotalWon - this.stats.twentyOnePlus3TotalWagered) / this.stats.twentyOnePlus3TotalWagered * 100).toFixed(1)
+        : 0,
+      royalMatchWinRate: this.stats.royalMatchPlaced > 0
+        ? ((this.stats.royalMatchWon / this.stats.royalMatchPlaced) * 100).toFixed(1)
+        : 0,
+      royalMatchROI: this.stats.royalMatchTotalWagered > 0
+        ? ((this.stats.royalMatchTotalWon - this.stats.royalMatchTotalWagered) / this.stats.royalMatchTotalWagered * 100).toFixed(1)
+        : 0,
+      superSevensWinRate: this.stats.superSevensPlaced > 0
+        ? ((this.stats.superSevensWon / this.stats.superSevensPlaced) * 100).toFixed(1)
+        : 0,
+      superSevensROI: this.stats.superSevensTotalWagered > 0
+        ? ((this.stats.superSevensTotalWon - this.stats.superSevensTotalWagered) / this.stats.superSevensTotalWagered * 100).toFixed(1)
         : 0
     };
   }
@@ -288,12 +506,16 @@ export class SideBetManager {
  * Format side bet results for display
  * @param {object} perfectPairsResult - Perfect Pairs resolution result
  * @param {object} twentyOnePlus3Result - 21+3 resolution result
+ * @param {object} royalMatchResult - Royal Match resolution result (optional)
+ * @param {object} superSevensResult - Super Sevens resolution result (optional)
  * @returns {string}
  */
-export function formatSideBetResults(perfectPairsResult, twentyOnePlus3Result) {
+export function formatSideBetResults(perfectPairsResult, twentyOnePlus3Result, royalMatchResult = null, superSevensResult = null) {
   let output = '\n🎰 SIDE BETS:\n';
+  let hasWin = false;
 
   if (perfectPairsResult && perfectPairsResult.win) {
+    hasWin = true;
     const typeLabels = {
       'perfect': '🌟 Perfect Pair',
       'colored': '🎨 Colored Pair',
@@ -303,6 +525,7 @@ export function formatSideBetResults(perfectPairsResult, twentyOnePlus3Result) {
   }
 
   if (twentyOnePlus3Result && twentyOnePlus3Result.win) {
+    hasWin = true;
     const typeLabels = {
       'suited-three-of-kind': '💎 Suited Three of a Kind',
       'straight-flush': '🔥 Straight Flush',
@@ -311,6 +534,31 @@ export function formatSideBetResults(perfectPairsResult, twentyOnePlus3Result) {
       'flush': '💧 Flush'
     };
     output += `  ${typeLabels[twentyOnePlus3Result.type]} - ${twentyOnePlus3Result.multiplier}:1 - Win: $${twentyOnePlus3Result.payout}\n`;
+  }
+
+  if (royalMatchResult && royalMatchResult.win) {
+    hasWin = true;
+    const typeLabels = {
+      'royal-match': '👑 Royal Match (K-Q Suited)',
+      'suited': '♠️ Suited Cards'
+    };
+    output += `  ${typeLabels[royalMatchResult.type]} - ${royalMatchResult.multiplier}:1 - Win: $${royalMatchResult.payout}\n`;
+  }
+
+  if (superSevensResult && superSevensResult.win) {
+    hasWin = true;
+    const typeLabels = {
+      'three-suited-sevens': '🌟 Three Suited 7s',
+      'three-unsuited-sevens': '🎰 Three 7s',
+      'two-suited-sevens': '💎 Two Suited 7s',
+      'two-unsuited-sevens': '🎲 Two 7s',
+      'one-seven': '7️⃣ One 7'
+    };
+    output += `  ${typeLabels[superSevensResult.type]} - ${superSevensResult.multiplier}:1 - Win: $${superSevensResult.payout}\n`;
+  }
+
+  if (!hasWin) {
+    output += '  No winning side bets\n';
   }
 
   return output;
