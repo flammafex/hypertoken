@@ -46,13 +46,19 @@ const __dirname = dirname(__filename);
  * BlackjackGame class - manages game flow for single-player blackjack
  */
 export class BlackjackGame {
-  constructor({ numStacks = 6, seed = null, initialBankroll = null, minBet = 5, maxBet = 500, variant = 'american' } = {}) {
+  constructor({ numStacks = 6, seed = null, initialBankroll = null, minBet = 5, maxBet = 500, variant = 'american', allowEarlySurrender = false, allowLateSurrender = false } = {}) {
     // Initialize engine with Chronicle session
     this.engine = new Engine();
 
     // Game variant: 'american' (default) or 'european'
     // European: Dealer receives only 1 card initially, hole card dealt after player actions
     this.variant = variant;
+
+    // Surrender options
+    // Early surrender: Can surrender before dealer checks for blackjack (more favorable to player)
+    // Late surrender: Can only surrender after dealer checks for blackjack (dealer BJ = full loss)
+    this.allowEarlySurrender = allowEarlySurrender;
+    this.allowLateSurrender = allowLateSurrender;
 
     // Load standard deck - try multiple paths for source vs dist
     let allTokens = [];
@@ -108,7 +114,9 @@ export class BlackjackGame {
       agentStood: false,
       result: null,
       insuranceOffered: false,
-      insuranceTaken: false
+      insuranceTaken: false,
+      surrendered: false,
+      earlySurrenderOffered: false  // True after deal, before any action taken
     };
 
     // Betting configuration (if provided)
@@ -141,7 +149,9 @@ export class BlackjackGame {
       agentStood: false,
       result: null,
       insuranceOffered: false,
-      insuranceTaken: false
+      insuranceTaken: false,
+      surrendered: false,
+      earlySurrenderOffered: this.allowEarlySurrender  // Available immediately after deal
     };
 
     // Deal 2 cards to agent
@@ -177,6 +187,9 @@ export class BlackjackGame {
       throw new Error("Agent has already stood.");
     }
 
+    // Early surrender is no longer available once player takes any action
+    this.gameState.earlySurrenderOffered = false;
+
     const card = this.engine.stack.draw();
     if (card) {
       this.engine.space.place("agent-hand", card, { faceUp: true });
@@ -202,6 +215,9 @@ export class BlackjackGame {
     if (this.gameState.agentStood) {
       throw new Error("Agent has already stood.");
     }
+
+    // Early surrender is no longer available once player takes any action
+    this.gameState.earlySurrenderOffered = false;
 
     this.gameState.agentStood = true;
     this.gameState.dealerTurn = true;
@@ -235,6 +251,9 @@ export class BlackjackGame {
     if (this.gameState.agentStood) {
       throw new Error("Agent has already stood.");
     }
+
+    // Early surrender is no longer available once player takes any action
+    this.gameState.earlySurrenderOffered = false;
 
     const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
     if (!canDoubleDown(agentHand)) {
@@ -306,6 +325,9 @@ export class BlackjackGame {
       throw new Error("Insurance already taken.");
     }
 
+    // Early surrender is no longer available after insurance decision
+    this.gameState.earlySurrenderOffered = false;
+
     const agent = this.engine._agents[0];
     const insuranceAmount = amount !== null ? amount : agent.resources.currentBet / 2;
 
@@ -346,6 +368,105 @@ export class BlackjackGame {
   }
 
   /**
+   * Early surrender - surrender BEFORE dealer checks for blackjack
+   *
+   * This is more favorable to the player because they can surrender
+   * even when dealer might have blackjack (showing Ace or 10).
+   * Player forfeits half their bet immediately.
+   *
+   * Must be called immediately after deal, before any other action.
+   */
+  earlySurrender() {
+    if (!this.allowEarlySurrender) {
+      throw new Error("Early surrender is not allowed in this game.");
+    }
+
+    if (this.gameState.gameOver) {
+      throw new Error("Game is over. Start a new round.");
+    }
+
+    if (!this.gameState.earlySurrenderOffered) {
+      throw new Error("Early surrender is no longer available. Must surrender immediately after deal.");
+    }
+
+    if (this.gameState.agentStood) {
+      throw new Error("Cannot surrender after standing.");
+    }
+
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    if (agentHand.length !== 2) {
+      throw new Error("Can only surrender with initial 2-card hand.");
+    }
+
+    // Early surrender: return half the bet, end immediately
+    // Dealer does NOT check for blackjack first
+    const agent = this.engine._agents[0];
+    if (this.hasBetting && agent.resources.currentBet > 0) {
+      // Return half the bet to the player
+      const halfBet = agent.resources.currentBet / 2;
+      agent.resources.bankroll += halfBet;
+    }
+
+    this.gameState.surrendered = true;
+    this.gameState.gameOver = true;
+    this.gameState.result = "surrender";
+
+    return this.getGameState();
+  }
+
+  /**
+   * Late surrender - surrender AFTER dealer checks for blackjack
+   *
+   * Only available after dealer has checked for (and doesn't have) blackjack.
+   * If dealer has blackjack, player loses full bet (no surrender option).
+   * Player forfeits half their bet.
+   *
+   * Must be called before taking any hit/stand actions.
+   */
+  surrender() {
+    if (!this.allowLateSurrender && !this.allowEarlySurrender) {
+      throw new Error("Surrender is not allowed in this game.");
+    }
+
+    if (this.gameState.gameOver) {
+      throw new Error("Game is over. Start a new round.");
+    }
+
+    if (this.gameState.agentStood) {
+      throw new Error("Cannot surrender after standing.");
+    }
+
+    const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
+    if (agentHand.length !== 2) {
+      throw new Error("Can only surrender with initial 2-card hand.");
+    }
+
+    // If early surrender is still available, use that logic
+    if (this.gameState.earlySurrenderOffered && this.allowEarlySurrender) {
+      return this.earlySurrender();
+    }
+
+    // Late surrender: only available after insurance phase
+    // (In American blackjack, dealer would have already checked for BJ)
+    if (!this.allowLateSurrender) {
+      throw new Error("Late surrender is not allowed. Early surrender window has passed.");
+    }
+
+    // Return half the bet to the player
+    const agent = this.engine._agents[0];
+    if (this.hasBetting && agent.resources.currentBet > 0) {
+      const halfBet = agent.resources.currentBet / 2;
+      agent.resources.bankroll += halfBet;
+    }
+
+    this.gameState.surrendered = true;
+    this.gameState.gameOver = true;
+    this.gameState.result = "surrender";
+
+    return this.getGameState();
+  }
+
+  /**
    * Split hand into two separate hands
    */
   split() {
@@ -355,6 +476,9 @@ export class BlackjackGame {
     if (this.gameState.agentStood) {
       throw new Error("Agent has already stood.");
     }
+
+    // Early surrender is no longer available once player takes any action
+    this.gameState.earlySurrenderOffered = false;
 
     const agentHand = this.engine.space.zone("agent-hand").map(p => p.tokenSnapshot);
     if (!canSplit(agentHand)) {
@@ -828,6 +952,21 @@ export class BlackjackGame {
                            !agentBusted &&
                            !agentBlackjack;
 
+    // Early surrender is only available immediately after deal, before any action
+    const canEarlySurrender = this.allowEarlySurrender &&
+                               this.gameState.earlySurrenderOffered &&
+                               agentHand.length === 2 &&
+                               !agentBlackjack &&
+                               !this.gameState.gameOver;
+
+    // Late surrender is available after insurance phase but before hit/stand
+    // Only when player still has 2 cards and hasn't taken any action
+    const canLateSurrender = this.allowLateSurrender &&
+                              !this.gameState.earlySurrenderOffered &&  // Insurance phase passed
+                              agentHand.length === 2 &&
+                              !agentBlackjack &&
+                              canTakeActions;
+
     return {
       agentHand: {
         cards: agentHand,
@@ -853,6 +992,8 @@ export class BlackjackGame {
                     agentHand.length === 2 &&
                     !this.gameState.insuranceOffered &&
                     canTakeInsurance(dealerHand),
+      canEarlySurrender,
+      canSurrender: canEarlySurrender || canLateSurrender,
       variant: this.variant
     };
   }
@@ -884,6 +1025,8 @@ export class BlackjackGame {
         return "😞 Dealer wins.";
       case "push":
         return "🤝 Push - tie game.";
+      case "surrender":
+        return "🏳️ Surrendered - half bet returned.";
       default:
         return null;
     }

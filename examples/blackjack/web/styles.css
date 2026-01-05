@@ -804,15 +804,89 @@ body {
   transform: scale(1.05);
 }
 
+/* Surrender button - base styling */
 .btn-action.btn-surrender {
   border-color: #9e9e9e;
   color: #bdbdbd;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
 }
 
 .btn-action.btn-surrender:hover:not(:disabled) {
   background: #757575;
   border-color: #9e9e9e;
   color: white;
+}
+
+.btn-action.btn-surrender .surrender-text {
+  font-size: 0.95rem;
+}
+
+.btn-action.btn-surrender .surrender-type-badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.btn-action.btn-surrender .surrender-type-badge:empty {
+  display: none;
+}
+
+/* Early surrender - urgent/time-limited styling */
+.btn-action.btn-surrender.early-surrender {
+  border-color: #ff6b35;
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 152, 0, 0.1));
+  color: #ffab91;
+  animation: earlySurrenderPulse 1.5s ease-in-out infinite;
+}
+
+.btn-action.btn-surrender.early-surrender .surrender-type-badge {
+  color: #ff6b35;
+  font-weight: bold;
+}
+
+.btn-action.btn-surrender.early-surrender:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff6b35, #ff9800);
+  border-color: #ff6b35;
+  color: white;
+  animation: none;
+}
+
+.btn-action.btn-surrender.early-surrender:hover:not(:disabled) .surrender-type-badge {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@keyframes earlySurrenderPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px 3px rgba(255, 107, 53, 0.6);
+  }
+}
+
+/* Late surrender - standard gray styling */
+.btn-action.btn-surrender.late-surrender {
+  border-color: #78909c;
+  color: #b0bec5;
+}
+
+.btn-action.btn-surrender.late-surrender .surrender-type-badge {
+  color: #78909c;
+}
+
+.btn-action.btn-surrender.late-surrender:hover:not(:disabled) {
+  background: #607d8b;
+  border-color: #78909c;
+  color: white;
+}
+
+.btn-action.btn-surrender.late-surrender:hover:not(:disabled) .surrender-type-badge {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .btn-action:disabled {
@@ -1151,6 +1225,13 @@ body {
   height: 18px;
   accent-color: var(--accent);
   cursor: pointer;
+}
+
+.option-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: normal;
+  margin-left: 4px;
 }
 
 /* Rules modal */

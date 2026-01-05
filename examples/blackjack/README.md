@@ -10,11 +10,12 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - Event-driven architecture
 - **🌐 Browser-based Web UI with PWA support**
 - **💰 Comprehensive betting system with 6 betting strategies**
-- **🎰 Full casino features: Double Down, Split, Insurance, Re-Split, Surrender**
+- **🎰 Full casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender**
 - **🎲 Side bets: Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack**
 - **🇪🇺 European blackjack variant with delayed hole card**
 - **📊 Card counting agents: Hi-Lo, Hi-Opt I, Omega II, Zen Count**
 - **👥 Multi-agent support (2-6 agents at one space)**
+- **🤖 OpenAI Gym-compatible RL training environment**
 
 ## Quick Start
 
@@ -414,6 +415,7 @@ while (!gameState.allAgentsFinished) {
 9. **Multi-agent Architecture** - Sequential turn-based multiagent
 10. **Web UI** - Browser bundling and PWA integration
 11. **Side Bets** - Extensible bonus bet system
+12. **Gym Environment** - OpenAI Gym-compatible RL training
 
 ## Casino Features (Fully Implemented!) 🎰
 
@@ -538,6 +540,41 @@ game.reSplit(0); // Re-split hand #0
 // Each hand requires an additional bet equal to the original wager
 ```
 
+### 🏳️ Early Surrender
+Surrender before the dealer checks for blackjack - more favorable to the player:
+```javascript
+const game = new BlackjackGame({ allowEarlySurrender: true });
+game.deal();
+
+// Can surrender immediately after deal, before any other action
+if (gameState.canEarlySurrender) {
+  game.earlySurrender();  // Forfeit half bet, hand ends immediately
+}
+
+// Key differences from late surrender:
+// - Available BEFORE dealer checks for blackjack
+// - Can surrender even when dealer shows Ace or 10 (might have BJ)
+// - More player-favorable (reduces house edge by ~0.39%)
+// - Must be used immediately after deal, before hit/stand/double/split
+```
+
+### 🏳️ Late Surrender
+Surrender after the dealer checks for blackjack:
+```javascript
+const game = new BlackjackGame({ allowLateSurrender: true });
+game.deal();
+
+// Late surrender available after insurance phase
+if (gameState.canSurrender) {
+  game.surrender();  // Forfeit half bet
+}
+
+// Key differences from early surrender:
+// - Available AFTER dealer checks for blackjack
+// - If dealer has blackjack, player loses full bet (no surrender option)
+// - Less favorable than early surrender but still useful
+```
+
 ### 🇪🇺 European Blackjack Variant
 Play European-style blackjack with different dealer card rules:
 ```javascript
@@ -586,13 +623,107 @@ Choose the right one for your needs:
 - **Building a multiplayer game?** Use `multiagent-game.js`
 - **Just want to play?** Use `cli.js`, `multiagent-cli.js`, or the Web UI
 
+## Reinforcement Learning Training
+
+The `BlackjackEnv.ts` provides a full **OpenAI Gym-compatible** environment for training RL agents.
+
+### Quick Start
+
+```bash
+# Run with basic strategy policy (100 episodes)
+node --loader ../../test/ts-esm-loader.js train.js
+
+# Run 1000 episodes with verbose output
+node --loader ../../test/ts-esm-loader.js train.js -e 1000 -v
+
+# Compare random vs basic strategy
+node --loader ../../test/ts-esm-loader.js train.js -p random -e 500
+```
+
+### Action Space (6 Discrete Actions)
+
+| Action | ID | Description |
+|--------|-----|-------------|
+| Hit | 0 | Take another card |
+| Stand | 1 | Keep current hand |
+| Double | 2 | Double bet, take one card |
+| Split | 3 | Split pair into two hands |
+| Surrender | 4 | Forfeit half bet |
+| Insurance | 5 | Side bet on dealer blackjack |
+
+### Observation Space (19 Features)
+
+```javascript
+import { BlackjackEnv, Actions, ObsIndex } from "./BlackjackEnv.js";
+
+const env = new BlackjackEnv({
+  agentName: "RLAgent",
+  initialBankroll: 1000,
+  numDecks: 6,
+  baseBet: 10,
+  allowSurrender: true
+});
+
+// Observation features (all normalized 0-1):
+// obs[ObsIndex.HAND_VALUE]       - Player hand value (0-30)
+// obs[ObsIndex.DEALER_VALUE]     - Dealer visible card (0-12)
+// obs[ObsIndex.IS_SOFT]          - Is soft hand (Ace as 11)
+// obs[ObsIndex.DECK_PENETRATION] - Cards remaining in shoe
+// obs[ObsIndex.CURRENT_BET]      - Current bet amount
+// obs[ObsIndex.BANKROLL]         - Player bankroll
+// obs[ObsIndex.CAN_HIT]          - Can hit action
+// obs[ObsIndex.CAN_STAND]        - Can stand action
+// obs[ObsIndex.CAN_DOUBLE]       - Can double down
+// obs[ObsIndex.CAN_SPLIT]        - Can split pair
+// obs[ObsIndex.CAN_SURRENDER]    - Can surrender
+// obs[ObsIndex.CAN_INSURANCE]    - Can take insurance
+// obs[ObsIndex.IS_SPLIT_HAND]    - Playing split hand
+// obs[ObsIndex.SPLIT_HAND_VALUE] - Split hand value
+// obs[ObsIndex.RUNNING_COUNT]    - Hi-Lo running count
+// obs[ObsIndex.TRUE_COUNT]       - True count (adjusted for decks)
+// obs[ObsIndex.DEALER_SHOWS_ACE] - Dealer shows Ace
+// obs[ObsIndex.HAND_IS_BLACKJACK]- Player has blackjack
+// obs[ObsIndex.NUM_CARDS_IN_HAND]- Number of cards in hand
+```
+
+### Action Masking
+
+The environment provides action masking to prevent invalid actions:
+
+```javascript
+const obs = await env.reset();
+const actionMask = env.getActionMask();
+
+// actionMask = [true, true, true, false, true, false]
+//               Hit   Stand Double Split  Surr  Ins
+
+// Only select from valid actions
+const validActions = actionMask
+  .map((valid, i) => valid ? i : -1)
+  .filter(i => i >= 0);
+
+const action = validActions[Math.floor(Math.random() * validActions.length)];
+const result = await env.step(action);
+```
+
+### Card Counting Features
+
+The environment includes Hi-Lo card counting:
+
+```javascript
+// Observation includes count info
+const rc = obs[ObsIndex.RUNNING_COUNT] * 40 - 20; // Denormalize: -20 to +20
+const tc = obs[ObsIndex.TRUE_COUNT] * 20 - 10;    // Denormalize: -10 to +10
+
+// True count > +2 favors player (increase bets)
+// True count < -2 favors house (decrease bets)
+```
+
 ## Future Enhancements
 
 ### Planned Features
 
-- **AI Training** - Reinforcement learning integration (partial support via `BlackjackEnv.ts`)
 - **Tournament Modes** - Elimination, sit-and-go formats
-- **Early Surrender** - Surrender before dealer checks for blackjack
 
 ### Community Contributions Welcome
 
@@ -607,4 +738,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, and multiagent architecture. A comprehensive example of building complex card games with HyperToken.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, and an OpenAI Gym-compatible RL training environment. A comprehensive example of building complex card games with HyperToken.

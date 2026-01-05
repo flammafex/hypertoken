@@ -36,7 +36,8 @@ class GameState {
   busterBlackjackBet = 5;
   // House rules
   dealerHitsSoft17 = false;
-  allowSurrender = false;
+  allowEarlySurrender = false;
+  allowLateSurrender = false;
   resplitAces = true;
   // Tools
   showCardCount = false;
@@ -489,7 +490,8 @@ const elements = {
   strategySelect: document.getElementById('strategy-select'),
   seedInput: document.getElementById('seed-input'),
   hitSoft17Check: document.getElementById('hit-soft-17'),
-  allowSurrenderCheck: document.getElementById('allow-surrender'),
+  allowEarlySurrenderCheck: document.getElementById('allow-early-surrender'),
+  allowLateSurrenderCheck: document.getElementById('allow-late-surrender'),
   resplitAcesCheck: document.getElementById('resplit-aces'),
   startGame: document.getElementById('start-game'),
   showRules: document.getElementById('show-rules'),
@@ -879,8 +881,29 @@ function updatePlayingControls(gameState) {
     elements.splitBtn.style.display = '';
   }
 
-  // Hide surrender if not allowed
-  elements.surrenderBtn.style.display = state.allowSurrender ? '' : 'none';
+  // Hide surrender if not allowed, update styling based on surrender type
+  const surrenderAllowed = state.allowEarlySurrender || state.allowLateSurrender;
+  elements.surrenderBtn.style.display = surrenderAllowed ? '' : 'none';
+
+  // Update surrender button styling and badge based on type available
+  const surrenderText = elements.surrenderBtn.querySelector('.surrender-text');
+  const surrenderBadge = elements.surrenderBtn.querySelector('.surrender-type-badge');
+
+  // Reset classes
+  elements.surrenderBtn.classList.remove('early-surrender', 'late-surrender');
+
+  if (gameState.canEarlySurrender) {
+    // Early surrender is available - show urgent styling
+    elements.surrenderBtn.classList.add('early-surrender');
+    if (surrenderBadge) surrenderBadge.textContent = 'Early';
+  } else if (gameState.canSurrender && state.allowLateSurrender) {
+    // Late surrender is available
+    elements.surrenderBtn.classList.add('late-surrender');
+    if (surrenderBadge) surrenderBadge.textContent = 'Late';
+  } else {
+    // No surrender available, clear badge
+    if (surrenderBadge) surrenderBadge.textContent = '';
+  }
 }
 
 function updateSideBetUI() {
@@ -1166,7 +1189,8 @@ function initGame() {
     variant: state.variant,
     seed: state.seed,
     dealerHitsSoft17: state.dealerHitsSoft17,
-    allowSurrender: state.allowSurrender,
+    allowEarlySurrender: state.allowEarlySurrender,
+    allowLateSurrender: state.allowLateSurrender,
     resplitAces: state.resplitAces
   });
 
@@ -1592,11 +1616,18 @@ function surrender() {
   try {
     sounds.buttonClick();
 
-    state.game.surrender();
+    // Check if early surrender is available
     const gameState = state.game.getGameState();
+    if (gameState.canEarlySurrender) {
+      state.game.earlySurrender();
+    } else {
+      state.game.surrender();
+    }
+
+    const newGameState = state.game.getGameState();
 
     // Show surrender result
-    showResult(gameState.result);
+    showResult(newGameState.result);
   } catch (e) {
     elements.message.textContent = e.message;
   }
@@ -1731,7 +1762,8 @@ function setupEventListeners() {
     state.seed = seedValue ? parseInt(seedValue) : null;
     // House rules
     state.dealerHitsSoft17 = elements.hitSoft17Check.checked;
-    state.allowSurrender = elements.allowSurrenderCheck.checked;
+    state.allowEarlySurrender = elements.allowEarlySurrenderCheck.checked;
+    state.allowLateSurrender = elements.allowLateSurrenderCheck.checked;
     state.resplitAces = elements.resplitAcesCheck.checked;
 
     // Tools

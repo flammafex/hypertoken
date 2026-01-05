@@ -156,7 +156,10 @@
           <button id="stand-btn" class="btn-action" data-action="stand">Stand (S)</button>
           <button id="double-btn" class="btn-action" data-action="double">Double (D)</button>
           <button id="split-btn" class="btn-action" data-action="split">Split (P)</button>
-          <button id="surrender-btn" class="btn-action btn-surrender" data-action="surrender">Surrender (R)</button>
+          <button id="surrender-btn" class="btn-action btn-surrender" data-action="surrender">
+            <span class="surrender-text">Surrender (R)</span>
+            <span class="surrender-type-badge"></span>
+          </button>
         </div>
 
         <!-- Insurance buttons -->
@@ -234,8 +237,16 @@
           </div>
           <div class="option-row checkbox-row">
             <label>
-              <input type="checkbox" id="allow-surrender">
-              Late surrender allowed
+              <input type="checkbox" id="allow-early-surrender">
+              Early surrender
+              <span class="option-hint">(before dealer checks)</span>
+            </label>
+          </div>
+          <div class="option-row checkbox-row">
+            <label>
+              <input type="checkbox" id="allow-late-surrender">
+              Late surrender
+              <span class="option-hint">(after dealer checks)</span>
             </label>
           </div>
           <div class="option-row checkbox-row">
