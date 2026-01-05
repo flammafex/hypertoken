@@ -18,6 +18,7 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - **🤖 OpenAI Gym-compatible RL training environment**
 - **🏆 Elimination tournaments with shared table play**
 - **🎰 Sit-and-Go tournaments with escalating blinds and prize pools**
+- **🌐 Multi-Table Tournaments (MTT) with table balancing and final table**
 
 ## Quick Start
 
@@ -156,6 +157,8 @@ blackjack/
 ├── elimination-cli.js              # Elimination tournament CLI
 ├── sit-and-go-tournament.js        # Sit-and-Go tournament class
 ├── sit-and-go-cli.js               # Sit-and-Go tournament CLI
+├── multi-table-tournament.js       # Multi-Table Tournament (MTT) class
+├── mtt-cli.js                      # MTT CLI runner
 ├── server.js                       # Network server for multiplayer
 ├── client.js                       # Network client for multiplayer
 ├── BlackjackEnv.ts                 # Gym environment for RL training
@@ -424,6 +427,7 @@ while (!gameState.allAgentsFinished) {
 12. **Gym Environment** - OpenAI Gym-compatible RL training
 13. **Elimination Tournaments** - Multi-agent competitive play
 14. **Sit-and-Go Tournaments** - Escalating blinds and prize pools
+15. **Multi-Table Tournaments** - Table balancing and final table
 
 ## Casino Features (Fully Implemented!) 🎰
 
@@ -921,11 +925,165 @@ class TournamentAgent {
 }
 ```
 
+## Multi-Table Tournaments (MTT)
+
+Large-scale tournaments with multiple tables, automatic balancing, and final table transition.
+
+### Quick Start
+
+```bash
+# Run an 18-player MTT (3 tables of 6)
+node --loader ../../test/ts-esm-loader.js mtt-cli.js
+
+# Larger tournament with 36 players
+node --loader ../../test/ts-esm-loader.js mtt-cli.js -p 36 -t 6
+
+# Turbo MTT (faster blinds)
+node --loader ../../test/ts-esm-loader.js mtt-cli.js -p 27 --turbo
+
+# Custom settings
+node --loader ../../test/ts-esm-loader.js mtt-cli.js -p 45 -b 50 -c 5000 -f 9 -v
+```
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --players <n>` | Number of players (min: 10) | 18 |
+| `-t, --table-size <n>` | Players per table | 6 |
+| `-f, --final-table <n>` | Final table size | 9 |
+| `-b, --buy-in <n>` | Buy-in amount ($) | 100 |
+| `-c, --chips <n>` | Starting chips | 3000 |
+| `--turbo` | Faster blind structure | - |
+| `-r, --max-rounds <n>` | Maximum hands | 1000 |
+| `-s, --seed <n>` | Random seed | random |
+| `-v, --verbose` | Detailed output | false |
+
+### Features
+
+- **Multiple Tables**: Players distributed across tables based on field size
+- **Automatic Balancing**: When tables become uneven (difference > 1), players are moved
+- **Table Collapse**: Tables with < 2 players merge into other tables
+- **Final Table Transition**: When players reach final table size, all merge to one table
+- **Tiered Payouts**: Automatic payout structure based on field size
+
+### Payout Structure
+
+Payouts scale with field size:
+
+| Field Size | Paid Places | Top 3 Distribution |
+|------------|-------------|-------------------|
+| 10-18 | 3 | 50% / 30% / 20% |
+| 19-27 | 5 | 40% / 25% / 15% |
+| 28-45 | 7 | 35% / 20% / 14% |
+| 46+ | 10 | 30% / 18% / 12% |
+
+### Table Balancing Algorithm
+
+The balancing algorithm ensures fair play:
+
+1. After each elimination, check table sizes
+2. If largest table - smallest table > 1, balance needed
+3. Move player from largest to smallest table
+4. Prefer moving players who have moved least
+5. Continue until all tables are balanced (within 1 player)
+
+```javascript
+// Example: 4 tables after an elimination
+// Table 1: 6 players
+// Table 2: 5 players
+// Table 3: 4 players  <- player eliminated here
+// Table 4: 5 players
+
+// Balance action: Move player from Table 1 → Table 3
+// Result: 5, 5, 5, 5 (balanced)
+```
+
+### Final Table Dynamics
+
+When remaining players fit at one table:
+
+```javascript
+// Transition triggers when:
+// - Players remaining <= finalTableSize (default: 9)
+// - More than one active table exists
+
+// All players merge to Table 1
+// Chip stacks preserved
+// New random seating arrangement
+// Tournament continues as single-table Sit-and-Go
+```
+
+### Programmatic Usage
+
+```javascript
+import { MultiTableTournament } from './multi-table-tournament.js';
+import { BasicStrategyAgent } from './agents/basic-strategy.js';
+
+// Create agents
+const agents = [];
+for (let i = 0; i < 36; i++) {
+  agents.push(new BasicStrategyAgent(`Player ${i + 1}`));
+}
+
+const tournament = new MultiTableTournament(agents, {
+  buyIn: 100,
+  startingChips: 3000,
+  playersPerTable: 6,
+  finalTableSize: 9,
+  verbose: true,
+  showBalancing: true
+});
+
+await tournament.run();
+
+// Access results
+for (const player of tournament.players) {
+  console.log(`${player.name}: ${player.finalRank} - $${player.prize}`);
+}
+```
+
+### MTT Agent Interface
+
+Agents receive additional tournament context:
+
+```javascript
+class MTTAgent {
+  constructor(name) {
+    this.name = name;
+  }
+
+  decide(gameState) {
+    // MTT-specific info available:
+    // - gameState.playersRemaining: total players left
+    // - gameState.tablesRemaining: active tables
+    // - gameState.isFinalTable: at final table?
+    // - gameState.blindLevel: current level
+
+    const atFinalTable = gameState.isFinalTable;
+    const nearBubble = gameState.playersRemaining <= 5;
+
+    // Tighten up at final table or near bubble
+    if (atFinalTable || nearBubble) {
+      if (gameState.agentHand.value >= 15) return "stand";
+    }
+
+    // Standard strategy otherwise
+    if (gameState.agentHand.value >= 17) return "stand";
+    return "hit";
+  }
+
+  getBetSize({ bankroll, bigBlind, playersRemaining }) {
+    // ICM-aware betting near payouts
+    if (playersRemaining <= 5) {
+      return bigBlind; // Min bet near bubble
+    }
+    return bigBlind * 2.5;
+  }
+}
+```
+
 ## Future Enhancements
-
-### Planned Features
-
-- **Multi-Table Tournaments** - Multiple tables with balancing and final table
 
 ### Community Contributions Welcome
 
@@ -939,4 +1097,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, OpenAI Gym-compatible RL training environment, elimination tournaments, and Sit-and-Go tournaments with escalating blinds and prize pools. A comprehensive example of building complex card games with HyperToken.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, OpenAI Gym-compatible RL training environment, and a complete tournament suite: elimination tournaments, Sit-and-Go tournaments with escalating blinds, and Multi-Table Tournaments (MTT) with table balancing and final table transition. A comprehensive example of building complex card games with HyperToken.
