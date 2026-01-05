@@ -16,6 +16,7 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - **📊 Card counting agents: Hi-Lo, Hi-Opt I, Omega II, Zen Count**
 - **👥 Multi-agent support (2-6 agents at one space)**
 - **🤖 OpenAI Gym-compatible RL training environment**
+- **🏆 Elimination tournaments with shared table play**
 
 ## Quick Start
 
@@ -150,6 +151,8 @@ blackjack/
 ├── cli.js                          # Interactive CLI (supports --betting flag)
 ├── multiagent-cli.js               # Multi-agent CLI (2-6 players)
 ├── tournament.js                   # Betting strategy tournament
+├── elimination-tournament.js       # Elimination tournament class
+├── elimination-cli.js              # Elimination tournament CLI
 ├── server.js                       # Network server for multiplayer
 ├── client.js                       # Network client for multiplayer
 ├── BlackjackEnv.ts                 # Gym environment for RL training
@@ -416,6 +419,7 @@ while (!gameState.allAgentsFinished) {
 10. **Web UI** - Browser bundling and PWA integration
 11. **Side Bets** - Extensible bonus bet system
 12. **Gym Environment** - OpenAI Gym-compatible RL training
+13. **Elimination Tournaments** - Multi-agent competitive play
 
 ## Casino Features (Fully Implemented!) 🎰
 
@@ -719,18 +723,79 @@ const tc = obs[ObsIndex.TRUE_COUNT] * 20 - 10;    // Denormalize: -10 to +10
 // True count < -2 favors house (decrease bets)
 ```
 
+## Elimination Tournaments
+
+Run competitive blackjack tournaments where players compete at a shared table until only one remains.
+
+### Quick Start
+
+```bash
+# Run a 6-player elimination tournament
+node --loader ../../test/ts-esm-loader.js elimination-cli.js
+
+# 8 players with $500 starting bankroll
+node --loader ../../test/ts-esm-loader.js elimination-cli.js -p 8 -b 500
+
+# Verbose mode to see each hand
+node --loader ../../test/ts-esm-loader.js elimination-cli.js -v
+
+# Reproducible tournament with seed
+node --loader ../../test/ts-esm-loader.js elimination-cli.js -s 12345
+```
+
+### CLI Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --players <n>` | Number of players (2-10) | 6 |
+| `-b, --bankroll <n>` | Starting bankroll | 1000 |
+| `-m, --min-bet <n>` | Minimum bet | 10 |
+| `-r, --max-rounds <n>` | Max rounds before end | 500 |
+| `-s, --seed <n>` | Random seed | random |
+| `-v, --verbose` | Show hand-by-hand detail | false |
+
+### Features
+
+- **Shared Table**: All players compete against the same dealer each round
+- **Elimination**: Players are eliminated when bankroll drops below minimum bet
+- **Multiple AI Agents**: Basic Strategy, Conservative, Aggressive, Card Counter, Risky, Cautious
+- **Statistics Tracking**: Wins, losses, blackjacks, doubles, splits, peak bankroll
+- **Final Rankings**: Medal positions based on survival and final bankroll
+
+### Programmatic Usage
+
+```javascript
+import { EliminationTournament } from './elimination-tournament.js';
+import { BasicStrategyAgent, AggressiveAgent } from './agents/basic-strategy.js';
+
+const agents = [
+  new BasicStrategyAgent("Player 1"),
+  new AggressiveAgent("Player 2"),
+  // ...more agents
+];
+
+const tournament = new EliminationTournament(agents, {
+  initialBankroll: 1000,
+  minBet: 10,
+  maxRounds: 500,
+  verbose: true
+});
+
+await tournament.run();
+```
+
 ## Future Enhancements
 
 ### Planned Features
 
-- **Tournament Modes** - Elimination, sit-and-go formats
+- **Sit-and-Go Tournaments** - Escalating blinds and prize pool distribution
+- **Multi-Table Tournaments** - Multiple tables with balancing and final table
 
 ### Community Contributions Welcome
 
 - Additional betting strategies (e.g., Labouchere, D'Alembert, Fibonacci)
 - More card counting systems (e.g., Wong Halves, Red Seven, KO Count)
 - Additional side bets (Royal Match, Super Sevens)
-- Blackjack tournaments and elimination formats
 
 ## License
 
@@ -738,4 +803,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, and an OpenAI Gym-compatible RL training environment. A comprehensive example of building complex card games with HyperToken.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, OpenAI Gym-compatible RL training environment, and elimination tournaments. A comprehensive example of building complex card games with HyperToken.
