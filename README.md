@@ -2,7 +2,7 @@
 
 **HyperToken** is a **Distributed Simulation Engine** where relationships create meaning, and meaning creates worlds.
 
-**HyperToken** provides deterministic multi-agent environments for AI research. Its discrete action space and compositional token semantics could make it useful for hybrid symbolic-neural architectures."
+**HyperToken** provides deterministic multi-agent environments for AI research. Its discrete action space and compositional token semantics could make it useful for hybrid symbolic-neural architectures.
 
 Built on **[Automerge](https://automerge.org/) CRDTs** for mathematical consensus, **[OpenAI Gym](https://gymnasium.farama.org/)**, and a **Host-Authoritative P2P** architecture for fairness without servers, HyperToken delivers what blockchain gaming promised but never achieved: persistent, cheat-proof worlds that cost nothing to run.
 
@@ -108,6 +108,17 @@ class MyGameEnv extends GymEnvironment {
 }
 ```
 
+## 🧠 Research Applications
+
+HyperToken is being explored for:
+- **Multi-agent reinforcement learning** - Native PettingZoo support
+- **Game-theoretic reasoning** - Cooperation, competition, negotiation
+- **Symbolic AI integration** - MCP server allows LLM interaction
+- **Compositional world models** - Tokens as semantic primitives
+
+We're interested in collaborations exploring HyperToken as a 
+discrete simulation substrate for hybrid AI architectures. 
+Contact us if you're working in this space.
 ---
 
 ## 🚀 Quick Start
