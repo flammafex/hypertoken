@@ -2,7 +2,9 @@
 
 **HyperToken** is a **Distributed Simulation Engine** where relationships create meaning, and meaning creates worlds.
 
-Built on **[Automerge](https://automerge.org/) CRDTs** for mathematical consensus, **[OpenAI Gym](https://gymnasium.farama.org/)** for AI research, and a **Host-Authoritative P2P** architecture for fairness without servers, HyperToken delivers what blockchain gaming promised but never achieved: persistent, cheat-proof worlds that cost nothing to run.
+**HyperToken** provides deterministic multi-agent environments for AI research. Its discrete action space and compositional token semantics could make it useful for hybrid symbolic-neural architectures."
+
+Built on **[Automerge](https://automerge.org/) CRDTs** for mathematical consensus, **[OpenAI Gym](https://gymnasium.farama.org/)**, and a **Host-Authoritative P2P** architecture for fairness without servers, HyperToken delivers what blockchain gaming promised but never achieved: persistent, cheat-proof worlds that cost nothing to run.
 
 ---
 
