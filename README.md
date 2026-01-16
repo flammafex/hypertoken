@@ -118,7 +118,8 @@ HyperToken is being explored for:
 
 We're interested in collaborations exploring HyperToken as a 
 discrete simulation substrate for hybrid AI architectures. 
-Contact us if you're working in this space.
+[Contact us](https://carpocratian.org/en/church/contact) if you're working in this space.
+
 ---
 
 ## 🚀 Quick Start
