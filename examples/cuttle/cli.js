@@ -457,8 +457,10 @@ async function getHumanAction(game, playerIndex) {
 
 function getRandomAction(game, playerIndex) {
   const actions = game.getValidActions(playerIndex);
-  if (actions.length === 0) return null;
-  return actions[Math.floor(Math.random() * actions.length)];
+  const turnActions = actions.filter((a) => !a.startsWith("peek:"));
+  const pool = turnActions.length > 0 ? turnActions : actions;
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Check if player can counter (has a 2 in hand)
@@ -611,7 +613,8 @@ async function playCutthroat(humanPlayer = 0) {
     let actingPlayer = -1;
     for (let p = 0; p < 3; p++) {
       const actions = game.getValidActions(p);
-      if (actions.length > 0) {
+      const turnActions = actions.filter((a) => !a.startsWith("peek:"));
+      if (turnActions.length > 0) {
         actingPlayer = p;
         break;
       }
@@ -622,6 +625,29 @@ async function playCutthroat(humanPlayer = 0) {
       console.log("\n⚠️  Error: No player has valid actions. Game state may be corrupted.");
       console.log(`Phase: ${state.phase}`);
       break;
+    }
+
+    // Cutthroat glasses support: allow out-of-turn peek selection when available.
+    if (actingPlayer !== humanPlayer) {
+      const peekActions = game.getValidActions(humanPlayer).filter((a) => a.startsWith("peek:"));
+      if (peekActions.length > 0) {
+        const peekTargets = peekActions.map((a) => parseInt(a.split(":")[1]));
+        console.log(`\n${colors.cyan}👓 Peek available:${colors.reset} ${peekTargets.map((p) => `p${p}`).join("  ")}`);
+        const peekInput = (await rl.question("Peek target (pN) or Enter to continue: ")).trim().toLowerCase();
+        const peekMatch = peekInput.match(/^p(\d+)$/);
+        if (peekMatch) {
+          const target = parseInt(peekMatch[1]);
+          const action = `peek:${target}`;
+          if (peekActions.includes(action)) {
+            const result = game.action(humanPlayer, action);
+            if (result.success) {
+              addToHistory(`Peek at Player ${target}`, humanPlayer);
+              continue;
+            }
+          }
+          console.log("Invalid peek target.");
+        }
+      }
     }
 
     if (actingPlayer === humanPlayer) {
@@ -701,7 +727,7 @@ async function showRules() {
 ║   9  - Return a PERMANENT + owner SKIPS next turn                ║
 ║                                                                  ║
 ║ PERMANENTS:                                                      ║
-║   8  - "Glasses" - ALL opponents' hands are revealed             ║
+║   8  - "Glasses" - Peek one opponent's hand at any time             ║
 ║   J  - Steal control of any opponent's point card                ║
 ║   Q  - Protect your other cards from being targeted              ║
 ║   K  - Reduce goal: 14 → 9 → 5 → 0 (3 Kings = instant win)       ║
@@ -738,7 +764,7 @@ async function showRules() {
 ║   8  - "Glasses" - Opponent's hand is revealed to you            ║
 ║   J  - Steal control of a point card                             ║
 ║   Q  - Protect your other cards from being targeted              ║
-║   K  - Reduce goal: 21 → 14 → 10 → 5 → 0 (4 Kings = instant win) ║
+║   K  - Reduce goal: 21 → 14 → 10 → 5 → 0 (4 Kings = instant win)║
 ║                                                                  ║
 ║ SCUTTLING: Use a higher card from hand to destroy opponent's     ║
 ║   point card. Both cards go to scrap. (Suits break ties:         ║
@@ -767,7 +793,7 @@ async function showRules() {
 ║   5  - Draw 2 cards                                              ║
 ║   6  - Destroy ALL permanents                                    ║
 ║   7  - Draw a card and MUST play it immediately                  ║
-║   9  - Return any card in play to its owner's hand               ║
+║   9  - Return a PERMANENT to its owner's hand                    ║
 ║                                                                  ║
 ║ PERMANENTS:                                                      ║
 ║   8  - "Glasses" - Opponent's hand is revealed to you            ║
