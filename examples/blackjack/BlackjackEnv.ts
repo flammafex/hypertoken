@@ -71,7 +71,14 @@ export class BlackjackEnv extends GymEnvironment {
   engine: Engine;
   game: MultiagentBlackjackGame;
   agentName: string;
-  config: Required<BlackjackEnvConfig>;
+  config: {
+    agentName: string;
+    initialBankroll: number;
+    numDecks: number;
+    baseBet: number;
+    allowSurrender: boolean;
+    seed: number | null;
+  };
 
   private _lastBankroll: number;
   private _runningCount: number = 0;
@@ -93,7 +100,7 @@ export class BlackjackEnv extends GymEnvironment {
       numDecks: config.numDecks ?? 6,
       baseBet: config.baseBet ?? 10,
       allowSurrender: config.allowSurrender ?? true,
-      seed: config.seed ?? undefined as any
+      seed: config.seed ?? null
     };
 
     this.agentName = this.config.agentName;
@@ -106,7 +113,8 @@ export class BlackjackEnv extends GymEnvironment {
       agentNames: [this.agentName] as any,
       initialBankroll: this.config.initialBankroll,
       numStacks: this.config.numDecks,
-      seed: this.config.seed
+      // multiagent-game.js is JS-inferred too narrowly for seed; runtime accepts number|null.
+      seed: this.config.seed as any
     });
   }
 
@@ -135,10 +143,10 @@ export class BlackjackEnv extends GymEnvironment {
 
     const canHit = !isBusted(agentCards) && !isBlackjack(agentCards) && this._roundActive;
     const canStand = this._roundActive;
-    const canDouble = canDoubleDown(agentCards) && agent.resources.bankroll >= agent.resources.currentBet;
-    const canSplitHand = canSplit(agentCards) && agent.resources.bankroll >= agent.resources.currentBet && !agent.resources.hasSplit;
-    const canSurrender = this.config.allowSurrender && agentCards.length === 2 && !agent.resources.hasSplit;
-    const canInsurance = this._insurancePhase && canTakeInsurance(dealerCards) && !agent.resources.insuranceBet;
+    const canDouble = this._roundActive && canDoubleDown(agentCards) && agent.resources.bankroll >= agent.resources.currentBet;
+    const canSplitHand = this._roundActive && canSplit(agentCards) && agent.resources.bankroll >= agent.resources.currentBet && !agent.resources.hasSplit;
+    const canSurrender = this._roundActive && this.config.allowSurrender && agentCards.length === 2 && !agent.resources.hasSplit;
+    const canInsurance = this._roundActive && this._insurancePhase && canTakeInsurance(dealerCards) && !agent.resources.insuranceBet;
 
     return [
       canHit,        // HIT
@@ -160,7 +168,7 @@ export class BlackjackEnv extends GymEnvironment {
     if (this.engine.stack) {
       if (this.engine.stack.size < 52) {
         this.engine.space.collectAllInto(this.engine.stack);
-        this.engine.stack.shuffle(seed ?? this.config.seed);
+        this.engine.stack.shuffle((seed ?? this.config.seed) ?? undefined);
         this._runningCount = 0;
         this._cardsDealt = 0;
       }
@@ -329,8 +337,9 @@ export class BlackjackEnv extends GymEnvironment {
 
   private _getHandCards(): any[] {
     const agent = this.getAgent();
+    const splitHandZone = this._getSplitHandZone(agent);
     const zoneName = agent.resources.playingSplitHand
-      ? agent.resources.splitHandZone
+      ? (splitHandZone ?? (agent.handZone || `agent-0-hand`))
       : (agent.handZone || `agent-0-hand`);
     return this.engine.space.zone(zoneName).map(pl => pl.tokenSnapshot);
   }
@@ -341,8 +350,9 @@ export class BlackjackEnv extends GymEnvironment {
 
   private _getHandString(): string {
     const agent = this.getAgent();
+    const splitHandZone = this._getSplitHandZone(agent);
     const zoneName = agent.resources.playingSplitHand
-      ? agent.resources.splitHandZone
+      ? (splitHandZone ?? (agent.handZone || `agent-0-hand`))
       : (agent.handZone || `agent-0-hand`);
     const cards = this.engine.space.zone(zoneName);
     return cards.map(c => c.tokenSnapshot.label).join(", ");
@@ -384,8 +394,9 @@ export class BlackjackEnv extends GymEnvironment {
         }
       }
       // Split hand
-      if (agent.resources.splitHandZone) {
-        const splitCards = this.engine.space.zone(agent.resources.splitHandZone);
+      const splitHandZone = this._getSplitHandZone(agent);
+      if (splitHandZone) {
+        const splitCards = this.engine.space.zone(splitHandZone);
         for (const c of splitCards) {
           if (c.faceUp) {
             count += countCard(c.tokenSnapshot);
@@ -426,8 +437,9 @@ export class BlackjackEnv extends GymEnvironment {
 
     // Get split hand value if applicable
     let splitHandVal = 0;
-    if (agent.resources.hasSplit && agent.resources.splitHandZone) {
-      const splitCards = this.engine.space.zone(agent.resources.splitHandZone).map(p => p.tokenSnapshot);
+    const splitHandZone = this._getSplitHandZone(agent);
+    if (agent.resources.hasSplit && splitHandZone) {
+      const splitCards = this.engine.space.zone(splitHandZone).map(p => p.tokenSnapshot);
       splitHandVal = getBestHandValue(splitCards);
     }
 
@@ -438,7 +450,7 @@ export class BlackjackEnv extends GymEnvironment {
       this.normalize(agentVal, 0, 30),                           // 0: Hand value
       this.normalize(dealerVal, 0, 12),                          // 1: Dealer visible
       isSoftHand(agentCards) ? 1 : 0,                           // 2: Is soft hand
-      this.normalize(this.engine.stack?.size ?? 0, 0, 312),     // 3: Deck penetration
+      this.normalize(this.engine.stack?.size ?? 0, 0, this.config.numDecks * 52), // 3: Deck penetration
       this.normalize(agent.resources.currentBet, 0, 500),       // 4: Current bet
       this.normalize(agent.resources.bankroll, 0, 5000),        // 5: Bankroll
       actionMask[Actions.HIT] ? 1 : 0,                          // 6: Can hit
@@ -455,5 +467,10 @@ export class BlackjackEnv extends GymEnvironment {
       isBlackjack(agentCards) ? 1 : 0,                          // 17: Hand is blackjack
       this.normalize(agentCards.length, 0, 10)                  // 18: Num cards in hand
     ];
+  }
+
+  private _getSplitHandZone(agent: IEngineAgent): string | null {
+    const zone = (agent.resources as unknown as Record<string, unknown>).splitHandZone;
+    return typeof zone === "string" && zone.length > 0 ? zone : null;
   }
 }

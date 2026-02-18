@@ -968,9 +968,16 @@ function renderMultiplayer() {
 function createObservationFromServerState(gameData, pIdx) {
   const myPlayer = gameData.players[pIdx];
   const myHand = myPlayer.hand;
+  const variant = gameData.variant || state.variant;
 
-  // Check if we have glasses (8 permanent) - reveals opponent hands
+  // Check if we have glasses (8 permanent)
   const weHaveGlasses = myPlayer.permanents.some(p => p.type === 'eight');
+  const glassesTargetPlayer =
+    variant === 'cutthroat' &&
+    Array.isArray(gameData.glassesPeekTargets) &&
+    typeof gameData.glassesPeekTargets[pIdx] === 'number'
+      ? gameData.glassesPeekTargets[pIdx]
+      : null;
 
   // Calculate my points
   let myPoints = 0;
@@ -986,7 +993,11 @@ function createObservationFromServerState(gameData, pIdx) {
 
   // Calculate goal based on kings
   const kingCount = myPlayer.permanents.filter(p => p.type === 'king').length;
-  const goals = state.variant === 'cutthroat' ? [14, 9, 5, 0] : [21, 14, 10, 7, 5];
+  const goals = variant === 'cutthroat'
+    ? [14, 9, 5, 0]
+    : (variant === 'standard' || variant === 'team')
+      ? [21, 14, 10, 5, 0]
+      : [21, 14, 10, 7, 5];
   const myGoal = goals[Math.min(kingCount, goals.length - 1)];
 
   // Get point cards I control
@@ -1006,7 +1017,7 @@ function createObservationFromServerState(gameData, pIdx) {
   const opponents = [];
   for (let i = 0; i < state.numPlayers; i++) {
     if (i === pIdx) continue;
-    if (state.variant === 'team' && i === (pIdx + 2) % 4) continue; // Skip partner
+    if (variant === 'team' && i === (pIdx + 2) % 4) continue; // Skip partner
 
     const oppPlayer = gameData.players[i];
 
@@ -1037,9 +1048,14 @@ function createObservationFromServerState(gameData, pIdx) {
     }
 
     opponents.push({
-      index: i,
+      playerIndex: i,
       handSize: oppPlayer.hand.length,
-      hand: weHaveGlasses ? oppPlayer.hand : null, // Reveal hand if we have glasses
+      hand:
+        !weHaveGlasses
+          ? null
+          : variant === 'cutthroat'
+            ? (glassesTargetPlayer === i ? oppPlayer.hand : null)
+            : oppPlayer.hand,
       points: oppPoints,
       goal: oppGoal,
       pointCards: oppPointCards,
@@ -1062,9 +1078,15 @@ function createObservationFromServerState(gameData, pIdx) {
     phase: gameData.phase,
     currentPlayer: gameData.currentPlayer,
     isMyTurn: gameData.currentPlayer === pIdx,
+    glassesTargetPlayer,
     // 2-player compatibility fields
     opponentHandSize: mainOpponent ? mainOpponent.hand.length : 0,
-    opponentHand: weHaveGlasses && mainOpponent ? mainOpponent.hand : null,
+    opponentHand:
+      !weHaveGlasses || !mainOpponent
+        ? null
+        : variant === 'cutthroat'
+          ? (glassesTargetPlayer === mainOpponentIdx ? mainOpponent.hand : null)
+          : mainOpponent.hand,
   };
 }
 
@@ -1373,12 +1395,31 @@ function getCardInfo(card) {
     '5': { type: 'Point / One-Off', desc: state.variant === 'classic' ? 'Point: 5 points\nOne-Off: Draw 2 cards' : 'Point: 5 points\nOne-Off: Discard 1, then draw 3' },
     '6': { type: 'Point / One-Off', desc: 'Point: 6 points\nOne-Off: Destroy ALL permanents in play' },
     '7': { type: 'Point / One-Off', desc: state.variant === 'classic' ? 'Point: 7 points\nOne-Off: Draw 1 and play it immediately' : 'Point: 7 points\nOne-Off: Reveal top 2, choose 1 to play' },
-    '8': { type: 'Point / Permanent', desc: 'Point: 8 points\nPermanent: "Glasses" - See opponent\'s hand' },
-    '9': { type: 'Point / One-Off', desc: state.variant === 'standard' ? 'Point: 9 points\nOne-Off: Return a permanent to hand (frozen)' : 'Point: 9 points\nOne-Off: Return a permanent + owner skips turn' },
+    '8': {
+      type: 'Point / Permanent',
+      desc: state.variant === 'cutthroat'
+        ? 'Point: 8 points\nPermanent: "Glasses" - Peek one opponent hand at any time'
+        : 'Point: 8 points\nPermanent: "Glasses" - See opponent hand'
+    },
+    '9': {
+      type: 'Point / One-Off',
+      desc: state.variant === 'classic'
+        ? 'Point: 9 points\nOne-Off: Return a permanent to hand'
+        : state.variant === 'cutthroat'
+          ? 'Point: 9 points\nOne-Off: Return a permanent + freeze + owner skips turn'
+          : 'Point: 9 points\nOne-Off: Return a permanent to hand (frozen until next turn)'
+    },
     '10': { type: 'Point', desc: 'Point: 10 points\nCan also scuttle lower point cards' },
     'J': { type: 'Permanent', desc: 'Steal control of an opponent\'s point card. Attach to the stolen card.' },
     'Q': { type: 'Permanent', desc: 'Protect your other cards from being targeted by opponents.' },
-    'K': { type: 'Permanent', desc: 'Reduce your goal: 21→14→10→7→5\nMultiple Kings stack!' },
+    'K': {
+      type: 'Permanent',
+      desc: (state.variant === 'standard' || state.variant === 'team')
+        ? 'Reduce your goal: 21→14→10→5→0\nMultiple Kings stack!'
+        : state.variant === 'cutthroat'
+          ? 'Reduce your goal: 14→9→5→0\nMultiple Kings stack!'
+          : 'Reduce your goal: 21→14→10→7→5\nMultiple Kings stack!'
+    },
   };
 
   return effects[rank] || { type: 'Card', desc: '' };
@@ -1509,6 +1550,34 @@ function renderOpponents(obs, gameState, hasGlasses) {
       ${isTurn ? '<span class="turn-indicator">THEIR TURN</span>' : ''}
       ${isSkipped ? '<span class="turn-indicator" style="background:#666;">SKIP</span>' : ''}
     `;
+    if (state.variant === 'cutthroat' && hasGlasses) {
+      const isPeekTarget = obs.glassesTargetPlayer === opp.playerIndex;
+      const peekHint = document.createElement('span');
+      peekHint.className = 'turn-indicator';
+      peekHint.style.background = isPeekTarget ? '#1f7a1f' : '#444';
+      peekHint.textContent = isPeekTarget ? 'PEEKING' : 'PEEK';
+      header.appendChild(peekHint);
+      section.style.cursor = 'pointer';
+      section.title = `Select Player ${opp.playerIndex} as glasses peek target`;
+      section.addEventListener('click', () => {
+        const peekAction = `peek:${opp.playerIndex}`;
+        if (state.isMultiplayer) {
+          const myActions = state.serverValidActions[state.playerIndex] || [];
+          if (myActions.includes(peekAction)) {
+            executeMultiplayerAction(peekAction);
+          }
+          return;
+        }
+        const actions = state.game.getValidActions(state.playerIndex);
+        if (actions.includes(peekAction)) {
+          const result = state.game.action(state.playerIndex, peekAction);
+          if (result.success) {
+            addToHistory(`Peek at Player ${opp.playerIndex}`, state.playerIndex);
+            render();
+          }
+        }
+      });
+    }
     section.appendChild(header);
 
     // Hand row
@@ -2616,9 +2685,9 @@ function addToHistory(action, pIndex) {
 // Check if it's the human player's turn to act (any phase)
 function isHumanTurn() {
   if (!state.game) return false;
-  // Let the game engine decide - if human has valid actions, it's their turn
+  // Ignore out-of-turn utility actions (peek) when determining turn ownership.
   const actions = state.game.getValidActions(state.playerIndex);
-  return actions.length > 0;
+  return actions.some((a) => !a.startsWith('peek:'));
 }
 
 function handleCardClick(card) {
@@ -3618,14 +3687,15 @@ async function runAITurn() {
     hideThinking();
 
     const actions = state.game.getValidActions(actingAI);
-    if (actions.length === 0) {
+    const turnActions = actions.filter((a) => !a.startsWith('peek:'));
+    if (turnActions.length === 0) {
       // No valid actions, skip
       break;
     }
 
     // Use heuristic AI to select best action
     const obs = state.game.getObservation(actingAI);
-    const action = selectBestAction(actions, obs, gameState);
+    const action = selectBestAction(turnActions, obs, gameState);
     const result = state.game.action(actingAI, action);
 
     if (result.success) {
@@ -3715,7 +3785,7 @@ function getCounterPhaseAI(gameState) {
   const aiPlayers = getAIPlayers();
   for (const ai of aiPlayers) {
     const actions = state.game.getValidActions(ai);
-    if (actions.length > 0) {
+    if (actions.some((a) => !a.startsWith('peek:'))) {
       return ai;
     }
   }
@@ -4387,7 +4457,7 @@ document.getElementById('pause-show-rules').addEventListener('click', () => {
 // ============================================================================
 
 function getRulesHTML(variant) {
-  if (state.variant === 'cutthroat') {
+  if (variant === 'cutthroat') {
     return `
       <h3>Objective</h3>
       <p>Be first to accumulate 14+ points in point cards.</p>
@@ -4412,7 +4482,7 @@ function getRulesHTML(variant) {
 
       <h3>Permanents</h3>
       <ul>
-        <li><b>8</b> - "Glasses" - ALL opponents' hands are revealed</li>
+        <li><b>8</b> - "Glasses" - Peek one opponent's hand at any time</li>
         <li><b>J</b> - Steal control of any opponent's point card</li>
         <li><b>Q</b> - Protect your other cards from being targeted</li>
         <li><b>K</b> - Reduce goal: 14 → 9 → 5 → 0 (3 Kings = instant win)</li>
@@ -4424,10 +4494,14 @@ function getRulesHTML(variant) {
     `;
   }
 
-  const goal = state.variant === 'standard' ? '21' : '21';
-  const fiveRule = state.variant === 'standard' ? 'Discard 1 card, then draw 3' : 'Draw 2 cards';
-  const sevenRule = state.variant === 'standard' ? 'Reveal top 2 cards, choose 1 to play' : 'Draw and must play immediately';
-  const nineRule = state.variant === 'standard' ? "Return a PERMANENT to hand (can't play it next turn)" : "Return any card in play to its owner's hand";
+  const goal = variant === 'cutthroat' ? '14' : '21';
+  const fiveRule = (variant === 'standard' || variant === 'team') ? 'Discard 1 card, then draw 3' : 'Draw 2 cards';
+  const sevenRule = (variant === 'standard' || variant === 'team') ? 'Reveal top 2 cards, choose 1 to play' : 'Draw and must play immediately';
+  const nineRule = variant === 'classic'
+    ? "Return a PERMANENT to hand"
+    : variant === 'cutthroat'
+      ? "Return a PERMANENT + owner skips next turn"
+      : "Return a PERMANENT to hand (can't play it next turn)";
 
   return `
     <h3>Objective</h3>
@@ -4453,7 +4527,7 @@ function getRulesHTML(variant) {
       <li><b>8</b> - "Glasses" - Opponent's hand is revealed to you</li>
       <li><b>J</b> - Steal control of a point card</li>
       <li><b>Q</b> - Protect your other cards from being targeted</li>
-      <li><b>K</b> - Reduce your goal: 21 → 14 → 10 → 7 → 5</li>
+      <li><b>K</b> - ${(variant === 'standard' || variant === 'team') ? 'Reduce your goal: 21 → 14 → 10 → 5 → 0' : 'Reduce your goal: 21 → 14 → 10 → 7 → 5'}</li>
     </ul>
 
     <h3>Scuttling</h3>

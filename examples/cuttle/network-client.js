@@ -443,7 +443,7 @@ function showRules() {
 ╔══════════════════════════════════════════════════════════════════╗
 ║               CUTTLE RULES (Cutthroat - 3 Players)               ║
 ╠══════════════════════════════════════════════════════════════════╣
-║ OBJECTIVE: Be first to accumulate 21+ points in point cards.     ║
+║ OBJECTIVE: Be first to accumulate 14+ points in point cards.     ║
 ║                                                                  ║
 ║ POINT CARDS (A-10): Play for points equal to rank (A=1)          ║
 ║                                                                  ║
@@ -458,11 +458,11 @@ function showRules() {
 ║   9  - Return PERMANENT + owner SKIPS next turn                  ║
 ║                                                                  ║
 ║ PERMANENTS:                                                      ║
-║   8  - "Glasses" - ALL opponents' hands revealed                 ║
+║   8  - "Glasses" - Peek one opponent's hand at any time                 ║
 ║   J  - Steal control of point card (adjacent only)               ║
 ║   Q  - Protect your other cards from targeting                   ║
-║   K  - Reduce goal: 21 → 14 → 10 → 5 → 0                        ║
-║   🃏  - JOKER: Steal a royal (8, Q, K) or Jack                    ║
+║   K  - Reduce goal: 14 → 9 → 5 → 0                        ║
+║   🃏  - JOKER: Steal a royal (J, Q, K)                    ║
 ║                                                                  ║
 ║ SCUTTLING: Use higher card to destroy opponent's point card.     ║
 ╚══════════════════════════════════════════════════════════════════╝
@@ -484,7 +484,7 @@ function showRules() {
 ║   5  - Draw 2 cards                                              ║
 ║   6  - Destroy ALL permanents                                    ║
 ║   7  - Draw a card and MUST play it immediately                  ║
-║   9  - Return any card in play to its owner's hand               ║
+║   9  - Return a PERMANENT to its owner's hand                    ║
 ║                                                                  ║
 ║ PERMANENTS:                                                      ║
 ║   8  - "Glasses" - Opponent's hand is revealed to you            ║

@@ -15,8 +15,8 @@
  * - 6: One-off - Move all permanents to scrap
  * - 7: One-off - Draw and immediately play a card
  * - 8: Permanent - Opponent's hand is revealed ("glasses")
- *      (In Cutthroat: reveals ALL opponents' hands)
- * - 9: One-off - Return a card to its controller's hand
+ *      (In Cutthroat: can peek one opponent's hand on demand)
+ * - 9: One-off - Return a permanent (8, Q, K, or J) to its controller's hand
  *      (In Cutthroat: target also skips their next turn)
  * - 10: Point card only (no special effect)
  * - J: Permanent - Take control of target point card
@@ -92,7 +92,9 @@ export interface PendingOneOff {
 export interface PendingRoyal {
   card: Card;
   player: number;
-  type: "eight" | "queen" | "king";
+  type: "jack" | "queen" | "king";
+  targetCardId?: number; // Jack target point card id
+  destinationPlayer?: number; // Team Jack destination controller
   respondersRemaining: number[]; // Players who can still respond (opponents with Nines)
 }
 
@@ -111,6 +113,7 @@ export interface CuttleGameState {
   discardCount: number; // Cards opponent still needs to discard for 4
   discardingPlayer: number | null; // Which player is discarding for 4 (3+ players)
   skipTurnPlayers: number[]; // Players who skip their next turn (Cutthroat 9)
+  glassesPeekTargets: number[]; // Cutthroat: selected opponent to peek with 8 (-1 = none)
   consecutivePasses: number;
   winner: number | null;
   isDraw: boolean;
@@ -322,6 +325,7 @@ export class CuttleGame {
       discardCount: 0,
       discardingPlayer: null,
       skipTurnPlayers: [],
+      glassesPeekTargets: Array.from({ length: numPlayers }, () => -1),
       consecutivePasses: 0,
       winner: null,
       isDraw: false,
@@ -399,9 +403,9 @@ export class CuttleGame {
     const player = this.state.players[playerIndex];
     const numPlayers = this.state.players.length;
 
-    // Check if we have glasses 8 - we see opponents' hands
-    // In Cutthroat: 8 reveals ALL opponents' hands
+    // Check if we have glasses 8
     const weHaveGlasses = player.permanents.some((p) => p.type === "eight");
+    const glassesVisibleTarget = this.getGlassesVisibleTarget(playerIndex);
 
     // Build opponent info for each opponent
     const opponents: Array<{
@@ -420,7 +424,12 @@ export class CuttleGame {
       opponents.push({
         playerIndex: i,
         handSize: opp.hand.length,
-        hand: weHaveGlasses ? opp.hand : null,
+        hand:
+          !weHaveGlasses
+            ? null
+            : this.config.variant === "cutthroat"
+              ? (glassesVisibleTarget === i ? opp.hand : null)
+              : opp.hand,
         pointCards: opp.pointCards,
         permanents: opp.permanents,
         points: this.getPoints(i),
@@ -444,7 +453,12 @@ export class CuttleGame {
 
       // Legacy 2-player fields (main opponent for backwards compatibility)
       opponentHandSize: mainOpponent.hand.length,
-      opponentHand: weHaveGlasses ? mainOpponent.hand : null,
+      opponentHand:
+        !weHaveGlasses
+          ? null
+          : this.config.variant === "cutthroat"
+            ? (glassesVisibleTarget === mainOpponentIndex ? mainOpponent.hand : null)
+            : mainOpponent.hand,
       opponentPointCards: mainOpponent.pointCards,
       opponentPermanents: mainOpponent.permanents,
       opponentPoints: this.getPoints(mainOpponentIndex),
@@ -482,6 +496,7 @@ export class CuttleGame {
       winningTeam: this.config.variant === "team" && this.state.winner !== null
         ? this.getTeam(this.state.winner)
         : null,
+      glassesTargetPlayer: glassesVisibleTarget,
     };
   }
 
@@ -544,6 +559,34 @@ export class CuttleGame {
   }
 
   /**
+   * Get "peek hand" actions available via 8 in Cutthroat.
+   * This can be used at any time and does not consume a turn.
+   */
+  private getPeekActions(playerIndex: number): string[] {
+    if (this.config.variant !== "cutthroat") return [];
+    const hasGlasses = this.state.players[playerIndex].permanents.some((p) => p.type === "eight");
+    if (!hasGlasses) return [];
+    return this.getOpponents(playerIndex).map((opp) => `peek:${opp}`);
+  }
+
+  /**
+   * Resolve which opponent hand is visible via 8 in Cutthroat.
+   */
+  private getGlassesVisibleTarget(playerIndex: number): number | null {
+    if (this.config.variant !== "cutthroat") return null;
+    const hasGlasses = this.state.players[playerIndex].permanents.some((p) => p.type === "eight");
+    if (!hasGlasses) return null;
+
+    const requested = this.state.glassesPeekTargets[playerIndex];
+    if (requested >= 0 && requested < this.state.players.length && requested !== playerIndex) {
+      return requested;
+    }
+
+    const opponents = this.getOpponents(playerIndex);
+    return opponents.length > 0 ? opponents[0] : null;
+  }
+
+  /**
    * Check if a card is a Joker
    */
   private isJoker(card: Card): boolean {
@@ -551,7 +594,7 @@ export class CuttleGame {
   }
 
   /**
-   * Get all targetable royals for Joker (8, Q, K, or attached Jacks from opponents)
+   * Get all targetable royals for Joker (Q, K, or attached Jacks from opponents)
    */
   private getJokerTargets(playerIndex: number): Array<{ card: Card; owner: number; type: "permanent" | "jack" }> {
     const targets: Array<{ card: Card; owner: number; type: "permanent" | "jack" }> = [];
@@ -621,6 +664,8 @@ export class CuttleGame {
     const actions: string[] = [];
     const player = this.state.players[playerIndex];
     const numPlayers = this.state.players.length;
+    const includePeekActions = playerIndex !== this.state.currentPlayer;
+    const peekActions = includePeekActions ? this.getPeekActions(playerIndex) : [];
 
     if (this.state.winner !== null || this.state.isDraw) {
       return [];
@@ -628,7 +673,7 @@ export class CuttleGame {
 
     switch (this.state.phase) {
       case "play":
-        if (playerIndex !== this.state.currentPlayer) return [];
+        if (playerIndex !== this.state.currentPlayer) return peekActions;
 
         // Draw (if deck not empty and under hand limit)
         if (this.state.deck.length > 0 && player.hand.length < this.config.handLimit) {
@@ -748,8 +793,7 @@ export class CuttleGame {
             case "9":
               // Return a card to controller's hand
               // In cutthroat: target also skips their next turn
-              // In standard variant: only targets permanents (8, Q, K, J)
-              // In classic variant: can target any card on the board
+              // In all variants: only targets permanents (8, Q, K, J)
               for (const p of this.state.players) {
                 const pIdx = this.state.players.indexOf(p);
                 for (const perm of p.permanents) {
@@ -763,12 +807,6 @@ export class CuttleGame {
                     const jackController = this.getJackController(pc, jack);
                     if (!this.isProtected(jackController, jack.id)) {
                       actions.push(`oneoff:${card.id}:card:${jack.id}`);
-                    }
-                  }
-                  // Point cards only targetable in classic variant (not standard or cutthroat)
-                  if (this.config.variant === "classic") {
-                    if (!this.isProtected(pc.controller, pc.card.id)) {
-                      actions.push(`oneoff:${card.id}:card:${pc.card.id}`);
                     }
                   }
                 }
@@ -863,7 +901,7 @@ export class CuttleGame {
         break;
 
       case "counter":
-        if (!this.state.pendingOneOff) return [];
+        if (!this.state.pendingOneOff) return peekActions;
 
         // Determine who can counter based on chain length
         // Even chain length: target's turn to counter
@@ -896,7 +934,7 @@ export class CuttleGame {
           counteringPlayer = oneOffPlayer;
         }
 
-        if (playerIndex !== counteringPlayer) return [];
+        if (playerIndex !== counteringPlayer) return peekActions;
 
         // Can counter with a 2
         for (const card of player.hand) {
@@ -909,7 +947,7 @@ export class CuttleGame {
         break;
 
       case "resolve_three":
-        if (playerIndex !== this.state.currentPlayer) return [];
+        if (playerIndex !== this.state.currentPlayer) return peekActions;
         // Choose a card from scrap
         for (const card of this.state.scrap) {
           actions.push(`choose:${card.id}`);
@@ -919,7 +957,7 @@ export class CuttleGame {
       case "resolve_four":
         // Opponent must discard - use discardingPlayer for 3+ player games
         const discardingPlayer = this.state.discardingPlayer ?? (1 - this.state.currentPlayer);
-        if (playerIndex !== discardingPlayer) return [];
+        if (playerIndex !== discardingPlayer) return peekActions;
         for (const card of player.hand) {
           actions.push(`discard:${card.id}`);
         }
@@ -927,7 +965,7 @@ export class CuttleGame {
 
       case "resolve_five_discard":
         // Standard variant: must discard a card before drawing 3
-        if (playerIndex !== this.state.currentPlayer) return [];
+        if (playerIndex !== this.state.currentPlayer) return peekActions;
         for (const card of player.hand) {
           actions.push(`five_discard:${card.id}`);
         }
@@ -935,8 +973,8 @@ export class CuttleGame {
 
       case "resolve_seven":
         // Classic variant: must play the single drawn card
-        if (playerIndex !== this.state.currentPlayer) return [];
-        if (!this.state.sevenDrawnCard) return [];
+        if (playerIndex !== this.state.currentPlayer) return peekActions;
+        if (!this.state.sevenDrawnCard) return peekActions;
 
         const drawnCard = this.state.sevenDrawnCard;
         const sevenActions = this.getSevenPlayActions(playerIndex, drawnCard);
@@ -951,8 +989,8 @@ export class CuttleGame {
 
       case "resolve_seven_choose":
         // Standard variant: choose one of two revealed cards
-        if (playerIndex !== this.state.currentPlayer) return [];
-        if (!this.state.sevenRevealedCards || this.state.sevenRevealedCards.length === 0) return [];
+        if (playerIndex !== this.state.currentPlayer) return peekActions;
+        if (!this.state.sevenRevealedCards || this.state.sevenRevealedCards.length === 0) return peekActions;
 
         for (const card of this.state.sevenRevealedCards) {
           const cardActions = this.getSevenPlayActions(playerIndex, card);
@@ -974,10 +1012,10 @@ export class CuttleGame {
 
       case "royal_response":
         // Team variant: opponents can respond to Royal with Nine
-        if (!this.state.pendingRoyal) return [];
+        if (!this.state.pendingRoyal) return peekActions;
 
         // Only players in respondersRemaining can act
-        if (!this.state.pendingRoyal.respondersRemaining.includes(playerIndex)) return [];
+        if (!this.state.pendingRoyal.respondersRemaining.includes(playerIndex)) return peekActions;
 
         // Can respond with a Nine (instant bounce, doesn't take turn)
         for (const card of player.hand) {
@@ -990,6 +1028,9 @@ export class CuttleGame {
         break;
     }
 
+    for (const action of peekActions) {
+      if (!actions.includes(action)) actions.push(action);
+    }
     return actions;
   }
 
@@ -998,7 +1039,7 @@ export class CuttleGame {
    */
   private getSevenPlayActions(playerIndex: number, card: Card): string[] {
     const actions: string[] = [];
-    const opponent = this.state.players[1 - playerIndex];
+    const numPlayers = this.state.players.length;
 
     // Jokers can only steal royals
     if (this.isJoker(card)) {
@@ -1060,8 +1101,17 @@ export class CuttleGame {
         }
         break;
       case "4":
-        if (opponent.hand.length > 0) {
-          actions.push(`seven_oneoff:${card.id}`);
+        if (numPlayers === 2) {
+          const opponent = this.state.players[1 - playerIndex];
+          if (opponent.hand.length > 0) {
+            actions.push(`seven_oneoff:${card.id}`);
+          }
+        } else {
+          for (let i = 0; i < numPlayers; i++) {
+            if (i !== playerIndex && this.state.players[i].hand.length > 0) {
+              actions.push(`seven_oneoff:${card.id}:target:${i}`);
+            }
+          }
         }
         break;
       case "5":
@@ -1080,8 +1130,7 @@ export class CuttleGame {
         }
         break;
       case "9":
-        // In standard variant: only targets permanents
-        // In classic variant: can target any card on the board
+        // In all variants: only targets permanents
         for (const p of this.state.players) {
           const pIdx = this.state.players.indexOf(p);
           for (const perm of p.permanents) {
@@ -1095,12 +1144,6 @@ export class CuttleGame {
               const jackController = this.getJackController(pc, jack);
               if (!this.isProtected(jackController, jack.id)) {
                 actions.push(`seven_oneoff:${card.id}:card:${jack.id}`);
-              }
-            }
-            // Point cards only targetable in classic variant
-            if (this.config.variant !== "standard") {
-              if (!this.isProtected(pc.controller, pc.card.id)) {
-                actions.push(`seven_oneoff:${card.id}:card:${pc.card.id}`);
               }
             }
           }
@@ -1212,6 +1255,14 @@ export class CuttleGame {
     const actionType = parts[0];
     let message = "";
 
+    if (actionType === "peek") {
+      const targetPlayer = parseInt(parts[1]);
+      this.state.glassesPeekTargets[playerIndex] = targetPlayer;
+      message = `Player ${playerIndex} peeks at Player ${targetPlayer}'s hand`;
+      this.state.lastAction = message;
+      return { success: true, message };
+    }
+
     this.state.consecutivePasses = actionType === "pass" ? this.state.consecutivePasses + 1 : 0;
 
     switch (this.state.phase) {
@@ -1311,12 +1362,36 @@ export class CuttleGame {
           // Jack targets a point card
           const targetId = parseInt(parts[2]);
           const targetPc = this.findPointCard(targetId);
+          const destinationPlayer = this.config.variant === "team" && parts.length > 3
+            ? parseInt(parts[3])
+            : player;
+
+          // Team variant: opponents can respond to Royals with Nine
+          if (this.config.variant === "team" && targetPc) {
+            const opponents = this.getOpponents(player);
+            const respondersWithNine = opponents.filter((oppIdx) =>
+              this.state.players[oppIdx].hand.some((c) => c.rank === "9")
+            );
+
+            if (respondersWithNine.length > 0) {
+              this.state.pendingRoyal = {
+                card,
+                player,
+                type: "jack",
+                targetCardId: targetId,
+                destinationPlayer,
+                respondersRemaining: respondersWithNine,
+              };
+              this.state.phase = "royal_response";
+              return `Player ${player} plays ${cardToString(card)} as Royal - opponents may respond`;
+            }
+          }
+
           if (targetPc) {
             targetPc.attachedJacks.push(card);
             // In team variant, destination player can be specified (parts[3])
             // Otherwise, control goes to the Jack player
-            if (this.config.variant === "team" && parts.length > 3) {
-              const destinationPlayer = parseInt(parts[3]);
+            if (this.config.variant === "team") {
               targetPc.controller = destinationPlayer;
               this.advanceTurn();
               return `Player ${player} plays ${cardToString(card)} to transfer point card to Player ${destinationPlayer}`;
@@ -1332,7 +1407,7 @@ export class CuttleGame {
           const type = card.rank === "8" ? "eight" : card.rank === "Q" ? "queen" : "king";
 
           // Team variant: check if opponents can respond with Nine
-          if (this.config.variant === "team") {
+          if (this.config.variant === "team" && (card.rank === "Q" || card.rank === "K")) {
             const opponents = this.getOpponents(player);
             const respondersWithNine = opponents.filter((oppIdx) =>
               this.state.players[oppIdx].hand.some((c) => c.rank === "9")
@@ -1343,7 +1418,7 @@ export class CuttleGame {
               this.state.pendingRoyal = {
                 card,
                 player,
-                type,
+                type: card.rank === "Q" ? "queen" : "king",
                 respondersRemaining: respondersWithNine,
               };
               this.state.phase = "royal_response";
@@ -1650,7 +1725,7 @@ export class CuttleGame {
 
           this.returnCardToHand(targetCardId);
 
-          // Standard/cutthroat: card can't be played next turn
+          // Standard/team/cutthroat: card can't be played next turn
           if (this.config.variant !== "classic") {
             this.state.frozenCardIds.push(targetCardId);
           }
@@ -1665,10 +1740,10 @@ export class CuttleGame {
 
         if (this.config.variant === "cutthroat") {
           message = "Permanent returned to hand (frozen + owner skips next turn)";
-        } else if (this.config.variant === "standard") {
+        } else if (this.config.variant === "standard" || this.config.variant === "team") {
           message = "Permanent returned to hand (frozen until next turn)";
         } else {
-          message = "Card returned to hand";
+          message = "Permanent returned to hand";
         }
         this.state.phase = "play";
         this.advanceTurn();
@@ -1753,14 +1828,20 @@ export class CuttleGame {
         break;
 
       case "oneoff": {
-        const target =
-          parts.length > 3
-            ? { cardId: parseInt(parts[3]), type: parts[2] as "permanent" | "pointCard" }
-            : undefined;
+        let target: { cardId: number; type: "permanent" | "pointCard" } | undefined;
+        let targetPlayer: number | undefined;
+
+        if (parts.length > 3 && parts[2] !== "target") {
+          target = { cardId: parseInt(parts[3]), type: parts[2] as "permanent" | "pointCard" };
+        }
+        if (parts.length > 2 && parts[2] === "target") {
+          targetPlayer = parseInt(parts[3]);
+        }
         this.state.pendingOneOff = {
           card,
           player,
           target,
+          targetPlayer,
           counterChain: [],
         };
         this.state.phase = "counter";
@@ -1912,14 +1993,20 @@ export class CuttleGame {
         break;
 
       case "oneoff": {
-        const target =
-          parts.length > 3
-            ? { cardId: parseInt(parts[3]), type: parts[2] as "permanent" | "pointCard" }
-            : undefined;
+        let target: { cardId: number; type: "permanent" | "pointCard" } | undefined;
+        let targetPlayer: number | undefined;
+
+        if (parts.length > 3 && parts[2] !== "target") {
+          target = { cardId: parseInt(parts[3]), type: parts[2] as "permanent" | "pointCard" };
+        }
+        if (parts.length > 2 && parts[2] === "target") {
+          targetPlayer = parseInt(parts[3]);
+        }
         this.state.pendingOneOff = {
           card: chosenCard,
           player,
           target,
+          targetPlayer,
           counterChain: [],
         };
         this.state.phase = "counter";
@@ -2054,10 +2141,24 @@ export class CuttleGame {
 
       if (this.state.pendingRoyal.respondersRemaining.length === 0) {
         // No more responders - Royal takes effect
-        this.state.players[pending.player].permanents.push({
-          card: pending.card,
-          type: pending.type,
-        });
+        if (pending.type === "jack") {
+          const targetPc = pending.targetCardId !== undefined
+            ? this.findPointCard(pending.targetCardId)
+            : undefined;
+          if (targetPc) {
+            targetPc.attachedJacks.push(pending.card);
+            targetPc.controller = pending.destinationPlayer ?? pending.player;
+          } else {
+            // If target disappeared while waiting for responses, return Jack to hand.
+            this.state.players[pending.player].hand.push(pending.card);
+          }
+        } else {
+          const permType = pending.type === "queen" ? "queen" : "king";
+          this.state.players[pending.player].permanents.push({
+            card: pending.card,
+            type: permType,
+          });
+        }
         this.state.pendingRoyal = null;
         this.state.phase = "play";
         this.advanceTurn();
