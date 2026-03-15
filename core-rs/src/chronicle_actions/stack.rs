@@ -335,14 +335,20 @@ impl Chronicle {
         let token_a = tokens[index_a].clone();
         let token_b = tokens[index_b].clone();
 
+        // Delete+reinsert to avoid stale optional fields from in-place overwrite
+        let (lo, hi) = if index_a < index_b { (index_a, index_b) } else { (index_b, index_a) };
+        let lo_token = if index_a < index_b { token_b.clone() } else { token_a.clone() };
+        let hi_token = if index_a < index_b { token_a } else { token_b };
+
         self.doc.transact::<_, _, AutomergeError>(|tx| {
-            // Get the ObjIds of the map objects at each index
-            if let Ok(Some((_, obj_a))) = tx.get(&stack_list_id, index_a) {
-                write_token_tx(tx, &obj_a, &token_b)?;
-            }
-            if let Ok(Some((_, obj_b))) = tx.get(&stack_list_id, index_b) {
-                write_token_tx(tx, &obj_b, &token_a)?;
-            }
+            // Delete higher index first to keep lower index valid
+            tx.delete(&stack_list_id, hi)?;
+            let hi_obj = tx.insert_object(&stack_list_id, hi, ObjType::Map)?;
+            write_token_tx(tx, &hi_obj, &hi_token)?;
+
+            tx.delete(&stack_list_id, lo)?;
+            let lo_obj = tx.insert_object(&stack_list_id, lo, ObjType::Map)?;
+            write_token_tx(tx, &lo_obj, &lo_token)?;
             Ok(())
         }).map_err(|e| HyperTokenError::CrdtError(format!("{:?}", e)))?;
 
