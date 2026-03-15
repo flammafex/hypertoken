@@ -132,22 +132,33 @@ impl Chronicle {
             .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize state: {}", e)))
     }
 
-    /// Apply a change to the document
+    /// Full-state replacement (initialization and legacy use only).
     ///
-    /// JavaScript usage:
-    /// ```js
-    /// chronicle.change("draw-card", newStateJson);
-    /// ```
-    #[wasm_bindgen(js_name = change)]
-    pub fn change(&mut self, _message: &str, new_state_json: &str) -> Result<()> {
-        // Parse and validate the new state
+    /// For incremental mutations, use the action methods (stack_draw, space_place, etc.).
+    #[wasm_bindgen(js_name = setStateFull)]
+    pub fn set_state_full(&mut self, message: &str, new_state_json: &str) -> Result<()> {
         let state: HyperTokenState = serde_json::from_str(new_state_json)
             .map_err(|e| HyperTokenError::SerializationError(format!("Invalid state JSON: {}", e)))?;
 
-        // Write state to document
+        if !message.is_empty() {
+            let msg = message.to_string();
+            self.doc.transact_with::<_, _, automerge::AutomergeError, _>(
+                |_| automerge::transaction::CommitOptions::default().with_message(msg),
+                |_tx| Ok(()),
+            ).map_err(|e| HyperTokenError::CrdtError(format!("Transaction failed: {:?}", e)))?;
+        }
+
         self.write_state_to_doc(&state)?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         Ok(())
+    }
+
+    /// Legacy alias for set_state_full (backward compatibility)
+    #[wasm_bindgen(js_name = change)]
+    pub fn change(&mut self, message: &str, new_state_json: &str) -> Result<()> {
+        self.set_state_full(message, new_state_json)
     }
 
     /// Save the document to a binary format
