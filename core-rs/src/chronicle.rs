@@ -116,6 +116,8 @@ impl Chronicle {
 
         // Write state to Automerge document using native types
         self.write_state_to_doc(&state)?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         Ok(())
     }
@@ -159,6 +161,8 @@ impl Chronicle {
     pub fn load(&mut self, data: &[u8]) -> Result<()> {
         self.doc = Automerge::load(data)
             .map_err(|e| HyperTokenError::CrdtError(format!("Failed to load document: {:?}", e)))?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
         Ok(())
     }
 
@@ -185,6 +189,8 @@ impl Chronicle {
 
         self.doc.merge(&mut other_doc)
             .map_err(|_e| HyperTokenError::CrdtError("Failed to merge documents".to_string()))?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         Ok(())
     }
@@ -265,6 +271,8 @@ impl Chronicle {
         // Receive the sync message
         self.doc.receive_sync_message(&mut sync_state, message)
             .map_err(|e| HyperTokenError::CrdtError(format!("Failed to receive sync message: {:?}", e)))?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         // Generate response message if needed
         let response = self.doc.generate_sync_message(&mut sync_state);
@@ -291,6 +299,125 @@ impl Chronicle {
     #[wasm_bindgen(js_name = syncFull)]
     pub fn sync_full(&mut self, other_doc_bytes: &[u8]) -> Result<()> {
         self.merge(other_doc_bytes)
+    }
+
+    /// Export stack section as JSON
+    #[wasm_bindgen(js_name = exportStack)]
+    pub fn export_stack(&self) -> Result<String> {
+        if let Some(ref stack_id) = self.stack_id {
+            let stack = self.read_stack_state(stack_id)?;
+            serde_json::to_string(&stack)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export zones section as JSON
+    #[wasm_bindgen(js_name = exportZones)]
+    pub fn export_zones(&self) -> Result<String> {
+        if let Some(ref zones_id) = self.zones_id {
+            let zones = self.read_zones(zones_id)?;
+            serde_json::to_string(&zones)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export source section as JSON
+    #[wasm_bindgen(js_name = exportSource)]
+    pub fn export_source(&self) -> Result<String> {
+        if let Some(ref source_id) = self.source_id {
+            let source = self.read_source_state(source_id)?;
+            serde_json::to_string(&source)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export gameLoop section as JSON
+    #[wasm_bindgen(js_name = exportGameLoop)]
+    pub fn export_game_loop(&self) -> Result<String> {
+        if let Some(ref gl_id) = self.game_loop_id {
+            let gl = self.read_game_loop_state(gl_id)?;
+            serde_json::to_string(&gl)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export gameState section as JSON
+    #[wasm_bindgen(js_name = exportGameState)]
+    pub fn export_game_state(&self) -> Result<String> {
+        if let Some(ref gs_id) = self.game_state_id {
+            // gameState is stored as a flat map with arbitrary keys
+            let mut state = HashMap::new();
+            for item in self.doc.map_range(gs_id, ..) {
+                let key = item.key.to_string();
+                if let Some(val) = self.read_string(gs_id, &key)? {
+                    state.insert(key, serde_json::Value::String(val));
+                } else if let Some(val) = self.read_i64(gs_id, &key)? {
+                    state.insert(key, serde_json::Value::Number(val.into()));
+                } else if let Some(val) = self.read_bool(gs_id, &key)? {
+                    state.insert(key, serde_json::Value::Bool(val));
+                }
+            }
+            serde_json::to_string(&state)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export rules section as JSON
+    #[wasm_bindgen(js_name = exportRules)]
+    pub fn export_rules(&self) -> Result<String> {
+        if let Some(ref rules_id) = self.rules_id {
+            let rules = self.read_rule_state(rules_id)?;
+            serde_json::to_string(&rules)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export agents section as JSON
+    #[wasm_bindgen(js_name = exportAgents)]
+    pub fn export_agents(&self) -> Result<String> {
+        if let Some(ref agents_id) = self.agents_id {
+            let agents = self.read_agents(agents_id)?;
+            serde_json::to_string(&agents)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export nullifiers section as JSON
+    #[wasm_bindgen(js_name = exportNullifiers)]
+    pub fn export_nullifiers(&self) -> Result<String> {
+        if let Some(ref null_id) = self.nullifiers_id {
+            let nullifiers = self.read_nullifiers(null_id)?;
+            serde_json::to_string(&nullifiers)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Get dirty section flags as JSON
+    #[wasm_bindgen(js_name = getDirty)]
+    pub fn get_dirty(&self) -> String {
+        self.dirty.to_json()
+    }
+
+    /// Clear all dirty flags
+    #[wasm_bindgen(js_name = clearDirty)]
+    pub fn clear_dirty(&mut self) {
+        self.dirty.clear();
     }
 }
 
@@ -1176,6 +1303,32 @@ const BASE64_DECODE: &[u8; 256] = &{
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_export_stack() {
+        let mut chronicle = Chronicle::new();
+        chronicle.set_state(r#"{"stack":{"stack":[{"id":"t1","text":"","char":"□","kind":"default","index":0,"meta":{}}],"drawn":[],"discards":[]}}"#).unwrap();
+        chronicle.resolve_section_ids();
+
+        let stack_json = chronicle.export_stack().unwrap();
+        let stack: IStackState = serde_json::from_str(&stack_json).unwrap();
+        assert_eq!(stack.stack.len(), 1);
+        assert_eq!(stack.stack[0].id, "t1");
+    }
+
+    #[test]
+    fn test_dirty_tracking() {
+        let mut chronicle = Chronicle::new();
+        chronicle.set_state(r#"{}"#).unwrap();
+        chronicle.resolve_section_ids();
+
+        // After set_state, dirty.all should be true
+        assert!(chronicle.dirty.all);
+
+        chronicle.dirty.clear();
+        assert!(!chronicle.dirty.all);
+        assert!(!chronicle.dirty.stack);
+    }
 
     #[test]
     fn test_resolve_section_ids() {
