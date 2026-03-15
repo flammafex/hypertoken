@@ -296,6 +296,84 @@ impl Chronicle {
 
 // Private implementation methods
 impl Chronicle {
+    /// Resolve and cache ObjIds for all top-level document sections.
+    /// Called after load/merge/set_state to refresh the cache.
+    pub(crate) fn resolve_section_ids(&mut self) {
+        self.stack_id = self.doc.get(automerge::ROOT, "stack")
+            .ok().flatten().map(|(_, id)| id);
+        self.zones_id = self.doc.get(automerge::ROOT, "zones")
+            .ok().flatten().map(|(_, id)| id);
+        self.source_id = self.doc.get(automerge::ROOT, "source")
+            .ok().flatten().map(|(_, id)| id);
+        self.game_loop_id = self.doc.get(automerge::ROOT, "gameLoop")
+            .ok().flatten().map(|(_, id)| id);
+        self.game_state_id = self.doc.get(automerge::ROOT, "gameState")
+            .ok().flatten().map(|(_, id)| id);
+        self.rules_id = self.doc.get(automerge::ROOT, "rules")
+            .ok().flatten().map(|(_, id)| id);
+        self.agents_id = self.doc.get(automerge::ROOT, "agents")
+            .ok().flatten().map(|(_, id)| id);
+        self.nullifiers_id = self.doc.get(automerge::ROOT, "nullifiers")
+            .ok().flatten().map(|(_, id)| id);
+    }
+
+    /// Ensure a top-level section exists, creating it if necessary.
+    /// Returns the ObjId of the section. Updates the cached ObjId.
+    pub(crate) fn ensure_section(&mut self, key: &str) -> Result<ObjId> {
+        // Check if already cached
+        let cached = match key {
+            "stack" => &self.stack_id,
+            "zones" => &self.zones_id,
+            "source" => &self.source_id,
+            "gameLoop" => &self.game_loop_id,
+            "gameState" => &self.game_state_id,
+            "rules" => &self.rules_id,
+            "agents" => &self.agents_id,
+            "nullifiers" => &self.nullifiers_id,
+            _ => return Err(HyperTokenError::InvalidOperation(format!("Unknown section: {}", key))),
+        };
+
+        if let Some(id) = cached {
+            return Ok(id.clone());
+        }
+
+        // Check if it exists in the doc but isn't cached
+        if let Ok(Some((_, id))) = self.doc.get(automerge::ROOT, key) {
+            let cloned = id.clone();
+            match key {
+                "stack" => self.stack_id = Some(cloned.clone()),
+                "zones" => self.zones_id = Some(cloned.clone()),
+                "source" => self.source_id = Some(cloned.clone()),
+                "gameLoop" => self.game_loop_id = Some(cloned.clone()),
+                "gameState" => self.game_state_id = Some(cloned.clone()),
+                "rules" => self.rules_id = Some(cloned.clone()),
+                "agents" => self.agents_id = Some(cloned.clone()),
+                "nullifiers" => self.nullifiers_id = Some(cloned.clone()),
+                _ => {}
+            }
+            return Ok(cloned);
+        }
+
+        // Create the section
+        let new_id = self.doc.transact::<_, _, AutomergeError>(|tx| {
+            Ok(tx.put_object(automerge::ROOT, key, ObjType::Map)?)
+        }).map_err(|e| HyperTokenError::CrdtError(format!("Failed to create section {}: {:?}", key, e)))?;
+
+        let result = new_id.result;
+        match key {
+            "stack" => self.stack_id = Some(result.clone()),
+            "zones" => self.zones_id = Some(result.clone()),
+            "source" => self.source_id = Some(result.clone()),
+            "gameLoop" => self.game_loop_id = Some(result.clone()),
+            "gameState" => self.game_state_id = Some(result.clone()),
+            "rules" => self.rules_id = Some(result.clone()),
+            "agents" => self.agents_id = Some(result.clone()),
+            "nullifiers" => self.nullifiers_id = Some(result.clone()),
+            _ => {}
+        }
+        Ok(result)
+    }
+
     /// Write HyperTokenState to Automerge document using native types
     fn write_state_to_doc(&mut self, state: &HyperTokenState) -> Result<()> {
         self.doc.transact::<_, _, AutomergeError>(|tx| {
@@ -1098,6 +1176,21 @@ const BASE64_DECODE: &[u8; 256] = &{
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_resolve_section_ids() {
+        let mut chronicle = Chronicle::new();
+        chronicle.set_state(r#"{"stack":{"stack":[],"drawn":[],"discards":[]},"zones":{},"gameLoop":{"turn":0,"running":false,"activeAgentIndex":0,"phase":"setup","maxTurns":10}}"#).unwrap();
+
+        chronicle.resolve_section_ids();
+
+        assert!(chronicle.stack_id.is_some());
+        assert!(chronicle.zones_id.is_some());
+        assert!(chronicle.game_loop_id.is_some());
+        // source, agents, rules, nullifiers not in state — should be None
+        assert!(chronicle.source_id.is_none());
+        assert!(chronicle.agents_id.is_none());
+    }
 
     #[test]
     fn test_chronicle_creation() {
