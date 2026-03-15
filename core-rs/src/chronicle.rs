@@ -375,6 +375,8 @@ impl Chronicle {
                     state.insert(key, serde_json::Value::Number(val.into()));
                 } else if let Some(val) = self.read_bool(gs_id, &key)? {
                     state.insert(key, serde_json::Value::Bool(val));
+                } else if let Some(val) = self.read_f64(gs_id, &key)? {
+                    state.insert(key, serde_json::json!(val));
                 }
             }
             serde_json::to_string(&state)
