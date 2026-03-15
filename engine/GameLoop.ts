@@ -13,8 +13,14 @@ export class GameLoop extends Emitter {
   session: Chronicle;
   delay: number;
   
-  // Track previous state to detect changes
-  private _lastState: Partial<IGameLoopState> = {};
+  // Track previous state to detect changes (initialized to match default CRDT state
+  // so the first _syncState() call does not fire spurious events)
+  private _lastState: Partial<IGameLoopState> = {
+    turn: 0,
+    running: false,
+    activeAgentIndex: -1,
+    phase: "setup",
+  };
 
   constructor(engine: Engine, { maxTurns = Infinity, delay = 0 } = {}) {
     super();
@@ -115,12 +121,16 @@ export class GameLoop extends Emitter {
   }
 
   nextTurn() {
+    // Capture agent count outside the change() callback so the callback
+    // is pure over document state (safe for CRDT replay/merge)
+    const agentCount = this.engine._agents.length;
+    if (!agentCount) return;
+
     this.session.change("next turn", (doc) => {
-      if (!doc.gameLoop || !this.engine._agents.length) return;
+      if (!doc.gameLoop) return;
       doc.gameLoop.turn++;
-      doc.gameLoop.activeAgentIndex = (doc.gameLoop.activeAgentIndex + 1) % this.engine._agents.length;
+      doc.gameLoop.activeAgentIndex = (doc.gameLoop.activeAgentIndex + 1) % agentCount;
     });
-    // FIX 3: Explicitly emit turn change events now
     this._syncState();
   }
 

@@ -6,7 +6,8 @@ import { Chronicle } from "./Chronicle.js";
 import { IPlacementCRDT, IToken } from "./types.js";
 import { Stack } from "./Stack.js";
 import { Source } from "./Source.js";
-import * as crypto from "crypto";
+import * as crypto from "node:crypto";
+import { shuffleArray } from "./random.js";
 
 export interface SpreadZone {
   id: string;
@@ -147,7 +148,7 @@ export class Space extends Emitter {
     });
 
     this.log.push({ type: "place", zoneName, placementId: placement.id, timestamp: Date.now() });
-    this.emit("place", placement);
+    this.emit("space:place", placement);
     return placement;
   }
 
@@ -192,7 +193,7 @@ export class Space extends Emitter {
     }
 
     this.log.push({ type: "move", fromZone, toZone, placementId, timestamp: Date.now() });
-    this.emit("move", { fromZone, toZone, placementId });
+    this.emit("space:move", { fromZone, toZone, placementId });
   }
 
   /**
@@ -227,7 +228,7 @@ export class Space extends Emitter {
     }
 
     this.log.push({ type: "flip", zoneName, placementId, faceUp, timestamp: Date.now() });
-    this.emit("flip", { id: placementId, faceUp });
+    this.emit("space:flip", { id: placementId, faceUp });
   }
 
   /**
@@ -262,7 +263,7 @@ export class Space extends Emitter {
     }
 
     this.log.push({ type: "remove", zoneName, placementId, timestamp: Date.now() });
-    this.emit("remove", { id: placementId });
+    this.emit("space:remove", { id: placementId });
   }
 
   clear(): void {
@@ -270,7 +271,7 @@ export class Space extends Emitter {
       doc.zones = {};
     });
     this.log = [];
-    this.emit("clear");
+    this.emit("space:clear");
   }
 
   createZone(id: string, { label = id, x = 0, y = 0 } = {}): this {
@@ -295,7 +296,7 @@ export class Space extends Emitter {
     this.session.change(`clear zone ${name}`, (doc) => {
       if (doc.zones) doc.zones[name] = [];
     });
-    this.emit("clearZone", { name });
+    this.emit("space:clearZone", { name });
     return this;
   }
 
@@ -320,7 +321,7 @@ export class Space extends Emitter {
       doc.zones[toZone].push(...items);
       count = items.length;
     });
-    this.emit("transferZone", { fromZone, toZone, count });
+    this.emit("space:transferZone", { fromZone, toZone, count });
     return count;
   }
 
@@ -367,13 +368,14 @@ export class Space extends Emitter {
 
   shuffleZone(name: string, seed?: number | null): void {
     if (this._isLocked(name)) return;
-    const items = [...this.zone(name)];
-    if (!items.length) return;
-    
-    items.sort(() => Math.random() - 0.5);
 
     this.session.change(`shuffle zone ${name}`, (doc) => {
       if (!doc.zones) doc.zones = {};
+      const zone = doc.zones[name];
+      if (!zone || zone.length === 0) return;
+      // Clone into plain array, shuffle, write back
+      const items = zone.map((item: any) => JSON.parse(JSON.stringify(item)));
+      shuffleArray(items, seed);
       doc.zones[name] = items;
     });
     this.log.push({ type: "shuffleZone", name, timestamp: Date.now() });
@@ -402,7 +404,7 @@ export class Space extends Emitter {
       }
     });
     drawn.reverse();
-    this.emit("drawFromZone", { zone: name, count: drawn.length });
+    this.emit("space:drawFromZone", { zone: name, count: drawn.length });
     return drawn;
   }
 
@@ -416,7 +418,7 @@ export class Space extends Emitter {
       if (!doc.zones[name]) doc.zones[name] = [];
       doc.zones[name].push(...arr);
     });
-    this.emit("pushToZone", { zone: name, count: arr.length });
+    this.emit("space:pushToZone", { zone: name, count: arr.length });
   }
 
   returnToStack(stack: Stack, zoneName: string, n: number = 1, { toTop = true } = {}): IToken[] {
@@ -431,45 +433,59 @@ export class Space extends Emitter {
     } else {
         tokens.forEach(t => stack.insertAt(t, 0));
     }
-    this.emit("returnToStack", { zone: zoneName, count: tokens.length });
+    this.emit("space:returnToStack", { zone: zoneName, count: tokens.length });
     return tokens;
   }
 
   collectAllInto(stack: Stack | any, { includeEmpty = false } = {}): number {
-    let total = 0;
     const tokensToReturn: IToken[] = [];
     const zonesToClear: string[] = [];
-    
+
     // Read phase
     for (const zoneName of this.zones) {
       const pile = this.zone(zoneName);
       if (!includeEmpty && pile.length === 0) continue;
-      
+
       pile.forEach(p => tokensToReturn.push(p.tokenSnapshot));
       zonesToClear.push(zoneName);
     }
 
-    // Write phase (Atomic)
-    this.session.change("collect all to stack", (doc) => {
-      // Clear zones
-      if (doc.zones) {
-        zonesToClear.forEach(z => doc.zones![z] = []);
-      }
-      // Add to stack (assuming Stack uses same session)
-      // Ideally we call stack methods, but we are inside a change callback here if we want atomicity.
-      // Since Stack logic is wrapped in session.change, calling stack.insert() here would nest transactions?
-      // Automerge handles nesting fine usually, or we can just do it sequentially.
-    });
+    if (tokensToReturn.length === 0) {
+      this.emit("space:collectAllInto", { zones: 0 });
+      return 0;
+    }
 
-    // We add tokens back to stack. 
-    // Since we are outside the change block above, we can call stack methods.
-    // Ideally this should be one atomic move, but for now:
-    tokensToReturn.forEach(t => stack.insertAt(t, stack.size));
-    total = tokensToReturn.length;
+    // Atomic write: clear zones and insert into stack in a single CRDT change
+    // when both share the same Chronicle session
+    const sameSession = stack.session === this.session;
+
+    if (sameSession) {
+      this.session.change("collect all to stack", (doc) => {
+        // Clear zones
+        if (doc.zones) {
+          zonesToClear.forEach(z => doc.zones![z] = []);
+        }
+        // Insert tokens into stack within the same change
+        if (doc.stack && doc.stack.stack) {
+          for (const t of tokensToReturn) {
+            const sanitized = JSON.parse(JSON.stringify(t));
+            doc.stack.stack.push(sanitized);
+          }
+        }
+      });
+    } else {
+      // Different sessions: insert into stack first (fail-safe: duplicate > lost)
+      tokensToReturn.forEach(t => stack.insertAt(t, stack.size));
+      this.session.change("collect all to stack", (doc) => {
+        if (doc.zones) {
+          zonesToClear.forEach(z => doc.zones![z] = []);
+        }
+      });
+    }
 
     stack.shuffle();
-    this.emit("collectAllInto", { zones: total });
-    return total;
+    this.emit("space:collectAllInto", { zones: tokensToReturn.length });
+    return tokensToReturn.length;
   }
 
   defineSpread(name: string, zones: SpreadZone[]): this {
@@ -491,7 +507,7 @@ export class Space extends Emitter {
         label: zone.label ?? zone.id
       });
     }
-    this.emit("dealSpread", { name });
+    this.emit("space:dealSpread", { name });
   }
 
   clearSpread(name: string): this {
@@ -505,7 +521,7 @@ export class Space extends Emitter {
         if (ids.has(zone)) doc.zones![zone] = [];
       });
     });
-    this.emit("clearSpread", { name });
+    this.emit("space:clearSpread", { name });
     return this;
   }
 }

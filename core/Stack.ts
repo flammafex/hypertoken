@@ -254,10 +254,10 @@ export class Stack extends Emitter {
       const top = stack.splice(cutPoint, len - cutPoint);
       const bottom = stack.splice(0, cutPoint);
 
-      if (topToBottom) stack = [...top, ...bottom];
-      else stack = [...bottom, ...top];
-
-      doc.stack.stack = stack;
+      // A cut always swaps the two halves at the cut point.
+      // topToBottom=true: top portion placed at bottom indices (standard cut)
+      // topToBottom=false: bottom portion placed at top indices (same result)
+      doc.stack.stack = [...top, ...bottom];
     });
     this.emit("stack:cut", { payload: { n, topToBottom } });
     return this;

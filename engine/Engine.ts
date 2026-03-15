@@ -72,6 +72,7 @@ export class Engine extends Emitter {
 
   history: Action[];
   future: Action[];
+  private _snapshots: string[]; // CRDT snapshots for undo support
   _policies: Map<string, any>;
 
   _agents: IEngineAgent[];
@@ -99,6 +100,7 @@ export class Engine extends Emitter {
 
     this.history = [];
     this.future = [];
+    this._snapshots = [];
     this._policies = new Map();
     this.debug = false;
 
@@ -348,6 +350,7 @@ export class Engine extends Emitter {
     this._policies.clear();
     this.history = [];
     this.future = [];
+    this._snapshots = [];
 
     this.emit('engine:shutdown');
   }
@@ -380,6 +383,9 @@ export class Engine extends Emitter {
     const action = new Action(type, payload, opts);
     if (this.debug) console.log("🧩 dispatch:", type, payload);
 
+    // Snapshot CRDT state before applying, for undo support
+    const snapshot = this.session.saveToBase64();
+
     let result: any;
 
     // Use worker if available
@@ -399,19 +405,24 @@ export class Engine extends Emitter {
       result = this.apply(action);
     }
 
-    this.history.push(action);
-    this.emit("engine:action", { payload: action });
+    // Only record successful actions in history
+    if (result !== Engine.ACTION_FAILED) {
+      this.history.push(action);
+      this._snapshots.push(snapshot);
+      this.future = []; // Clear redo stack on new action to prevent timeline corruption
+      this.emit("engine:action", { payload: action });
 
-    // Evaluate policies
-    for (const [, policy] of this._policies) {
-      try {
-        policy.evaluate(this);
-      } catch (err) {
-        this.emit("engine:error", { payload: { policy, err } });
+      // Evaluate policies
+      for (const [, policy] of this._policies) {
+        try {
+          policy.evaluate(this);
+        } catch (err) {
+          this.emit("engine:error", { payload: { policy, err } });
+        }
       }
     }
 
-    return result;
+    return result === Engine.ACTION_FAILED ? undefined : result;
   }
 
   // Actions implemented in WASM ActionDispatcher
@@ -449,6 +460,9 @@ export class Engine extends Emitter {
     "debug:log"
   ]);
 
+  /** Sentinel returned by apply() to distinguish errors from void results */
+  private static readonly ACTION_FAILED = Symbol("ACTION_FAILED");
+
   apply(action: Action): any {
     // Try WASM ActionDispatcher first (zero overhead with typed methods)
     if (this._wasmDispatcher && Engine.WASM_ACTIONS.has(action.type)) {
@@ -473,11 +487,11 @@ export class Engine extends Emitter {
         return result;
       } catch (err) {
         this.emit("engine:error", { payload: { action, err } });
-        return undefined;
+        return Engine.ACTION_FAILED;
       }
     } else {
       this.emit("engine:error", { payload: { action, msg: "Unknown action" } });
-      return undefined;
+      return Engine.ACTION_FAILED;
     }
   }
 
@@ -784,7 +798,15 @@ export class Engine extends Emitter {
 
   undo(): Action | null {
     const last = this.history.pop();
-    if (!last || !last.reversible) return null;
+    if (!last || !last.reversible) {
+      // Put it back if it exists but isn't reversible
+      if (last) this.history.push(last);
+      return null;
+    }
+    const snapshot = this._snapshots.pop();
+    if (snapshot) {
+      this.session.loadFromBase64(snapshot);
+    }
     this.future.push(last);
     this.emit("engine:undo", { payload: last });
     return last;
@@ -793,6 +815,8 @@ export class Engine extends Emitter {
   redo(): Action | null {
     const next = this.future.pop();
     if (!next) return null;
+    // Save current state before re-applying for future undo
+    this._snapshots.push(this.session.saveToBase64());
     this.apply(next);
     this.history.push(next);
     this.emit("engine:redo", { payload: next });
