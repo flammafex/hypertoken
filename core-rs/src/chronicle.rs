@@ -12,6 +12,45 @@ use crate::types::{
 };
 use std::collections::HashMap;
 
+/// Tracks which document sections have been modified since last cache read
+#[derive(Default)]
+pub(crate) struct DirtySections {
+    pub stack: bool,
+    pub zones: bool,
+    pub source: bool,
+    pub game_loop: bool,
+    pub game_state: bool,
+    pub rules: bool,
+    pub agents: bool,
+    pub nullifiers: bool,
+    pub all: bool, // set on load/merge/init — forces full cache refresh
+}
+
+impl DirtySections {
+    pub fn mark_all(&mut self) {
+        self.all = true;
+    }
+
+    pub fn clear(&mut self) {
+        *self = DirtySections::default();
+    }
+
+    /// Return a JSON summary of which sections are dirty
+    pub fn to_json(&self) -> String {
+        serde_json::json!({
+            "stack": self.stack,
+            "zones": self.zones,
+            "source": self.source,
+            "gameLoop": self.game_loop,
+            "gameState": self.game_state,
+            "rules": self.rules,
+            "agents": self.agents,
+            "nullifiers": self.nullifiers,
+            "all": self.all
+        }).to_string()
+    }
+}
+
 /// Chronicle wraps an Automerge CRDT document
 ///
 /// This implementation stores HyperTokenState fields as native Automerge
@@ -29,7 +68,21 @@ use std::collections::HashMap;
 /// └── nullifiers: { hash: timestamp, ... }
 #[wasm_bindgen]
 pub struct Chronicle {
-    doc: Automerge,
+    // All fields are pub(crate) so chronicle_actions/ submodules can access them.
+    // chronicle_actions/ is declared in lib.rs as a sibling module to chronicle,
+    // so private fields would be inaccessible from there.
+    pub(crate) doc: Automerge,
+    // Cached ObjIds for fast access to top-level sections
+    pub(crate) stack_id: Option<ObjId>,
+    pub(crate) zones_id: Option<ObjId>,
+    pub(crate) source_id: Option<ObjId>,
+    pub(crate) game_loop_id: Option<ObjId>,
+    pub(crate) game_state_id: Option<ObjId>,
+    pub(crate) rules_id: Option<ObjId>,
+    pub(crate) agents_id: Option<ObjId>,
+    pub(crate) nullifiers_id: Option<ObjId>,
+    // Dirty tracking for cache invalidation
+    pub(crate) dirty: DirtySections,
 }
 
 #[wasm_bindgen]
@@ -39,6 +92,15 @@ impl Chronicle {
     pub fn new() -> Chronicle {
         Chronicle {
             doc: Automerge::new(),
+            stack_id: None,
+            zones_id: None,
+            source_id: None,
+            game_loop_id: None,
+            game_state_id: None,
+            rules_id: None,
+            agents_id: None,
+            nullifiers_id: None,
+            dirty: DirtySections::default(),
         }
     }
 
@@ -965,6 +1027,7 @@ impl Default for Chronicle {
         Self::new()
     }
 }
+
 
 // Base64 encoding/decoding helpers
 fn base64_encode(data: &[u8]) -> String {
