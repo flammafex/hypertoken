@@ -138,6 +138,15 @@ impl Chronicle {
         let zones_id = self.zones_id.clone()
             .ok_or_else(|| HyperTokenError::InvalidOperation("No zones section".into()))?;
 
+        // Check for zone lock
+        if let Ok(Some((automerge::Value::Scalar(s), _))) =
+            self.doc.get(&zones_id, &format!("_lock:{}", zone))
+        {
+            if let automerge::ScalarValue::Boolean(true) = s.as_ref() {
+                return Err(HyperTokenError::ZoneLocked(zone.to_string()));
+            }
+        }
+
         let zone_list_id = self.doc.get(&zones_id, zone)
             .map_err(|e| HyperTokenError::CrdtError(e.to_string()))?
             .map(|(_, id)| id)
@@ -177,6 +186,15 @@ impl Chronicle {
     pub fn space_flip(&mut self, zone: &str, placement_id: &str) -> Result<()> {
         let zones_id = self.zones_id.clone()
             .ok_or_else(|| HyperTokenError::InvalidOperation("No zones section".into()))?;
+
+        // Check for zone lock
+        if let Ok(Some((automerge::Value::Scalar(s), _))) =
+            self.doc.get(&zones_id, &format!("_lock:{}", zone))
+        {
+            if let automerge::ScalarValue::Boolean(true) = s.as_ref() {
+                return Err(HyperTokenError::ZoneLocked(zone.to_string()));
+            }
+        }
 
         let zone_list_id = self.doc.get(&zones_id, zone)
             .map_err(|e| HyperTokenError::CrdtError(e.to_string()))?
@@ -572,6 +590,42 @@ mod tests {
         let result2 = c.space_place("hand", token_json, None, None);
         assert!(result2.is_ok());
         assert!(c.dirty.zones);
+    }
+
+    #[test]
+    fn test_space_lock_zone_blocks_remove() {
+        let mut c = init_space_chronicle();
+        let result_json = place_token(&mut c, "hand", "t1");
+        let placement: serde_json::Value = serde_json::from_str(&result_json).unwrap();
+        let placement_id = placement["id"].as_str().unwrap();
+
+        c.space_lock_zone("hand", true).unwrap();
+        let result = c.space_remove("hand", placement_id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_space_lock_zone_blocks_flip() {
+        let mut c = init_space_chronicle();
+        let result_json = place_token(&mut c, "hand", "t1");
+        let placement: serde_json::Value = serde_json::from_str(&result_json).unwrap();
+        let placement_id = placement["id"].as_str().unwrap();
+
+        c.space_lock_zone("hand", true).unwrap();
+        let result = c.space_flip("hand", placement_id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_space_lock_zone_blocks_move() {
+        let mut c = init_space_chronicle();
+        let result_json = place_token(&mut c, "hand", "t1");
+        let placement: serde_json::Value = serde_json::from_str(&result_json).unwrap();
+        let placement_id = placement["id"].as_str().unwrap();
+
+        c.space_lock_zone("hand", true).unwrap();
+        let result = c.space_move(placement_id, "hand", "table");
+        assert!(result.is_err());
     }
 
     #[test]
