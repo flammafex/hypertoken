@@ -10,6 +10,7 @@ use crate::types::{
     HyperTokenError, HyperTokenState, IStackState, ISourceState, IGameLoopState,
     IRuleState, IPlacementCRDT, IToken, ReshufflePolicy, Result,
 };
+use crate::chronicle_actions::helpers::{read_token_list_rd, write_token_tx};
 use std::collections::HashMap;
 
 /// Tracks which document sections have been modified since last cache read
@@ -547,6 +548,27 @@ impl Chronicle {
                 let _ = tx.delete(automerge::ROOT, "gameLoop");
             }
 
+            // Write gameState field
+            if let Some(game_state) = &state.gameState {
+                let gs_id = tx.put_object(automerge::ROOT, "gameState", ObjType::Map)?;
+                for (key, value) in game_state {
+                    match value {
+                        serde_json::Value::String(s) => { tx.put(&gs_id, key.as_str(), s.as_str())?; }
+                        serde_json::Value::Number(n) => {
+                            if let Some(i) = n.as_i64() { tx.put(&gs_id, key.as_str(), i)?; }
+                            else if let Some(f) = n.as_f64() { tx.put(&gs_id, key.as_str(), f)?; }
+                        }
+                        serde_json::Value::Bool(b) => { tx.put(&gs_id, key.as_str(), *b)?; }
+                        _ => {
+                            let s = serde_json::to_string(value).unwrap_or_default();
+                            tx.put(&gs_id, key.as_str(), s.as_str())?;
+                        }
+                    }
+                }
+            } else {
+                let _ = tx.delete(automerge::ROOT, "gameState");
+            }
+
             // Write rules field
             if let Some(rules) = &state.rules {
                 let rules_id = tx.put_object(automerge::ROOT, "rules", ObjType::Map)?;
@@ -792,11 +814,46 @@ impl Chronicle {
         Ok(())
     }
 
-    /// Write agents map (transaction-compatible)
+    /// Write agents map as structured nested Maps (transaction-compatible)
     fn write_agents_tx<T: Transactable>(tx: &mut T, obj: &ObjId, agents: &HashMap<String, serde_json::Value>) -> std::result::Result<(), AutomergeError> {
         for (agent_name, agent_data) in agents {
-            let json_str = serde_json::to_string(agent_data).unwrap_or_else(|_| "{}".to_string());
-            tx.put(obj, agent_name.as_str(), json_str.as_str())?;
+            let agent_obj = tx.put_object(obj, agent_name.as_str(), ObjType::Map)?;
+            if let Some(id) = agent_data.get("id").and_then(|v| v.as_str()) {
+                tx.put(&agent_obj, "id", id)?;
+            }
+            if let Some(name) = agent_data.get("name").and_then(|v| v.as_str()) {
+                tx.put(&agent_obj, "name", name)?;
+            }
+            if let Some(active) = agent_data.get("active").and_then(|v| v.as_bool()) {
+                tx.put(&agent_obj, "active", active)?;
+            }
+            let resources_obj = tx.put_object(&agent_obj, "resources", ObjType::Map)?;
+            if let Some(resources) = agent_data.get("resources").and_then(|v| v.as_object()) {
+                for (k, v) in resources {
+                    if let Some(val) = v.as_f64() { tx.put(&resources_obj, k.as_str(), val)?; }
+                }
+            }
+            let inventory_obj = tx.put_object(&agent_obj, "inventory", ObjType::List)?;
+            if let Some(inventory) = agent_data.get("inventory").and_then(|v| v.as_array()) {
+                for (i, token_val) in inventory.iter().enumerate() {
+                    if let Ok(token) = serde_json::from_value::<IToken>(token_val.clone()) {
+                        let token_obj = tx.insert_object(&inventory_obj, i, ObjType::Map)?;
+                        write_token_tx(tx, &token_obj, &token)?;
+                    }
+                }
+            }
+            let meta_obj = tx.put_object(&agent_obj, "meta", ObjType::Map)?;
+            if let Some(meta) = agent_data.get("meta").and_then(|v| v.as_object()) {
+                for (k, v) in meta {
+                    if let Some(s) = v.as_str() { tx.put(&meta_obj, k.as_str(), s)?; }
+                    else if let Some(n) = v.as_f64() { tx.put(&meta_obj, k.as_str(), n)?; }
+                    else if let Some(b) = v.as_bool() { tx.put(&meta_obj, k.as_str(), b)?; }
+                    else {
+                        let s = serde_json::to_string(v).unwrap_or_default();
+                        tx.put(&meta_obj, k.as_str(), s.as_str())?;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -825,6 +882,24 @@ impl Chronicle {
             state.gameLoop = Some(self.read_game_loop_state(&gl_id)?);
         }
 
+        // Read gameState
+        if let Ok(Some((_, gs_id))) = self.doc.get(automerge::ROOT, "gameState") {
+            let mut gs = HashMap::new();
+            for item in self.doc.map_range(&gs_id, ..) {
+                let key = item.key.to_string();
+                if let Some(v) = self.read_string(&gs_id, &key)? {
+                    gs.insert(key, serde_json::Value::String(v));
+                } else if let Some(v) = self.read_i64(&gs_id, &key)? {
+                    gs.insert(key, serde_json::json!(v));
+                } else if let Some(v) = self.read_bool(&gs_id, &key)? {
+                    gs.insert(key, serde_json::Value::Bool(v));
+                } else if let Some(v) = self.read_f64(&gs_id, &key)? {
+                    gs.insert(key, serde_json::json!(v));
+                }
+            }
+            state.gameState = Some(gs);
+        }
+
         // Read rules
         if let Ok(Some((_, rules_id))) = self.doc.get(automerge::ROOT, "rules") {
             state.rules = Some(self.read_rule_state(&rules_id)?);
@@ -848,7 +923,7 @@ impl Chronicle {
         }
 
         // Read extra fields - scan ROOT for unknown keys
-        let known_keys = ["stack", "zones", "source", "gameLoop", "rules", "agents", "version", "nullifiers"];
+        let known_keys = ["stack", "zones", "source", "gameLoop", "gameState", "rules", "agents", "version", "nullifiers"];
         for item in self.doc.map_range(automerge::ROOT, ..) {
             let key = item.key.to_string();
             if !known_keys.contains(&key.as_str()) {
@@ -1126,15 +1201,48 @@ impl Chronicle {
         Ok(rules)
     }
 
-    /// Read agents map
+    /// Read agents map — supports structured nested Maps with legacy JSON string fallback
     fn read_agents(&self, obj: &ObjId) -> Result<HashMap<String, serde_json::Value>> {
         let mut agents = HashMap::new();
 
         for item in self.doc.map_range(obj, ..) {
             let key = item.key.to_string();
-            if let Some(json_str) = self.read_string(obj, key.as_str())? {
-                if let Ok(value) = serde_json::from_str(&json_str) {
-                    agents.insert(key, value);
+            if let Ok(Some((Value::Object(ObjType::Map), agent_obj))) = self.doc.get(obj, key.as_str()) {
+                // Structured Map format (new)
+                let mut agent = serde_json::Map::new();
+                if let Some(v) = self.read_string(&agent_obj, "id")? { agent.insert("id".into(), v.into()); }
+                if let Some(v) = self.read_string(&agent_obj, "name")? { agent.insert("name".into(), v.into()); }
+                if let Some(v) = self.read_bool(&agent_obj, "active")? { agent.insert("active".into(), v.into()); }
+                // Read resources sub-map
+                if let Ok(Some((_, res_obj))) = self.doc.get(&agent_obj, "resources") {
+                    let mut resources = serde_json::Map::new();
+                    for res_item in self.doc.map_range(&res_obj, ..) {
+                        let res_key = res_item.key.to_string();
+                        if let Some(v) = self.read_f64(&res_obj, &res_key)? { resources.insert(res_key, v.into()); }
+                    }
+                    agent.insert("resources".into(), resources.into());
+                }
+                // Read inventory list
+                if let Ok(Some((_, inv_obj))) = self.doc.get(&agent_obj, "inventory") {
+                    let tokens = read_token_list_rd(&self.doc, &inv_obj);
+                    agent.insert("inventory".into(), serde_json::to_value(&tokens).unwrap_or_default());
+                }
+                // Read meta sub-map
+                if let Ok(Some((_, meta_obj))) = self.doc.get(&agent_obj, "meta") {
+                    let mut meta = serde_json::Map::new();
+                    for meta_item in self.doc.map_range(&meta_obj, ..) {
+                        let meta_key = meta_item.key.to_string();
+                        if let Some(v) = self.read_string(&meta_obj, &meta_key)? { meta.insert(meta_key, v.into()); }
+                        else if let Some(v) = self.read_f64(&meta_obj, &meta_key)? { meta.insert(meta_key, v.into()); }
+                        else if let Some(v) = self.read_bool(&meta_obj, &meta_key)? { meta.insert(meta_key, v.into()); }
+                    }
+                    agent.insert("meta".into(), meta.into());
+                }
+                agents.insert(key, serde_json::Value::Object(agent));
+            } else if let Some(json_str) = self.read_string(obj, key.as_str())? {
+                // Legacy fallback: JSON string scalars
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    agents.insert(key, val);
                 }
             }
         }
