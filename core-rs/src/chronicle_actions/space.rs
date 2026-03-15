@@ -385,16 +385,21 @@ impl Chronicle {
         Ok(())
     }
 
-    /// Clear all zones entirely. Deletes all zone entries and recreates an empty zones map.
+    /// Clear all zones entirely. Deletes all zone keys in-place to preserve the zones ObjId.
     pub fn space_clear(&mut self) -> Result<()> {
-        // Recreate the zones section as empty
+        let zones_id = self.zones_id.clone()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No zones section".into()))?;
+
+        // Collect all keys to delete
+        let keys: Vec<String> = self.doc.keys(&zones_id).map(|k| k.to_string()).collect();
+
         self.doc.transact::<_, _, AutomergeError>(|tx| {
-            tx.put_object(automerge::ROOT, "zones", ObjType::Map)?;
+            for key in &keys {
+                tx.delete(&zones_id, key.as_str())?;
+            }
             Ok(())
         }).map_err(|e| HyperTokenError::CrdtError(format!("{:?}", e)))?;
 
-        // Update the cached zones_id
-        self.resolve_section_ids();
         self.dirty.zones = true;
         Ok(())
     }
