@@ -78,7 +78,7 @@ export class WebWorker extends Emitter {
   private pendingRequests: Map<string, PendingRequest> = new Map();
   private _isReady: boolean = false;
   private options: Required<WebWorkerOptions>;
-  private batchQueue: Array<{ actionType: string; actionPayload: any }> = [];
+  private batchQueue: Array<{ actionType: string; actionPayload: any; resolve: (v: any) => void; reject: (e: any) => void }> = [];
   private batchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: WebWorkerOptions = {}) {
@@ -192,7 +192,7 @@ export class WebWorker extends Emitter {
     actionPayload: any
   ): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.batchQueue.push({ actionType, actionPayload });
+      this.batchQueue.push({ actionType, actionPayload, resolve, reject });
 
       // Clear existing timer
       if (this.batchTimer) {
@@ -201,9 +201,7 @@ export class WebWorker extends Emitter {
 
       // Set new timer to flush batch
       this.batchTimer = setTimeout(() => {
-        this.flushBatch()
-          .then(resolve)
-          .catch(reject);
+        this.flushBatch();
       }, this.options.batchWindow);
     });
   }
@@ -211,25 +209,36 @@ export class WebWorker extends Emitter {
   /**
    * Flush queued actions as a batch
    */
-  private async flushBatch(): Promise<any> {
+  private async flushBatch(): Promise<void> {
     if (this.batchQueue.length === 0) {
       return;
     }
 
-    const actions = [...this.batchQueue];
+    const entries = [...this.batchQueue];
     this.batchQueue = [];
     this.batchTimer = null;
 
     if (this.options.debug) {
-      console.log(`[WebWorker] Flushing batch of ${actions.length} actions`);
+      console.log(`[WebWorker] Flushing batch of ${entries.length} actions`);
     }
+
+    const actions = entries.map(e => ({ actionType: e.actionType, actionPayload: e.actionPayload }));
 
     const request: DispatchBatchRequest = createRequest(
       'dispatch_batch' as WorkerRequestType,
       { actions }
     ) as DispatchBatchRequest;
 
-    return this.sendRequest(request);
+    try {
+      const result = await this.sendRequest(request);
+      for (const entry of entries) {
+        entry.resolve(result);
+      }
+    } catch (err) {
+      for (const entry of entries) {
+        entry.reject(err);
+      }
+    }
   }
 
   /**

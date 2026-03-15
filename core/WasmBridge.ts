@@ -88,9 +88,10 @@ export async function loadWasm(): Promise<HyperTokenWasm> {
     return wasmLoadPromise;
   }
 
-  // If previously failed, throw the cached error
+  // If previously failed, clear the error and retry
+  // (the environment may have changed, e.g. WASM file now available)
   if (wasmLoadError) {
-    throw wasmLoadError;
+    wasmLoadError = null;
   }
 
   // Start loading
@@ -118,6 +119,7 @@ export async function loadWasm(): Promise<HyperTokenWasm> {
       return wasmModule;
     } catch (error) {
       wasmLoadError = error instanceof Error ? error : new Error(String(error));
+      wasmLoadPromise = null; // Clear so future calls can retry instead of getting stuck
       console.warn('⚠️  Failed to load WASM module:', wasmLoadError.message);
       console.warn('    Falling back to TypeScript implementation');
       throw wasmLoadError;

@@ -194,6 +194,7 @@ export class Source extends Emitter {
     }
 
     let drawn: IToken[] = [];
+    let reshuffled = false;
     this.session.change(`draw ${n} from source`, (doc) => {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
@@ -207,10 +208,14 @@ export class Source extends Emitter {
         const tokens = this._clone(doc.source.tokens);
         shuffleArray(tokens, doc.source.seed);
         doc.source.tokens = tokens;
-        this.emit("source:reshuffled", { payload: { reason: "threshold" } });
+        reshuffled = true;
       }
     });
 
+    // Emit events after change() completes so listeners see consistent state
+    if (reshuffled) {
+      this.emit("source:reshuffled", { payload: { reason: "threshold" } });
+    }
     if (drawn.length > 0) {
       this.emit("source:draw", { payload: { count: drawn.length } });
     }

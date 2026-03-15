@@ -27,6 +27,16 @@ import { Engine } from "./Engine.js";
 export interface ReplayOptions {
   delay?: number;
   stopOnError?: boolean;
+  /**
+   * Replay mode:
+   * - "exact" (default): Uses apply() directly — replays only the recorded actions
+   *   without triggering RuleEngine or policies. Safe and deterministic.
+   * - "full": Uses dispatch() — triggers RuleEngine, policies, and history tracking
+   *   just like the original run. Useful for state reconstruction, but rules may
+   *   trigger additional actions not in the recording. Recording is automatically
+   *   suppressed during full replay to prevent re-logging.
+   */
+  mode?: "exact" | "full";
 }
 
 /**
@@ -114,24 +124,46 @@ export class Recorder {
    * @param options - Replay options
    * @param options.delay - Delay in ms between actions (default: 0)
    * @param options.stopOnError - Stop replay on first error (default: true)
+   * @param options.mode - "exact" (default) uses apply(), "full" uses dispatch()
    */
-  async replay(targetEngine: Engine, { delay = 0, stopOnError = true }: ReplayOptions = {}): Promise<void> {
+  async replay(targetEngine: Engine, { delay = 0, stopOnError = true, mode = "exact" }: ReplayOptions = {}): Promise<void> {
     if (!targetEngine) throw new Error("No target engine provided");
-    targetEngine.emit?.("recorder:replay:start", { payload: { size: this.log.length } });
+    targetEngine.emit?.("recorder:replay:start", { payload: { size: this.log.length, mode } });
 
-    for (let i = 0; i < this.log.length; i++) {
-      const entry = this.log[i];
-      try {
-        const action = Action.fromJSON ? Action.fromJSON(entry) : entry;
-        // Use apply() to avoid re-logging during replay; use dispatch if you *want* policies & logging
-        targetEngine.apply(action);
-        if (delay) await new Promise(r => setTimeout(r, delay));
-      } catch (err) {
-        targetEngine.emit?.("recorder:replay:error", { payload: { index: i, error: err } });
-        if (stopOnError) break;
+    // In "full" mode, suppress recording on the target engine to prevent
+    // replayed actions from being re-logged
+    const wasEnabled = this.enabled;
+    if (mode === "full" && this.engine === targetEngine) {
+      this.enabled = false;
+    }
+
+    try {
+      for (let i = 0; i < this.log.length; i++) {
+        const entry = this.log[i];
+        try {
+          const action = Action.fromJSON ? Action.fromJSON(entry) : entry;
+
+          if (mode === "full") {
+            await targetEngine.dispatch(action.type, action.payload, {
+              reversible: action.reversible ?? true,
+            });
+          } else {
+            targetEngine.apply(action);
+          }
+
+          if (delay) await new Promise(r => setTimeout(r, delay));
+        } catch (err) {
+          targetEngine.emit?.("recorder:replay:error", { payload: { index: i, error: err } });
+          if (stopOnError) break;
+        }
+      }
+    } finally {
+      // Restore recording state
+      if (mode === "full" && this.engine === targetEngine) {
+        this.enabled = wasEnabled;
       }
     }
 
-    targetEngine.emit?.("recorder:replay:complete", { payload: { size: this.log.length } });
+    targetEngine.emit?.("recorder:replay:complete", { payload: { size: this.log.length, mode } });
   }
 }

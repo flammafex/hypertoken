@@ -117,9 +117,8 @@ export class EventRegistry extends Emitter {
     this._sources.add(source);
 
     const tag = label || source.constructor.name;
-    source.on("*", (payload: any) => this.record("*", tag, payload));
 
-    // Monkey-patch emit to intercept all events (common pattern in this architecture)
+    // Monkey-patch emit to intercept all events
     const originalEmit = source.emit.bind(source);
     source.emit = (type: string, payload?: any) => {
       const result = originalEmit(type, payload);

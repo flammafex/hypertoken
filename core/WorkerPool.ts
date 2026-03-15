@@ -46,6 +46,7 @@ export interface WorkerPoolOptions {
 interface WorkerInfo {
   worker: Worker;
   busy: boolean;
+  recycling: boolean;
   tasksProcessed: number;
   currentTask?: WorkerTask;
   lastActivity: number;
@@ -94,6 +95,7 @@ export class WorkerPool extends EventEmitter {
     const workerInfo: WorkerInfo = {
       worker,
       busy: false,
+      recycling: false,
       tasksProcessed: 0,
       lastActivity: Date.now(),
     };
@@ -210,7 +212,8 @@ export class WorkerPool extends EventEmitter {
    */
   private async recycleWorker(workerId: number): Promise<void> {
     const workerInfo = this.workers.get(workerId);
-    if (!workerInfo) return;
+    if (!workerInfo || workerInfo.recycling) return;
+    workerInfo.recycling = true;
 
     await workerInfo.worker.terminate();
     this.workers.delete(workerId);
@@ -229,6 +232,8 @@ export class WorkerPool extends EventEmitter {
       const now = Date.now();
       for (const [workerId, workerInfo] of this.workers) {
         if (!workerInfo.busy &&
+            !workerInfo.recycling &&
+            workerInfo.tasksProcessed > 0 &&
             now - workerInfo.lastActivity > this.options.workerIdleTimeout) {
           this.log(`Worker ${workerId} idle timeout, recycling...`);
           this.recycleWorker(workerId);

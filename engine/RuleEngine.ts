@@ -59,7 +59,7 @@ export class RuleEngine {
     return this;
   }
 
-  evaluate(lastAction: Action | null = null): void {
+  async evaluate(lastAction: Action | null = null): Promise<void> {
     // Get fired state from CRDT
     const firedRules = this.engine.session.state.rules?.fired || {};
 
@@ -86,7 +86,7 @@ export class RuleEngine {
         }
 
         try {
-          this._execute(rule.sequence);
+          await this._execute(rule.sequence);
           this.engine.emit("rule:triggered", { payload: { name: rule.name } });
         } catch (err) {
           this.engine.emit("rule:error", { payload: { name: rule.name, error: err } });
@@ -103,10 +103,10 @@ export class RuleEngine {
     } else if (Array.isArray(seq)) {
       for (const step of seq) {
         const act = step instanceof Action ? step : new Action(step.type, step.payload);
-        this.engine.dispatch(act.type, act.payload);
+        await this.engine.dispatch(act.type, act.payload);
       }
     } else if (seq instanceof Action) {
-      this.engine.dispatch(seq.type, seq.payload);
+      await this.engine.dispatch(seq.type, seq.payload);
     } else if (typeof seq === "function") {
       await seq(this.engine);
     } else {

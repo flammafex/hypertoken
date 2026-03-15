@@ -106,14 +106,14 @@ test('ActionRegistry is defined', () => {
   assertExists(ActionRegistry);
 });
 
-test('ActionRegistry has all 45 actions', () => {
+test('ActionRegistry has all 61 actions', () => {
   const count = Object.keys(ActionRegistry).length;
-  assertEquals(count, 45, `Expected 45 actions, found ${count}`);
+  assertEquals(count, 61, `Expected 61 actions, found ${count}`);
 });
 
 test('listActions returns all action names', () => {
   const actions = listActions();
-  assertEquals(actions.length, 45);
+  assertEquals(actions.length, 61);
   assertEquals(actions[0].includes(':'), true, 'Actions should have category prefix');
 });
 
