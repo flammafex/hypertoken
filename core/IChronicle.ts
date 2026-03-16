@@ -2,7 +2,7 @@
  * core/IChronicle.ts
  *
  * Abstraction over Chronicle (Automerge) and WasmChronicleAdapter (dirty-section caching).
- * Allows Engine to work with either backend transparently.
+ * Allows Engine and ConsensusCore to work with either backend transparently.
  */
 
 export interface IChronicle {
@@ -13,8 +13,11 @@ export interface IChronicle {
     loadFromBase64(b64: string): void;
     merge(other: any): void;
     change(message: string, callback: (doc: any) => void, source?: string): void;
-    generateSyncMessage?(state?: Uint8Array): string;
-    receiveSyncMessage?(msg: Uint8Array, state?: Uint8Array): string;
+    update(newDoc: any, source?: string): void;
+    // Sync protocol (used by ConsensusCore)
+    initSyncState(): any;
+    generateSyncMessage(syncState: any): { nextSyncState: any; message: Uint8Array | null };
+    receiveSyncMessage(syncState: any, message: Uint8Array, source?: string): { nextSyncState: any };
     // Emitter methods
     on(type: string, fn: Function): any;
     off(type: string, fn: Function): any;

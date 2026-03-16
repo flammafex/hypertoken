@@ -268,7 +268,7 @@ export class Engine extends Emitter {
       this.network = new PeerConnection(url, this, peerOptions);
     }
 
-    this.sync = new ConsensusCore(this.session as Chronicle, this.network);
+    this.sync = new ConsensusCore(this.session, this.network);
     this.network.connect();
 
     // Forward network events
