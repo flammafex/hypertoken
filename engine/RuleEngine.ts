@@ -30,9 +30,7 @@ export class RuleEngine {
 
     // Initialize CRDT state if missing
     if (!this.engine.session.state.rules) {
-      this.engine.session.change("init rule state", (doc) => {
-        doc.rules = { fired: {} };
-      });
+      this.engine.dispatch("rule:initRules", {});
     }
 
     // Attach post-action evaluation hook
@@ -80,9 +78,7 @@ export class RuleEngine {
         
         // Mark as fired in CRDT immediately (prevents double-fire in async scenarios)
         if (rule.once) {
-          this.engine.session.change(`rule fired: ${rule.name}`, (doc) => {
-            if (doc.rules) doc.rules.fired[rule.name] = Date.now();
-          });
+          this.engine.dispatch("rule:markFired", { name: rule.name, timestamp: Date.now() });
         }
 
         try {
