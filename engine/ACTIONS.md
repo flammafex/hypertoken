@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 67 built-in actions in the HyperToken engine.
+Complete documentation for all 76+ built-in actions in the HyperToken engine.
 
 ---
 
@@ -15,9 +15,11 @@ Complete documentation for all 67 built-in actions in the HyperToken engine.
 | **Source** | 7 | [Source Actions](./actions/SHOE.md) |
 | **Agent** | 16 | [Agent Actions](./actions/PLAYER.md) |
 | **Game** | 7 | [Game Actions](./actions/GAME.md) |
+| **GameLoop** | 7 | Game loop lifecycle (loopInit, loopStart, loopStop, nextTurn, setPhase, setMaxTurns, setActiveAgent) |
+| **Rules** | 2 | Rule engine state (markFired, initRules) |
 | **Token** | 5 | [Token Actions](./actions/TOKEN.md) |
 | **Batch** | 8 | [Batch Actions](./actions/BATCH.md) |
-| **Total** | **67** | **100% Complete** |
+| **Total** | **76** | **100% Complete** |
 
 ---
 
@@ -83,6 +85,37 @@ Collection operations and queries.
 **Actions:** filter, map, forEach, collect, count, find, shuffle, draw
 
 **Use cases:** Finding cards, batch modifications, counting resources, state queries, parallel operations
+
+---
+
+### 🔄 GameLoop Actions (7)
+Game loop lifecycle management. These actions manage turn-based flow and are used internally by `GameLoop` via `engine.dispatch()`.
+
+**Actions:** loopInit, loopStart, loopStop, nextTurn, setPhase, setMaxTurns, setActiveAgent
+
+**Use cases:** Starting/stopping game loops, advancing turns, phase transitions, setting the active agent
+
+```javascript
+engine.dispatch("game:loopStart", {});
+engine.dispatch("game:nextTurn", {});
+engine.dispatch("game:setPhase", { phase: "betting" });
+engine.dispatch("game:setActiveAgent", { index: 0 });
+engine.dispatch("game:loopStop", { phase: "complete" });
+```
+
+---
+
+### 📏 Rules Actions (2)
+Rule engine state tracking.
+
+**Actions:** markFired, initRules
+
+**Use cases:** Recording which rules have fired, initializing rule state in the CRDT
+
+```javascript
+engine.dispatch("rule:initRules", {});
+engine.dispatch("rule:markFired", { name: "low-health-warning", timestamp: Date.now() });
+```
 
 ---
 
@@ -303,6 +336,6 @@ Each category file includes:
 
 ---
 
-**Total: 67 actions - 100% complete and documented**
+**Total: 76 actions - 100% complete and documented**
 
-**Note:** An additional debug action (`debug:log`) exists in the legacy JSON dispatch system, bringing the total to 68 actions. The 67 actions listed here are all available as zero-overhead typed methods (e.g., `stackDraw()`, `agentCreate()`).
+**Note:** An additional debug action (`debug:log`) exists in the legacy JSON dispatch system. The 76 actions listed here include 67 original actions plus 9 new GameLoop/Rules actions added for the incremental Chronicle CRDT integration. Actions route through dual-path dispatch: WASM Chronicle (incremental field-level ops) or TS ActionRegistry fallback.
