@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 68 built-in actions in the HyperToken engine.
+Complete documentation for all 77 built-in actions in the HyperToken engine.
 
 ---
 
@@ -15,19 +15,23 @@ Complete documentation for all 68 built-in actions in the HyperToken engine.
 | **Source** | 7 | draw, shuffle, burn, reset, addStack, removeStack, inspect |
 | **Agent** | 16 | create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade |
 | **Game** | 7 | start, end, pause, resume, nextPhase, setProperty, getState |
+| **GameLoop** | 7 | loopInit, loopStart, loopStop, nextTurn, setPhase, setMaxTurns, setActiveAgent |
+| **Rules** | 2 | markFired, initRules |
 | **Token** | 5 | transform, attach, detach, merge, split |
 | **Batch** | 8 | filter, map, forEach, collect, count, find, shuffle, draw |
-| **Total** | **67** | **100% Complete** |
+| **Total** | **76** | **100% Complete** |
 
 ---
 
 ## Space of Contents
 
 1. [Stack Actions](#stack-actions) (10)
-2. [Space Actions](#space-actions) (13)
+2. [Space Actions](#space-actions) (14)
 3. [Source Actions](#source-actions) (7)
-4. [Agent Actions](#agent-actions) (12)
-5. [Game Actions](#game-actions) (6)
+4. [Agent Actions](#agent-actions) (16)
+5. [Game Actions](#game-actions) (7)
+6. [GameLoop Actions](#gameloop-actions) (7)
+7. [Rules Actions](#rules-actions) (2)
 6. [Token Actions](#token-actions) (5)
 7. [Batch Actions](#batch-actions) (5)
 
@@ -1336,6 +1340,163 @@ const state = engine.dispatch("game:getState");
 - Custom properties set via `game:setProperty`
 
 **Use cases:** State inspection, UI updates, saving game state, debugging
+
+---
+
+# GameLoop Actions
+
+Game loop lifecycle management. These actions are used internally by `GameLoop` and `Engine` via `engine.dispatch()` to manage turn-based flow through the CRDT state.
+
+---
+
+## `game:loopInit`
+
+Initialize game loop state in the CRDT document.
+
+```javascript
+engine.dispatch("game:loopInit", {});
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| *(none)* | | Initializes default gameLoop state |
+
+**Returns:** void
+
+---
+
+## `game:loopStart`
+
+Start the game loop, setting it to active.
+
+```javascript
+engine.dispatch("game:loopStart", {});
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| *(none)* | | Sets loop running = true, turn = 1 |
+
+**Returns:** void
+
+---
+
+## `game:loopStop`
+
+Stop the game loop with an optional phase.
+
+```javascript
+engine.dispatch("game:loopStop", { phase: "complete" });
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `phase` | string? | Optional phase to set before stopping |
+
+**Returns:** void
+
+---
+
+## `game:nextTurn`
+
+Advance to the next turn.
+
+```javascript
+engine.dispatch("game:nextTurn", {});
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| *(none)* | | Increments turn counter |
+
+**Returns:** void
+
+---
+
+## `game:setPhase`
+
+Set the current game phase.
+
+```javascript
+engine.dispatch("game:setPhase", { phase: "betting" });
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `phase` | string | Phase name to set |
+
+**Returns:** void
+
+---
+
+## `game:setMaxTurns`
+
+Set the maximum number of turns.
+
+```javascript
+engine.dispatch("game:setMaxTurns", { maxTurns: 10 });
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `maxTurns` | number | Maximum turn count |
+
+**Returns:** void
+
+---
+
+## `game:setActiveAgent`
+
+Set the active agent by index.
+
+```javascript
+engine.dispatch("game:setActiveAgent", { index: 0 });
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `index` | number | Agent index to make active |
+
+**Returns:** void
+
+---
+
+# Rules Actions
+
+Rule engine state tracking in the CRDT document.
+
+---
+
+## `rule:initRules`
+
+Initialize rules state in the CRDT document.
+
+```javascript
+engine.dispatch("rule:initRules", {});
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| *(none)* | | Creates rules section in CRDT state |
+
+**Returns:** void
+
+---
+
+## `rule:markFired`
+
+Record that a rule has fired.
+
+```javascript
+engine.dispatch("rule:markFired", { name: "low-health-warning", timestamp: Date.now() });
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | string | Rule name |
+| `timestamp` | number | When the rule fired |
+
+**Returns:** void
 
 ---
 

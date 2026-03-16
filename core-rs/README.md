@@ -42,8 +42,9 @@ This is the Rust implementation of HyperToken's core logic, compiled to WebAssem
 - **`Token`**: Universal entity representation
 - **`Stack`**: CRDT-backed ordered collection (deck/discard pile)
 - **`Space`**: 2D placement with zone management
-- **`Chronicle`**: CRDT document wrapper (automerge-rs)
-- **`ActionDispatcher`**: Unified action routing
+- **`Chronicle`**: Incremental CRDT document (automerge-rs) — DirtySections tracking, cached ObjIds, 54 field-level action methods via `chronicle_actions/`
+- **`chronicle_actions/`**: 8 submodules implementing incremental Automerge operations (helpers, stack, space, source, agent, game_loop, game_state, rules)
+- **`ActionDispatcher`**: Unified action routing — delegates to Chronicle's incremental methods
 
 ---
 
@@ -251,23 +252,33 @@ npm run build:rust:release
 ```
 core-rs/
 ├── src/
-│   ├── lib.rs          # Main entry point + re-exports
-│   ├── token.rs        # Token data structure
-│   ├── stack.rs        # Stack operations (10 actions)
-│   ├── space.rs        # Space operations (14 actions)
-│   ├── source.rs       # Source/deck management (7 actions)
-│   ├── agent.rs        # Agent management (16 actions)
-│   ├── token_ops.rs    # Token transformations (5 actions)
-│   ├── gamestate.rs    # Game lifecycle (7 actions)
-│   ├── batch.rs        # Batch operations (8 actions)
-│   ├── chronicle.rs    # CRDT wrapper (automerge-rs)
-│   ├── actions.rs      # Unified ActionDispatcher (67 actions)
-│   ├── parallel.rs     # Parallel algorithms
-│   ├── types.rs        # Shared types and errors
-│   └── utils.rs        # Utility functions
-├── Cargo.toml          # Dependencies
-├── build.sh            # Build script for all targets
-└── README.md           # This file
+│   ├── lib.rs              # Main entry point + re-exports
+│   ├── token.rs            # Token data structure
+│   ├── stack.rs            # Stack operations (10 actions)
+│   ├── space.rs            # Space operations (14 actions)
+│   ├── source.rs           # Source/deck management (7 actions)
+│   ├── agent.rs            # Agent management (16 actions)
+│   ├── token_ops.rs        # Token transformations (5 actions)
+│   ├── gamestate.rs        # Game lifecycle (7 actions)
+│   ├── batch.rs            # Batch operations (8 actions)
+│   ├── chronicle.rs        # Incremental CRDT (DirtySections, section exports, cached ObjIds)
+│   ├── chronicle_actions/  # Incremental Automerge action methods (54 total)
+│   │   ├── mod.rs          # Module declarations
+│   │   ├── helpers.rs      # Transaction helpers (resolve/ensure section IDs)
+│   │   ├── stack.rs        # 10 stack actions (draw, shuffle, burn, etc.)
+│   │   ├── space.rs        # 11 space actions (place, move, flip, etc.)
+│   │   ├── source.rs       # 7 source actions (draw, reshuffle, etc.)
+│   │   ├── agent.rs        # 14 agent actions (create, give_resource, etc.)
+│   │   ├── game_loop.rs    # 5 game loop actions (start, stop, next_turn, etc.)
+│   │   ├── game_state.rs   # 6 game state actions (start, end, set_property, etc.)
+│   │   └── rules.rs        # 1 rules action (mark_fired)
+│   ├── actions.rs          # ActionDispatcher (delegates to Chronicle methods)
+│   ├── parallel.rs         # Parallel algorithms
+│   ├── types.rs            # Shared types (HyperTokenState, DirtySections)
+│   └── utils.rs            # Utility functions
+├── Cargo.toml              # Dependencies
+├── build.sh                # Build script for all targets
+└── README.md               # This file
 ```
 
 ---
@@ -327,15 +338,24 @@ When adding new features to the Rust core:
 | Stack | 10 | ✅ Complete |
 | Space | 14 | ✅ Complete |
 | Source | 7 | ✅ Complete |
-| Chronicle | - | ✅ Complete |
+| Chronicle | 54 incremental | ✅ Complete (DirtySections, field-level ops) |
 | **Action Modules** |
 | Agent | 16 | ✅ Complete |
 | TokenOps | 5 | ✅ Complete |
 | GameState | 7 | ✅ Complete |
 | Batch | 8 | ✅ Complete |
+| **Chronicle Action Modules** |
+| chronicle_actions/stack | 10 | ✅ Complete |
+| chronicle_actions/space | 11 | ✅ Complete |
+| chronicle_actions/source | 7 | ✅ Complete |
+| chronicle_actions/agent | 14 | ✅ Complete |
+| chronicle_actions/game_loop | 5 | ✅ Complete |
+| chronicle_actions/game_state | 6 | ✅ Complete |
+| chronicle_actions/rules | 1 | ✅ Complete |
 | **Integration** |
-| ActionDispatcher | 67 | ✅ Complete |
-| Engine.ts Wiring | 67 | ✅ Complete |
+| ActionDispatcher | 67 | ✅ Complete (delegates to Chronicle) |
+| Engine.ts Wiring | 76+ | ✅ Complete (dual-path dispatch) |
+| IChronicle + WasmChronicleAdapter | - | ✅ Complete |
 | Worker Mode (Node.js) | - | ✅ Complete |
 | **Future** |
 | Worker Mode (Browser) | - | 🚧 Coming soon |

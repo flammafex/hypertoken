@@ -1,6 +1,6 @@
 # WASM Integration Guide
 
-**Status:** Phase 2C Complete - Chronicle CRDT Types Ready! 🚀
+**Status:** Incremental Chronicle CRDT Integration Complete 🚀
 
 This document describes the integration of Rust/WASM performance optimizations into HyperToken.
 
@@ -8,17 +8,17 @@ This document describes the integration of Rust/WASM performance optimizations i
 
 ## 🎯 Overview
 
-HyperToken's performance-critical operations are being ported to Rust and compiled to WebAssembly for **significant performance improvements** (benchmarks show ~20x for Stack/Space operations).
+HyperToken's performance-critical operations are implemented in Rust and compiled to WebAssembly for **significant performance improvements** (~20x for Stack/Space operations). The Rust Chronicle now provides **incremental field-level Automerge operations** via 54 action methods, with dirty-section tracking to minimize WASM↔JS boundary crossings.
 
 ### Current Status
 
-| Component | Rust Implementation | TypeScript Wrapper | Status |
-|-----------|---------------------|-------------------|--------|
+| Component | Rust Implementation | TypeScript Integration | Status |
+|-----------|---------------------|----------------------|--------|
 | **Token** | ✅ Complete | ⏳ TODO | Rust ready, needs TS wrapper |
 | **Stack** | ✅ Complete | ✅ Complete | **READY** - ~20x faster |
 | **Space** | ✅ Complete | ✅ Complete | **READY** - ~20x faster |
-| **Chronicle** | ✅ Complete | ✅ Hybrid (TS Fallback) | **READY** - Native Automerge fields (benchmark pending) |
-| **Actions** | ✅ Complete | ⏳ TODO | Rust ready, needs TS wrapper |
+| **Chronicle** | ✅ Complete (54 incremental actions) | ✅ `WasmChronicleAdapter` + `IChronicle` | **READY** - Field-level CRDT ops with dirty-section caching |
+| **Actions** | ✅ Complete | ✅ Dual-path dispatch in Engine | **READY** - WASM or TS fallback per action |
 | **WasmBridge** | ✅ Complete | ✅ Complete | Module loader working |
 
 ---
@@ -65,8 +65,10 @@ This runs the Rust test suite on your native target (much faster than WASM).
 ```
 hypertoken/
 ├── core/
+│   ├── IChronicle.ts         # ✅ Interface abstracting Chronicle / WasmChronicleAdapter
+│   ├── WasmChronicleAdapter.ts # ✅ Dirty-section caching proxy for WASM Chronicle
 │   ├── WasmBridge.ts         # ✅ WASM module loader
-│   ├── ChronicleWasm.ts      # ⚠️ Hybrid Chronicle (TS + WASM hooks)
+│   ├── ChronicleWasm.ts      # ✅ Hybrid Chronicle (TS + WASM hooks)
 │   ├── StackWasm.ts          # ✅ WASM-accelerated Stack
 │   └── SpaceWasm.ts          # ✅ WASM-accelerated Space
 │
@@ -76,9 +78,18 @@ hypertoken/
 │   │   ├── token.rs          # ✅ Token implementation
 │   │   ├── stack.rs          # ✅ Stack operations
 │   │   ├── space.rs          # ✅ Space operations
-│   │   ├── chronicle.rs      # ⚠️ Basic CRDT wrapper
-│   │   ├── actions.rs        # ✅ Action dispatcher
-│   │   ├── types.rs          # ✅ Type definitions
+│   │   ├── chronicle.rs      # ✅ Incremental CRDT (DirtySections, section exports, 54 action methods)
+│   │   ├── chronicle_actions/ # ✅ Action method modules
+│   │   │   ├── helpers.rs    #    Transaction helpers (resolve/ensure)
+│   │   │   ├── stack.rs      #    10 stack actions
+│   │   │   ├── space.rs      #    11 space actions
+│   │   │   ├── source.rs     #    7 source actions
+│   │   │   ├── agent.rs      #    14 agent actions
+│   │   │   ├── game_loop.rs  #    5 game loop actions
+│   │   │   ├── game_state.rs #    6 game state actions
+│   │   │   └── rules.rs      #    1 rules action
+│   │   ├── actions.rs        # ✅ ActionDispatcher (delegates to Chronicle methods)
+│   │   ├── types.rs          # ✅ Type definitions (HyperTokenState)
 │   │   └── utils.rs          # ✅ Utilities
 │   │
 │   ├── pkg/                  # Generated WASM output
@@ -88,6 +99,7 @@ hypertoken/
 │
 └── test/
     ├── testWasmBridge.ts     # ✅ WASM module loading tests
+    ├── testChronicleIncremental.ts # ✅ Chronicle incremental CRDT parity tests
     ├── testStackWasm.ts      # ✅ StackWasm integration tests
     └── testSpaceWasm.ts      # ✅ SpaceWasm integration tests
 ```
@@ -192,7 +204,7 @@ Based on benchmarks from M2 MacBook Air:
 | Large simulation memory | 377 MB | <50 MB | **~8x** |
 | Chronicle merge | TBD | TBD | **TBD** (see note) |
 
-> **Note on Chronicle Performance:** The Rust Chronicle now uses native Automerge fields for proper CRDT conflict resolution. Performance benchmarks are pending. Run `npm run benchmark:chronicle` to measure.
+> **Note on Chronicle Performance:** The Rust Chronicle now uses incremental field-level Automerge operations (54 action methods) with dirty-section caching. This avoids full-state replacement on every action. Performance benchmarks are pending. Run `npm run benchmark:chronicle` to measure.
 
 ---
 
@@ -235,11 +247,16 @@ Based on benchmarks from M2 MacBook Air:
 - ⏳ Benchmark comparison scripts (coming in Phase 2D)
 - ⏳ Update existing tests to use WASM (optional flag)
 
-### Phase 2C: Chronicle Integration (✅ COMPLETE)
+### Phase 2C: Chronicle Incremental CRDT (✅ COMPLETE)
 
-- ✅ Implement full HyperTokenState in Rust Chronicle (types.rs - 275 lines)
-- ✅ **Native Automerge fields** - Proper field-level CRDT conflict resolution
-- ✅ Hybrid ChronicleWasm with binary sync (preserves CRDT history)
+- ✅ Implement full HyperTokenState in Rust Chronicle (types.rs)
+- ✅ **54 incremental action methods** — field-level Automerge operations (no full-state replacement)
+- ✅ **DirtySections tracking** — per-section dirty flags minimize WASM↔JS re-exports
+- ✅ **`chronicle_actions/`** — 8 submodules (helpers, stack, space, source, agent, game_loop, game_state, rules)
+- ✅ **`IChronicle` interface** — abstracts over Chronicle (Automerge) and WasmChronicleAdapter
+- ✅ **`WasmChronicleAdapter`** — dirty-section caching proxy, selectively re-exports only changed sections
+- ✅ **Dual-path dispatch** — Engine routes to WASM ActionDispatcher or TS ActionRegistry per action
+- ✅ **GameLoop/RuleEngine migrated** — use `engine.dispatch()` instead of direct `session.change()`
 - ✅ Incremental sync support via automerge SyncState
 - ⏳ Performance benchmarks pending (run `npm run benchmark:chronicle`)
 
@@ -266,9 +283,9 @@ Based on benchmarks from M2 MacBook Air:
 
 **A:** Yes! Build with `npm run build:rust` and use the `core-rs/pkg/web/` output.
 
-### Q: Why is Chronicle still using TypeScript Automerge?
+### Q: How does the dual-path dispatch work?
 
-**A:** The Rust Chronicle needs to implement the full `HyperTokenState` structure. This is coming in Phase 2C.
+**A:** `Engine.dispatch()` checks if the action is in the WASM-supported set. If so, it routes to the Rust `ActionDispatcher` which calls incremental Chronicle methods. Otherwise, it falls back to the TS `ActionRegistry` which uses `session.change()`. The `IChronicle` interface lets both paths work transparently.
 
 ### Q: How do I know if WASM is being used?
 
@@ -319,17 +336,15 @@ Error: failed to execute `wasm-opt`
 
 ## 📞 Next Steps
 
-Phase 2C is complete! ✅ Chronicle CRDT types are ready. To continue WASM integration:
+Chronicle incremental CRDT integration is complete! ✅ To continue WASM integration:
 
-**Phase 2D: Benchmarks & WASM Build**
-1. Install `wasm-pack` to build Rust Chronicle WASM module
-2. Create comprehensive benchmark suite comparing TS vs WASM
-3. Measure actual StackWasm performance improvement
-4. Measure actual SpaceWasm performance improvement
-5. Measure Chronicle CRDT merge performance (Rust vs TS)
-6. Create migration guide for existing codebases
+**Next: Benchmarks**
+1. Create comprehensive benchmark suite comparing TS vs WASM Chronicle
+2. Measure incremental action performance (field-level ops vs full-state replacement)
+3. Measure dirty-section caching impact on WASM↔JS boundary overhead
+4. Measure Chronicle CRDT merge performance (Rust vs TS)
 
-**Phase 3: Multi-Threading**
+**Future: Multi-Threading**
 1. Web Worker wrapper for WASM module
 2. Async action dispatch
 3. Non-blocking CRDT merges
