@@ -11,7 +11,7 @@ export interface IChronicle {
     saveToBase64(): string;
     load(data: Uint8Array): void;
     loadFromBase64(b64: string): void;
-    merge(other: Uint8Array): void;
+    merge(other: any): void;
     change(message: string, callback: (doc: any) => void, source?: string): void;
     generateSyncMessage?(state?: Uint8Array): string;
     receiveSyncMessage?(msg: Uint8Array, state?: Uint8Array): string;

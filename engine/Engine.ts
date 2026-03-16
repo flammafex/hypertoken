@@ -92,10 +92,9 @@ export class Engine extends Emitter {
     super();
 
     this.session = new Chronicle();
-    this.space = space ?? new Space(this.session, "main-space");
+    this.space = space ?? new Space(this.session as Chronicle, "main-space");
     this.stack = stack;
     this.source = source;
-    this.loop = new GameLoop(this);
     this.eventBus = new Emitter();
     this.useWebRTC = useWebRTC;
     this.networkOptions = networkOptions;
@@ -110,7 +109,11 @@ export class Engine extends Emitter {
     this._gameState = {};
     this._transactions = [];
 
-    this.session.on("state:changed", (e) => this.emit("state:updated", e));
+    // GameLoop must be created after all fields are initialized,
+    // because its constructor calls engine.dispatch() which accesses history/etc.
+    this.loop = new GameLoop(this);
+
+    this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
     // Initialize worker mode or direct WASM dispatcher
     this._useWorker = useWorker;
@@ -261,7 +264,7 @@ export class Engine extends Emitter {
       this.network = new PeerConnection(url, this, peerOptions);
     }
 
-    this.sync = new ConsensusCore(this.session, this.network);
+    this.sync = new ConsensusCore(this.session as Chronicle, this.network);
     this.network.connect();
 
     // Forward network events
