@@ -29,10 +29,14 @@ export class RuleEngine {
     this.debug = false;
 
     // Initialize CRDT state if missing
+    // On WASM path, the rules section is auto-created by ensure_section("rules")
+    // when any rule action is dispatched, so failure here is safe to ignore.
     if (!this.engine.session.state.rules) {
-      this.engine.session.change("init rule state", (doc) => {
-        doc.rules = { fired: {} };
-      });
+      try {
+        this.engine.dispatch("rule:initRules", {});
+      } catch (e) {
+        // WASM path: rules section created on demand by ensure_section
+      }
     }
 
     // Attach post-action evaluation hook
@@ -80,9 +84,7 @@ export class RuleEngine {
         
         // Mark as fired in CRDT immediately (prevents double-fire in async scenarios)
         if (rule.once) {
-          this.engine.session.change(`rule fired: ${rule.name}`, (doc) => {
-            if (doc.rules) doc.rules.fired[rule.name] = Date.now();
-          });
+          this.engine.dispatch("rule:markFired", { name: rule.name, timestamp: Date.now() });
         }
 
         try {

@@ -56,4 +56,21 @@ saveToBase64(): string {
     const bytes = new Uint8Array(Buffer.from(base64, 'base64'));
     this.load(bytes);
   }
+
+  // Sync protocol — used by ConsensusCore via IChronicle
+  initSyncState(): any {
+    return A.initSyncState();
+  }
+
+  generateSyncMessage(syncState: any): { nextSyncState: any; message: Uint8Array | null } {
+    const [nextSyncState, message] = A.generateSyncMessage(this._doc, syncState);
+    return { nextSyncState, message };
+  }
+
+  receiveSyncMessage(syncState: any, message: Uint8Array, source: string = "sync"): { nextSyncState: any } {
+    const [newDoc, nextSyncState] = A.receiveSyncMessage(this._doc, syncState, message);
+    this._doc = newDoc;
+    this.emit("state:changed", { doc: this._doc, source });
+    return { nextSyncState };
+  }
 }

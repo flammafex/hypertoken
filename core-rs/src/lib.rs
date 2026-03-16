@@ -38,6 +38,7 @@ mod types;
 mod utils;
 mod parallel;
 mod batch;
+mod chronicle_actions;
 
 // Re-exports
 pub use chronicle::Chronicle;

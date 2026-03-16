@@ -10,7 +10,47 @@ use crate::types::{
     HyperTokenError, HyperTokenState, IStackState, ISourceState, IGameLoopState,
     IRuleState, IPlacementCRDT, IToken, ReshufflePolicy, Result,
 };
+use crate::chronicle_actions::helpers::{read_token_list_rd, write_token_tx};
 use std::collections::HashMap;
+
+/// Tracks which document sections have been modified since last cache read
+#[derive(Default)]
+pub(crate) struct DirtySections {
+    pub stack: bool,
+    pub zones: bool,
+    pub source: bool,
+    pub game_loop: bool,
+    pub game_state: bool,
+    pub rules: bool,
+    pub agents: bool,
+    pub nullifiers: bool,
+    pub all: bool, // set on load/merge/init — forces full cache refresh
+}
+
+impl DirtySections {
+    pub fn mark_all(&mut self) {
+        self.all = true;
+    }
+
+    pub fn clear(&mut self) {
+        *self = DirtySections::default();
+    }
+
+    /// Return a JSON summary of which sections are dirty
+    pub fn to_json(&self) -> String {
+        serde_json::json!({
+            "stack": self.stack,
+            "zones": self.zones,
+            "source": self.source,
+            "gameLoop": self.game_loop,
+            "gameState": self.game_state,
+            "rules": self.rules,
+            "agents": self.agents,
+            "nullifiers": self.nullifiers,
+            "all": self.all
+        }).to_string()
+    }
+}
 
 /// Chronicle wraps an Automerge CRDT document
 ///
@@ -29,7 +69,21 @@ use std::collections::HashMap;
 /// └── nullifiers: { hash: timestamp, ... }
 #[wasm_bindgen]
 pub struct Chronicle {
-    doc: Automerge,
+    // All fields are pub(crate) so chronicle_actions/ submodules can access them.
+    // chronicle_actions/ is declared in lib.rs as a sibling module to chronicle,
+    // so private fields would be inaccessible from there.
+    pub(crate) doc: Automerge,
+    // Cached ObjIds for fast access to top-level sections
+    pub(crate) stack_id: Option<ObjId>,
+    pub(crate) zones_id: Option<ObjId>,
+    pub(crate) source_id: Option<ObjId>,
+    pub(crate) game_loop_id: Option<ObjId>,
+    pub(crate) game_state_id: Option<ObjId>,
+    pub(crate) rules_id: Option<ObjId>,
+    pub(crate) agents_id: Option<ObjId>,
+    pub(crate) nullifiers_id: Option<ObjId>,
+    // Dirty tracking for cache invalidation
+    pub(crate) dirty: DirtySections,
 }
 
 #[wasm_bindgen]
@@ -39,6 +93,15 @@ impl Chronicle {
     pub fn new() -> Chronicle {
         Chronicle {
             doc: Automerge::new(),
+            stack_id: None,
+            zones_id: None,
+            source_id: None,
+            game_loop_id: None,
+            game_state_id: None,
+            rules_id: None,
+            agents_id: None,
+            nullifiers_id: None,
+            dirty: DirtySections::default(),
         }
     }
 
@@ -54,6 +117,8 @@ impl Chronicle {
 
         // Write state to Automerge document using native types
         self.write_state_to_doc(&state)?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         Ok(())
     }
@@ -68,22 +133,33 @@ impl Chronicle {
             .map_err(|e| HyperTokenError::SerializationError(format!("Failed to serialize state: {}", e)))
     }
 
-    /// Apply a change to the document
+    /// Full-state replacement (initialization and legacy use only).
     ///
-    /// JavaScript usage:
-    /// ```js
-    /// chronicle.change("draw-card", newStateJson);
-    /// ```
-    #[wasm_bindgen(js_name = change)]
-    pub fn change(&mut self, _message: &str, new_state_json: &str) -> Result<()> {
-        // Parse and validate the new state
+    /// For incremental mutations, use the action methods (stack_draw, space_place, etc.).
+    #[wasm_bindgen(js_name = setStateFull)]
+    pub fn set_state_full(&mut self, message: &str, new_state_json: &str) -> Result<()> {
         let state: HyperTokenState = serde_json::from_str(new_state_json)
             .map_err(|e| HyperTokenError::SerializationError(format!("Invalid state JSON: {}", e)))?;
 
-        // Write state to document
+        if !message.is_empty() {
+            let msg = message.to_string();
+            self.doc.transact_with::<_, _, automerge::AutomergeError, _>(
+                |_| automerge::transaction::CommitOptions::default().with_message(msg),
+                |_tx| Ok(()),
+            ).map_err(|e| HyperTokenError::CrdtError(format!("Transaction failed: {:?}", e)))?;
+        }
+
         self.write_state_to_doc(&state)?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         Ok(())
+    }
+
+    /// Legacy alias for set_state_full (backward compatibility)
+    #[wasm_bindgen(js_name = change)]
+    pub fn change(&mut self, message: &str, new_state_json: &str) -> Result<()> {
+        self.set_state_full(message, new_state_json)
     }
 
     /// Save the document to a binary format
@@ -97,6 +173,8 @@ impl Chronicle {
     pub fn load(&mut self, data: &[u8]) -> Result<()> {
         self.doc = Automerge::load(data)
             .map_err(|e| HyperTokenError::CrdtError(format!("Failed to load document: {:?}", e)))?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
         Ok(())
     }
 
@@ -123,6 +201,8 @@ impl Chronicle {
 
         self.doc.merge(&mut other_doc)
             .map_err(|_e| HyperTokenError::CrdtError("Failed to merge documents".to_string()))?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         Ok(())
     }
@@ -203,6 +283,8 @@ impl Chronicle {
         // Receive the sync message
         self.doc.receive_sync_message(&mut sync_state, message)
             .map_err(|e| HyperTokenError::CrdtError(format!("Failed to receive sync message: {:?}", e)))?;
+        self.resolve_section_ids();
+        self.dirty.mark_all();
 
         // Generate response message if needed
         let response = self.doc.generate_sync_message(&mut sync_state);
@@ -230,10 +312,209 @@ impl Chronicle {
     pub fn sync_full(&mut self, other_doc_bytes: &[u8]) -> Result<()> {
         self.merge(other_doc_bytes)
     }
+
+    /// Export stack section as JSON
+    #[wasm_bindgen(js_name = exportStack)]
+    pub fn export_stack(&self) -> Result<String> {
+        if let Some(ref stack_id) = self.stack_id {
+            let stack = self.read_stack_state(stack_id)?;
+            serde_json::to_string(&stack)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export zones section as JSON
+    #[wasm_bindgen(js_name = exportZones)]
+    pub fn export_zones(&self) -> Result<String> {
+        if let Some(ref zones_id) = self.zones_id {
+            let zones = self.read_zones(zones_id)?;
+            serde_json::to_string(&zones)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export source section as JSON
+    #[wasm_bindgen(js_name = exportSource)]
+    pub fn export_source(&self) -> Result<String> {
+        if let Some(ref source_id) = self.source_id {
+            let source = self.read_source_state(source_id)?;
+            serde_json::to_string(&source)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export gameLoop section as JSON
+    #[wasm_bindgen(js_name = exportGameLoop)]
+    pub fn export_game_loop(&self) -> Result<String> {
+        if let Some(ref gl_id) = self.game_loop_id {
+            let gl = self.read_game_loop_state(gl_id)?;
+            serde_json::to_string(&gl)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export gameState section as JSON
+    #[wasm_bindgen(js_name = exportGameState)]
+    pub fn export_game_state(&self) -> Result<String> {
+        if let Some(ref gs_id) = self.game_state_id {
+            // gameState is stored as a flat map with arbitrary keys
+            let mut state = HashMap::new();
+            for item in self.doc.map_range(gs_id, ..) {
+                let key = item.key.to_string();
+                if let Some(val) = self.read_string(gs_id, &key)? {
+                    state.insert(key, serde_json::Value::String(val));
+                } else if let Some(val) = self.read_i64(gs_id, &key)? {
+                    state.insert(key, serde_json::Value::Number(val.into()));
+                } else if let Some(val) = self.read_bool(gs_id, &key)? {
+                    state.insert(key, serde_json::Value::Bool(val));
+                } else if let Some(val) = self.read_f64(gs_id, &key)? {
+                    state.insert(key, serde_json::json!(val));
+                }
+            }
+            serde_json::to_string(&state)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export rules section as JSON
+    #[wasm_bindgen(js_name = exportRules)]
+    pub fn export_rules(&self) -> Result<String> {
+        if let Some(ref rules_id) = self.rules_id {
+            let rules = self.read_rule_state(rules_id)?;
+            serde_json::to_string(&rules)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export agents section as JSON
+    #[wasm_bindgen(js_name = exportAgents)]
+    pub fn export_agents(&self) -> Result<String> {
+        if let Some(ref agents_id) = self.agents_id {
+            let agents = self.read_agents(agents_id)?;
+            serde_json::to_string(&agents)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Export nullifiers section as JSON
+    #[wasm_bindgen(js_name = exportNullifiers)]
+    pub fn export_nullifiers(&self) -> Result<String> {
+        if let Some(ref null_id) = self.nullifiers_id {
+            let nullifiers = self.read_nullifiers(null_id)?;
+            serde_json::to_string(&nullifiers)
+                .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
+        } else {
+            Ok("null".to_string())
+        }
+    }
+
+    /// Get dirty section flags as JSON
+    #[wasm_bindgen(js_name = getDirty)]
+    pub fn get_dirty(&self) -> String {
+        self.dirty.to_json()
+    }
+
+    /// Clear all dirty flags
+    #[wasm_bindgen(js_name = clearDirty)]
+    pub fn clear_dirty(&mut self) {
+        self.dirty.clear();
+    }
 }
 
 // Private implementation methods
 impl Chronicle {
+    /// Resolve and cache ObjIds for all top-level document sections.
+    /// Called after load/merge/set_state to refresh the cache.
+    pub(crate) fn resolve_section_ids(&mut self) {
+        self.stack_id = self.doc.get(automerge::ROOT, "stack")
+            .ok().flatten().map(|(_, id)| id);
+        self.zones_id = self.doc.get(automerge::ROOT, "zones")
+            .ok().flatten().map(|(_, id)| id);
+        self.source_id = self.doc.get(automerge::ROOT, "source")
+            .ok().flatten().map(|(_, id)| id);
+        self.game_loop_id = self.doc.get(automerge::ROOT, "gameLoop")
+            .ok().flatten().map(|(_, id)| id);
+        self.game_state_id = self.doc.get(automerge::ROOT, "gameState")
+            .ok().flatten().map(|(_, id)| id);
+        self.rules_id = self.doc.get(automerge::ROOT, "rules")
+            .ok().flatten().map(|(_, id)| id);
+        self.agents_id = self.doc.get(automerge::ROOT, "agents")
+            .ok().flatten().map(|(_, id)| id);
+        self.nullifiers_id = self.doc.get(automerge::ROOT, "nullifiers")
+            .ok().flatten().map(|(_, id)| id);
+    }
+
+    /// Ensure a top-level section exists, creating it if necessary.
+    /// Returns the ObjId of the section. Updates the cached ObjId.
+    pub(crate) fn ensure_section(&mut self, key: &str) -> Result<ObjId> {
+        // Check if already cached
+        let cached = match key {
+            "stack" => &self.stack_id,
+            "zones" => &self.zones_id,
+            "source" => &self.source_id,
+            "gameLoop" => &self.game_loop_id,
+            "gameState" => &self.game_state_id,
+            "rules" => &self.rules_id,
+            "agents" => &self.agents_id,
+            "nullifiers" => &self.nullifiers_id,
+            _ => return Err(HyperTokenError::InvalidOperation(format!("Unknown section: {}", key))),
+        };
+
+        if let Some(id) = cached {
+            return Ok(id.clone());
+        }
+
+        // Check if it exists in the doc but isn't cached
+        if let Ok(Some((_, id))) = self.doc.get(automerge::ROOT, key) {
+            let cloned = id.clone();
+            match key {
+                "stack" => self.stack_id = Some(cloned.clone()),
+                "zones" => self.zones_id = Some(cloned.clone()),
+                "source" => self.source_id = Some(cloned.clone()),
+                "gameLoop" => self.game_loop_id = Some(cloned.clone()),
+                "gameState" => self.game_state_id = Some(cloned.clone()),
+                "rules" => self.rules_id = Some(cloned.clone()),
+                "agents" => self.agents_id = Some(cloned.clone()),
+                "nullifiers" => self.nullifiers_id = Some(cloned.clone()),
+                _ => {}
+            }
+            return Ok(cloned);
+        }
+
+        // Create the section
+        let new_id = self.doc.transact::<_, _, AutomergeError>(|tx| {
+            Ok(tx.put_object(automerge::ROOT, key, ObjType::Map)?)
+        }).map_err(|e| HyperTokenError::CrdtError(format!("Failed to create section {}: {:?}", key, e)))?;
+
+        let result = new_id.result;
+        match key {
+            "stack" => self.stack_id = Some(result.clone()),
+            "zones" => self.zones_id = Some(result.clone()),
+            "source" => self.source_id = Some(result.clone()),
+            "gameLoop" => self.game_loop_id = Some(result.clone()),
+            "gameState" => self.game_state_id = Some(result.clone()),
+            "rules" => self.rules_id = Some(result.clone()),
+            "agents" => self.agents_id = Some(result.clone()),
+            "nullifiers" => self.nullifiers_id = Some(result.clone()),
+            _ => {}
+        }
+        Ok(result)
+    }
+
     /// Write HyperTokenState to Automerge document using native types
     fn write_state_to_doc(&mut self, state: &HyperTokenState) -> Result<()> {
         self.doc.transact::<_, _, AutomergeError>(|tx| {
@@ -267,6 +548,27 @@ impl Chronicle {
                 Self::write_game_loop_state_tx(tx, &gl_id, game_loop)?;
             } else {
                 let _ = tx.delete(automerge::ROOT, "gameLoop");
+            }
+
+            // Write gameState field
+            if let Some(game_state) = &state.gameState {
+                let gs_id = tx.put_object(automerge::ROOT, "gameState", ObjType::Map)?;
+                for (key, value) in game_state {
+                    match value {
+                        serde_json::Value::String(s) => { tx.put(&gs_id, key.as_str(), s.as_str())?; }
+                        serde_json::Value::Number(n) => {
+                            if let Some(i) = n.as_i64() { tx.put(&gs_id, key.as_str(), i)?; }
+                            else if let Some(f) = n.as_f64() { tx.put(&gs_id, key.as_str(), f)?; }
+                        }
+                        serde_json::Value::Bool(b) => { tx.put(&gs_id, key.as_str(), *b)?; }
+                        _ => {
+                            let s = serde_json::to_string(value).unwrap_or_default();
+                            tx.put(&gs_id, key.as_str(), s.as_str())?;
+                        }
+                    }
+                }
+            } else {
+                let _ = tx.delete(automerge::ROOT, "gameState");
             }
 
             // Write rules field
@@ -514,11 +816,46 @@ impl Chronicle {
         Ok(())
     }
 
-    /// Write agents map (transaction-compatible)
+    /// Write agents map as structured nested Maps (transaction-compatible)
     fn write_agents_tx<T: Transactable>(tx: &mut T, obj: &ObjId, agents: &HashMap<String, serde_json::Value>) -> std::result::Result<(), AutomergeError> {
         for (agent_name, agent_data) in agents {
-            let json_str = serde_json::to_string(agent_data).unwrap_or_else(|_| "{}".to_string());
-            tx.put(obj, agent_name.as_str(), json_str.as_str())?;
+            let agent_obj = tx.put_object(obj, agent_name.as_str(), ObjType::Map)?;
+            if let Some(id) = agent_data.get("id").and_then(|v| v.as_str()) {
+                tx.put(&agent_obj, "id", id)?;
+            }
+            if let Some(name) = agent_data.get("name").and_then(|v| v.as_str()) {
+                tx.put(&agent_obj, "name", name)?;
+            }
+            if let Some(active) = agent_data.get("active").and_then(|v| v.as_bool()) {
+                tx.put(&agent_obj, "active", active)?;
+            }
+            let resources_obj = tx.put_object(&agent_obj, "resources", ObjType::Map)?;
+            if let Some(resources) = agent_data.get("resources").and_then(|v| v.as_object()) {
+                for (k, v) in resources {
+                    if let Some(val) = v.as_f64() { tx.put(&resources_obj, k.as_str(), val)?; }
+                }
+            }
+            let inventory_obj = tx.put_object(&agent_obj, "inventory", ObjType::List)?;
+            if let Some(inventory) = agent_data.get("inventory").and_then(|v| v.as_array()) {
+                for (i, token_val) in inventory.iter().enumerate() {
+                    if let Ok(token) = serde_json::from_value::<IToken>(token_val.clone()) {
+                        let token_obj = tx.insert_object(&inventory_obj, i, ObjType::Map)?;
+                        write_token_tx(tx, &token_obj, &token)?;
+                    }
+                }
+            }
+            let meta_obj = tx.put_object(&agent_obj, "meta", ObjType::Map)?;
+            if let Some(meta) = agent_data.get("meta").and_then(|v| v.as_object()) {
+                for (k, v) in meta {
+                    if let Some(s) = v.as_str() { tx.put(&meta_obj, k.as_str(), s)?; }
+                    else if let Some(n) = v.as_f64() { tx.put(&meta_obj, k.as_str(), n)?; }
+                    else if let Some(b) = v.as_bool() { tx.put(&meta_obj, k.as_str(), b)?; }
+                    else {
+                        let s = serde_json::to_string(v).unwrap_or_default();
+                        tx.put(&meta_obj, k.as_str(), s.as_str())?;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -547,6 +884,24 @@ impl Chronicle {
             state.gameLoop = Some(self.read_game_loop_state(&gl_id)?);
         }
 
+        // Read gameState
+        if let Ok(Some((_, gs_id))) = self.doc.get(automerge::ROOT, "gameState") {
+            let mut gs = HashMap::new();
+            for item in self.doc.map_range(&gs_id, ..) {
+                let key = item.key.to_string();
+                if let Some(v) = self.read_string(&gs_id, &key)? {
+                    gs.insert(key, serde_json::Value::String(v));
+                } else if let Some(v) = self.read_i64(&gs_id, &key)? {
+                    gs.insert(key, serde_json::json!(v));
+                } else if let Some(v) = self.read_bool(&gs_id, &key)? {
+                    gs.insert(key, serde_json::Value::Bool(v));
+                } else if let Some(v) = self.read_f64(&gs_id, &key)? {
+                    gs.insert(key, serde_json::json!(v));
+                }
+            }
+            state.gameState = Some(gs);
+        }
+
         // Read rules
         if let Ok(Some((_, rules_id))) = self.doc.get(automerge::ROOT, "rules") {
             state.rules = Some(self.read_rule_state(&rules_id)?);
@@ -570,7 +925,7 @@ impl Chronicle {
         }
 
         // Read extra fields - scan ROOT for unknown keys
-        let known_keys = ["stack", "zones", "source", "gameLoop", "rules", "agents", "version", "nullifiers"];
+        let known_keys = ["stack", "zones", "source", "gameLoop", "gameState", "rules", "agents", "version", "nullifiers"];
         for item in self.doc.map_range(automerge::ROOT, ..) {
             let key = item.key.to_string();
             if !known_keys.contains(&key.as_str()) {
@@ -848,15 +1203,48 @@ impl Chronicle {
         Ok(rules)
     }
 
-    /// Read agents map
+    /// Read agents map — supports structured nested Maps with legacy JSON string fallback
     fn read_agents(&self, obj: &ObjId) -> Result<HashMap<String, serde_json::Value>> {
         let mut agents = HashMap::new();
 
         for item in self.doc.map_range(obj, ..) {
             let key = item.key.to_string();
-            if let Some(json_str) = self.read_string(obj, key.as_str())? {
-                if let Ok(value) = serde_json::from_str(&json_str) {
-                    agents.insert(key, value);
+            if let Ok(Some((Value::Object(ObjType::Map), agent_obj))) = self.doc.get(obj, key.as_str()) {
+                // Structured Map format (new)
+                let mut agent = serde_json::Map::new();
+                if let Some(v) = self.read_string(&agent_obj, "id")? { agent.insert("id".into(), v.into()); }
+                if let Some(v) = self.read_string(&agent_obj, "name")? { agent.insert("name".into(), v.into()); }
+                if let Some(v) = self.read_bool(&agent_obj, "active")? { agent.insert("active".into(), v.into()); }
+                // Read resources sub-map
+                if let Ok(Some((_, res_obj))) = self.doc.get(&agent_obj, "resources") {
+                    let mut resources = serde_json::Map::new();
+                    for res_item in self.doc.map_range(&res_obj, ..) {
+                        let res_key = res_item.key.to_string();
+                        if let Some(v) = self.read_f64(&res_obj, &res_key)? { resources.insert(res_key, v.into()); }
+                    }
+                    agent.insert("resources".into(), resources.into());
+                }
+                // Read inventory list
+                if let Ok(Some((_, inv_obj))) = self.doc.get(&agent_obj, "inventory") {
+                    let tokens = read_token_list_rd(&self.doc, &inv_obj);
+                    agent.insert("inventory".into(), serde_json::to_value(&tokens).unwrap_or_default());
+                }
+                // Read meta sub-map
+                if let Ok(Some((_, meta_obj))) = self.doc.get(&agent_obj, "meta") {
+                    let mut meta = serde_json::Map::new();
+                    for meta_item in self.doc.map_range(&meta_obj, ..) {
+                        let meta_key = meta_item.key.to_string();
+                        if let Some(v) = self.read_string(&meta_obj, &meta_key)? { meta.insert(meta_key, v.into()); }
+                        else if let Some(v) = self.read_f64(&meta_obj, &meta_key)? { meta.insert(meta_key, v.into()); }
+                        else if let Some(v) = self.read_bool(&meta_obj, &meta_key)? { meta.insert(meta_key, v.into()); }
+                    }
+                    agent.insert("meta".into(), meta.into());
+                }
+                agents.insert(key, serde_json::Value::Object(agent));
+            } else if let Some(json_str) = self.read_string(obj, key.as_str())? {
+                // Legacy fallback: JSON string scalars
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    agents.insert(key, val);
                 }
             }
         }
@@ -966,6 +1354,7 @@ impl Default for Chronicle {
     }
 }
 
+
 // Base64 encoding/decoding helpers
 fn base64_encode(data: &[u8]) -> String {
     let mut result = String::new();
@@ -1035,6 +1424,47 @@ const BASE64_DECODE: &[u8; 256] = &{
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_export_stack() {
+        let mut chronicle = Chronicle::new();
+        chronicle.set_state(r#"{"stack":{"stack":[{"id":"t1","text":"","char":"□","kind":"default","index":0,"meta":{}}],"drawn":[],"discards":[]}}"#).unwrap();
+        chronicle.resolve_section_ids();
+
+        let stack_json = chronicle.export_stack().unwrap();
+        let stack: IStackState = serde_json::from_str(&stack_json).unwrap();
+        assert_eq!(stack.stack.len(), 1);
+        assert_eq!(stack.stack[0].id, "t1");
+    }
+
+    #[test]
+    fn test_dirty_tracking() {
+        let mut chronicle = Chronicle::new();
+        chronicle.set_state(r#"{}"#).unwrap();
+        chronicle.resolve_section_ids();
+
+        // After set_state, dirty.all should be true
+        assert!(chronicle.dirty.all);
+
+        chronicle.dirty.clear();
+        assert!(!chronicle.dirty.all);
+        assert!(!chronicle.dirty.stack);
+    }
+
+    #[test]
+    fn test_resolve_section_ids() {
+        let mut chronicle = Chronicle::new();
+        chronicle.set_state(r#"{"stack":{"stack":[],"drawn":[],"discards":[]},"zones":{},"gameLoop":{"turn":0,"running":false,"activeAgentIndex":0,"phase":"setup","maxTurns":10}}"#).unwrap();
+
+        chronicle.resolve_section_ids();
+
+        assert!(chronicle.stack_id.is_some());
+        assert!(chronicle.zones_id.is_some());
+        assert!(chronicle.game_loop_id.is_some());
+        // source, agents, rules, nullifiers not in state — should be None
+        assert!(chronicle.source_id.is_none());
+        assert!(chronicle.agents_id.is_none());
+    }
 
     #[test]
     fn test_chronicle_creation() {

@@ -261,6 +261,9 @@ pub struct HyperTokenState {
     pub gameLoop: Option<IGameLoopState>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub gameState: Option<HashMap<String, serde_json::Value>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<IRuleState>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
