@@ -258,9 +258,7 @@ export class EliminationTournament {
           // Simulate being the active agent
           const currentActiveIdx = this.engine.loop.activeAgentIndex;
           const agentIdx = this.engine._agents.findIndex(a => a.name === agentInfo.name);
-          this.engine.session.change("set active", doc => {
-            doc.gameLoop.activeAgentIndex = agentIdx;
-          });
+          this.engine.dispatch("game:setActiveAgent", { index: agentIdx });
 
           this.game.hit();
           agentInfo.stats.handsPlayed; // Will be counted at end
@@ -279,9 +277,7 @@ export class EliminationTournament {
         case 'double':
           if (gameState.canDouble) {
             const agentIdx = this.engine._agents.findIndex(a => a.name === agentInfo.name);
-            this.engine.session.change("set active", doc => {
-              doc.gameLoop.activeAgentIndex = agentIdx;
-            });
+            this.engine.dispatch("game:setActiveAgent", { index: agentIdx });
             this.game.doubleDown();
             agentInfo.stats.doubles++;
             agentInfo.stats.totalWagered += engineAgent.resources.currentBet / 2; // Half was already counted
@@ -292,9 +288,7 @@ export class EliminationTournament {
         case 'split':
           if (gameState.canSplit) {
             const agentIdx = this.engine._agents.findIndex(a => a.name === agentInfo.name);
-            this.engine.session.change("set active", doc => {
-              doc.gameLoop.activeAgentIndex = agentIdx;
-            });
+            this.engine.dispatch("game:setActiveAgent", { index: agentIdx });
             this.game.split();
             agentInfo.stats.splits++;
             agentInfo.stats.totalWagered += engineAgent.resources.currentBet;

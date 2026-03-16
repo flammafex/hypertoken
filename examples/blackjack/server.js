@@ -41,22 +41,15 @@ async function main() {
     });
 
     if (hasChanges) {
-      engine.session.change("sync agents", (doc) => {
-        if (!doc.agents) doc.agents = {};
-        engine._agents.forEach(p => {
-          if (!doc.agents[p.name]) {
-            doc.agents[p.name] = {
-              bankroll: p.resources.bankroll,
-              currentBet: p.resources.currentBet,
-              active: p.active
-            };
-          } else {
-            doc.agents[p.name].bankroll = p.resources.bankroll;
-            doc.agents[p.name].currentBet = p.resources.currentBet;
-            doc.agents[p.name].active = p.active;
-          }
-        });
+      const agentSnapshot = {};
+      engine._agents.forEach(p => {
+        agentSnapshot[p.name] = {
+          bankroll: p.resources.bankroll,
+          currentBet: p.resources.currentBet,
+          active: p.active
+        };
       });
+      engine.dispatch("game:setProperty", { key: "agents", value: agentSnapshot });
     }
   }, 500);
 

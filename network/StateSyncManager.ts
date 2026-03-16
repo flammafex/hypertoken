@@ -173,7 +173,7 @@ export class StateSyncManager extends Emitter {
     }
 
     if (this.deltas.length === 0) {
-      return seq >= this.currentSeq;
+      return false; // No history available, need full snapshot
     }
 
     const oldestSeq = this.deltas[0].seq;

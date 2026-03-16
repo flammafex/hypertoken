@@ -710,9 +710,7 @@ export class MultiTableTournament {
       switch (decision.toLowerCase()) {
         case 'hit':
           const agentIdx = table.engine._agents.findIndex(a => a.name === player.name);
-          table.engine.session.change("set active", doc => {
-            doc.gameLoop.activeAgentIndex = agentIdx;
-          });
+          table.engine.dispatch("game:setActiveAgent", { index: agentIdx });
           table.game.hit();
 
           const afterHit = this.buildAgentGameState(player, table);
@@ -728,9 +726,7 @@ export class MultiTableTournament {
         case 'double':
           if (gameState.canDouble) {
             const agentIdx = table.engine._agents.findIndex(a => a.name === player.name);
-            table.engine.session.change("set active", doc => {
-              doc.gameLoop.activeAgentIndex = agentIdx;
-            });
+            table.engine.dispatch("game:setActiveAgent", { index: agentIdx });
             table.game.doubleDown();
             player.stats.doubles++;
             player.stats.totalWagered += engineAgent.resources.currentBet / 2;
@@ -741,9 +737,7 @@ export class MultiTableTournament {
         case 'split':
           if (gameState.canSplit) {
             const agentIdx = table.engine._agents.findIndex(a => a.name === player.name);
-            table.engine.session.change("set active", doc => {
-              doc.gameLoop.activeAgentIndex = agentIdx;
-            });
+            table.engine.dispatch("game:setActiveAgent", { index: agentIdx });
             table.game.split();
             player.stats.splits++;
             player.stats.totalWagered += engineAgent.resources.currentBet;

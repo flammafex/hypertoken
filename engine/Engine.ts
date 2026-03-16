@@ -9,6 +9,8 @@ import { Action } from "./Action.js";
 import { ActionRegistry } from "./actions.js";
 import { IActionPayload } from "../core/types.js";
 import { Chronicle } from "../core/Chronicle.js";
+import type { IChronicle } from '../core/IChronicle.js';
+import { WasmChronicleAdapter } from '../core/WasmChronicleAdapter.js';
 import { PeerConnection, PeerConnectionOptions, ReconnectConfig } from "../network/PeerConnection.js";
 import { HybridPeerManager, HybridPeerManagerOptions } from "../network/HybridPeerManager.js";
 import { ConsensusCore, INetworkConnection } from "../core/ConsensusCore.js";
@@ -59,7 +61,7 @@ export class Engine extends Emitter {
   space: Space | SpaceWasm;
   source: Source | SourceWasm | null;
 
-  session: Chronicle;
+  session: IChronicle;
   network?: INetworkConnection; // Can be PeerConnection or HybridPeerManager
   sync?: ConsensusCore;
   loop: GameLoop;
@@ -90,10 +92,9 @@ export class Engine extends Emitter {
     super();
 
     this.session = new Chronicle();
-    this.space = space ?? new Space(this.session, "main-space");
+    this.space = space ?? new Space(this.session as Chronicle, "main-space");
     this.stack = stack;
     this.source = source;
-    this.loop = new GameLoop(this);
     this.eventBus = new Emitter();
     this.useWebRTC = useWebRTC;
     this.networkOptions = networkOptions;
@@ -108,7 +109,11 @@ export class Engine extends Emitter {
     this._gameState = {};
     this._transactions = [];
 
-    this.session.on("state:changed", (e) => this.emit("state:updated", e));
+    // GameLoop must be created after all fields are initialized,
+    // because its constructor calls engine.dispatch() which accesses history/etc.
+    this.loop = new GameLoop(this);
+
+    this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
     // Initialize worker mode or direct WASM dispatcher
     this._useWorker = useWorker;
@@ -190,27 +195,11 @@ export class Engine extends Emitter {
 
       this._wasmDispatcher = new wasm.ActionDispatcher();
 
-      // Set WASM instances if available
-      if (this.stack && 'wasmInstance' in this.stack) {
-        const wasmStack = (this.stack as unknown as StackWasm).wasmInstance;
-        if (wasmStack) {
-          this._wasmDispatcher.setStack(wasmStack);
-        }
-      }
-
-      if (this.space && 'wasmInstance' in this.space) {
-        const wasmSpace = (this.space as unknown as SpaceWasm).wasmInstance;
-        if (wasmSpace) {
-          this._wasmDispatcher.setSpace(wasmSpace);
-        }
-      }
-
-      if (this.source && 'wasmInstance' in this.source) {
-        const wasmSource = (this.source as unknown as SourceWasm).wasmInstance;
-        if (wasmSource) {
-          this._wasmDispatcher.setSource(wasmSource);
-        }
-      }
+      // Initialize WASM Chronicle with current TS state and swap session
+      this._wasmDispatcher.initializeState(JSON.stringify(this.session.state));
+      this.session = new WasmChronicleAdapter(this._wasmDispatcher);
+      // Re-wire state:changed -> state:updated relay
+      this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
       if (this.debug) {
         console.log('✅ WASM ActionDispatcher initialized');
@@ -232,27 +221,11 @@ export class Engine extends Emitter {
 
       this._wasmDispatcher = new wasm.ActionDispatcher();
 
-      // Set WASM instances if available
-      if (this.stack && 'wasmInstance' in this.stack) {
-        const wasmStack = (this.stack as unknown as StackWasm).wasmInstance;
-        if (wasmStack) {
-          this._wasmDispatcher.setStack(wasmStack);
-        }
-      }
-
-      if (this.space && 'wasmInstance' in this.space) {
-        const wasmSpace = (this.space as unknown as SpaceWasm).wasmInstance;
-        if (wasmSpace) {
-          this._wasmDispatcher.setSpace(wasmSpace);
-        }
-      }
-
-      if (this.source && 'wasmInstance' in this.source) {
-        const wasmSource = (this.source as unknown as SourceWasm).wasmInstance;
-        if (wasmSource) {
-          this._wasmDispatcher.setSource(wasmSource);
-        }
-      }
+      // Initialize WASM Chronicle with current TS state and swap session
+      this._wasmDispatcher.initializeState(JSON.stringify(this.session.state));
+      this.session = new WasmChronicleAdapter(this._wasmDispatcher);
+      // Re-wire state:changed -> state:updated relay
+      this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
       if (this.debug) {
         console.log('✅ WASM ActionDispatcher initialized (async)');
@@ -269,6 +242,10 @@ export class Engine extends Emitter {
 
   connect(url: string): void {
     if (this.network) return;
+    if (this._wasmDispatcher) {
+      console.warn('[Engine] Network sync is not yet supported with WASM Chronicle backend');
+      return;
+    }
 
     // Build peer connection options from engine network config
     const peerOptions: PeerConnectionOptions = {
@@ -450,9 +427,14 @@ export class Engine extends Emitter {
     // Token operations (5)
     "token:transform", "token:attach", "token:detach",
     "token:merge", "token:split",
+    // GameLoop actions (6)
+    "game:loopInit", "game:loopStart", "game:loopStop",
+    "game:nextTurn", "game:setPhase", "game:setMaxTurns",
     // GameState actions (7)
     "game:start", "game:end", "game:pause", "game:resume",
     "game:nextPhase", "game:setProperty", "game:getState",
+    // Rules actions (1) — rule:initRules stays TS-only (no WASM equivalent)
+    "rule:markFired",
     // Batch operations (8)
     "tokens:shuffle", "tokens:draw", "tokens:filter", "tokens:map",
     "tokens:find", "tokens:count", "tokens:collect", "tokens:forEach",
@@ -469,6 +451,8 @@ export class Engine extends Emitter {
       try {
         const result = this._dispatchWasm(action.type, action.payload);
         action.result = result;
+        // Emit state:changed so GameLoop/RuleEngine can react
+        this.session.emit("state:changed", { source: "dispatch" });
         return result;
       } catch (err) {
         if (this.debug) {
@@ -725,6 +709,32 @@ export class Engine extends Emitter {
       return JSON.parse(result);
     }
 
+    // GameLoop actions
+    if (type === "game:loopInit") {
+      dispatcher.gameLoopInit(payload.maxTurns ?? 100);
+      return;
+    }
+    if (type === "game:loopStart") {
+      dispatcher.gameLoopStart();
+      return;
+    }
+    if (type === "game:loopStop") {
+      dispatcher.gameLoopStop(payload.phase ?? "stopped");
+      return;
+    }
+    if (type === "game:nextTurn") {
+      dispatcher.gameLoopNextTurn(payload.agentCount ?? 0);
+      return;
+    }
+    if (type === "game:setPhase") {
+      dispatcher.gameLoopSetPhase(payload.phase);
+      return;
+    }
+    if (type === "game:setMaxTurns") {
+      dispatcher.gameLoopInit(payload.maxTurns ?? 100);
+      return;
+    }
+
     // GameState actions
     if (type === "game:start") {
       const result = dispatcher.gameStart();
@@ -763,6 +773,11 @@ export class Engine extends Emitter {
       return JSON.parse(result);
     }
 
+    // Rules actions
+    if (type === "rule:markFired") {
+      dispatcher.ruleMarkFired(payload.name, payload.timestamp ?? Date.now());
+      return;
+    }
     // Batch operations
     if (type === "tokens:shuffle") {
       const result = dispatcher.batchShuffle(

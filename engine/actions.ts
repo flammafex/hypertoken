@@ -383,6 +383,80 @@ const GameActions: ActionRegistryType = {
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GAME LOOP ACTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
+
+const GameLoopActions: ActionRegistryType = {
+  "game:loopInit": (engine, { maxTurns = 100 } = {} as any) => {
+    engine.session.change("init loop", (doc: any) => {
+      doc.gameLoop = {
+        turn: 0, running: false, activeAgentIndex: -1,
+        phase: "setup", maxTurns,
+      };
+    });
+  },
+  "game:loopStart": (engine) => {
+    engine.session.change("start loop", (doc: any) => {
+      if (doc.gameLoop) {
+        doc.gameLoop.running = true;
+        doc.gameLoop.turn = 0;
+        doc.gameLoop.phase = "play";
+        doc.gameLoop.activeAgentIndex = 0;
+      }
+    });
+  },
+  "game:loopStop": (engine, { phase = "stopped" } = {} as any) => {
+    engine.session.change("stop loop", (doc: any) => {
+      if (doc.gameLoop) {
+        doc.gameLoop.running = false;
+        doc.gameLoop.phase = phase;
+      }
+    });
+  },
+  "game:nextTurn": (engine, { agentCount = 0 } = {} as any) => {
+    engine.session.change("next turn", (doc: any) => {
+      if (!doc.gameLoop) return;
+      doc.gameLoop.turn++;
+      doc.gameLoop.activeAgentIndex = agentCount > 0
+        ? (doc.gameLoop.activeAgentIndex + 1) % agentCount
+        : 0;
+    });
+  },
+  "game:setPhase": (engine, { phase } = {} as any) => {
+    engine.session.change("set phase", (doc: any) => {
+      if (doc.gameLoop) doc.gameLoop.phase = phase;
+    });
+  },
+  "game:setMaxTurns": (engine, { maxTurns } = {} as any) => {
+    engine.session.change("set maxTurns", (doc: any) => {
+      if (doc.gameLoop) doc.gameLoop.maxTurns = maxTurns;
+    });
+  },
+  "game:setActiveAgent": (engine, { index } = {} as any) => {
+    engine.session.change("set active agent", (doc: any) => {
+      if (doc.gameLoop) doc.gameLoop.activeAgentIndex = index;
+    });
+  },
+};
+
+/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RULE ACTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
+
+const RuleActions: ActionRegistryType = {
+  "rule:markFired": (engine, { name, timestamp } = {} as any) => {
+    engine.session.change("mark fired", (doc: any) => {
+      if (doc.rules) doc.rules.fired[name] = timestamp ?? Date.now();
+    });
+  },
+  "rule:initRules": (engine) => {
+    engine.session.change("init rules", (doc: any) => {
+      doc.rules = { fired: {} };
+    });
+  },
+};
+
+/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   TOKEN OPERATIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
@@ -447,6 +521,8 @@ export const ActionRegistry: ActionRegistryType = {
   ...SourceActions,
   ...AgentActions,
   ...GameActions,
+  ...GameLoopActions,
+  ...RuleActions,
   ...TokenActions,
   ...DebugActions,
 };

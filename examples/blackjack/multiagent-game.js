@@ -153,14 +153,8 @@ export class MultiagentBlackjackGame {
       }
     }
 
-    // Start Round via CRDT (GameLoop will reactively emit loop:start)
-    this.engine.session.change("start round", (doc) => {
-      if (!doc.gameLoop) doc.gameLoop = { turn: 0, running: true, activeAgentIndex: 0, phase: "play", maxTurns: Infinity };
-      doc.gameLoop.running = true;
-      doc.gameLoop.turn = 1;
-      doc.gameLoop.activeAgentIndex = 0; 
-      doc.gameLoop.phase = "play";
-    });
+    // Start Round via dispatch (GameLoop will reactively emit loop:start)
+    this.engine.dispatch("game:loopStart", {});
 
     // REMOVED MANUAL EMIT
     this.checkTurnState();
@@ -174,9 +168,7 @@ export class MultiagentBlackjackGame {
     while (nextIdx < agents.length) {
       const p = agents[nextIdx];
       if (p.resources.currentBet > 0) {
-        this.engine.session.change("next agent", (doc) => {
-          doc.gameLoop.activeAgentIndex = nextIdx;
-        });
+        this.engine.dispatch("game:setActiveAgent", { index: nextIdx });
         return;
       }
       nextIdx++;
@@ -193,11 +185,8 @@ export class MultiagentBlackjackGame {
   }
 
   endRound() {
-    // End Round via CRDT (GameLoop will reactively emit loop:stop)
-    this.engine.session.change("stop round", (doc) => {
-      doc.gameLoop.running = false;
-      doc.gameLoop.phase = "dealer";
-    });
+    // End Round via dispatch (GameLoop will reactively emit loop:stop)
+    this.engine.dispatch("game:loopStop", { phase: "dealer" });
     // REMOVED MANUAL EMIT
   }
 
@@ -400,10 +389,7 @@ export class MultiagentBlackjackGame {
     });
 
     // End the round
-    this.engine.session.change("dealer blackjack", (doc) => {
-      doc.gameLoop.running = false;
-      doc.gameLoop.phase = "complete";
-    });
+    this.engine.dispatch("game:loopStop", { phase: "complete" });
 
     return true;
   }

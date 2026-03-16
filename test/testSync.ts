@@ -5,6 +5,7 @@ import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
 import { Token } from "../core/Token.js";
 import { Stack } from "../core/Stack.js";
+import { Chronicle } from "../core/Chronicle.js";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -24,7 +25,7 @@ async function run() {
     new Token({ id: "c1", label: "Card 1" }), 
     new Token({ id: "c2", label: "Card 2" })
   ];
-  const stackA = new Stack(engineA.session, cardsA);
+  const stackA = new Stack(engineA.session as Chronicle, cardsA);
   engineA.stack = stackA;
 
   // 3. Setup Engine B (Client)
@@ -45,7 +46,7 @@ async function run() {
   // Now that B has synced, 'session.state.stack' should exist (from A).
   // The Stack constructor will see the existing state and skip initialization,
   // effectively just wrapping the shared state.
-  const stackB = new Stack(engineB.session, []);
+  const stackB = new Stack(engineB.session as Chronicle, []);
   engineB.stack = stackB;
 
   console.log(`[Debug] Engine B Initialized. Stack size: ${stackB.size}`);
