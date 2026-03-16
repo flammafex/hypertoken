@@ -242,6 +242,10 @@ export class Engine extends Emitter {
 
   connect(url: string): void {
     if (this.network) return;
+    if (this._wasmDispatcher) {
+      console.warn('[Engine] Network sync is not yet supported with WASM Chronicle backend');
+      return;
+    }
 
     // Build peer connection options from engine network config
     const peerOptions: PeerConnectionOptions = {

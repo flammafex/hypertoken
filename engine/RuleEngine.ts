@@ -29,8 +29,14 @@ export class RuleEngine {
     this.debug = false;
 
     // Initialize CRDT state if missing
+    // On WASM path, the rules section is auto-created by ensure_section("rules")
+    // when any rule action is dispatched, so failure here is safe to ignore.
     if (!this.engine.session.state.rules) {
-      this.engine.dispatch("rule:initRules", {});
+      try {
+        this.engine.dispatch("rule:initRules", {});
+      } catch (e) {
+        // WASM path: rules section created on demand by ensure_section
+      }
     }
 
     // Attach post-action evaluation hook
