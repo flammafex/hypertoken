@@ -48,6 +48,12 @@ export class WasmChronicleAdapter extends Emitter implements IChronicle {
         );
     }
 
+    update(newDoc: any, source: string = "local"): void {
+        throw new Error(
+            "Direct update() not supported with WASM Chronicle. Use engine.dispatch() instead."
+        );
+    }
+
     save(): Uint8Array {
         return this._wasm.save();
     }
@@ -74,14 +80,17 @@ export class WasmChronicleAdapter extends Emitter implements IChronicle {
         this.emit("state:changed", { doc: this.state, source: "merge" });
     }
 
-    generateSyncMessage(state?: Uint8Array): string {
-        return this._wasm.generateSyncMessage(state || null);
+    // Sync protocol — not supported with WASM backend.
+    // Engine.connect() guards against this by returning early when WASM is active.
+    initSyncState(): any {
+        throw new Error("Sync protocol not supported with WASM Chronicle backend.");
     }
 
-    receiveSyncMessage(msg: Uint8Array, state?: Uint8Array): string {
-        const result = this._wasm.receiveSyncMessage(msg, state || null);
-        this._cache = {};
-        this.emit("state:changed", { doc: this.state, source: "sync" });
-        return result;
+    generateSyncMessage(syncState: any): { nextSyncState: any; message: Uint8Array | null } {
+        throw new Error("Sync protocol not supported with WASM Chronicle backend.");
+    }
+
+    receiveSyncMessage(syncState: any, message: Uint8Array, source?: string): { nextSyncState: any } {
+        throw new Error("Sync protocol not supported with WASM Chronicle backend.");
     }
 }

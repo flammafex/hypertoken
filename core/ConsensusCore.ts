@@ -3,10 +3,9 @@
  * Fixed Event Unwrapping & Echo Loop
  *
  * Now supports both PeerConnection and HybridPeerManager for WebRTC!
+ * Uses IChronicle interface — sync protocol is delegated to the session.
  */
-import * as A from "@automerge/automerge";
-import { Chronicle } from "./Chronicle.js";
-import { PeerConnection } from "../network/PeerConnection.js";
+import type { IChronicle } from "./IChronicle.js";
 import { Emitter } from "./events.js";
 import { Buffer } from "node:buffer";
 
@@ -20,12 +19,12 @@ export interface INetworkConnection extends Emitter {
 }
 
 export class ConsensusCore extends Emitter {
-  session: Chronicle;
+  session: IChronicle;
   network: INetworkConnection;
 
-  private _syncStates: Map<string, A.SyncState> = new Map();
+  private _syncStates: Map<string, any> = new Map();
 
-  constructor(session: Chronicle, network: INetworkConnection) {
+  constructor(session: IChronicle, network: INetworkConnection) {
     super();
     this.session = session;
     this.network = network;
@@ -37,7 +36,7 @@ export class ConsensusCore extends Emitter {
     });
 
     this.network.on("net:peer:connected", (evt) => {
-      const { peerId } = evt.payload; 
+      const { peerId } = evt.payload;
       console.log(`[Sync] Connected to peer: ${peerId}`);
       this.addPeer(peerId);
     });
@@ -55,7 +54,7 @@ export class ConsensusCore extends Emitter {
 
   addPeer(peerId: string) {
     if (this._syncStates.has(peerId)) return;
-    this._syncStates.set(peerId, A.initSyncState());
+    this._syncStates.set(peerId, this.session.initSyncState());
     this.updatePeer(peerId);
   }
 
@@ -76,13 +75,11 @@ export class ConsensusCore extends Emitter {
     const syncState = this._syncStates.get(peerId);
     if (!syncState) return;
 
-    const doc = this.session.state;
-    const [nextSyncState, message] = A.generateSyncMessage(doc, syncState);
+    const { nextSyncState, message } = this.session.generateSyncMessage(syncState);
 
     this._syncStates.set(peerId, nextSyncState);
 
     if (message) {
-      // console.log(`[Sync] Sending ${message.byteLength} bytes to ${peerId}`);
       this.network.sendToPeer(peerId, {
         type: "sync",
         data: this.arrayBufferToBase64(message)
@@ -92,45 +89,37 @@ export class ConsensusCore extends Emitter {
 
   private processMessage(payload: any) {
     if (!payload || payload.type !== "sync") return;
-    
+
     if (!payload.data || !payload.fromPeerId) {
       console.warn("[Sync] Received malformed sync message", payload);
       return;
     }
 
     const peerId = payload.fromPeerId;
-    // console.log(`[Sync] Received sync data from ${peerId}`);
 
     let syncState = this._syncStates.get(peerId);
     if (!syncState) {
-      syncState = A.initSyncState();
+      syncState = this.session.initSyncState();
       this._syncStates.set(peerId, syncState);
     }
 
     const message = this.base64ToUint8Array(payload.data);
 
     try {
-      const [newDoc, newSyncState] = A.receiveSyncMessage(
-        this.session.state,
-        syncState,
-        message
-      );
+      // Delegate sync to session — it applies the message internally and emits state:changed
+      const { nextSyncState } = this.session.receiveSyncMessage(syncState, message, peerId);
 
-      this._syncStates.set(peerId, newSyncState);
-      
-      // FIX: Mark this update as coming from 'peerId' so we don't echo it back in the listener
-      this.session.update(newDoc, peerId);
-      
-      // We DO want to reply to the sender specifically to acknowledge/converge, 
-      // just not via the generic broadcast listener loop.
+      this._syncStates.set(peerId, nextSyncState);
+
+      // Reply to sender to acknowledge/converge
       this.updatePeer(peerId);
-      
+
     } catch (err) {
       console.error("[Sync] Error applying sync message:", err);
     }
   }
 
-private arrayBufferToBase64(buffer: Uint8Array): string {
+  private arrayBufferToBase64(buffer: Uint8Array): string {
     return Buffer.from(buffer).toString("base64");
   }
 

@@ -140,15 +140,26 @@ export class HybridPeerManager extends Emitter {
    * Broadcast data to all connected peers
    */
   broadcast(type: string, payload: any = {}): void {
-    // Send to all WebRTC-connected peers
+    const rtcSent = new Set<string>();
+
+    // Send to all WebRTC-connected peers directly
     for (const [peerId, rtcConn] of this.rtcConnections) {
       if (rtcConn.isConnected()) {
         rtcConn.send({ type, payload });
+        rtcSent.add(peerId);
       }
     }
 
-    // Also broadcast via WebSocket for peers without WebRTC
-    this.wsConnection.broadcast(type, payload);
+    // Send to remaining peers via WebSocket relay (avoid double-delivery)
+    if (rtcSent.size === 0) {
+      this.wsConnection.broadcast(type, payload);
+    } else {
+      for (const peerId of this.wsConnection.peers) {
+        if (!rtcSent.has(peerId)) {
+          this.wsConnection.sendToPeer(peerId, { type, payload });
+        }
+      }
+    }
   }
 
   /**
