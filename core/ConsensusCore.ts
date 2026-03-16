@@ -30,7 +30,7 @@ export class ConsensusCore extends Emitter {
     this.network = network;
 
     // FIX: Check the source of the change to avoid echoing back to sender
-    this.session.on("state:changed", (evt) => {
+    this.session.on("state:changed", (evt: any) => {
       const source = evt.source || "local";
       this.updatePeers(source);
     });

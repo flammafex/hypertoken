@@ -627,42 +627,42 @@ export class Engine extends Emitter {
       return JSON.parse(result);
     }
     if (type === "agent:get") {
-      const result = dispatcher.agentGet(payload.name!);
-      return JSON.parse(result);
+      const result = dispatcher.agentGet(payload.name!) as any;
+      return result ? JSON.parse(result) : null;
     }
     if (type === "agent:transferResource") {
-      const result = dispatcher.agentTransferResource(
+      dispatcher.agentTransferResource(
         payload.from!,
         payload.to!,
         payload.resource!,
         payload.amount ?? 1
       );
-      return JSON.parse(result);
+      return {};
     }
     if (type === "agent:transferToken") {
-      const result = dispatcher.agentTransferToken(
+      dispatcher.agentTransferToken(
         payload.from!,
         payload.to!,
         payload.tokenId!
       );
-      return JSON.parse(result);
+      return {};
     }
     if (type === "agent:stealResource") {
-      const result = dispatcher.agentStealResource(
+      dispatcher.agentStealResource(
         payload.from!,
         payload.to!,
         payload.resource!,
         payload.amount ?? 1
       );
-      return JSON.parse(result);
+      return {};
     }
     if (type === "agent:stealToken") {
-      const result = dispatcher.agentStealToken(
+      dispatcher.agentStealToken(
         payload.from!,
         payload.to!,
         payload.tokenId!
       );
-      return JSON.parse(result);
+      return {};
     }
     if (type === "agent:getAll") {
       const result = dispatcher.agentGetAll();
@@ -737,36 +737,36 @@ export class Engine extends Emitter {
 
     // GameState actions
     if (type === "game:start") {
-      const result = dispatcher.gameStart();
-      return JSON.parse(result);
+      const result = dispatcher.gameStart() as any;
+      return result ? JSON.parse(result) : {};
     }
     if (type === "game:end") {
       const result = dispatcher.gameEnd(
         payload.winner ? String(payload.winner) : undefined,
         payload.reason ? String(payload.reason) : undefined
-      );
-      return JSON.parse(result);
+      ) as any;
+      return result ? JSON.parse(result) : {};
     }
     if (type === "game:pause") {
-      const result = dispatcher.gamePause();
-      return JSON.parse(result);
+      dispatcher.gamePause();
+      return {};
     }
     if (type === "game:resume") {
-      const result = dispatcher.gameResume();
-      return JSON.parse(result);
+      dispatcher.gameResume();
+      return {};
     }
     if (type === "game:nextPhase") {
-      const result = dispatcher.gameNextPhase(
+      dispatcher.gameNextPhase(
         payload.phase ? String(payload.phase) : undefined
       );
-      return JSON.parse(result);
+      return {};
     }
     if (type === "game:setProperty") {
-      const result = dispatcher.gameSetProperty(
+      dispatcher.gameSetProperty(
         payload.key!,
         JSON.stringify(payload.value)
       );
-      return JSON.parse(result);
+      return {};
     }
     if (type === "game:getState") {
       const result = dispatcher.gameGetState();
