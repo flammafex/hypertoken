@@ -432,6 +432,11 @@ const GameLoopActions: ActionRegistryType = {
       if (doc.gameLoop) doc.gameLoop.maxTurns = maxTurns;
     });
   },
+  "game:setActiveAgent": (engine, { index } = {} as any) => {
+    engine.session.change("set active agent", (doc: any) => {
+      if (doc.gameLoop) doc.gameLoop.activeAgentIndex = index;
+    });
+  },
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
