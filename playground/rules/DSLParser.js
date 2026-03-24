@@ -120,8 +120,6 @@ export class DSLParser {
     let state = 'start'; // start, when, then, options
     let conditionBuffer = [];
     let actionBuffer = [];
-    let hasOr = false;
-
     for (const line of block.lines) {
       const trimmed = line.text.trim();
       const upper = trimmed.toUpperCase();
@@ -151,7 +149,6 @@ export class DSLParser {
         }
       } else if (upper.startsWith('OR ')) {
         if (state === 'when') {
-          hasOr = true;
           conditionBuffer.push({
             text: trimmed.substring(3).trim(),
             line: line.lineNumber,
@@ -195,7 +192,16 @@ export class DSLParser {
       }
     }
 
-    // Set condition logic based on OR presence
+    // Set condition logic based on prefixes
+    const prefixes = conditionBuffer.map(c => c.prefix).filter(Boolean);
+    const hasAnd = prefixes.includes('AND');
+    const hasOr = prefixes.includes('OR');
+    if (hasAnd && hasOr) {
+      this.warnings.push({
+        line: conditionBuffer[0]?.line,
+        message: 'Mixed AND/OR conditions detected. All conditions will use OR logic when any OR is present.'
+      });
+    }
     if (hasOr) {
       rule.conditionLogic = 'OR';
     }
@@ -256,6 +262,7 @@ export class DSLParser {
     for (const item of buffer) {
       const condition = this.parseConditionExpression(item.text, item.line);
       if (condition) {
+        condition.prefix = item.prefix;
         conditions.push(condition);
       }
     }

@@ -363,6 +363,7 @@ function PeerMonitor({ networkManager }) {
             class="collapse-btn"
             onClick=${() => setIsCollapsed(true)}
             title="Collapse panel"
+            aria-expanded=${!isCollapsed}
           >
             \u25B6
           </button>
@@ -440,22 +441,27 @@ function ResizeHandle({ onResize }) {
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e) => {
-      const delta = startXRef.current - e.clientX;
+    const onMove = (moveEvent) => {
+      const pos = moveEvent.touches ? moveEvent.touches[0] : moveEvent;
+      const delta = startXRef.current - pos.clientX;
       const newWidth = Math.max(200, Math.min(400, startWidthRef.current + delta));
       onResize(newWidth);
     };
 
-    const handleMouseUp = () => {
+    const onUp = () => {
       setIsDragging(false);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove);
+    document.addEventListener('touchend', onUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
     };
   }, [isDragging, onResize]);
 
@@ -471,6 +477,10 @@ function ResizeHandle({ onResize }) {
     <div
       class="peer-resize-handle ${isDragging ? 'active' : ''}"
       onMouseDown=${handleMouseDown}
+      onTouchStart=${(e) => {
+        const touch = e.touches[0];
+        handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+      }}
     />
   `;
 }

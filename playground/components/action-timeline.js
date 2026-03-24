@@ -78,9 +78,15 @@ function getActionLabel(type) {
  */
 function deepClone(obj) {
   try {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(obj);
+    }
+  } catch (e) { /* fall through */ }
+  try {
     return JSON.parse(JSON.stringify(obj));
-  } catch (e) {
-    return obj;
+  } catch (e2) {
+    console.warn('deepClone failed, returning shallow copy');
+    return { ...obj };
   }
 }
 
@@ -136,7 +142,8 @@ function ActionNode({ action, index, isSelected, isCurrent, isSignificant, onCli
       class="action-node ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''} ${isSignificant ? 'significant' : ''}"
       style="--action-color: ${color}"
       onClick=${() => onClick(index)}
-      onMouseEnter=${() => onHover(action, true)}
+      onMouseEnter=${(e) => onHover(action, true, e)}
+      onMouseMove=${(e) => onHover(action, true, e)}
       onMouseLeave=${() => onHover(null, false)}
       title="${action.type}"
     >
@@ -429,9 +436,14 @@ function ActionTimeline({ getHistory, getStateAt, onScrub, onClearHistory }) {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Only handle if timeline is focused or no input is focused
-      if (document.activeElement?.tagName === 'INPUT' ||
-          document.activeElement?.tagName === 'TEXTAREA') {
+      // Only handle if no interactive element is focused
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') {
+        return;
+      }
+      // Skip if active element is inside a different panel
+      if (containerRef.current && !containerRef.current.contains(document.activeElement) &&
+          document.activeElement !== document.body) {
         return;
       }
 
@@ -482,9 +494,12 @@ function ActionTimeline({ getHistory, getStateAt, onScrub, onClearHistory }) {
     setSelectedIndex(prev => prev === index ? null : index);
   }, []);
 
-  const handleHover = useCallback((action, isHovering) => {
+  const handleHover = useCallback((action, isHovering, event) => {
     if (isHovering && action) {
       setHoveredAction(action);
+      if (event) {
+        setTooltipPos({ x: event.clientX + 10, y: event.clientY - 30 });
+      }
     } else {
       setHoveredAction(null);
     }

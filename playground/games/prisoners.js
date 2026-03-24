@@ -69,10 +69,10 @@ export class PrisonersDilemmaGame {
 
     this._elements.btnCooperate.addEventListener('click', () => this.play('C'));
     this._elements.btnDefect.addEventListener('click', () => this.play('D'));
-    this._elements.btnReset.addEventListener('click', () => this.reset());
+    this._elements.btnReset.addEventListener('click', () => this.resetUI());
   }
 
-  reset() {
+  resetUI() {
     this.history = [];
     this.scores = { player: 0, opponent: 0 };
     this.updateDisplay();
@@ -218,7 +218,7 @@ export class PrisonersDilemmaGame {
   }
 
   // Reset game and return initial observation (Gym interface)
-  async resetGame(seed = null) {
+  async reset(seed = null) {
     this.history = [];
     this.scores = { player: 0, opponent: 0 };
     return this.getState();
@@ -271,7 +271,8 @@ export class PrisonersDilemmaGame {
         opponentChoice,
         playerPayoff,
         opponentPayoff,
-        round: this.history.length
+        round: this.history.length,
+        outcome: terminated ? (this.scores.player > this.scores.opponent ? 'win' : this.scores.player < this.scores.opponent ? 'loss' : 'tie') : null
       }
     };
   }

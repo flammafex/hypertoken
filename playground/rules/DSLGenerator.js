@@ -109,10 +109,13 @@ export class DSLGenerator {
 
     // Handle unary operators (isEmpty, isNotEmpty)
     if (['exists', 'notExists', 'isEmpty', 'isNotEmpty'].includes(item.comparator)) {
-      const unaryOp = item.comparator === 'exists' || item.comparator === 'isEmpty'
-        ? 'isEmpty'
-        : 'isNotEmpty';
-      return `${field} ${unaryOp}`;
+      const DSL_UNARY = {
+        'exists': 'exists',
+        'notExists': 'not exists',
+        'isEmpty': 'isEmpty',
+        'isNotEmpty': 'isNotEmpty',
+      };
+      return `${field} ${DSL_UNARY[item.comparator]}`;
     }
 
     return `${field} ${comparator} ${value}`;

@@ -99,17 +99,16 @@ class TrainingSession extends EventTarget {
 
     this.game = game;
     this.config = {
-      totalEpisodes: config.totalEpisodes || DEFAULT_TOTAL_EPISODES,
-      batchSize: config.batchSize || DEFAULT_BATCH_SIZE,
-      evalInterval: config.evalInterval || DEFAULT_EVAL_INTERVAL,
+      totalEpisodes: config.totalEpisodes ?? DEFAULT_TOTAL_EPISODES,
+      batchSize: config.batchSize ?? DEFAULT_BATCH_SIZE,
+      evalInterval: config.evalInterval ?? DEFAULT_EVAL_INTERVAL,
       recordTrajectories: config.recordTrajectories ?? true,
       trackActionDistribution: config.trackActionDistribution ?? true,
-      chartUpdateInterval: config.chartUpdateInterval || DEFAULT_CHART_UPDATE_INTERVAL,
-      exploration: config.exploration || DEFAULT_EXPLORATION_RATE,
-      temperature: config.temperature || DEFAULT_TEMPERATURE,
-      policyType: config.policyType || 'random',
-      verboseLogging: config.verboseLogging || false,
-      ...config
+      chartUpdateInterval: config.chartUpdateInterval ?? DEFAULT_CHART_UPDATE_INTERVAL,
+      exploration: config.exploration ?? DEFAULT_EXPLORATION_RATE,
+      temperature: config.temperature ?? DEFAULT_TEMPERATURE,
+      policyType: config.policyType ?? 'random',
+      verboseLogging: config.verboseLogging ?? false,
     };
 
     /** @type {TrainingStatus} */
@@ -122,6 +121,7 @@ class TrainingSession extends EventTarget {
     /** @type {TrainingMetrics} */
     this.metrics = {
       rewards: [],
+      scores: [], // Initialize scores array
       wins: 0,
       losses: 0,
       ties: 0,
@@ -238,6 +238,7 @@ class TrainingSession extends EventTarget {
 
     this.metrics = {
       rewards: [],
+      scores: [], // Initialize scores array
       wins: 0,
       losses: 0,
       ties: 0,
@@ -272,6 +273,11 @@ class TrainingSession extends EventTarget {
       this.metrics.rewards.push(trajectory.totalReward);
       this.metrics.stepsPerEpisode.push(trajectory.steps.length);
       this.metrics.episodeDurations.push(episodeDuration);
+
+      // Track scores if available (score is attached as trajectory.finalInfo by runGymEpisode)
+      if (trajectory.finalInfo && trajectory.finalInfo.score !== undefined) {
+         this.metrics.scores.push(trajectory.finalInfo.score);
+      }
 
       if (trajectory.outcome === 'win') this.metrics.wins++;
       else if (trajectory.outcome === 'loss') this.metrics.losses++;
@@ -360,6 +366,7 @@ class TrainingSession extends EventTarget {
 
     let done = false;
     let stepCount = 0;
+    let lastResult = null;
 
     while (!done && stepCount < MAX_STEPS_PER_EPISODE) {
       const state = this.game.getState ? this.game.getState() : initialObs;
@@ -372,6 +379,7 @@ class TrainingSession extends EventTarget {
 
       // Step environment
       const result = await this.game.step(action);
+      lastResult = result;
 
       // Record step
       trajectory.steps.push({
@@ -388,8 +396,18 @@ class TrainingSession extends EventTarget {
       stepCount++;
     }
 
-    // Determine outcome
-    trajectory.outcome = this.determineOutcome(trajectory.totalReward);
+    // Determine outcome from last result if available
+    if (lastResult && lastResult.outcome) {
+      trajectory.outcome = lastResult.outcome;
+    } else if (lastResult && lastResult.info && lastResult.info.outcome) {
+      trajectory.outcome = lastResult.info.outcome;
+    } else {
+      trajectory.outcome = this.determineOutcome(trajectory.totalReward);
+    }
+
+    if (lastResult && lastResult.info) {
+      trajectory.finalInfo = lastResult.info;
+    }
 
     return trajectory;
   }
@@ -642,6 +660,13 @@ class TrainingSession extends EventTarget {
       ? Math.sqrt(recent.reduce((sum, r) => sum + Math.pow(r - avgReward, 2), 0) / recent.length)
       : 0;
 
+    // Average Score (if scores are tracked)
+    let avgScore = 0;
+    if (this.metrics.scores && this.metrics.scores.length > 0) {
+      const recentScores = this.metrics.scores.slice(-STATS_WINDOW_SIZE);
+      avgScore = recentScores.reduce((a, b) => a + b, 0) / recentScores.length;
+    }
+
     // Steps per episode stats
     const stepsPerEp = this.metrics.stepsPerEpisode;
     const avgSteps = stepsPerEp.length > 0
@@ -665,6 +690,7 @@ class TrainingSession extends EventTarget {
       worstReward,
       latestReward,
       rewardStdDev,
+      avgScore, // Included if scores are tracked
 
       // Win/Loss
       wins: this.metrics.wins,

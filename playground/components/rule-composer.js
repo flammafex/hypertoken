@@ -69,22 +69,22 @@ const styles = `
     font-weight: 500;
   }
 
-  .btn-primary {
+  .rc-btn-primary {
     background: #3b82f6;
     color: white;
   }
 
-  .btn-primary:hover {
+  .rc-btn-primary:hover {
     background: #2563eb;
   }
 
-  .btn-secondary {
+  .rc-btn-secondary {
     background: rgba(255, 255, 255, 0.1);
     color: #94a3b8;
     border: 1px solid #1e293b;
   }
 
-  .btn-secondary:hover {
+  .rc-btn-secondary:hover {
     background: rgba(255, 255, 255, 0.15);
     color: #e2e8f0;
   }
@@ -104,7 +104,7 @@ const styles = `
     font-size: 11px;
   }
 
-  .btn-icon {
+  .rc-btn-icon {
     padding: 4px;
     min-width: 24px;
     display: flex;
@@ -217,7 +217,7 @@ const styles = `
   }
 
   /* Modal */
-  .modal-overlay {
+  .rc-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -231,7 +231,7 @@ const styles = `
     padding: 20px;
   }
 
-  .modal {
+  .rc-modal {
     background: #0f172a;
     border: 1px solid #1e293b;
     border-radius: 12px;
@@ -243,7 +243,7 @@ const styles = `
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
 
-  .modal-header {
+  .rc-modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -251,18 +251,18 @@ const styles = `
     border-bottom: 1px solid #1e293b;
   }
 
-  .modal-title {
+  .rc-modal-title {
     font-size: 16px;
     font-weight: 600;
   }
 
-  .modal-body {
+  .rc-modal-body {
     flex: 1;
     overflow-y: auto;
     padding: 20px;
   }
 
-  .modal-footer {
+  .rc-modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -694,7 +694,7 @@ function ConditionBuilder({ conditions, logic, onChange, onLogicChange }) {
     <div class="section">
       <div class="section-header">
         <span class="section-title">Conditions</span>
-        <button class="btn btn-secondary btn-sm" onClick=${addCondition}>+ Add</button>
+        <button class="btn rc-btn-secondary btn-sm" onClick=${addCondition}>+ Add</button>
       </div>
 
       ${conditions.length > 1 && html`
@@ -769,7 +769,7 @@ function ConditionBuilder({ conditions, logic, onChange, onLogicChange }) {
             </div>
 
             <button
-              class="btn btn-danger btn-icon btn-sm"
+              class="btn btn-danger rc-btn-icon btn-sm"
               onClick=${() => removeCondition(index)}
               title="Remove condition"
             >×</button>
@@ -817,7 +817,7 @@ function ActionBuilder({ actions, onChange }) {
     <div class="section">
       <div class="section-header">
         <span class="section-title">Actions</span>
-        <button class="btn btn-secondary btn-sm" onClick=${addAction}>+ Add</button>
+        <button class="btn rc-btn-secondary btn-sm" onClick=${addAction}>+ Add</button>
       </div>
 
       <div class="action-list">
@@ -838,7 +838,7 @@ function ActionBuilder({ actions, onChange }) {
               </select>
 
               <button
-                class="btn btn-danger btn-icon btn-sm"
+                class="btn btn-danger rc-btn-icon btn-sm"
                 onClick=${() => removeAction(index)}
                 title="Remove action"
               >×</button>
@@ -1016,7 +1016,7 @@ function CodePreview({ rule, ruleManager }) {
       <div class="section-header">
         <span class="section-title">Generated Code</span>
         <button
-          class="btn btn-secondary btn-sm ${copied ? 'copied' : ''}"
+          class="btn rc-btn-secondary btn-sm ${copied ? 'copied' : ''}"
           onClick=${handleCopy}
         >${copied ? 'Copied!' : 'Copy'}</button>
       </div>
@@ -1038,14 +1038,14 @@ function RuleEditor({ rule, ruleManager, onSave, onClose }) {
   };
 
   return html`
-    <div class="modal-overlay" onClick=${(e) => e.target === e.currentTarget && onClose()}>
-      <div class="modal">
-        <div class="modal-header">
-          <span class="modal-title">Edit Rule</span>
-          <button class="btn btn-secondary btn-icon" onClick=${onClose}>×</button>
+    <div class="rc-modal-overlay" onClick=${(e) => e.target === e.currentTarget && onClose()}>
+      <div class="rc-modal">
+        <div class="rc-modal-header">
+          <span class="rc-modal-title">Edit Rule</span>
+          <button class="btn rc-btn-secondary rc-btn-icon" onClick=${onClose}>×</button>
         </div>
 
-        <div class="modal-body">
+        <div class="rc-modal-body">
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Rule Name</label>
@@ -1126,9 +1126,9 @@ function RuleEditor({ rule, ruleManager, onSave, onClose }) {
           `}
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-secondary" onClick=${onClose}>Cancel</button>
-          <button class="btn btn-primary" onClick=${handleSave}>Save Rule</button>
+        <div class="rc-modal-footer">
+          <button class="btn rc-btn-secondary" onClick=${onClose}>Cancel</button>
+          <button class="btn rc-btn-primary" onClick=${handleSave}>Save Rule</button>
         </div>
       </div>
     </div>
@@ -1152,14 +1152,14 @@ function PresetsModal({ ruleManager, onClose }) {
   };
 
   return html`
-    <div class="modal-overlay" onClick=${(e) => e.target === e.currentTarget && onClose()}>
-      <div class="modal" style="max-width: 600px;">
-        <div class="modal-header">
-          <span class="modal-title">Rule Presets</span>
-          <button class="btn btn-secondary btn-icon" onClick=${onClose}>×</button>
+    <div class="rc-modal-overlay" onClick=${(e) => e.target === e.currentTarget && onClose()}>
+      <div class="rc-modal" style="max-width: 600px;">
+        <div class="rc-modal-header">
+          <span class="rc-modal-title">Rule Presets</span>
+          <button class="btn rc-btn-secondary rc-btn-icon" onClick=${onClose}>×</button>
         </div>
 
-        <div class="modal-body">
+        <div class="rc-modal-body">
           <p style="color: #64748b; margin-bottom: 16px;">
             Choose a preset to quickly add a common rule pattern:
           </p>
@@ -1174,8 +1174,8 @@ function PresetsModal({ ruleManager, onClose }) {
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-secondary" onClick=${onClose}>Close</button>
+        <div class="rc-modal-footer">
+          <button class="btn rc-btn-secondary" onClick=${onClose}>Close</button>
         </div>
       </div>
     </div>
@@ -1307,10 +1307,10 @@ function RuleComposer({ ruleManager }) {
 
         <div class="rule-composer-actions">
           ${mode === 'form' && html`
-            <button class="btn btn-secondary btn-sm" onClick=${() => setShowPresets(true)}>Presets</button>
-            <button class="btn btn-secondary btn-sm" onClick=${handleImport}>Import</button>
-            <button class="btn btn-secondary btn-sm" onClick=${handleExport}>Export</button>
-            <button class="btn btn-primary btn-sm" onClick=${handleNewRule}>+ New</button>
+            <button class="btn rc-btn-secondary btn-sm" onClick=${() => setShowPresets(true)}>Presets</button>
+            <button class="btn rc-btn-secondary btn-sm" onClick=${handleImport}>Import</button>
+            <button class="btn rc-btn-secondary btn-sm" onClick=${handleExport}>Export</button>
+            <button class="btn rc-btn-primary btn-sm" onClick=${handleNewRule}>+ New</button>
           `}
         </div>
       </div>
@@ -1356,7 +1356,7 @@ function RuleComposer({ ruleManager }) {
 
             <div class="rule-card-actions">
               <button
-                class="btn btn-secondary btn-sm"
+                class="btn rc-btn-secondary btn-sm"
                 onClick=${(e) => handleDuplicateRule(rule.id, e)}
               >Duplicate</button>
               <button

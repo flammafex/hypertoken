@@ -311,7 +311,7 @@ function StateInspector({ getState, isCollapsed, onToggleCollapse, width, onResi
       } catch (err) {
         console.error('State Inspector error:', err);
       }
-    }, 100);
+    }, 500);
 
     return () => {
       clearInterval(interval);
@@ -405,7 +405,7 @@ function StateInspector({ getState, isCollapsed, onToggleCollapse, width, onResi
     <div class="state-inspector" style="width: ${width}px">
       <div class="inspector-header">
         <div class="inspector-title">
-          <button class="inspector-collapse-btn" onClick=${onToggleCollapse} title="Collapse panel">
+          <button class="inspector-collapse-btn" onClick=${onToggleCollapse} title="Collapse panel" aria-expanded=${!isCollapsed}>
             \u25C0
           </button>
           <span>State Inspector</span>
@@ -420,6 +420,7 @@ function StateInspector({ getState, isCollapsed, onToggleCollapse, width, onResi
         <input
           type="text"
           placeholder="Filter keys..."
+          aria-label="Search state tree"
           value=${searchTerm}
           onInput=${(e) => setSearchTerm(e.target.value)}
         />
@@ -485,22 +486,27 @@ function ResizeHandle({ onResize }) {
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e) => {
-      const delta = e.clientX - startXRef.current;
+    const onMove = (moveEvent) => {
+      const pos = moveEvent.touches ? moveEvent.touches[0] : moveEvent;
+      const delta = pos.clientX - startXRef.current;
       const newWidth = Math.max(200, Math.min(600, startWidthRef.current + delta));
       onResize(newWidth);
     };
 
-    const handleMouseUp = () => {
+    const onUp = () => {
       setIsDragging(false);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove);
+    document.addEventListener('touchend', onUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
     };
   }, [isDragging, onResize]);
 
@@ -516,6 +522,10 @@ function ResizeHandle({ onResize }) {
     <div
       class="resize-handle ${isDragging ? 'active' : ''}"
       onMouseDown=${handleMouseDown}
+      onTouchStart=${(e) => {
+        const touch = e.touches[0];
+        handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+      }}
     />
   `;
 }

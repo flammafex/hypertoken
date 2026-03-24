@@ -12,6 +12,8 @@
  *
  * @implements {GymCompatibleGame}
  */
+import { escapeHtml } from '../utils/escapeHtml.js';
+import { SeededRandom } from '../utils/SeededRandom.js';
 
 const COLORS = ['red', 'yellow', 'green', 'blue', 'white'];
 const NUMBERS = [1, 2, 3, 4, 5];
@@ -22,24 +24,6 @@ const COLOR_HEX = { red: '#e74c3c', yellow: '#f1c40f', green: '#2ecc71', blue: '
 const MAX_INFO_TOKENS = 8;
 const MAX_LIFE_TOKENS = 3;
 const HAND_SIZE = 5;
-
-class SeededRandom {
-  constructor(seed) {
-    this.seed = seed ?? Date.now();
-  }
-  next() {
-    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
-    return this.seed / 0x7fffffff;
-  }
-  shuffle(array) {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(this.next() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-  }
-}
 
 export class HanabiGame {
   constructor({ gameArea, controlsArea, log }) {
@@ -438,10 +422,10 @@ export class HanabiGame {
     // Render partner's hand (visible)
     this._elements.partnerHand.innerHTML = this.state.hands[1].map((card, i) => {
       const color = COLOR_HEX[card.color];
-      return `<div class="hanabi-card" style="background:${color}" data-index="${i}">
-        <span class="hanabi-num">${card.number}</span>
-        ${card.knownColor ? `<span class="hint-marker color">${COLOR_SYMBOLS[card.knownColor]}</span>` : ''}
-        ${card.knownNumber ? `<span class="hint-marker number">${card.knownNumber}</span>` : ''}
+      return `<div class="hanabi-card" style="background:${escapeHtml(color)}" data-index="${i}">
+        <span class="hanabi-num">${escapeHtml(String(card.number))}</span>
+        ${card.knownColor ? `<span class="hint-marker color">${escapeHtml(COLOR_SYMBOLS[card.knownColor])}</span>` : ''}
+        ${card.knownNumber ? `<span class="hint-marker number">${escapeHtml(String(card.knownNumber))}</span>` : ''}
       </div>`;
     }).join('');
 
@@ -449,8 +433,8 @@ export class HanabiGame {
     this._elements.playerHand.innerHTML = this.state.hands[0].map((card, i) => {
       const isSelected = this._selectedCard === i;
       const hints = [];
-      if (card.knownColor) hints.push(COLOR_SYMBOLS[card.knownColor]);
-      if (card.knownNumber) hints.push(card.knownNumber);
+      if (card.knownColor) hints.push(escapeHtml(COLOR_SYMBOLS[card.knownColor]));
+      if (card.knownNumber) hints.push(escapeHtml(String(card.knownNumber)));
 
       return `<div class="hanabi-card hidden ${isSelected ? 'selected' : ''}" data-index="${i}">
         <span class="hanabi-num">?</span>
@@ -541,22 +525,51 @@ export class HanabiGame {
       return { observation: this.getState(), reward: 0, terminated: true, truncated: false, info: {} };
     }
 
+    let reward = 0;
+    let validMove = true;
+
     if (action < 5) {
-      this.playCard(action);
+      if (action < this.state.hands[this.state.currentPlayer].length) {
+        this.playCard(action);
+      } else {
+        validMove = false;
+      }
     } else if (action < 10) {
-      this.discardCard(action - 5);
-    } else if (action < 15 && this.state.infoTokens > 0) {
-      this.giveHint(1 - this.state.currentPlayer, 'color', COLORS[action - 10]);
-    } else if (action < 20 && this.state.infoTokens > 0) {
-      this.giveHint(1 - this.state.currentPlayer, 'number', action - 14);
+      if (action - 5 < this.state.hands[this.state.currentPlayer].length) {
+        this.discardCard(action - 5);
+      } else {
+        validMove = false;
+      }
+    } else if (action < 15) {
+      if (this.state.infoTokens > 0) {
+        this.giveHint(1 - this.state.currentPlayer, 'color', COLORS[action - 10]);
+      } else {
+        validMove = false;
+      }
+    } else if (action < 20) {
+      if (this.state.infoTokens > 0) {
+        this.giveHint(1 - this.state.currentPlayer, 'number', action - 14);
+      } else {
+        validMove = false;
+      }
+    }
+
+    if (!validMove) {
+      // Penalize invalid move but don't crash
+      reward = -0.1;
+    } else if (this.state.isComplete) {
+      reward = this.state.score / 25;
     }
 
     return {
       observation: this.getState(),
-      reward: this.state.isComplete ? this.state.score / 25 : 0,
+      reward,
       terminated: this.state.isComplete,
       truncated: false,
-      info: { score: this.state.score }
+      info: {
+        score: this.state.score,
+        outcome: this.state.isComplete ? (this.state.score >= 20 ? 'win' : 'loss') : null
+      }
     };
   }
 }
