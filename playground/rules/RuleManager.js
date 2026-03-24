@@ -685,7 +685,12 @@ export class RuleManager extends EventTarget {
       if (stored) {
         const rules = JSON.parse(stored);
         rules.forEach(rule => {
-          this.rules.set(rule.id, rule);
+          const validation = validateRule(rule);
+          if (validation.sanitizedRule !== null) {
+            this.rules.set(validation.sanitizedRule.id, validation.sanitizedRule);
+          } else {
+            console.warn('Rejected invalid rule from storage:', rule.id, validation.errors);
+          }
         });
       }
     } catch (e) {

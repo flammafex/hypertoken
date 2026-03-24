@@ -24,6 +24,8 @@
  *
  * @implements {GymCompatibleGame}
  */
+import { escapeHtml } from '../utils/escapeHtml.js';
+import { SeededRandom } from '../utils/SeededRandom.js';
 
 // ============================================================================
 // Constants
@@ -74,27 +76,6 @@ function isPointRank(rank) {
 
 function cardToString(card) {
   return `${card.rank}${SUIT_SYMBOLS[card.suit]}`;
-}
-
-// Seeded random for reproducibility
-class SeededRandom {
-  constructor(seed) {
-    this.seed = seed ?? Date.now();
-  }
-
-  next() {
-    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
-    return this.seed / 0x7fffffff;
-  }
-
-  shuffle(array) {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(this.next() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-  }
 }
 
 // ============================================================================
@@ -770,7 +751,7 @@ export class CuttleGame {
       return `<div class="card cuttle-card ${isRed ? 'red' : ''} ${isSelected ? 'selected' : ''} ${canPlay ? 'playable' : ''}"
                    data-card-id="${card.id}"
                    ${!interactive ? 'style="transform: rotateY(180deg);"' : ''}>
-                ${interactive ? `${card.rank}${SUIT_SYMBOLS[card.suit]}` : '?'}
+                ${interactive ? `${escapeHtml(card.rank)}${escapeHtml(SUIT_SYMBOLS[card.suit])}` : '?'}
               </div>`;
     }).join('');
 
@@ -794,7 +775,7 @@ export class CuttleGame {
       const isRed = perm.card.suit === 'hearts' || perm.card.suit === 'diamonds';
       return `<div class="card cuttle-card small ${isRed ? 'red' : ''}"
                    data-card-id="${perm.card.id}" data-type="permanent">
-                ${perm.card.rank}${SUIT_SYMBOLS[perm.card.suit]}
+                ${escapeHtml(perm.card.rank)}${escapeHtml(SUIT_SYMBOLS[perm.card.suit])}
               </div>`;
     }).join('');
 
@@ -805,7 +786,7 @@ export class CuttleGame {
       const jacks = pc.attachedJacks.length > 0 ? `<span class="jack-count">J×${pc.attachedJacks.length}</span>` : '';
       return `<div class="card cuttle-card small ${isRed ? 'red' : ''}"
                    data-card-id="${pc.card.id}" data-type="point">
-                ${pc.card.rank}${SUIT_SYMBOLS[pc.card.suit]}${jacks}
+                ${escapeHtml(pc.card.rank)}${escapeHtml(SUIT_SYMBOLS[pc.card.suit])}${jacks}
               </div>`;
     }).join('');
 
@@ -1029,11 +1010,15 @@ export class CuttleGame {
   }
 
   getActionLabels() {
-    return {
+    const labels = {
       0: 'Draw',
-      1: 'Pass',
-      // Dynamic labels for card plays would be generated based on state
+      1: 'Pass'
     };
+    // Generate labels for card plays
+    for (let i = 2; i < 100; i++) {
+      labels[i] = `Card Action ${i - 1}`;
+    }
+    return labels;
   }
 
   getActionCount() {
@@ -1122,12 +1107,19 @@ export class CuttleGame {
       const player = this.state.players[this.state.currentPlayer];
       if (player.hand.length > 0) {
         const cardIndex = (action - 2) % player.hand.length;
-        const card = player.hand[cardIndex];
-        if (isPointRank(card.rank)) {
-          this.playPoint(card.id);
+        if (cardIndex < player.hand.length) {
+          const card = player.hand[cardIndex];
+          if (isPointRank(card.rank)) {
+            this.playPoint(card.id);
+          } else {
+            // If can't play points, try to draw or pass
+            this.draw();
+          }
         } else {
-          this.draw(); // Fallback
+            this.draw();
         }
+      } else {
+         this.draw();
       }
     }
 
@@ -1147,8 +1139,9 @@ export class CuttleGame {
       terminated: this.state.winner !== null || this.state.isDraw,
       truncated: false,
       info: {
-        player0Points: this.getPoints(0),
-        player1Points: this.getPoints(1)
+        score: this.getPoints(0),
+        opponentScore: this.getPoints(1),
+        outcome: this.state.winner === 0 ? 'win' : (this.state.winner === 1 ? 'loss' : (this.state.isDraw ? 'tie' : null))
       }
     };
   }

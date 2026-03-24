@@ -313,8 +313,8 @@ export class MockNetworkManager extends EventTarget {
     }, 500);
 
     // Occasional peer events
-    setTimeout(() => {
-      setInterval(() => {
+    this._peerEventTimeout = setTimeout(() => {
+      this._peerEventInterval = setInterval(() => {
         const peers = this.getPeers();
 
         // Small chance of peer disconnect/reconnect
@@ -359,6 +359,14 @@ export class MockNetworkManager extends EventTarget {
     if (this._syncInterval) {
       clearInterval(this._syncInterval);
       this._syncInterval = null;
+    }
+    if (this._peerEventInterval) {
+      clearInterval(this._peerEventInterval);
+      this._peerEventInterval = null;
+    }
+    if (this._peerEventTimeout) {
+      clearTimeout(this._peerEventTimeout);
+      this._peerEventTimeout = null;
     }
   }
 

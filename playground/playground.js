@@ -22,7 +22,7 @@ import { initStateInspector } from './components/state-inspector.js';
 import { initActionTimeline } from './components/action-timeline.js';
 import { initPeerMonitor } from './components/peer-monitor.js';
 import { initRuleComposer } from './components/rule-composer.js';
-import { initTrainingDashboard } from './components/training-dashboard.js';
+import { initTrainingDashboard } from './components/training/index.js';
 import { initTokenCanvas } from './components/token-canvas.js';
 
 // === Rule Engine ===
@@ -97,14 +97,17 @@ let lastFullSnapshot = null;
  */
 function efficientClone(obj) {
   try {
-    // structuredClone is faster and handles more types than JSON
     if (typeof structuredClone === 'function') {
       return structuredClone(obj);
     }
-    return JSON.parse(JSON.stringify(obj));
   } catch (e) {
-    // Fallback for circular references or non-serializable data
-    return obj;
+    // structuredClone failed — try JSON fallback
+  }
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch (e2) {
+    console.warn('efficientClone: both structuredClone and JSON failed, returning shallow copy', e2);
+    return { ...obj };
   }
 }
 
@@ -506,6 +509,103 @@ function wrapGameMethods(game, gameId) {
     };
   }
 
+  if (gameId === 'poker') {
+    const originalAction = game.action.bind(game);
+    game.action = function(actionIndex) {
+      const labels = game.getActionLabels?.() || [];
+      const result = originalAction(actionIndex);
+      recordAction('poker:action', {
+        action: labels[actionIndex] || `action-${actionIndex}`,
+        pot: game.state?.pot,
+        phase: game.state?.phase
+      }, { actor: 'player', source: 'user' });
+      return result;
+    };
+
+    const originalResetGame = game.resetGame.bind(game);
+    game.resetGame = function(seed) {
+      const result = originalResetGame(seed);
+      recordAction('poker:reset', {}, { actor: 'system', source: 'user' });
+      return result;
+    };
+  }
+
+  if (gameId === 'coup') {
+    for (const method of ['doIncome', 'doForeignAid', 'doTax', 'doCoup', 'doSteal', 'doAssassinate']) {
+      if (typeof game[method] === 'function') {
+        const original = game[method].bind(game);
+        game[method] = function(...args) {
+          const result = original(...args);
+          recordAction(`coup:${method.replace('do', '').toLowerCase()}`, {
+            player: game.state?.currentPlayer,
+            phase: game.state?.phase
+          }, { actor: 'player', source: 'user' });
+          return result;
+        };
+      }
+    }
+
+    const originalResetGame = game.resetGame.bind(game);
+    game.resetGame = function(seed) {
+      const result = originalResetGame(seed);
+      recordAction('coup:reset', {}, { actor: 'system', source: 'user' });
+      return result;
+    };
+  }
+
+  if (gameId === 'hanabi') {
+    const originalPlay = game.playCard.bind(game);
+    game.playCard = function(cardIndex) {
+      const result = originalPlay(cardIndex);
+      recordAction('hanabi:play', { cardIndex }, { actor: 'player', source: 'user' });
+      return result;
+    };
+
+    const originalDiscard = game.discardCard.bind(game);
+    game.discardCard = function(cardIndex) {
+      const result = originalDiscard(cardIndex);
+      recordAction('hanabi:discard', { cardIndex }, { actor: 'player', source: 'user' });
+      return result;
+    };
+
+    const originalHint = game.giveHint.bind(game);
+    game.giveHint = function(targetPlayer, hintType, hintValue) {
+      const result = originalHint(targetPlayer, hintType, hintValue);
+      recordAction('hanabi:hint', { targetPlayer, hintType, hintValue }, { actor: 'player', source: 'user' });
+      return result;
+    };
+
+    const originalResetGame = game.resetGame.bind(game);
+    game.resetGame = function(seed) {
+      const result = originalResetGame(seed);
+      recordAction('hanabi:reset', {}, { actor: 'system', source: 'user' });
+      return result;
+    };
+  }
+
+  if (gameId === 'liars-dice') {
+    const originalBid = game.makeBid.bind(game);
+    game.makeBid = function(quantity, face) {
+      const result = originalBid(quantity, face);
+      recordAction('liars-dice:bid', { quantity, face }, { actor: 'player', source: 'user' });
+      return result;
+    };
+
+    const originalCall = game.callLiar.bind(game);
+    game.callLiar = function() {
+      const result = originalCall();
+      recordAction('liars-dice:callLiar', {}, { actor: 'player', source: 'user' });
+      return result;
+    };
+
+    const originalResetGame = game.resetGame.bind(game);
+    game.resetGame = function(seed) {
+      const result = originalResetGame(seed);
+      recordAction('liars-dice:reset', {}, { actor: 'system', source: 'user' });
+      return result;
+    };
+  }
+
   return game;
 }
 
@@ -584,6 +684,10 @@ function loadGame(gameId) {
 
   // Clear historical view
   viewingHistoricalState = null;
+
+  // Show loading state while game initializes
+  elements.gameArea.textContent = 'Loading game...';
+  elements.gameControls.textContent = '';
 
   // Create new game
   const GameClass = games[gameId];

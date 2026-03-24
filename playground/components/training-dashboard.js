@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'https://esm.s
 import htm from 'https://esm.sh/htm@3.1.1';
 
 import { TrainingSession } from '../training/TrainingSession.js';
+import { trapFocus } from '../utils/focusTrap.js';
 
 const html = htm.bind(h);
 
@@ -428,6 +429,14 @@ function PolicyHeatmap({ snapshots, metric = 'hitProb', gameType }) {
 
 function ConfigModal({ config, onSave, onCancel, onStartTraining }) {
   const [localConfig, setLocalConfig] = useState({ ...config });
+  const modalRef = useRef();
+
+  useEffect(() => {
+    if (modalRef.current) {
+      const cleanup = trapFocus(modalRef.current);
+      return cleanup;
+    }
+  }, []);
 
   const handleChange = (key, value) => {
     setLocalConfig(prev => ({ ...prev, [key]: value }));
@@ -441,7 +450,7 @@ function ConfigModal({ config, onSave, onCancel, onStartTraining }) {
   };
 
   return html`
-    <div class="modal-overlay" onClick=${onCancel}>
+    <div class="modal-overlay" role="dialog" aria-modal="true" ref=${modalRef} onClick=${onCancel}>
       <div class="modal config-modal" onClick=${e => e.stopPropagation()}>
         <div class="modal-header">
           <h3>Training Configuration</h3>
@@ -597,10 +606,19 @@ function ConfigModal({ config, onSave, onCancel, onStartTraining }) {
 // ============================================================================
 
 function EpisodeDetailModal({ trajectory, actionLabels, onClose, onPrev, onNext, onReplay }) {
+  const modalRef = useRef();
+
+  useEffect(() => {
+    if (modalRef.current) {
+      const cleanup = trapFocus(modalRef.current);
+      return cleanup;
+    }
+  }, []);
+
   if (!trajectory) return null;
 
   return html`
-    <div class="modal-overlay" onClick=${onClose}>
+    <div class="modal-overlay" role="dialog" aria-modal="true" ref=${modalRef} onClick=${onClose}>
       <div class="modal episode-detail-modal" onClick=${e => e.stopPropagation()}>
         <div class="modal-header">
           <h3>Episode #${trajectory.episode} Details</h3>

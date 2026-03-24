@@ -15,6 +15,8 @@
  *
  * @implements {GymCompatibleGame}
  */
+import { escapeHtml } from '../utils/escapeHtml.js';
+import { SeededRandom } from '../utils/SeededRandom.js';
 
 const ROLES = ['duke', 'assassin', 'captain', 'ambassador', 'contessa'];
 const ROLE_SYMBOLS = {
@@ -29,24 +31,6 @@ const STARTING_COINS = 2;
 const COUP_COST = 7;
 const ASSASSINATE_COST = 3;
 const CARDS_PER_ROLE = 3;
-
-class SeededRandom {
-  constructor(seed) {
-    this.seed = seed ?? Date.now();
-  }
-  next() {
-    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
-    return this.seed / 0x7fffffff;
-  }
-  shuffle(array) {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(this.next() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-  }
-}
 
 export class CoupGame {
   constructor({ gameArea, controlsArea, log }) {
@@ -539,9 +523,9 @@ export class CoupGame {
         const revealed = card.revealed;
 
         if (p === 0 || revealed) {
-          return `<div class="coup-card ${revealed ? 'revealed' : ''}" style="background:${color}">
-            <span class="coup-role">${card.role}</span>
-            <span class="coup-symbol">${symbol}</span>
+          return `<div class="coup-card ${revealed ? 'revealed' : ''}" style="background:${escapeHtml(color)}">
+            <span class="coup-role">${escapeHtml(card.role)}</span>
+            <span class="coup-symbol">${escapeHtml(symbol)}</span>
           </div>`;
         } else {
           return `<div class="coup-card hidden">?</div>`;
@@ -673,7 +657,9 @@ export class CoupGame {
       reward,
       terminated: this.state.phase === 'complete',
       truncated: false,
-      info: {}
+      info: {
+        outcome: this.state.phase === 'complete' ? (this.state.winner === 0 ? 'win' : 'loss') : null
+      }
     };
   }
 }

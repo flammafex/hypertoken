@@ -9,6 +9,7 @@
 import { h, render } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
+import { trapFocus } from '../utils/focusTrap.js';
 
 const html = htm.bind(h);
 
@@ -705,6 +706,15 @@ function TokenCanvasCore({
 // === Token Detail Modal ===
 
 function TokenDetailModal({ token, zones, onFlip, onMove, onRemove, onClose }) {
+  const modalRef = useRef();
+
+  useEffect(() => {
+    if (modalRef.current) {
+      const cleanup = trapFocus(modalRef.current);
+      return cleanup;
+    }
+  }, []);
+
   if (!token) return null;
 
   const t = token.token || {};
@@ -733,7 +743,7 @@ function TokenDetailModal({ token, zones, onFlip, onMove, onRemove, onClose }) {
   };
 
   return html`
-    <div class="token-detail-modal" onClick=${handleBackdropClick}>
+    <div class="token-detail-modal" role="dialog" aria-modal="true" ref=${modalRef} onClick=${handleBackdropClick}>
       <div class="token-detail-content">
         <div class="detail-header">
           <span>Token Details</span>
@@ -807,6 +817,14 @@ function ZoneEditorModal({ zoneName, config, tokenCount, onUpdate, onClear, onDe
   const [y, setY] = useState(config?.y || 0);
   const [width, setWidth] = useState(config?.width || 100);
   const [height, setHeight] = useState(config?.height || 100);
+  const modalRef = useRef();
+
+  useEffect(() => {
+    if (modalRef.current) {
+      const cleanup = trapFocus(modalRef.current);
+      return cleanup;
+    }
+  }, []);
 
   const handleSave = () => {
     onUpdate?.(zoneName, { label, x, y, width, height });
@@ -820,7 +838,7 @@ function ZoneEditorModal({ zoneName, config, tokenCount, onUpdate, onClear, onDe
   };
 
   return html`
-    <div class="zone-editor-modal" onClick=${handleBackdropClick}>
+    <div class="zone-editor-modal" role="dialog" aria-modal="true" ref=${modalRef} onClick=${handleBackdropClick}>
       <div class="zone-editor-content">
         <div class="editor-header">
           <span>Zone: ${zoneName}</span>
@@ -899,6 +917,7 @@ function TokenCanvasPanel({ getSpaceState, gameType, onLog }) {
   const [zoneConfigs, setZoneConfigs] = useState(null);
 
   const prevStateRef = useRef(null);
+  const prevJsonRef = useRef(null);
   const panelRef = useRef(null);
 
   // Helper to get first selected token (for backwards compatibility)
@@ -914,14 +933,16 @@ function TokenCanvasPanel({ getSpaceState, gameType, onLog }) {
     const interval = setInterval(() => {
       try {
         const newState = getSpaceState?.();
-        if (newState && JSON.stringify(newState) !== JSON.stringify(prevStateRef.current)) {
+        const newJson = JSON.stringify(newState);
+        if (newState && newJson !== prevJsonRef.current) {
+          prevJsonRef.current = newJson;
           setSpaceState(newState);
           prevStateRef.current = newState;
         }
       } catch (err) {
         console.error('Token Canvas state error:', err);
       }
-    }, 100);
+    }, 500);
 
     return () => clearInterval(interval);
   }, [getSpaceState]);

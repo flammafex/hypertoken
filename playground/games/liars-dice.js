@@ -14,23 +14,11 @@
  *
  * @implements {GymCompatibleGame}
  */
+import { SeededRandom } from '../utils/SeededRandom.js';
 
 const STARTING_DICE = 5;
 const FACES = [1, 2, 3, 4, 5, 6];
 const DICE_SYMBOLS = ['\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685']; // Unicode dice
-
-class SeededRandom {
-  constructor(seed) {
-    this.seed = seed ?? Date.now();
-  }
-  next() {
-    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
-    return this.seed / 0x7fffffff;
-  }
-  rollDie() {
-    return Math.floor(this.next() * 6) + 1;
-  }
-}
 
 export class LiarsDiceGame {
   constructor({ gameArea, controlsArea, log }) {
