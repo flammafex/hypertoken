@@ -77,9 +77,6 @@ export class Engine extends Emitter {
   private _snapshots: string[]; // CRDT snapshots for undo support
   _policies: Map<string, any>;
 
-  _agents: IEngineAgent[];
-  _gameState: IGameState;
-  _transactions: ITransaction[];
   debug: boolean;
 
   private useWebRTC: boolean;
@@ -105,9 +102,6 @@ export class Engine extends Emitter {
     this._policies = new Map();
     this.debug = false;
 
-    this._agents = [];
-    this._gameState = {};
-    this._transactions = [];
 
     // GameLoop must be created after all fields are initialized,
     // because its constructor calls engine.dispatch() which accesses history/etc.
@@ -127,6 +121,19 @@ export class Engine extends Emitter {
     if (autoConnect) {
       this.connect(autoConnect);
     }
+  }
+
+  get _gameState(): IGameState {
+    return (this.session.state as any).gameState ?? {};
+  }
+
+  get _agents(): IEngineAgent[] {
+    const agents = (this.session.state as any).agents ?? {};
+    return Object.values(agents) as IEngineAgent[];
+  }
+
+  get _transactions(): ITransaction[] {
+    return (this.session.state as any).transactions ?? [];
   }
 
   /**

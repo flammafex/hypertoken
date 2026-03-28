@@ -6,7 +6,7 @@ import { Chronicle } from "./Chronicle.js";
 import { IPlacementCRDT, IToken } from "./types.js";
 import { Stack } from "./Stack.js";
 import { Source } from "./Source.js";
-import * as crypto from "node:crypto";
+import { generateId } from "./crypto.js";
 import { shuffleArray } from "./random.js";
 
 export interface SpreadZone {
@@ -129,7 +129,7 @@ export class Space extends Emitter {
     const safeToken = this._sanitizeToken(token);
 
     const placement: IPlacementCRDT = {
-      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `p-${Date.now()}-${Math.random()}`,
+      id: generateId(),
       tokenId: token.id,
       tokenSnapshot: safeToken,
       x: opts.x ?? 0,

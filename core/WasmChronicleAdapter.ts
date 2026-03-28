@@ -9,8 +9,9 @@
  */
 import { Emitter } from './events.js';
 import type { IChronicle } from './IChronicle.js';
+import type { HyperTokenState } from './types.js';
 
-export class WasmChronicleAdapter extends Emitter implements IChronicle {
+export class WasmChronicleAdapter extends Emitter implements IChronicle<HyperTokenState> {
     private _wasm: any; // ActionDispatcher from WASM module
     private _cache: Record<string, any> = {};
 
