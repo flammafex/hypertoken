@@ -358,13 +358,16 @@ await test('Multiple policies with different priorities', () => {
 
 await test('Policy conditions can depend on game state', () => {
   const engine = new Engine();
-  engine._gameState = { score: 0 };
+  engine.session.change("test setup", (doc: any) => { doc.gameState = { score: 0 }; });
 
   const scorePolicy = new Policy(
     'win-check',
     (eng) => (eng._gameState.score || 0) >= 100,
     (eng) => {
-      eng._gameState.winner = 'Player';
+      eng.session.change("win", (doc: any) => {
+        if (!doc.gameState) doc.gameState = {};
+        doc.gameState.winner = 'Player';
+      });
     }
   );
 
@@ -373,7 +376,7 @@ await test('Policy conditions can depend on game state', () => {
   assert(!engine._gameState.winner, 'Should not trigger yet');
 
   // Increase score
-  engine._gameState.score = 100;
+  engine.session.change("set score", (doc: any) => { if (!doc.gameState) doc.gameState = {}; doc.gameState.score = 100; });
   scorePolicy.evaluate(engine);
 
   assertEquals(engine._gameState.winner, 'Player', 'Should trigger at 100');
@@ -381,13 +384,16 @@ await test('Policy conditions can depend on game state', () => {
 
 await test('Policy effects can modify engine state', () => {
   const engine = new Engine();
-  engine._gameState = { round: 1 };
+  engine.session.change("test setup", (doc: any) => { doc.gameState = { round: 1 }; });
 
   const roundPolicy = new Policy(
     'advance-round',
     (eng) => eng._agents.length >= 2,
     (eng) => {
-      eng._gameState.round++;
+      eng.session.change("advance round", (doc: any) => {
+        if (!doc.gameState) doc.gameState = {};
+        doc.gameState.round = (doc.gameState.round ?? 0) + 1;
+      });
     }
   );
 
@@ -397,8 +403,12 @@ await test('Policy effects can modify engine state', () => {
   roundPolicy.evaluate(engine);
   assertEquals(engine._gameState.round, 1, 'Round should not advance');
 
-  // Add agents
-  engine._agents.push({ name: 'Alice' } as any, { name: 'Bob' } as any);
+  // Add agents via Chronicle
+  engine.session.change("add agents", (doc: any) => {
+    if (!doc.agents) doc.agents = {};
+    doc.agents['Alice'] = { id: 'alice', name: 'Alice', active: true, resources: {}, inventory: [] };
+    doc.agents['Bob'] = { id: 'bob', name: 'Bob', active: true, resources: {}, inventory: [] };
+  });
   roundPolicy.evaluate(engine);
 
   assertEquals(engine._gameState.round, 2, 'Round should advance');
@@ -412,8 +422,10 @@ console.log('\n🎯 Complex Scenario Tests\n');
 
 await test('Game end policy with multiple conditions', () => {
   const engine = new Engine();
-  engine._gameState = { turns: 0, maxTurns: 10 };
-  engine._agents.push({ name: 'Alice', resources: { score: 0 } } as any);
+  engine.session.change("test setup", (doc: any) => {
+    doc.gameState = { turns: 0, maxTurns: 10 };
+    doc.agents = { Alice: { id: 'alice', name: 'Alice', active: true, resources: { score: 0 }, inventory: [] } };
+  });
 
   const gameEndPolicy = new Policy(
     'game-end',
@@ -424,7 +436,10 @@ await test('Game end policy with multiple conditions', () => {
       return state.turns >= state.maxTurns || maxScore >= 100;
     },
     (eng) => {
-      eng._gameState.ended = true;
+      eng.session.change("end game", (doc: any) => {
+        if (!doc.gameState) doc.gameState = {};
+        doc.gameState.ended = true;
+      });
     },
     { once: true }
   );
@@ -434,7 +449,7 @@ await test('Game end policy with multiple conditions', () => {
   assert(!engine._gameState.ended, 'Game should not end yet');
 
   // Max turns reached
-  engine._gameState.turns = 10;
+  engine.session.change("set turns", (doc: any) => { if (!doc.gameState) doc.gameState = {}; doc.gameState.turns = 10; });
   gameEndPolicy.evaluate(engine);
 
   assert(engine._gameState.ended === true, 'Game should end at max turns');
@@ -442,28 +457,37 @@ await test('Game end policy with multiple conditions', () => {
 
 await test('Resource management policy', () => {
   const engine = new Engine();
-  engine._agents.push(
-    { name: 'Alice', resources: { gold: 50 } } as any,
-    { name: 'Bob', resources: { gold: 30 } } as any
-  );
+  engine.session.change("test setup", (doc: any) => {
+    doc.agents = {
+      Alice: { id: 'alice', name: 'Alice', active: true, resources: { gold: 50 }, inventory: [] },
+      Bob: { id: 'bob', name: 'Bob', active: true, resources: { gold: 30 }, inventory: [] },
+    };
+    doc.gameState = { turn: 5, treasury: 0 };
+  });
 
   const taxPolicy = new Policy(
     'tax-collection',
     (eng) => (eng._gameState.turn ?? 0) % 5 === 0,
     (eng) => {
-      eng._agents.forEach((agent: any) => {
-        const tax = Math.floor((agent.resources.gold || 0) * 0.1);
-        agent.resources.gold = (agent.resources.gold || 0) - tax;
-        engine._gameState.treasury = (engine._gameState.treasury || 0) + tax;
+      eng.session.change("collect tax", (doc: any) => {
+        if (!doc.agents) return;
+        let taxTotal = 0;
+        for (const agent of Object.values(doc.agents) as any[]) {
+          const tax = Math.floor((agent.resources?.gold || 0) * 0.1);
+          if (!agent.resources) agent.resources = {};
+          agent.resources.gold = (agent.resources.gold || 0) - tax;
+          taxTotal += tax;
+        }
+        if (!doc.gameState) doc.gameState = {};
+        doc.gameState.treasury = (doc.gameState.treasury || 0) + taxTotal;
       });
     }
   );
 
-  engine._gameState = { turn: 5, treasury: 0 };
   taxPolicy.evaluate(engine);
 
-  assertEquals(engine._agents[0].resources.gold, 45, 'Alice should pay 5 gold tax');
-  assertEquals(engine._agents[1].resources.gold, 27, 'Bob should pay 3 gold tax');
+  assertEquals(engine._agents.find(a => a.name === 'Alice')?.resources.gold, 45, 'Alice should pay 5 gold tax');
+  assertEquals(engine._agents.find(a => a.name === 'Bob')?.resources.gold, 27, 'Bob should pay 3 gold tax');
   assertEquals(engine._gameState.treasury, 8, 'Treasury should collect 8 gold');
 });
 

@@ -20,6 +20,7 @@
 
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
+import type { IEngineAgent } from "./types.js";
 
 export type ActionHandler = (engine: Engine, payload: any) => any;
 
@@ -190,8 +191,12 @@ const SourceActions: ActionRegistryType = {
   AGENT ACTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
-function findAgent(engine: Engine, name: string) {
-  const agent = engine._agents.find(a => a.name === name);
+function getAgentMap(engine: Engine): Record<string, IEngineAgent> {
+  return (engine.session.state as any).agents ?? {};
+}
+
+function findAgent(engine: Engine, name: string): IEngineAgent {
+  const agent = getAgentMap(engine)[name];
   if (!agent) throw new Error(`Agent "${name}" not found`);
   return agent;
 }
@@ -199,8 +204,8 @@ function findAgent(engine: Engine, name: string) {
 const AgentActions: ActionRegistryType = {
   "agent:create": (engine, { id, name, meta } = {} as any) => {
     if (!name) throw new Error("name required");
-    if (engine._agents.find(a => a.name === name)) throw new Error(`Agent "${name}" already exists`);
-    const agent = {
+    if (getAgentMap(engine)[name]) throw new Error(`Agent "${name}" already exists`);
+    const agent: IEngineAgent = {
       id: id ?? `agent-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name,
       meta: meta ?? {},
@@ -208,35 +213,59 @@ const AgentActions: ActionRegistryType = {
       resources: {},
       inventory: [],
     };
-    engine._agents.push(agent);
+    engine.session.change("agent:create", (doc: any) => {
+      if (!doc.agents) doc.agents = {};
+      doc.agents[name] = agent;
+    });
     return agent;
   },
   "agent:remove": (engine, { name } = {} as any) => {
-    const idx = engine._agents.findIndex(a => a.name === name);
-    if (idx === -1) throw new Error(`Agent "${name}" not found`);
-    engine._agents.splice(idx, 1);
+    if (!getAgentMap(engine)[name]) throw new Error(`Agent "${name}" not found`);
+    engine.session.change("agent:remove", (doc: any) => {
+      if (doc.agents) delete doc.agents[name];
+    });
   },
   "agent:setActive": (engine, { name, active = true } = {} as any) => {
-    const agent = findAgent(engine, name);
-    agent.active = active;
+    findAgent(engine, name); // validate existence
+    engine.session.change("agent:setActive", (doc: any) => {
+      if (doc.agents?.[name]) doc.agents[name].active = active;
+    });
   },
   "agent:giveResource": (engine, { name, resource, amount = 1 } = {} as any) => {
-    const agent = findAgent(engine, name);
-    agent.resources[resource] = (agent.resources[resource] || 0) + amount;
+    findAgent(engine, name); // validate existence
+    engine.session.change("agent:giveResource", (doc: any) => {
+      if (!doc.agents?.[name]) return;
+      if (!doc.agents[name].resources) doc.agents[name].resources = {};
+      doc.agents[name].resources[resource] = (doc.agents[name].resources[resource] ?? 0) + amount;
+    });
   },
   "agent:takeResource": (engine, { name, resource, amount = 1 } = {} as any) => {
-    const agent = findAgent(engine, name);
-    agent.resources[resource] = (agent.resources[resource] || 0) - amount;
+    findAgent(engine, name); // validate existence
+    engine.session.change("agent:takeResource", (doc: any) => {
+      if (!doc.agents?.[name]) return;
+      if (!doc.agents[name].resources) doc.agents[name].resources = {};
+      doc.agents[name].resources[resource] = (doc.agents[name].resources[resource] ?? 0) - amount;
+    });
   },
   "agent:addToken": (engine, { name, token } = {} as any) => {
-    const agent = findAgent(engine, name);
-    agent.inventory.push(token);
+    findAgent(engine, name); // validate existence
+    engine.session.change("agent:addToken", (doc: any) => {
+      if (!doc.agents?.[name]) return;
+      if (!doc.agents[name].inventory) doc.agents[name].inventory = [];
+      doc.agents[name].inventory.push(token);
+    });
   },
   "agent:removeToken": (engine, { name, tokenId } = {} as any) => {
     const agent = findAgent(engine, name);
-    const idx = agent.inventory.findIndex((t: IToken) => t.id === tokenId);
+    const idx = (agent.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
     if (idx === -1) throw new Error(`Token "${tokenId}" not found in agent "${name}"`);
-    return agent.inventory.splice(idx, 1)[0];
+    const removed = agent.inventory[idx];
+    engine.session.change("agent:removeToken", (doc: any) => {
+      if (!doc.agents?.[name]?.inventory) return;
+      const i = doc.agents[name].inventory.findIndex((t: IToken) => t.id === tokenId);
+      if (i !== -1) doc.agents[name].inventory.splice(i, 1);
+    });
+    return removed;
   },
   "agent:get": (engine, { name } = {} as any) => {
     return findAgent(engine, name);
@@ -245,72 +274,125 @@ const AgentActions: ActionRegistryType = {
     return engine._agents;
   },
   "agent:transferResource": (engine, { from, to, resource, amount = 1 } = {} as any) => {
-    const src = findAgent(engine, from);
-    const dst = findAgent(engine, to);
-    src.resources[resource] = (src.resources[resource] || 0) - amount;
-    dst.resources[resource] = (dst.resources[resource] || 0) + amount;
-    engine._transactions.push({ type: "resource_transfer", from, to, resource, amount, timestamp: Date.now() });
-    return { from: src.resources[resource], to: dst.resources[resource] };
+    findAgent(engine, from);
+    findAgent(engine, to);
+    engine.session.change("agent:transferResource", (doc: any) => {
+      if (!doc.agents) return;
+      if (!doc.agents[from].resources) doc.agents[from].resources = {};
+      if (!doc.agents[to].resources) doc.agents[to].resources = {};
+      doc.agents[from].resources[resource] = (doc.agents[from].resources[resource] ?? 0) - amount;
+      doc.agents[to].resources[resource] = (doc.agents[to].resources[resource] ?? 0) + amount;
+      if (!doc.transactions) doc.transactions = [];
+      doc.transactions.push({ type: "resource_transfer", from, to, resource, amount, timestamp: Date.now() });
+    });
+    const state = (engine.session.state as any);
+    return {
+      from: state.agents?.[from]?.resources?.[resource] ?? 0,
+      to: state.agents?.[to]?.resources?.[resource] ?? 0,
+    };
   },
   "agent:transferToken": (engine, { from, to, tokenId } = {} as any) => {
     const src = findAgent(engine, from);
-    const dst = findAgent(engine, to);
-    const idx = src.inventory.findIndex((t: IToken) => t.id === tokenId);
+    findAgent(engine, to);
+    const idx = (src.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
     if (idx === -1) throw new Error(`Token "${tokenId}" not found in agent "${from}"`);
-    const [token] = src.inventory.splice(idx, 1);
-    dst.inventory.push(token);
-    engine._transactions.push({ type: "token_transfer", from, to, token: tokenId, timestamp: Date.now() });
+    const token = src.inventory[idx];
+    engine.session.change("agent:transferToken", (doc: any) => {
+      if (!doc.agents) return;
+      const i = doc.agents[from].inventory.findIndex((t: IToken) => t.id === tokenId);
+      if (i !== -1) {
+        const [moved] = doc.agents[from].inventory.splice(i, 1);
+        if (!doc.agents[to].inventory) doc.agents[to].inventory = [];
+        doc.agents[to].inventory.push(moved);
+      }
+      if (!doc.transactions) doc.transactions = [];
+      doc.transactions.push({ type: "token_transfer", from, to, token: tokenId, timestamp: Date.now() });
+    });
     return token;
   },
   "agent:stealResource": (engine, { from, to, resource, amount = 1 } = {} as any) => {
     const src = findAgent(engine, from);
-    const dst = findAgent(engine, to);
-    const available = src.resources[resource] || 0;
+    findAgent(engine, to);
+    const available = src.resources?.[resource] ?? 0;
     const stolen = Math.min(amount, available);
-    src.resources[resource] = available - stolen;
-    dst.resources[resource] = (dst.resources[resource] || 0) + stolen;
-    engine._transactions.push({ type: "steal_resource", from, to, resource, amount: stolen, timestamp: Date.now() });
-    return { stolen, from: src.resources[resource], to: dst.resources[resource] };
+    engine.session.change("agent:stealResource", (doc: any) => {
+      if (!doc.agents) return;
+      if (!doc.agents[from].resources) doc.agents[from].resources = {};
+      if (!doc.agents[to].resources) doc.agents[to].resources = {};
+      doc.agents[from].resources[resource] = available - stolen;
+      doc.agents[to].resources[resource] = (doc.agents[to].resources[resource] ?? 0) + stolen;
+      if (!doc.transactions) doc.transactions = [];
+      doc.transactions.push({ type: "steal_resource", from, to, resource, amount: stolen, timestamp: Date.now() });
+    });
+    const state = (engine.session.state as any);
+    return {
+      stolen,
+      from: state.agents?.[from]?.resources?.[resource] ?? 0,
+      to: state.agents?.[to]?.resources?.[resource] ?? 0,
+    };
   },
   "agent:stealToken": (engine, { from, to, tokenId } = {} as any) => {
     const src = findAgent(engine, from);
-    const dst = findAgent(engine, to);
-    const idx = src.inventory.findIndex((t: IToken) => t.id === tokenId);
+    findAgent(engine, to);
+    const idx = (src.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
     if (idx === -1) throw new Error(`Token "${tokenId}" not found in agent "${from}"`);
-    const [token] = src.inventory.splice(idx, 1);
-    dst.inventory.push(token);
-    engine._transactions.push({ type: "steal_token", from, to, token: tokenId, timestamp: Date.now() });
+    const token = src.inventory[idx];
+    engine.session.change("agent:stealToken", (doc: any) => {
+      if (!doc.agents) return;
+      const i = doc.agents[from].inventory.findIndex((t: IToken) => t.id === tokenId);
+      if (i !== -1) {
+        const [moved] = doc.agents[from].inventory.splice(i, 1);
+        if (!doc.agents[to].inventory) doc.agents[to].inventory = [];
+        doc.agents[to].inventory.push(moved);
+      }
+      if (!doc.transactions) doc.transactions = [];
+      doc.transactions.push({ type: "steal_token", from, to, token: tokenId, timestamp: Date.now() });
+    });
     return token;
   },
   "agent:trade": (engine, { agent1, agent2, offer1, offer2 } = {} as any) => {
-    const a1 = findAgent(engine, agent1);
-    const a2 = findAgent(engine, agent2);
-    // Execute offer1: agent1 gives to agent2
-    if (offer1?.token) {
-      const idx = a1.inventory.findIndex((t: IToken) => t.id === offer1.token.id);
-      if (idx !== -1) a2.inventory.push(...a1.inventory.splice(idx, 1));
-    }
-    if (offer1?.resource && offer1?.amount) {
-      a1.resources[offer1.resource] = (a1.resources[offer1.resource] || 0) - offer1.amount;
-      a2.resources[offer1.resource] = (a2.resources[offer1.resource] || 0) + offer1.amount;
-    }
-    // Execute offer2: agent2 gives to agent1
-    if (offer2?.token) {
-      const idx = a2.inventory.findIndex((t: IToken) => t.id === offer2.token.id);
-      if (idx !== -1) a1.inventory.push(...a2.inventory.splice(idx, 1));
-    }
-    if (offer2?.resource && offer2?.amount) {
-      a2.resources[offer2.resource] = (a2.resources[offer2.resource] || 0) - offer2.amount;
-      a1.resources[offer2.resource] = (a1.resources[offer2.resource] || 0) + offer2.amount;
-    }
-    engine._transactions.push({ type: "trade", from: agent1, to: agent2, agent1, agent2, offer1, offer2, timestamp: Date.now() });
+    findAgent(engine, agent1);
+    findAgent(engine, agent2);
+    engine.session.change("agent:trade", (doc: any) => {
+      if (!doc.agents) return;
+      const a1 = doc.agents[agent1];
+      const a2 = doc.agents[agent2];
+      if (!a1.inventory) a1.inventory = [];
+      if (!a2.inventory) a2.inventory = [];
+      if (!a1.resources) a1.resources = {};
+      if (!a2.resources) a2.resources = {};
+      // Execute offer1: agent1 gives to agent2
+      if (offer1?.token) {
+        const idx = a1.inventory.findIndex((t: IToken) => t.id === offer1.token.id);
+        if (idx !== -1) a2.inventory.push(...a1.inventory.splice(idx, 1));
+      }
+      if (offer1?.resource && offer1?.amount) {
+        a1.resources[offer1.resource] = (a1.resources[offer1.resource] ?? 0) - offer1.amount;
+        a2.resources[offer1.resource] = (a2.resources[offer1.resource] ?? 0) + offer1.amount;
+      }
+      // Execute offer2: agent2 gives to agent1
+      if (offer2?.token) {
+        const idx = a2.inventory.findIndex((t: IToken) => t.id === offer2.token.id);
+        if (idx !== -1) a1.inventory.push(...a2.inventory.splice(idx, 1));
+      }
+      if (offer2?.resource && offer2?.amount) {
+        a2.resources[offer2.resource] = (a2.resources[offer2.resource] ?? 0) - offer2.amount;
+        a1.resources[offer2.resource] = (a1.resources[offer2.resource] ?? 0) + offer2.amount;
+      }
+      if (!doc.transactions) doc.transactions = [];
+      doc.transactions.push({ type: "trade", from: agent1, to: agent2, agent1, agent2, offer1, offer2, timestamp: Date.now() });
+    });
   },
   "agent:drawCards": (engine, { name, count = 1 } = {} as any) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
-    const agent = findAgent(engine, name);
+    findAgent(engine, name); // validate existence
     const drawn = engine.stack.draw(count);
     const cards = Array.isArray(drawn) ? drawn : drawn ? [drawn] : [];
-    agent.inventory.push(...cards);
+    engine.session.change("agent:drawCards", (doc: any) => {
+      if (!doc.agents?.[name]) return;
+      if (!doc.agents[name].inventory) doc.agents[name].inventory = [];
+      doc.agents[name].inventory.push(...cards);
+    });
     return cards;
   },
   "agent:discardCards": (engine, { name, tokenIds } = {} as any) => {
@@ -318,12 +400,16 @@ const AgentActions: ActionRegistryType = {
     const agent = findAgent(engine, name);
     const discarded: IToken[] = [];
     for (const tokenId of (tokenIds || [])) {
-      const idx = agent.inventory.findIndex((t: IToken) => t.id === tokenId);
-      if (idx !== -1) {
-        const [card] = agent.inventory.splice(idx, 1);
-        engine.stack.discard(card);
-        discarded.push(card);
-      }
+      const idx = (agent.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
+      if (idx !== -1) discarded.push(agent.inventory[idx]);
+    }
+    if (discarded.length > 0) {
+      const discardedIds = new Set(discarded.map((t: IToken) => t.id));
+      engine.session.change("agent:discardCards", (doc: any) => {
+        if (!doc.agents?.[name]?.inventory) return;
+        doc.agents[name].inventory = doc.agents[name].inventory.filter((t: IToken) => !discardedIds.has(t.id));
+      });
+      for (const card of discarded) engine.stack.discard(card);
     }
     return discarded;
   },
@@ -335,46 +421,64 @@ const AgentActions: ActionRegistryType = {
 
 const GameActions: ActionRegistryType = {
   "game:start": (engine) => {
-    engine._gameState.started = true;
-    engine._gameState.startTime = Date.now();
-    engine._gameState.ended = false;
-    engine._gameState.paused = false;
-    engine._gameState.totalPauseDuration = 0;
+    engine.session.change("game:start", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      doc.gameState.started = true;
+      doc.gameState.startTime = Date.now();
+      doc.gameState.ended = false;
+      doc.gameState.paused = false;
+      doc.gameState.totalPauseDuration = 0;
+    });
     engine.emit("game:started", { payload: engine._gameState });
     return engine._gameState;
   },
   "game:end": (engine, { winner, reason } = {}) => {
-    engine._gameState.ended = true;
-    engine._gameState.endTime = Date.now();
-    if (winner) engine._gameState.winner = winner;
-    if (reason) engine._gameState.reason = reason;
+    engine.session.change("game:end", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      doc.gameState.ended = true;
+      doc.gameState.endTime = Date.now();
+      if (winner) doc.gameState.winner = winner;
+      if (reason) doc.gameState.reason = reason;
+    });
     engine.emit("game:ended", { payload: engine._gameState });
     return engine._gameState;
   },
   "game:pause": (engine) => {
-    engine._gameState.paused = true;
-    engine._gameState.pauseTime = Date.now();
+    engine.session.change("game:pause", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      doc.gameState.paused = true;
+      doc.gameState.pauseTime = Date.now();
+    });
     engine.emit("game:paused", { payload: engine._gameState });
     return engine._gameState;
   },
   "game:resume": (engine) => {
-    if (engine._gameState.pauseTime) {
-      engine._gameState.totalPauseDuration = (engine._gameState.totalPauseDuration || 0) + (Date.now() - engine._gameState.pauseTime);
-    }
-    engine._gameState.paused = false;
-    engine._gameState.resumeTime = Date.now();
+    engine.session.change("game:resume", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      if (doc.gameState.pauseTime) {
+        doc.gameState.totalPauseDuration = (doc.gameState.totalPauseDuration ?? 0) + (Date.now() - doc.gameState.pauseTime);
+      }
+      doc.gameState.paused = false;
+      doc.gameState.resumeTime = Date.now();
+    });
     engine.emit("game:resumed", { payload: engine._gameState });
     return engine._gameState;
   },
   "game:nextPhase": (engine, { phase } = {} as any) => {
-    engine._gameState.phase = phase;
-    engine._gameState.turn = (engine._gameState.turn || 0) + 1;
+    engine.session.change("game:nextPhase", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      doc.gameState.phase = phase;
+      doc.gameState.turn = (doc.gameState.turn ?? 0) + 1;
+    });
     engine.emit("game:phaseChanged", { payload: { phase, turn: engine._gameState.turn } });
     return engine._gameState;
   },
   "game:setProperty": (engine, { key, value } = {} as any) => {
     if (!key) throw new Error("key required");
-    engine._gameState[key] = value;
+    engine.session.change("game:setProperty", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      doc.gameState[key] = value;
+    });
     return engine._gameState;
   },
   "game:getState": (engine) => {
