@@ -97,27 +97,32 @@ export function registerLastStanding(ruleEngine, opts = {}) {
     statusField = "alive",
     eliminatedValue = false
   } = opts;
-  
+
+  // Helper: reads from meta for status fields managed by resource-limits patterns,
+  // falls back to top-level for custom fields callers manage themselves.
+  const isAlive = (p) => {
+    const metaVal = p.meta?.[statusField];
+    const topVal = p[statusField];
+    const val = metaVal !== undefined ? metaVal : topVal;
+    return val !== eliminatedValue;
+  };
+
   ruleEngine.addRule(
     "last-standing-wins",
     (engine) => {
       const agents = engine._agents || [];
       const gameEnded = engine._gameState?.ended;
-      
       if (gameEnded || agents.length === 0) return false;
-      
-      const alive = agents.filter(p => p[statusField] !== eliminatedValue);
-      return alive.length === 1;
+      return agents.filter(isAlive).length === 1;
     },
     (engine) => {
       const agents = engine._agents || [];
-      const winner = agents.find(p => p[statusField] !== eliminatedValue);
-      
+      const winner = agents.find(isAlive);
       engine.dispatch("game:end", {
         winner: winner.name,
         reason: "elimination",
         survivors: 1,
-        eliminated: agents.length - 1
+        eliminated: agents.length - 1,
       });
     },
     { priority: 100, once: true }

@@ -13,7 +13,14 @@
  * - Call "Liar!" to challenge the previous bid
  * - Loser of challenge loses one die
  * - Last player with dice wins
+ *
+ * Engine integration:
+ * - Players are CRDT-backed agents; dice count is an agent resource
+ * - Per-player dice values (hidden from others) are stored in agent meta
+ * - Turn / phase / bid state lives in doc.gameState via session.change()
  */
+
+import { Engine } from "../../engine/Engine.js";
 
 // ============================================================================
 // Types
@@ -52,9 +59,9 @@ export interface LiarsDiceConfig {
 // Constants
 // ============================================================================
 
-const DEFAULT_STARTING_DICE = 5;
-const MIN_FACE = 2;
-const MAX_FACE = 6;
+export const DEFAULT_STARTING_DICE = 5;
+export const MIN_FACE = 2;
+export const MAX_FACE = 6;
 const WILD_FACE = 1;
 
 // ============================================================================
@@ -89,14 +96,15 @@ class SeededRandom {
 export class LiarsDiceGame {
   private config: Required<LiarsDiceConfig>;
   private rng: SeededRandom;
-  private state: LiarsDiceGameState;
+  readonly engine: Engine;
 
-  constructor(config: LiarsDiceConfig = {}) {
+  constructor(engine: Engine, config: LiarsDiceConfig = {}) {
     const numPlayers = config.numPlayers ?? 2;
     if (numPlayers < 2 || numPlayers > 6) {
       throw new Error("Liar's Dice requires 2-6 players");
     }
 
+    this.engine = engine;
     this.config = {
       numPlayers,
       startingDice: config.startingDice ?? DEFAULT_STARTING_DICE,
@@ -104,23 +112,35 @@ export class LiarsDiceGame {
     };
 
     this.rng = new SeededRandom(this.config.seed ?? undefined);
-    this.state = this.createInitialState();
+    this._initState();
   }
 
-  reset(seed?: number): void {
-    if (seed !== undefined) {
-      this.rng = new SeededRandom(seed);
-    } else if (this.config.seed !== null) {
-      this.rng = new SeededRandom(this.config.seed);
-    } else {
-      this.rng = new SeededRandom();
-    }
-    this.state = this.createInitialState();
+  // ── CRDT state helpers ─────────────────────────────────────────────────────
+
+  private get state(): LiarsDiceGameState {
+    return (this.engine._gameState as any) as LiarsDiceGameState;
   }
 
-  private createInitialState(): LiarsDiceGameState {
+  /** Atomically update multiple game-state fields in one CRDT change. */
+  private mergeState(updates: Partial<LiarsDiceGameState>): void {
+    this.engine.session.change("liars-dice:mergeState", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      Object.assign(doc.gameState, updates);
+    });
+  }
+
+  /** Update a single player's fields atomically. */
+  private mergePlayer(playerIndex: number, updates: Partial<PlayerState>): void {
+    this.engine.session.change("liars-dice:mergePlayer", (doc: any) => {
+      if (!doc.gameState?.players?.[playerIndex]) return;
+      Object.assign(doc.gameState.players[playerIndex], updates);
+    });
+  }
+
+  // ── Initialization ─────────────────────────────────────────────────────────
+
+  private _initState(): void {
     const players: PlayerState[] = [];
-
     for (let i = 0; i < this.config.numPlayers; i++) {
       players.push({
         dice: this.rng.rollDice(this.config.startingDice),
@@ -129,44 +149,77 @@ export class LiarsDiceGame {
       });
     }
 
-    return {
-      players,
-      currentPlayer: 0,
-      currentBid: null,
-      lastBidder: null,
-      roundNumber: 1,
-      turnInRound: 0,
-      winner: null,
-      lastAction: null,
-      phase: "bid",
-    };
+    this.engine.session.change("liars-dice:init", (doc: any) => {
+      doc.gameState = {
+        players,
+        currentPlayer: 0,
+        currentBid: null,
+        lastBidder: null,
+        roundNumber: 1,
+        turnInRound: 0,
+        winner: null,
+        lastAction: null,
+        phase: "bid",
+      };
+    });
+
+    // Create engine agents (one per player) — coins via resources, status via meta
+    for (let i = 0; i < this.config.numPlayers; i++) {
+      this.engine.dispatch("agent:create", { name: `player-${i}`, meta: { playerIndex: i } });
+      this.engine.dispatch("agent:giveResource", {
+        name: `player-${i}`,
+        resource: "dice",
+        amount: this.config.startingDice,
+      });
+    }
+
+    this.engine.dispatch("game:loopInit", { maxTurns: 1000 });
+    this.engine.dispatch("game:loopStart");
   }
+
+  reset(seed?: number): void {
+    if (seed !== undefined) {
+      this.rng = new SeededRandom(seed);
+    } else if (this.config.seed !== null) {
+      this.rng = new SeededRandom(this.config.seed!);
+    } else {
+      this.rng = new SeededRandom();
+    }
+
+    // Remove existing agents before re-creating
+    for (let i = 0; i < this.config.numPlayers; i++) {
+      try { this.engine.dispatch("agent:remove", { name: `player-${i}` }); } catch {}
+    }
+
+    this._initState();
+  }
+
+  // ── Public API ─────────────────────────────────────────────────────────────
 
   getState(): LiarsDiceGameState {
     return JSON.parse(JSON.stringify(this.state));
   }
 
   /**
-   * Get observation for a player (can only see own dice)
+   * Get observation for a player — can only see own dice, not others'.
    */
   getObservation(playerIndex: number) {
-    const player = this.state.players[playerIndex];
+    const s = this.state;
+    const player = s.players[playerIndex];
 
     return {
       myDice: [...player.dice],
       myDiceCount: player.diceCount,
-      otherPlayers: this.state.players.map((p, i) => ({
-        playerIndex: i,
-        diceCount: p.diceCount,
-        alive: p.alive,
-      })).filter((_, i) => i !== playerIndex),
+      otherPlayers: s.players
+        .map((p, i) => ({ playerIndex: i, diceCount: p.diceCount, alive: p.alive }))
+        .filter((_, i) => i !== playerIndex),
       totalDiceInPlay: this.getTotalDice(),
-      currentBid: this.state.currentBid,
-      lastBidder: this.state.lastBidder,
-      currentPlayer: this.state.currentPlayer,
-      roundNumber: this.state.roundNumber,
-      winner: this.state.winner,
-      lastAction: this.state.lastAction,
+      currentBid: s.currentBid,
+      lastBidder: s.lastBidder,
+      currentPlayer: s.currentPlayer,
+      roundNumber: s.roundNumber,
+      winner: s.winner,
+      lastAction: s.lastAction,
     };
   }
 
@@ -183,24 +236,22 @@ export class LiarsDiceGame {
   }
 
   /**
-   * Get valid actions for current player
+   * Get valid actions for a player.
    */
   getValidActions(playerIndex: number): string[] {
-    if (playerIndex !== this.state.currentPlayer) return [];
-    if (!this.state.players[playerIndex].alive) return [];
-    if (this.state.winner !== null) return [];
+    const s = this.state;
+    if (playerIndex !== s.currentPlayer) return [];
+    if (!s.players[playerIndex].alive) return [];
+    if (s.winner !== null) return [];
 
     const actions: string[] = [];
     const totalDice = this.getTotalDice();
 
-    // Can always call liar if there's a bid
-    if (this.state.currentBid) {
+    if (s.currentBid) {
       actions.push("liar");
     }
 
-    // Generate valid bids
-    const minQuantity = this.state.currentBid ? this.state.currentBid.quantity : 1;
-    const minFace = this.state.currentBid ? this.state.currentBid.face : MIN_FACE;
+    const minQuantity = s.currentBid ? s.currentBid.quantity : 1;
 
     for (let qty = minQuantity; qty <= totalDice; qty++) {
       for (let face = MIN_FACE; face <= MAX_FACE; face++) {
@@ -214,27 +265,16 @@ export class LiarsDiceGame {
   }
 
   private isValidBid(quantity: number, face: number): boolean {
-    if (quantity < 1 || face < MIN_FACE || face > MAX_FACE) {
-      return false;
-    }
-
-    if (!this.state.currentBid) {
-      return true;
-    }
-
-    // Must increase: higher quantity, OR same quantity with higher face
-    if (quantity > this.state.currentBid.quantity) {
-      return true;
-    }
-    if (quantity === this.state.currentBid.quantity && face > this.state.currentBid.face) {
-      return true;
-    }
-
+    const bid = this.state.currentBid;
+    if (quantity < 1 || face < MIN_FACE || face > MAX_FACE) return false;
+    if (!bid) return true;
+    if (quantity > bid.quantity) return true;
+    if (quantity === bid.quantity && face > bid.face) return true;
     return false;
   }
 
   /**
-   * Execute an action
+   * Execute an action string ("liar" or "bid:qty:face").
    */
   action(actionStr: string): { success: boolean; message: string } {
     const playerIndex = this.state.currentPlayer;
@@ -248,161 +288,156 @@ export class LiarsDiceGame {
       return this.handleChallenge(playerIndex);
     }
 
-    const [_, qtyStr, faceStr] = actionStr.split(":");
-    const quantity = parseInt(qtyStr);
-    const face = parseInt(faceStr);
-
-    return this.handleBid(playerIndex, quantity, face);
+    const [, qtyStr, faceStr] = actionStr.split(":");
+    return this.handleBid(playerIndex, parseInt(qtyStr), parseInt(faceStr));
   }
 
   private handleBid(player: number, quantity: number, face: number): { success: boolean; message: string } {
-    this.state.currentBid = { quantity, face };
-    this.state.lastBidder = player;
-    this.state.turnInRound++;
-
-    this.advancePlayer();
-
     const message = `Player ${player} bids: ${quantity}x ${face}s`;
-    this.state.lastAction = message;
+    this.mergeState({
+      currentBid: { quantity, face },
+      lastBidder: player,
+      turnInRound: this.state.turnInRound + 1,
+      lastAction: message,
+    });
+    this.advancePlayer();
+    this.engine.dispatch("game:nextTurn", { agentCount: this.config.numPlayers });
     return { success: true, message };
   }
 
   private handleChallenge(challenger: number): { success: boolean; message: string } {
-    const bid = this.state.currentBid!;
-    const bidder = this.state.lastBidder!;
+    const s = this.state;
+    const bid = s.currentBid!;
+    const bidder = s.lastBidder!;
 
-    // Count actual dice matching the bid (including wilds)
+    // Count dice matching the bid (including wilds)
     let actualCount = 0;
-    for (const player of this.state.players) {
-      if (player.alive) {
-        for (const die of player.dice) {
-          if (die === bid.face || die === WILD_FACE) {
-            actualCount++;
-          }
+    for (const p of s.players) {
+      if (p.alive) {
+        for (const die of p.dice) {
+          if (die === bid.face || die === WILD_FACE) actualCount++;
         }
       }
     }
 
-    let loser: number;
-    let message: string;
+    const bidWasValid = actualCount >= bid.quantity;
+    const loser = bidWasValid ? challenger : bidder;
 
-    if (actualCount >= bid.quantity) {
-      // Bid was valid - challenger loses
-      loser = challenger;
-      message = `Player ${challenger} calls LIAR! But there were ${actualCount}x ${bid.face}s (needed ${bid.quantity}). Challenger loses!`;
-    } else {
-      // Bid was a lie - bidder loses
-      loser = bidder;
-      message = `Player ${challenger} calls LIAR! Only ${actualCount}x ${bid.face}s (claimed ${bid.quantity}). Bidder loses!`;
+    let message = bidWasValid
+      ? `Player ${challenger} calls LIAR! But there were ${actualCount}x ${bid.face}s (needed ${bid.quantity}). Challenger loses!`
+      : `Player ${challenger} calls LIAR! Only ${actualCount}x ${bid.face}s (claimed ${bid.quantity}). Bidder loses!`;
+
+    const newDiceCount = s.players[loser].diceCount - 1;
+    const loserEliminated = newDiceCount <= 0;
+
+    this.mergePlayer(loser, {
+      diceCount: newDiceCount,
+      alive: !loserEliminated,
+      dice: loserEliminated ? [] : s.players[loser].dice,
+    });
+
+    // Sync agent resource
+    this.engine.dispatch("agent:takeResource", { name: `player-${loser}`, resource: "dice", amount: 1 });
+    if (loserEliminated) {
+      this.engine.dispatch("agent:setMeta", { name: `player-${loser}`, key: "status", value: "eliminated" });
+      this.engine.dispatch("agent:setActive", { name: `player-${loser}`, active: false });
     }
 
-    // Loser loses a die
-    this.state.players[loser].diceCount--;
-    if (this.state.players[loser].diceCount <= 0) {
-      this.state.players[loser].alive = false;
-      this.state.players[loser].dice = [];
-    }
-
-    // Check for winner
+    // Re-read state after mergePlayer to get fresh players list
     const alivePlayers = this.state.players.filter(p => p.alive);
+
     if (alivePlayers.length === 1) {
       const winnerIndex = this.state.players.findIndex(p => p.alive);
-      this.state.winner = winnerIndex;
-      this.state.phase = "complete";
       message += ` Player ${winnerIndex} wins!`;
+      this.mergeState({ winner: winnerIndex, phase: "complete", lastAction: message });
+      this.engine.dispatch("game:end", { winner: `player-${winnerIndex}`, reason: "last_standing" });
+      this.engine.dispatch("game:loopStop", { phase: "complete" });
     } else {
-      // Start new round
       this.startNewRound(loser);
+      this.mergeState({ lastAction: message });
     }
 
-    this.state.lastAction = message;
     return { success: true, message };
   }
 
   private startNewRound(loserStartsNext: number): void {
-    // Reroll all dice
-    for (const player of this.state.players) {
-      if (player.alive) {
-        player.dice = this.rng.rollDice(player.diceCount);
-      }
-    }
+    const s = this.state;
+    const freshPlayers: PlayerState[] = s.players.map(p => ({
+      ...p,
+      dice: p.alive ? this.rng.rollDice(p.diceCount) : [],
+    }));
 
-    this.state.currentBid = null;
-    this.state.lastBidder = null;
-    this.state.roundNumber++;
-    this.state.turnInRound = 0;
+    const nextPlayer = freshPlayers[loserStartsNext].alive
+      ? loserStartsNext
+      : this.findNextAlivePlayer(loserStartsNext, freshPlayers);
 
-    // Loser starts next round (if still alive)
-    if (this.state.players[loserStartsNext].alive) {
-      this.state.currentPlayer = loserStartsNext;
-    } else {
-      this.state.currentPlayer = this.findNextAlivePlayer(loserStartsNext);
-    }
+    this.engine.session.change("liars-dice:newRound", (doc: any) => {
+      if (!doc.gameState) return;
+      doc.gameState.players = freshPlayers;
+      doc.gameState.currentBid = null;
+      doc.gameState.lastBidder = null;
+      doc.gameState.roundNumber = (doc.gameState.roundNumber ?? 1) + 1;
+      doc.gameState.turnInRound = 0;
+      doc.gameState.currentPlayer = nextPlayer;
+    });
   }
 
   private advancePlayer(): void {
-    this.state.currentPlayer = this.findNextAlivePlayer(this.state.currentPlayer);
+    const next = this.findNextAlivePlayer(this.state.currentPlayer, this.state.players);
+    this.mergeState({ currentPlayer: next });
   }
 
-  private findNextAlivePlayer(from: number): number {
+  private findNextAlivePlayer(from: number, players: PlayerState[] = this.state.players): number {
     let next = (from + 1) % this.config.numPlayers;
-    while (!this.state.players[next].alive && next !== from) {
+    while (!players[next].alive && next !== from) {
       next = (next + 1) % this.config.numPlayers;
     }
     return next;
   }
 
   render(): void {
+    const s = this.state;
     console.log("\n" + "=".repeat(50));
     console.log("LIAR'S DICE");
     console.log("=".repeat(50));
-    console.log(`Round: ${this.state.roundNumber} | Turn: ${this.state.turnInRound}`);
+    console.log(`Round: ${s.roundNumber} | Turn: ${s.turnInRound}`);
     console.log(`Total dice in play: ${this.getTotalDice()}`);
 
-    if (this.state.currentBid) {
-      console.log(`Current bid: ${this.state.currentBid.quantity}x ${this.state.currentBid.face}s (by Player ${this.state.lastBidder})`);
+    if (s.currentBid) {
+      console.log(`Current bid: ${s.currentBid.quantity}x ${s.currentBid.face}s (by Player ${s.lastBidder})`);
     } else {
       console.log("No bid yet");
     }
 
     console.log("\nPlayers:");
     for (let i = 0; i < this.config.numPlayers; i++) {
-      const p = this.state.players[i];
-      const marker = i === this.state.currentPlayer ? "→ " : "  ";
+      const p = s.players[i];
+      const marker = i === s.currentPlayer ? "→ " : "  ";
       const status = p.alive ? "" : " [OUT]";
       const dice = p.dice.map(d => `[${d}]`).join(" ");
       console.log(`${marker}Player ${i}: ${p.diceCount} dice ${dice}${status}`);
     }
 
-    if (this.state.lastAction) {
-      console.log(`\nLast: ${this.state.lastAction}`);
-    }
-    if (this.state.winner !== null) {
-      console.log(`\n*** PLAYER ${this.state.winner} WINS ***`);
-    }
+    if (s.lastAction) console.log(`\nLast: ${s.lastAction}`);
+    if (s.winner !== null) console.log(`\n*** PLAYER ${s.winner} WINS ***`);
   }
 }
 
 // ============================================================================
-// Action Encoding
+// Action Encoding (unchanged — used by LiarsDiceAEC)
 // ============================================================================
 
 export function getActionSpaceSize(maxDice: number): number {
-  // "liar" = 1
-  // bids: quantity (1 to maxDice) × face (2-6) = maxDice * 5
+  // "liar" = 1, bids: quantity (1 to maxDice) × face (2-6) = maxDice * 5
   return 1 + maxDice * 5;
 }
 
-export function encodeBid(quantity: number, face: number, maxDice: number): number {
-  // 0 = liar
-  // 1+ = bids
+export function encodeBid(quantity: number, face: number, _maxDice: number): number {
   return 1 + (quantity - 1) * 5 + (face - 2);
 }
 
-export function decodeBid(action: number, maxDice: number): { type: "liar" } | { type: "bid"; quantity: number; face: number } {
-  if (action === 0) {
-    return { type: "liar" };
-  }
+export function decodeBid(action: number, _maxDice: number): { type: "liar" } | { type: "bid"; quantity: number; face: number } {
+  if (action === 0) return { type: "liar" };
   const bidIndex = action - 1;
   const quantity = Math.floor(bidIndex / 5) + 1;
   const face = (bidIndex % 5) + 2;

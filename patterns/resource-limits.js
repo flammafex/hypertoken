@@ -43,42 +43,31 @@ export function registerHandSizeLimit(ruleEngine, opts = {}) {
     (engine, lastAction) => {
       if (!lastAction || lastAction.type !== triggerAction) return false;
       
-      const agent = engine._agents?.find(p => 
-        p.hand?.length > maxSize
+      const agent = engine._agents?.find(p =>
+        (p.inventory?.length ?? 0) > maxSize
       );
       
       return !!agent;
     },
     (engine) => {
-      const agent = engine._agents.find(p => p.hand.length > maxSize);
-      const excess = agent.hand.length - maxSize;
-      
+      const agent = engine._agents.find(p => (p.inventory?.length ?? 0) > maxSize);
+      const excess = (agent.inventory?.length ?? 0) - maxSize;
+
       if (discardMode === "auto") {
-        // Auto-discard from end of hand
-        const toDiscard = agent.hand.slice(-excess);
-        
+        const toDiscard = (agent.inventory ?? []).slice(-excess);
         engine.dispatch("agent:discardCards", {
           name: agent.name,
-          cards: toDiscard
+          tokenIds: toDiscard.map(t => t.id),
         });
-        
         engine.emit("hand:limitEnforced", {
-          payload: {
-            agent: agent.name,
-            discarded: excess,
-            auto: true
-          }
+          payload: { agent: agent.name, discarded: excess, auto: true }
         });
       } else {
-        // Set flag requiring agent choice
-        agent.mustDiscard = excess;
-        engine._gameState.waitingForDiscard = agent.name;
-        
+        // Flag the agent and store in game state so it persists in CRDT
+        engine.dispatch("agent:setMeta", { name: agent.name, key: "mustDiscard", value: excess });
+        engine.dispatch("game:setProperty", { key: "waitingForDiscard", value: agent.name });
         engine.emit("hand:mustDiscard", {
-          payload: {
-            agent: agent.name,
-            count: excess
-          }
+          payload: { agent: agent.name, count: excess }
         });
       }
     },
@@ -193,28 +182,20 @@ export function registerNegativePrevention(ruleEngine, opts = {}) {
       return !!agent;
     },
     (engine) => {
-      engine._agents.forEach(p => {
+      for (const p of engine._agents) {
         const resourcesToCheck = resources || Object.keys(p.resources || {});
-        
-        resourcesToCheck.forEach(resource => {
-          if ((p.resources?.[resource] || 0) < 0) {
-            const deficit = p.resources[resource];
-            p.resources[resource] = 0;
-            
-            if (onViolation) {
-              onViolation(engine, p, resource, deficit);
-            }
-            
+        for (const resource of resourcesToCheck) {
+          const current = p.resources?.[resource] ?? 0;
+          if (current < 0) {
+            // Give back the deficit to bring the resource to 0
+            engine.dispatch("agent:giveResource", { name: p.name, resource, amount: -current });
+            if (onViolation) onViolation(engine, p, resource, current);
             engine.emit("resource:negative", {
-              payload: {
-                agent: p.name,
-                resource,
-                deficit
-              }
+              payload: { agent: p.name, resource, deficit: current }
             });
           }
-        });
-      });
+        }
+      }
     },
     { priority: 150 }
   );
@@ -250,32 +231,21 @@ export function registerResourceMaxima(ruleEngine, opts = {}) {
       return !!agent;
     },
     (engine) => {
-      engine._agents.forEach(p => {
-        Object.entries(maxima).forEach(([resource, max]) => {
-          const current = p.resources?.[resource] || 0;
-          
+      for (const p of engine._agents) {
+        for (const [resource, max] of Object.entries(maxima)) {
+          const current = p.resources?.[resource] ?? 0;
           if (current > max) {
             const overflow = current - max;
-            
-            if (overflowMode === "cap") {
-              p.resources[resource] = max;
-            } else if (overflowMode === "refund") {
-              // Convert overflow to another resource (if defined)
-              p.resources[resource] = max;
-              p.resources.overflow = (p.resources.overflow || 0) + overflow;
+            engine.dispatch("agent:takeResource", { name: p.name, resource, amount: overflow });
+            if (overflowMode === "refund") {
+              engine.dispatch("agent:giveResource", { name: p.name, resource: "overflow", amount: overflow });
             }
-            
             engine.emit("resource:overflow", {
-              payload: {
-                agent: p.name,
-                resource,
-                overflow,
-                mode: overflowMode
-              }
+              payload: { agent: p.name, resource, overflow, mode: overflowMode }
             });
           }
-        });
-      });
+        }
+      }
     },
     { priority: 90 }
   );
@@ -320,21 +290,14 @@ export function registerResourceGeneration(ruleEngine, opts = {}) {
     (engine) => {
       const agents = engine._agents || [];
       
-      agents.forEach(p => {
-        if (p.status === "eliminated") return;
-        
-        Object.entries(amounts).forEach(([resource, amount]) => {
-          engine.dispatch("agent:giveResource", {
-            name: p.name,
-            resource,
-            amount
-          });
-        });
-      });
-      
-      engine.emit("resources:generated", {
-        payload: { amounts }
-      });
+      for (const p of agents) {
+        if (p.meta?.status === "eliminated") continue;
+        for (const [resource, amount] of Object.entries(amounts)) {
+          engine.dispatch("agent:giveResource", { name: p.name, resource, amount });
+        }
+      }
+
+      engine.emit("resources:generated", { payload: { amounts } });
     },
     { priority: 85 }
   );
@@ -374,21 +337,15 @@ export function registerResourceDecay(ruleEngine, opts = {}) {
     (engine) => {
       const agents = engine._agents || [];
       
-      agents.forEach(p => {
-        if (p.status === "eliminated") return;
-        
-        Object.entries(amounts).forEach(([resource, amount]) => {
-          engine.dispatch("agent:takeResource", {
-            name: p.name,
-            resource,
-            amount
-          });
-        });
-      });
+      for (const p of agents) {
+        if (p.meta?.status === "eliminated") continue;
+        for (const [resource, amount] of Object.entries(amounts)) {
+          engine.dispatch("agent:takeResource", { name: p.name, resource, amount });
+        }
+      }
       
       if (trigger === "time") {
-        if (!engine._gameState) engine._gameState = {};
-        engine._gameState.lastDrainTime = Date.now();
+        engine.dispatch("game:setProperty", { key: "lastDrainTime", value: Date.now() });
       }
       
       engine.emit("resources:drained", {
@@ -421,36 +378,30 @@ export function registerEliminationOnDepletion(ruleEngine, opts = {}) {
       if (!lastAction?.type.includes("Resource")) return false;
       
       const agent = engine._agents?.find(p => {
-        const value = p.resources?.[resource] || 0;
-        return value <= threshold && p.status !== "eliminated";
+        const value = p.resources?.[resource] ?? 0;
+        return value <= threshold && p.meta?.status !== "eliminated";
       });
       
       return !!agent;
     },
     (engine) => {
       const agent = engine._agents.find(p => {
-        const value = p.resources?.[resource] || 0;
-        return value <= threshold && p.status !== "eliminated";
+        const value = p.resources?.[resource] ?? 0;
+        return value <= threshold && p.meta?.status !== "eliminated";
       });
-      
-      agent.status = "eliminated";
-      agent.active = false;
-      agent.alive = false;
-      
+
+      engine.dispatch("agent:setActive", { name: agent.name, active: false });
+      engine.dispatch("agent:setMeta", { name: agent.name, key: "status", value: "eliminated" });
+      engine.dispatch("agent:setMeta", { name: agent.name, key: "alive", value: false });
+
       engine.emit("agent:eliminated", {
-        payload: {
-          agent: agent.name,
-          reason: `${resource}_depleted`
-        }
+        payload: { agent: agent.name, reason: `${resource}_depleted` }
       });
-      
+
       // Check if this triggers game end
-      const remaining = engine._agents.filter(p => p.status !== "eliminated");
+      const remaining = engine._agents.filter(p => p.meta?.status !== "eliminated");
       if (remaining.length === 1) {
-        engine.dispatch("game:end", {
-          winner: remaining[0].name,
-          reason: "elimination"
-        });
+        engine.dispatch("game:end", { winner: remaining[0].name, reason: "elimination" });
       }
     },
     { priority: 110 }

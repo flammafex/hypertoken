@@ -1,5 +1,4 @@
 import { ActionRegistry } from '../../engine/actions.js';
-import { Token } from '../../core/Token.js';
 
 // Dungeon generation and game logic
 const DUNGEON_WIDTH = 40;
@@ -121,22 +120,66 @@ function placeEntities(rooms) {
   return entities;
 }
 
+// Helpers that read/write the CRDT-backed game state via session.change()
+function getState(engine) {
+  return engine._gameState;
+}
+
+function mergeState(engine, updates) {
+  engine.session.change("dungeon:mergeState", (doc) => {
+    if (!doc.gameState) doc.gameState = {};
+    Object.assign(doc.gameState, updates);
+  });
+}
+
+function mergePlayer(engine, clientId, updates) {
+  engine.session.change("dungeon:mergePlayer", (doc) => {
+    if (!doc.gameState?.players?.[clientId]) return;
+    Object.assign(doc.gameState.players[clientId], updates);
+  });
+}
+
+function mergeEntity(engine, entityId, updates) {
+  engine.session.change("dungeon:mergeEntity", (doc) => {
+    if (!doc.gameState?.entities) return;
+    const entity = doc.gameState.entities.find(e => e.id === entityId);
+    if (entity) Object.assign(entity, updates);
+  });
+}
+
+function removeEntity(engine, entityId) {
+  engine.session.change("dungeon:removeEntity", (doc) => {
+    if (!doc.gameState?.entities) return;
+    const idx = doc.gameState.entities.findIndex(e => e.id === entityId);
+    if (idx !== -1) doc.gameState.entities.splice(idx, 1);
+  });
+}
+
+function pushMessage(engine, message) {
+  engine.session.change("dungeon:pushMessage", (doc) => {
+    if (!doc.gameState?.messages) return;
+    doc.gameState.messages.push(message);
+  });
+}
+
 // Extend ActionRegistry with dungeon-specific actions
 Object.assign(ActionRegistry, {
   "dungeon:init": (engine) => {
     const { dungeon, rooms } = generateDungeon();
     const entities = placeEntities(rooms);
 
-    engine._gameState = {
-      dungeon,
-      entities,
-      players: {},
-      messages: [],
-      turn: 0,
-      spawnRoom: rooms[0],
-      status: 'waiting',
-      maxPlayers: 4
-    };
+    engine.session.change("dungeon:init", (doc) => {
+      doc.gameState = {
+        dungeon,
+        entities,
+        players: {},
+        messages: [],
+        turn: 0,
+        spawnRoom: rooms[0],
+        status: 'waiting',
+        maxPlayers: 4,
+      };
+    });
 
     engine.emit("dungeon:initialized", {
       width: DUNGEON_WIDTH,
@@ -145,23 +188,22 @@ Object.assign(ActionRegistry, {
   },
 
   "player:join": (engine, { clientId, name }) => {
-    const state = engine._gameState;
+    const state = getState(engine);
 
-    if (Object.keys(state.players).length >= state.maxPlayers) {
+    if (Object.keys(state.players ?? {}).length >= state.maxPlayers) {
       throw new Error("Game is full");
     }
-
-    if (state.players[clientId]) {
+    if (state.players?.[clientId]) {
       throw new Error("Player already joined");
     }
 
-    // Spawn player in first room
     const spawnX = state.spawnRoom.centerX + Math.floor(Math.random() * 3) - 1;
     const spawnY = state.spawnRoom.centerY + Math.floor(Math.random() * 3) - 1;
+    const playerName = name || `Player${Object.keys(state.players ?? {}).length + 1}`;
 
-    state.players[clientId] = {
+    const player = {
       id: clientId,
-      name: name || `Player${Object.keys(state.players).length + 1}`,
+      name: playerName,
       x: spawnX,
       y: spawnY,
       hp: 10,
@@ -170,32 +212,41 @@ Object.assign(ActionRegistry, {
       gold: 0,
       xp: 0,
       level: 1,
-      alive: true
+      alive: true,
     };
 
-    state.messages.push(`${state.players[clientId].name} has entered the dungeon!`);
-    engine.emit("player:joined", { clientId, player: state.players[clientId] });
+    engine.session.change("player:join", (doc) => {
+      if (!doc.gameState.players) doc.gameState.players = {};
+      doc.gameState.players[clientId] = player;
+      doc.gameState.messages.push(`${playerName} has entered the dungeon!`);
 
-    if (state.status === 'waiting' && Object.keys(state.players).length >= 1) {
-      state.status = 'playing';
-      state.messages.push("The adventure begins!");
+      const playerCount = Object.keys(doc.gameState.players).length;
+      if (doc.gameState.status === 'waiting' && playerCount >= 1) {
+        doc.gameState.status = 'playing';
+        doc.gameState.messages.push("The adventure begins!");
+      }
+    });
+
+    engine.emit("player:joined", { clientId, player });
+
+    if (getState(engine).status === 'playing') {
       engine.emit("game:started");
     }
   },
 
   "player:move": (engine, { clientId, direction }) => {
-    const state = engine._gameState;
-    const player = state.players[clientId];
+    const state = getState(engine);
+    const player = state.players?.[clientId];
 
     if (!player || !player.alive) {
       throw new Error("Invalid player or player is dead");
     }
 
     const moves = {
-      'up': { dx: 0, dy: -1 },
-      'down': { dx: 0, dy: 1 },
-      'left': { dx: -1, dy: 0 },
-      'right': { dx: 1, dy: 0 }
+      'up':    { dx: 0,  dy: -1 },
+      'down':  { dx: 0,  dy:  1 },
+      'left':  { dx: -1, dy:  0 },
+      'right': { dx:  1, dy:  0 },
     };
 
     const move = moves[direction];
@@ -204,49 +255,56 @@ Object.assign(ActionRegistry, {
     const newX = player.x + move.dx;
     const newY = player.y + move.dy;
 
-    // Check bounds
     if (newX < 0 || newX >= DUNGEON_WIDTH || newY < 0 || newY >= DUNGEON_HEIGHT) {
       throw new Error("Out of bounds");
     }
-
-    // Check if walkable
     if (state.dungeon[newY][newX] === TILES.WALL) {
       throw new Error("Can't walk through walls");
     }
 
-    // Check for monsters at new position
+    // Check for monster at new position
     const monster = state.entities.find(e =>
       e.type === 'monster' && e.x === newX && e.y === newY && e.hp > 0
     );
 
     if (monster) {
-      // Attack monster
-      monster.hp -= player.damage;
-      state.messages.push(`${player.name} attacks ${monster.name} for ${player.damage} damage!`);
+      const newHp = monster.hp - player.damage;
+      mergeEntity(engine, monster.id, { hp: newHp });
+      pushMessage(engine, `${player.name} attacks ${monster.name} for ${player.damage} damage!`);
 
-      if (monster.hp <= 0) {
-        state.messages.push(`${player.name} defeated ${monster.name}! +${monster.xp} XP`);
-        player.xp += monster.xp;
-        player.gold += Math.floor(Math.random() * 10) + 5;
-
-        // Level up check
+      if (newHp <= 0) {
+        pushMessage(engine, `${player.name} defeated ${monster.name}! +${monster.xp} XP`);
+        const goldGain = Math.floor(Math.random() * 10) + 5;
+        const newXp = player.xp + monster.xp;
+        const newGold = player.gold + goldGain;
         const xpNeeded = player.level * 50;
-        if (player.xp >= xpNeeded) {
-          player.level++;
-          player.maxHp += 3;
-          player.hp = player.maxHp;
-          player.damage++;
-          state.messages.push(`${player.name} reached level ${player.level}!`);
-          engine.emit("player:levelup", { clientId, level: player.level });
+        const leveled = newXp >= xpNeeded;
+        const newLevel = leveled ? player.level + 1 : player.level;
+
+        mergePlayer(engine, clientId, {
+          xp: newXp,
+          gold: newGold,
+          ...(leveled ? {
+            level: newLevel,
+            maxHp: player.maxHp + 3,
+            hp: player.maxHp + 3,
+            damage: player.damage + 1,
+          } : {}),
+        });
+
+        if (leveled) {
+          pushMessage(engine, `${player.name} reached level ${newLevel}!`);
+          engine.emit("player:levelup", { clientId, level: newLevel });
         }
       } else {
-        // Monster counterattacks
-        player.hp -= monster.damage;
-        state.messages.push(`${monster.name} hits ${player.name} for ${monster.damage} damage!`);
+        // Monster counterattack
+        const playerNewHp = player.hp - monster.damage;
+        pushMessage(engine, `${monster.name} hits ${player.name} for ${monster.damage} damage!`);
+        mergePlayer(engine, clientId, { hp: playerNewHp });
 
-        if (player.hp <= 0) {
-          player.alive = false;
-          state.messages.push(`${player.name} has been defeated!`);
+        if (playerNewHp <= 0) {
+          mergePlayer(engine, clientId, { alive: false });
+          pushMessage(engine, `${player.name} has been defeated!`);
           engine.emit("player:died", { clientId });
         }
       }
@@ -254,19 +312,16 @@ Object.assign(ActionRegistry, {
       engine.emit("combat:occurred", { clientId, monsterId: monster.id });
     } else {
       // Move player
-      player.x = newX;
-      player.y = newY;
+      mergePlayer(engine, clientId, { x: newX, y: newY });
 
       // Check for treasure
       const treasure = state.entities.find(e =>
         e.type === 'treasure' && e.x === newX && e.y === newY
       );
-
       if (treasure) {
-        player.gold += treasure.gold;
-        state.messages.push(`${player.name} found ${treasure.gold} gold!`);
-        // Remove treasure
-        state.entities = state.entities.filter(e => e.id !== treasure.id);
+        mergePlayer(engine, clientId, { gold: player.gold + treasure.gold });
+        pushMessage(engine, `${player.name} found ${treasure.gold} gold!`);
+        removeEntity(engine, treasure.id);
         engine.emit("treasure:collected", { clientId, gold: treasure.gold });
       }
 
@@ -274,42 +329,43 @@ Object.assign(ActionRegistry, {
       const exit = state.entities.find(e =>
         e.type === 'exit' && e.x === newX && e.y === newY
       );
-
       if (exit) {
         const allMonstersDefeated = state.entities.every(e =>
           e.type !== 'monster' || e.hp <= 0
         );
-
         if (allMonstersDefeated) {
-          state.status = 'won';
-          state.messages.push(`${player.name} found the exit! Victory!`);
+          mergeState(engine, { status: 'won' });
+          pushMessage(engine, `${player.name} found the exit! Victory!`);
           engine.emit("game:won", { winner: clientId });
+          engine.dispatch("game:end", { winner: clientId, reason: "exit_reached" });
         } else {
-          state.messages.push(`The exit is blocked by monsters!`);
+          pushMessage(engine, `The exit is blocked by monsters!`);
         }
       }
 
       engine.emit("player:moved", { clientId, x: newX, y: newY, direction });
     }
 
-    state.turn++;
+    // Increment turn counter in CRDT
+    engine.session.change("dungeon:turn", (doc) => {
+      if (doc.gameState) doc.gameState.turn = (doc.gameState.turn ?? 0) + 1;
+    });
   },
 
   "player:leave": (engine, { clientId }) => {
-    const state = engine._gameState;
-    const player = state.players[clientId];
-
+    const player = getState(engine).players?.[clientId];
     if (player) {
-      state.messages.push(`${player.name} has left the dungeon.`);
-      delete state.players[clientId];
+      pushMessage(engine, `${player.name} has left the dungeon.`);
+      engine.session.change("player:leave", (doc) => {
+        if (doc.gameState?.players) delete doc.gameState.players[clientId];
+      });
       engine.emit("player:left", { clientId });
     }
   },
 
   "dungeon:getMessages": (engine, { since = 0 }) => {
-    const state = engine._gameState;
-    return state.messages.slice(since);
-  }
+    return (getState(engine).messages ?? []).slice(since);
+  },
 });
 
 export { TILES, DUNGEON_WIDTH, DUNGEON_HEIGHT };

@@ -12,7 +12,14 @@
  * - Contessa: Blocks assassination
  *
  * Last player with influence wins.
+ *
+ * Engine integration:
+ * - Players are CRDT-backed agents; influence count is an agent resource
+ * - All game state (deck, cards, phase, pending actions) lives in CRDT gameState
+ * - Per-player coin/card state is stored in doc.gameState.players via session.change()
  */
+
+import { Engine } from "../../engine/Engine.js";
 
 // ============================================================================
 // Types
@@ -88,14 +95,6 @@ const COUP_COST = 7;
 const ASSASSINATE_COST = 3;
 const MUST_COUP_THRESHOLD = 10;
 
-// Which roles can perform which actions
-const ACTION_ROLES: Partial<Record<ActionType, Role>> = {
-  tax: "duke",
-  assassinate: "assassin",
-  steal: "captain",
-  exchange: "ambassador",
-};
-
 // Which roles can block which actions
 const BLOCK_ROLES: Record<string, Role[]> = {
   foreign_aid: ["duke"],
@@ -134,38 +133,65 @@ class SeededRandom {
 // ============================================================================
 
 export class CoupGame {
+  readonly engine: Engine;
   private config: Required<CoupConfig>;
   private rng: SeededRandom;
-  private state: CoupGameState;
 
-  constructor(config: CoupConfig = {}) {
+  constructor(engine: Engine, config: CoupConfig = {}) {
     const numPlayers = config.numPlayers ?? 2;
     if (numPlayers < 2 || numPlayers > 6) {
       throw new Error("Coup requires 2-6 players");
     }
 
+    this.engine = engine;
     this.config = {
       numPlayers,
       seed: config.seed ?? null,
     };
 
     this.rng = new SeededRandom(this.config.seed ?? undefined);
-    this.state = this.createInitialState();
+    this._initState();
   }
 
-  reset(seed?: number): void {
-    if (seed !== undefined) {
-      this.rng = new SeededRandom(seed);
-    } else if (this.config.seed !== null) {
-      this.rng = new SeededRandom(this.config.seed);
-    } else {
-      this.rng = new SeededRandom();
+  // ── CRDT state helpers ─────────────────────────────────────────────────────
+
+  private get state(): CoupGameState {
+    return (this.engine._gameState as any) as CoupGameState;
+  }
+
+  /** Atomically update multiple top-level game-state fields. */
+  private mergeState(updates: Partial<CoupGameState>): void {
+    this.engine.session.change("coup:mergeState", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      Object.assign(doc.gameState, updates);
+    });
+  }
+
+  // ── Initialization ─────────────────────────────────────────────────────────
+
+  private _initState(): void {
+    const initialState = this._computeInitialState();
+
+    this.engine.session.change("coup:init", (doc: any) => {
+      doc.gameState = initialState;
+    });
+
+    // Create engine agents — influence tracked as a resource
+    for (let i = 0; i < this.config.numPlayers; i++) {
+      this.engine.dispatch("agent:create", { name: `player-${i}`, meta: { playerIndex: i } });
+      this.engine.dispatch("agent:giveResource", {
+        name: `player-${i}`,
+        resource: "influence",
+        amount: 2,
+      });
     }
-    this.state = this.createInitialState();
+
+    this.engine.dispatch("game:loopInit", { maxTurns: 1000 });
+    this.engine.dispatch("game:loopStart");
   }
 
-  private createInitialState(): CoupGameState {
-    // Create deck (3 of each role)
+  private _computeInitialState(): CoupGameState {
+    // Create and shuffle deck (3 of each role)
     const deck: Role[] = [];
     for (const role of ROLES) {
       for (let i = 0; i < CARDS_PER_ROLE; i++) {
@@ -202,6 +228,25 @@ export class CoupGame {
     };
   }
 
+  reset(seed?: number): void {
+    if (seed !== undefined) {
+      this.rng = new SeededRandom(seed);
+    } else if (this.config.seed !== null) {
+      this.rng = new SeededRandom(this.config.seed);
+    } else {
+      this.rng = new SeededRandom();
+    }
+
+    // Remove existing agents before re-creating
+    for (let i = 0; i < this.config.numPlayers; i++) {
+      try { this.engine.dispatch("agent:remove", { name: `player-${i}` }); } catch {}
+    }
+
+    this._initState();
+  }
+
+  // ── Public API ─────────────────────────────────────────────────────────────
+
   getState(): CoupGameState {
     return JSON.parse(JSON.stringify(this.state));
   }
@@ -210,28 +255,29 @@ export class CoupGame {
    * Get observation for a player (can only see own cards, others' revealed cards)
    */
   getObservation(playerIndex: number) {
-    const player = this.state.players[playerIndex];
+    const s = this.state;
+    const player = s.players[playerIndex];
 
     return {
       myCards: player.cards.map(c => ({ role: c.role, revealed: c.revealed })),
       myCoins: player.coins,
-      otherPlayers: this.state.players.map((p, i) => ({
+      otherPlayers: s.players.map((p, i) => ({
         playerIndex: i,
         coins: p.coins,
         cardCount: p.cards.filter(c => !c.revealed).length,
         revealedCards: p.cards.filter(c => c.revealed).map(c => c.role),
         alive: p.alive,
       })).filter((_, i) => i !== playerIndex),
-      currentPlayer: this.state.currentPlayer,
-      phase: this.state.phase,
-      pendingAction: this.state.pendingAction,
-      pendingBlock: this.state.pendingBlock,
-      mustLoseInfluence: this.state.mustLoseInfluence,
-      exchangeOptions: this.state.exchangeCards && this.state.mustLoseInfluence === playerIndex
-        ? this.state.exchangeCards
+      currentPlayer: s.currentPlayer,
+      phase: s.phase,
+      pendingAction: s.pendingAction,
+      pendingBlock: s.pendingBlock,
+      mustLoseInfluence: s.mustLoseInfluence,
+      exchangeOptions: s.exchangeCards && s.mustLoseInfluence === playerIndex
+        ? s.exchangeCards
         : null,
-      winner: this.state.winner,
-      lastAction: this.state.lastAction,
+      winner: s.winner,
+      lastAction: s.lastAction,
     };
   }
 
@@ -243,21 +289,22 @@ export class CoupGame {
    * Get valid actions for a player in current state
    */
   getValidActions(playerIndex: number): string[] {
+    const s = this.state;
     const actions: string[] = [];
-    const player = this.state.players[playerIndex];
+    const player = s.players[playerIndex];
 
-    if (!player.alive || this.state.winner !== null) {
+    if (!player.alive || s.winner !== null) {
       return [];
     }
 
-    switch (this.state.phase) {
+    switch (s.phase) {
       case "action":
-        if (playerIndex !== this.state.currentPlayer) return [];
+        if (playerIndex !== s.currentPlayer) return [];
 
         // Must coup if 10+ coins
         if (player.coins >= MUST_COUP_THRESHOLD) {
           for (let t = 0; t < this.config.numPlayers; t++) {
-            if (t !== playerIndex && this.state.players[t].alive) {
+            if (t !== playerIndex && s.players[t].alive) {
               actions.push(`coup:${t}`);
             }
           }
@@ -271,7 +318,7 @@ export class CoupGame {
         // Coup if can afford
         if (player.coins >= COUP_COST) {
           for (let t = 0; t < this.config.numPlayers; t++) {
-            if (t !== playerIndex && this.state.players[t].alive) {
+            if (t !== playerIndex && s.players[t].alive) {
               actions.push(`coup:${t}`);
             }
           }
@@ -282,14 +329,14 @@ export class CoupGame {
 
         if (player.coins >= ASSASSINATE_COST) {
           for (let t = 0; t < this.config.numPlayers; t++) {
-            if (t !== playerIndex && this.state.players[t].alive) {
+            if (t !== playerIndex && s.players[t].alive) {
               actions.push(`assassinate:${t}`);
             }
           }
         }
 
         for (let t = 0; t < this.config.numPlayers; t++) {
-          if (t !== playerIndex && this.state.players[t].alive && this.state.players[t].coins > 0) {
+          if (t !== playerIndex && s.players[t].alive && s.players[t].coins > 0) {
             actions.push(`steal:${t}`);
           }
         }
@@ -299,7 +346,7 @@ export class CoupGame {
 
       case "challenge":
         // Anyone except action player can challenge
-        if (playerIndex === this.state.pendingAction?.player) {
+        if (playerIndex === s.pendingAction?.player) {
           return [];
         }
         actions.push("challenge");
@@ -308,28 +355,30 @@ export class CoupGame {
 
       case "block":
         // Only target can block (for targeted actions) or anyone for foreign_aid
-        const pending = this.state.pendingAction;
-        if (!pending) return [];
+        {
+          const pending = s.pendingAction;
+          if (!pending) return [];
 
-        if (pending.type === "foreign_aid") {
-          if (playerIndex !== pending.player) {
-            actions.push("block:duke");
+          if (pending.type === "foreign_aid") {
+            if (playerIndex !== pending.player) {
+              actions.push("block:duke");
+              actions.push("pass");
+            }
+          } else if (pending.target === playerIndex) {
+            const blockers = BLOCK_ROLES[pending.type];
+            if (blockers) {
+              for (const role of blockers) {
+                actions.push(`block:${role}`);
+              }
+            }
             actions.push("pass");
           }
-        } else if (pending.target === playerIndex) {
-          const blockers = BLOCK_ROLES[pending.type];
-          if (blockers) {
-            for (const role of blockers) {
-              actions.push(`block:${role}`);
-            }
-          }
-          actions.push("pass");
         }
         break;
 
       case "block_challenge":
         // Anyone except blocker can challenge the block
-        if (playerIndex === this.state.pendingBlock?.player) {
+        if (playerIndex === s.pendingBlock?.player) {
           return [];
         }
         actions.push("challenge");
@@ -337,22 +386,24 @@ export class CoupGame {
         break;
 
       case "lose_influence":
-        if (playerIndex !== this.state.mustLoseInfluence) return [];
-        const hiddenCards = player.cards
-          .map((c, i) => ({ card: c, index: i }))
-          .filter(x => !x.card.revealed);
-        for (const { index } of hiddenCards) {
-          actions.push(`lose:${index}`);
+        if (playerIndex !== s.mustLoseInfluence) return [];
+        {
+          const hiddenCards = player.cards
+            .map((c, i) => ({ card: c, index: i }))
+            .filter(x => !x.card.revealed);
+          for (const { index } of hiddenCards) {
+            actions.push(`lose:${index}`);
+          }
         }
         break;
 
       case "exchange":
-        if (playerIndex !== this.state.currentPlayer) return [];
-        // Choose which cards to keep (simplified: just pick indices)
-        const numToKeep = player.cards.filter(c => !c.revealed).length;
-        const available = this.state.exchangeCards?.length ?? 0;
-        // Generate all combinations
-        actions.push(...this.generateExchangeChoices(available, numToKeep));
+        if (playerIndex !== s.currentPlayer) return [];
+        {
+          const numToKeep = player.cards.filter(c => !c.revealed).length;
+          const available = s.exchangeCards?.length ?? 0;
+          actions.push(...this.generateExchangeChoices(available, numToKeep));
+        }
         break;
     }
 
@@ -417,7 +468,7 @@ export class CoupGame {
         break;
     }
 
-    this.state.lastAction = message;
+    this.mergeState({ lastAction: message });
     this.checkWinner();
     return { success: true, message };
   }
@@ -427,40 +478,51 @@ export class CoupGame {
 
     switch (action) {
       case "income":
-        this.state.players[player].coins += 1;
+        this.engine.session.change("coup:income", (doc: any) => {
+          doc.gameState.players[player].coins += 1;
+        });
         this.advanceTurn();
         return `Player ${player} takes income (1 coin)`;
 
       case "foreign_aid":
-        this.state.pendingAction = { type: "foreign_aid", player };
-        this.state.phase = "block";
+        this.mergeState({ pendingAction: { type: "foreign_aid", player }, phase: "block" });
         return `Player ${player} attempts foreign aid`;
 
       case "coup":
-        this.state.players[player].coins -= COUP_COST;
-        this.state.mustLoseInfluence = target!;
-        this.state.phase = "lose_influence";
+        this.engine.session.change("coup:coup", (doc: any) => {
+          doc.gameState.players[player].coins -= COUP_COST;
+          doc.gameState.mustLoseInfluence = target!;
+          doc.gameState.phase = "lose_influence";
+        });
         return `Player ${player} coups player ${target}`;
 
       case "tax":
-        this.state.pendingAction = { type: "tax", player, claimedRole: "duke" };
-        this.state.phase = "challenge";
+        this.mergeState({
+          pendingAction: { type: "tax", player, claimedRole: "duke" },
+          phase: "challenge",
+        });
         return `Player ${player} claims Duke, takes tax`;
 
       case "assassinate":
-        this.state.players[player].coins -= ASSASSINATE_COST;
-        this.state.pendingAction = { type: "assassinate", player, target, claimedRole: "assassin" };
-        this.state.phase = "challenge";
+        this.engine.session.change("coup:assassinate", (doc: any) => {
+          doc.gameState.players[player].coins -= ASSASSINATE_COST;
+          doc.gameState.pendingAction = { type: "assassinate", player, target, claimedRole: "assassin" };
+          doc.gameState.phase = "challenge";
+        });
         return `Player ${player} claims Assassin, targets ${target}`;
 
       case "steal":
-        this.state.pendingAction = { type: "steal", player, target, claimedRole: "captain" };
-        this.state.phase = "challenge";
+        this.mergeState({
+          pendingAction: { type: "steal", player, target, claimedRole: "captain" },
+          phase: "challenge",
+        });
         return `Player ${player} claims Captain, steals from ${target}`;
 
       case "exchange":
-        this.state.pendingAction = { type: "exchange", player, claimedRole: "ambassador" };
-        this.state.phase = "challenge";
+        this.mergeState({
+          pendingAction: { type: "exchange", player, claimedRole: "ambassador" },
+          phase: "challenge",
+        });
         return `Player ${player} claims Ambassador, exchanges`;
 
       default:
@@ -470,7 +532,6 @@ export class CoupGame {
 
   private handleChallenge(challenger: number, didChallenge: boolean): string {
     if (!didChallenge) {
-      // All players passed - check if action needs blocking
       return this.proceedAfterChallenge();
     }
 
@@ -479,29 +540,36 @@ export class CoupGame {
     const claimant = pending.player;
     const claimantCards = this.state.players[claimant].cards;
 
-    // Check if claimant actually has the role
     const hasRole = claimantCards.some(c => !c.revealed && c.role === claimedRole);
 
     if (hasRole) {
-      // Challenge fails - challenger loses influence
-      this.state.mustLoseInfluence = challenger;
-      this.state.phase = "lose_influence";
-      // Claimant shuffles the revealed card back and draws new
+      // Challenge fails — claimant shuffles the card back and draws new
       const cardIndex = claimantCards.findIndex(c => !c.revealed && c.role === claimedRole);
-      const card = claimantCards[cardIndex];
-      this.state.deck.push(card.role);
-      this.state.deck = this.rng.shuffle(this.state.deck);
-      claimantCards[cardIndex] = { role: this.state.deck.pop()!, revealed: false };
+      const currentDeck = [...this.state.deck, claimantCards[cardIndex].role];
+      const newDeck = this.rng.shuffle(currentDeck);
+      const newCard: CoupCard = { role: newDeck.pop()!, revealed: false };
+
+      this.engine.session.change("coup:challenge-fail", (doc: any) => {
+        doc.gameState.mustLoseInfluence = challenger;
+        doc.gameState.phase = "lose_influence";
+        doc.gameState.players[claimant].cards[cardIndex] = newCard;
+        doc.gameState.deck = newDeck;
+      });
+
       return `Player ${challenger} challenges - FAILS! Player ${claimant} had ${claimedRole}`;
     } else {
-      // Challenge succeeds - claimant loses influence, action cancelled
-      this.state.mustLoseInfluence = claimant;
-      this.state.phase = "lose_influence";
-      this.state.pendingAction = null;
-      // Refund assassination cost if applicable
-      if (pending.type === "assassinate") {
-        this.state.players[claimant].coins += ASSASSINATE_COST;
-      }
+      // Challenge succeeds — claimant loses influence, action cancelled
+      const refundCoins = pending.type === "assassinate" ? ASSASSINATE_COST : 0;
+
+      this.engine.session.change("coup:challenge-success", (doc: any) => {
+        doc.gameState.mustLoseInfluence = claimant;
+        doc.gameState.phase = "lose_influence";
+        doc.gameState.pendingAction = null;
+        if (refundCoins > 0) {
+          doc.gameState.players[claimant].coins += refundCoins;
+        }
+      });
+
       return `Player ${challenger} challenges - SUCCESS! Player ${claimant} didn't have ${claimedRole}`;
     }
   }
@@ -509,32 +577,32 @@ export class CoupGame {
   private proceedAfterChallenge(): string {
     const pending = this.state.pendingAction!;
 
-    // Check if action can be blocked
     if (BLOCK_ROLES[pending.type]) {
-      this.state.phase = "block";
+      this.mergeState({ phase: "block" });
       return "No challenge - proceeding to block phase";
     }
 
-    // Execute action
     return this.executeAction();
   }
 
   private handleBlock(blocker: number, action: string, role?: string): string {
     if (action === "pass") {
-      // Check if all potential blockers passed
       return this.executeAction();
     }
 
-    this.state.pendingBlock = { player: blocker, claimedRole: role as Role };
-    this.state.phase = "block_challenge";
+    this.mergeState({
+      pendingBlock: { player: blocker, claimedRole: role as Role },
+      phase: "block_challenge",
+    });
     return `Player ${blocker} blocks with ${role}`;
   }
 
   private handleBlockChallenge(challenger: number, didChallenge: boolean): string {
     if (!didChallenge) {
-      // Block succeeds
-      this.state.pendingAction = null;
-      this.state.pendingBlock = null;
+      this.engine.session.change("coup:block-success", (doc: any) => {
+        doc.gameState.pendingAction = null;
+        doc.gameState.pendingBlock = null;
+      });
       this.advanceTurn();
       return "Block successful - action cancelled";
     }
@@ -544,20 +612,28 @@ export class CoupGame {
     const hasRole = blockerCards.some(c => !c.revealed && c.role === block.claimedRole);
 
     if (hasRole) {
-      // Block challenge fails
-      this.state.mustLoseInfluence = challenger;
-      this.state.phase = "lose_influence";
-      this.state.pendingAction = null;
-      // Shuffle and draw for blocker
+      // Block challenge fails — blocker shuffles card and draws new
       const cardIndex = blockerCards.findIndex(c => !c.revealed && c.role === block.claimedRole);
-      this.state.deck.push(blockerCards[cardIndex].role);
-      this.state.deck = this.rng.shuffle(this.state.deck);
-      blockerCards[cardIndex] = { role: this.state.deck.pop()!, revealed: false };
+      const currentDeck = [...this.state.deck, blockerCards[cardIndex].role];
+      const newDeck = this.rng.shuffle(currentDeck);
+      const newCard: CoupCard = { role: newDeck.pop()!, revealed: false };
+
+      this.engine.session.change("coup:block-challenge-fail", (doc: any) => {
+        doc.gameState.mustLoseInfluence = challenger;
+        doc.gameState.phase = "lose_influence";
+        doc.gameState.pendingAction = null;
+        doc.gameState.players[block.player].cards[cardIndex] = newCard;
+        doc.gameState.deck = newDeck;
+      });
+
       return `Block challenge FAILS - blocker had ${block.claimedRole}`;
     } else {
-      // Block challenge succeeds - blocker loses influence, action proceeds
-      this.state.mustLoseInfluence = block.player;
-      this.state.phase = "lose_influence";
+      // Block challenge succeeds — blocker loses influence, action proceeds
+      this.engine.session.change("coup:block-challenge-success", (doc: any) => {
+        doc.gameState.mustLoseInfluence = block.player;
+        doc.gameState.phase = "lose_influence";
+      });
+
       return `Block challenge SUCCESS - blocker didn't have ${block.claimedRole}`;
     }
   }
@@ -568,34 +644,44 @@ export class CoupGame {
 
     switch (pending.type) {
       case "foreign_aid":
-        this.state.players[player].coins += 2;
+        this.engine.session.change("coup:foreign-aid", (doc: any) => {
+          doc.gameState.players[player].coins += 2;
+        });
         this.advanceTurn();
         return "Foreign aid successful (+2 coins)";
 
       case "tax":
-        this.state.players[player].coins += 3;
+        this.engine.session.change("coup:tax", (doc: any) => {
+          doc.gameState.players[player].coins += 3;
+        });
         this.advanceTurn();
         return "Tax successful (+3 coins)";
 
       case "assassinate":
-        this.state.mustLoseInfluence = pending.target!;
-        this.state.phase = "lose_influence";
+        this.mergeState({ mustLoseInfluence: pending.target!, phase: "lose_influence" });
         return `Assassination proceeds - player ${pending.target} must lose influence`;
 
-      case "steal":
+      case "steal": {
         const stolen = Math.min(2, this.state.players[pending.target!].coins);
-        this.state.players[pending.target!].coins -= stolen;
-        this.state.players[player].coins += stolen;
+        this.engine.session.change("coup:steal", (doc: any) => {
+          doc.gameState.players[pending.target!].coins -= stolen;
+          doc.gameState.players[player].coins += stolen;
+        });
         this.advanceTurn();
         return `Steal successful (${stolen} coins)`;
+      }
 
-      case "exchange":
-        // Draw 2 cards
-        const drawn = [this.state.deck.pop()!, this.state.deck.pop()!];
+      case "exchange": {
+        const drawn = [this.state.deck[this.state.deck.length - 1], this.state.deck[this.state.deck.length - 2]];
         const playerCards = this.state.players[player].cards.filter(c => !c.revealed).map(c => c.role);
-        this.state.exchangeCards = [...playerCards, ...drawn];
-        this.state.phase = "exchange";
+
+        this.engine.session.change("coup:exchange-draw", (doc: any) => {
+          doc.gameState.deck.splice(doc.gameState.deck.length - 2, 2);
+          doc.gameState.exchangeCards = [...playerCards, ...drawn];
+          doc.gameState.phase = "exchange";
+        });
         return "Exchange - choose cards to keep";
+      }
 
       default:
         this.advanceTurn();
@@ -605,26 +691,36 @@ export class CoupGame {
 
   private handleLoseInfluence(player: number, cardIndex: number): string {
     const card = this.state.players[player].cards[cardIndex];
-    card.revealed = true;
+    const remainingHidden = this.state.players[player].cards.filter((c, i) => !c.revealed && i !== cardIndex).length;
+    const isEliminated = remainingHidden === 0;
 
-    // Check if player is eliminated
-    const hiddenCards = this.state.players[player].cards.filter(c => !c.revealed);
-    if (hiddenCards.length === 0) {
-      this.state.players[player].alive = false;
+    this.engine.session.change("coup:lose-influence", (doc: any) => {
+      doc.gameState.players[player].cards[cardIndex].revealed = true;
+      if (isEliminated) {
+        doc.gameState.players[player].alive = false;
+      }
+      doc.gameState.mustLoseInfluence = null;
+    });
+
+    if (isEliminated) {
+      this.engine.dispatch("agent:setMeta", { name: `player-${player}`, key: "status", value: "eliminated" });
+      this.engine.dispatch("agent:setActive", { name: `player-${player}`, active: false });
     }
 
-    this.state.mustLoseInfluence = null;
+    // Sync influence resource
+    this.engine.dispatch("agent:takeResource", { name: `player-${player}`, resource: "influence", amount: 1 });
 
-    // Check if we need to continue with pending action (block challenge success)
+    // If block was challenged and succeeded — execute the original action
     if (this.state.pendingBlock && this.state.pendingAction) {
-      // Block was challenged and failed - execute original action
       const result = this.executeAction();
-      this.state.pendingBlock = null;
+      this.mergeState({ pendingBlock: null });
       return `Player ${player} loses ${card.role}. ${result}`;
     }
 
-    this.state.pendingAction = null;
-    this.state.pendingBlock = null;
+    this.engine.session.change("coup:lose-influence-cleanup", (doc: any) => {
+      doc.gameState.pendingAction = null;
+      doc.gameState.pendingBlock = null;
+    });
     this.advanceTurn();
     return `Player ${player} loses ${card.role}`;
   }
@@ -632,72 +728,87 @@ export class CoupGame {
   private handleExchange(player: number, keepIndices: string): string {
     const indices = keepIndices.split(",").map(Number);
     const allCards = this.state.exchangeCards!;
+    const keptRoles = indices.map(i => allCards[i]);
+    const returnedRoles = allCards.filter((_, i) => !indices.includes(i));
 
-    // Keep selected cards
-    const keptCards = indices.map(i => allCards[i]);
-    const returnedCards = allCards.filter((_, i) => !indices.includes(i));
-
-    // Update player's hidden cards
+    // Compute new card array for the player (replace hidden cards with kept ones)
+    const playerCards = [...this.state.players[player].cards];
     let keptIdx = 0;
-    for (let i = 0; i < this.state.players[player].cards.length; i++) {
-      if (!this.state.players[player].cards[i].revealed) {
-        this.state.players[player].cards[i] = { role: keptCards[keptIdx++], revealed: false };
+    for (let i = 0; i < playerCards.length; i++) {
+      if (!playerCards[i].revealed) {
+        playerCards[i] = { role: keptRoles[keptIdx++], revealed: false };
       }
     }
 
-    // Return others to deck
-    this.state.deck.push(...returnedCards);
-    this.state.deck = this.rng.shuffle(this.state.deck);
+    const newDeck = this.rng.shuffle([...this.state.deck, ...returnedRoles]);
 
-    this.state.exchangeCards = null;
-    this.state.pendingAction = null;
+    this.engine.session.change("coup:exchange-complete", (doc: any) => {
+      doc.gameState.players[player].cards = playerCards;
+      doc.gameState.deck = newDeck;
+      doc.gameState.exchangeCards = null;
+      doc.gameState.pendingAction = null;
+    });
+
     this.advanceTurn();
     return "Exchange complete";
   }
 
   private advanceTurn(): void {
-    this.state.phase = "action";
-    this.state.turnNumber++;
-
-    // Find next alive player
-    let next = (this.state.currentPlayer + 1) % this.config.numPlayers;
-    while (!this.state.players[next].alive && next !== this.state.currentPlayer) {
+    const s = this.state;
+    let next = (s.currentPlayer + 1) % this.config.numPlayers;
+    while (!s.players[next].alive && next !== s.currentPlayer) {
       next = (next + 1) % this.config.numPlayers;
     }
-    this.state.currentPlayer = next;
+
+    this.engine.session.change("coup:advanceTurn", (doc: any) => {
+      doc.gameState.phase = "action";
+      doc.gameState.turnNumber = (doc.gameState.turnNumber ?? 0) + 1;
+      doc.gameState.currentPlayer = next;
+      doc.gameState.pendingAction = null;
+      doc.gameState.pendingBlock = null;
+    });
+
+    this.engine.dispatch("game:nextTurn", { agentCount: this.config.numPlayers });
   }
 
   private checkWinner(): void {
-    const alivePlayers = this.state.players
+    const s = this.state;
+    const alivePlayers = s.players
       .map((p, i) => ({ alive: p.alive, index: i }))
       .filter(p => p.alive);
 
-    if (alivePlayers.length === 1) {
-      this.state.winner = alivePlayers[0].index;
-      this.state.phase = "complete";
+    if (alivePlayers.length === 1 && s.winner === null) {
+      const winnerIndex = alivePlayers[0].index;
+      this.mergeState({ winner: winnerIndex, phase: "complete" });
+      this.engine.dispatch("game:end", {
+        winner: `player-${winnerIndex}`,
+        reason: "last_standing",
+      });
+      this.engine.dispatch("game:loopStop", { phase: "complete" });
     }
   }
 
   render(): void {
+    const s = this.state;
     console.log("\n" + "=".repeat(50));
     console.log("COUP");
     console.log("=".repeat(50));
-    console.log(`Turn: ${this.state.turnNumber} | Phase: ${this.state.phase}`);
-    console.log(`Current player: ${this.state.currentPlayer}`);
+    console.log(`Turn: ${s.turnNumber} | Phase: ${s.phase}`);
+    console.log(`Current player: ${s.currentPlayer}`);
 
     for (let i = 0; i < this.config.numPlayers; i++) {
-      const p = this.state.players[i];
-      const marker = i === this.state.currentPlayer ? "→ " : "  ";
+      const p = s.players[i];
+      const marker = i === s.currentPlayer ? "→ " : "  ";
       const status = p.alive ? "" : " [ELIMINATED]";
       const cards = p.cards.map(c => c.revealed ? `[${c.role}]` : "?").join(" ");
       console.log(`${marker}Player ${i}: ${p.coins} coins | ${cards}${status}`);
     }
 
-    if (this.state.lastAction) {
-      console.log(`\nLast: ${this.state.lastAction}`);
+    if (s.lastAction) {
+      console.log(`\nLast: ${s.lastAction}`);
     }
-    if (this.state.winner !== null) {
-      console.log(`\n*** PLAYER ${this.state.winner} WINS ***`);
+    if (s.winner !== null) {
+      console.log(`\n*** PLAYER ${s.winner} WINS ***`);
     }
   }
 }

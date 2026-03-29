@@ -7,6 +7,7 @@
 
 import { AECEnvironment } from "../../interface/PettingZoo.js";
 import { Observation, ActionID, Space } from "../../interface/Gym.js";
+import { Engine } from "../../engine/Engine.js";
 import { CoupGame, CoupConfig, ROLES, ACTIONS, Role, getActionSpaceSize } from "./CoupGame.js";
 
 export interface CoupAECConfig {
@@ -50,7 +51,8 @@ export class CoupAEC extends AECEnvironment {
 
     this._seed = this.config.seed;
 
-    this.game = new CoupGame({
+    const engine = new Engine();
+    this.game = new CoupGame(engine, {
       numPlayers: this.config.numPlayers,
       seed: this.config.seed,
     });
