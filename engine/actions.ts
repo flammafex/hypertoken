@@ -21,8 +21,28 @@
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
 import type { IEngineAgent } from "./types.js";
+import type {
+  StackInsertAtPayload, StackSwapPayload, StackDiscardPayload,
+  SpacePlacePayload, SpaceRemovePayload, SpaceMovePayload, SpaceFlipPayload,
+  SpaceCreateZonePayload, SpaceDeleteZonePayload, SpaceClearZonePayload,
+  SpaceLockZonePayload, SpaceShuffleZonePayload, SpaceFanZonePayload,
+  SpaceSpreadZonePayload, SpaceStackZonePayload, SpaceTransferZonePayload,
+  SourceShufflePayload, SourceAddStackPayload, SourceRemoveStackPayload,
+  AgentCreatePayload, AgentRemovePayload, AgentSetActivePayload,
+  AgentGiveResourcePayload, AgentTakeResourcePayload,
+  AgentAddTokenPayload, AgentRemoveTokenPayload, AgentGetPayload,
+  AgentTransferResourcePayload, AgentTransferTokenPayload,
+  AgentStealResourcePayload, AgentStealTokenPayload,
+  AgentTradePayload, AgentDrawCardsPayload, AgentDiscardCardsPayload,
+  GameNextPhasePayload, GameSetPropertyPayload,
+  GameLoopInitPayload, GameLoopStopPayload, GameNextTurnPayload,
+  GameSetPhasePayload, GameSetMaxTurnsPayload, GameSetActiveAgentPayload,
+  RuleMarkFiredPayload,
+  TokenTransformPayload, TokenAttachPayload, TokenDetachPayload,
+  TokenMergePayload, TokenSplitPayload,
+} from "./payloads.js";
 
-export type ActionHandler = (engine: Engine, payload: any) => any;
+export type ActionHandler = (engine: Engine, payload?: any) => unknown;
 
 export interface ActionRegistryType {
   [key: string]: ActionHandler;
@@ -61,7 +81,7 @@ const StackActions: ActionRegistryType = {
     if (!engine.stack) throw new Error("No stack attached to engine");
     engine.stack.cut(position);
   },
-  "stack:insertAt": (engine, { position = 0, card } = {} as any) => {
+  "stack:insertAt": (engine, { position = 0, card } = {} as StackInsertAtPayload) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     if (!card) throw new Error("card required");
     engine.stack.insertAt(card, position);
@@ -70,7 +90,7 @@ const StackActions: ActionRegistryType = {
     if (!engine.stack) throw new Error("No stack attached to engine");
     return engine.stack.removeAt(position);
   },
-  "stack:swap": (engine, { i, j } = {} as any) => {
+  "stack:swap": (engine, { i, j } = {} as StackSwapPayload) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     engine.stack.swap(i, j);
   },
@@ -78,7 +98,7 @@ const StackActions: ActionRegistryType = {
     if (!engine.stack) throw new Error("No stack attached to engine");
     engine.stack.reverseRange(0, engine.stack.size - 1);
   },
-  "stack:discard": (engine, { card } = {} as any) => {
+  "stack:discard": (engine, { card } = {} as StackDiscardPayload) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     if (!card) throw new Error("card required");
     return engine.stack.discard(card);
@@ -90,57 +110,57 @@ const StackActions: ActionRegistryType = {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 const SpaceActions: ActionRegistryType = {
-  "space:place": (engine, { zone, card, opts = {} } = {} as any) => {
+  "space:place": (engine, { zone, card, opts = {} } = {} as SpacePlacePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     if (!zone) throw new Error("zone required");
     if (!card) throw new Error("card required");
     return engine.space.place(zone, card, opts);
   },
-  "space:remove": (engine, { zone, placementId } = {} as any) => {
+  "space:remove": (engine, { zone, placementId } = {} as SpaceRemovePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.remove(zone, placementId);
   },
-  "space:move": (engine, { fromZone, toZone, placementId, x, y } = {} as any) => {
+  "space:move": (engine, { fromZone, toZone, placementId, x, y } = {} as SpaceMovePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.move(fromZone, toZone, placementId, { x, y });
   },
-  "space:flip": (engine, { zone, placementId, faceUp } = {} as any) => {
+  "space:flip": (engine, { zone, placementId, faceUp } = {} as SpaceFlipPayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.flip(zone, placementId, faceUp);
   },
-  "space:createZone": (engine, { name, label, x, y } = {} as any) => {
+  "space:createZone": (engine, { name, label, x, y } = {} as SpaceCreateZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.createZone(name, { label, x, y });
   },
-  "space:deleteZone": (engine, { name } = {} as any) => {
+  "space:deleteZone": (engine, { name } = {} as SpaceDeleteZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.deleteZone(name);
   },
-  "space:clearZone": (engine, { zone } = {} as any) => {
+  "space:clearZone": (engine, { zone } = {} as SpaceClearZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.clearZone(zone);
   },
-  "space:lockZone": (engine, { zone, locked = true } = {} as any) => {
+  "space:lockZone": (engine, { zone, locked = true } = {} as SpaceLockZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.lockZone(zone, locked);
   },
-  "space:shuffleZone": (engine, { zone, seed } = {} as any) => {
+  "space:shuffleZone": (engine, { zone, seed } = {} as SpaceShuffleZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.shuffleZone(zone, seed);
   },
-  "space:fanZone": (engine, { zone, ...opts } = {} as any) => {
+  "space:fanZone": (engine, { zone, ...opts } = {} as SpaceFanZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.fan(zone, opts);
   },
-  "space:spreadZone": (engine, { zone, pattern, angleStep, radius } = {} as any) => {
+  "space:spreadZone": (engine, { zone, pattern, angleStep, radius } = {} as SpaceSpreadZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.spreadZone(zone, { pattern, angleStep, radius });
   },
-  "space:stackZone": (engine, { zone } = {} as any) => {
+  "space:stackZone": (engine, { zone } = {} as SpaceStackZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     engine.space.stackZone(zone);
   },
-  "space:transferZone": (engine, { fromZone, toZone } = {} as any) => {
+  "space:transferZone": (engine, { fromZone, toZone } = {} as SpaceTransferZonePayload) => {
     if (!engine.space) throw new Error("No space attached to engine");
     return engine.space.transferZone(fromZone, toZone);
   },
@@ -159,7 +179,7 @@ const SourceActions: ActionRegistryType = {
     if (!engine.source) throw new Error("No source attached to engine");
     return engine.source.draw(count);
   },
-  "source:shuffle": (engine, { seed } = {} as any) => {
+  "source:shuffle": (engine, { seed } = {} as SourceShufflePayload) => {
     if (!engine.source) throw new Error("No source attached to engine");
     engine.source.shuffle(seed);
   },
@@ -167,12 +187,12 @@ const SourceActions: ActionRegistryType = {
     if (!engine.source) throw new Error("No source attached to engine");
     return engine.source.burn(count);
   },
-  "source:addStack": (engine, { stack } = {} as any) => {
+  "source:addStack": (engine, { stack } = {} as SourceAddStackPayload) => {
     if (!engine.source) throw new Error("No source attached to engine");
     if (!stack) throw new Error("stack required");
     engine.source.addStack(stack);
   },
-  "source:removeStack": (engine, { stack } = {} as any) => {
+  "source:removeStack": (engine, { stack } = {} as SourceRemoveStackPayload) => {
     if (!engine.source) throw new Error("No source attached to engine");
     if (!stack) throw new Error("stack required");
     engine.source.removeStack(stack);
@@ -202,7 +222,7 @@ function findAgent(engine: Engine, name: string): IEngineAgent {
 }
 
 const AgentActions: ActionRegistryType = {
-  "agent:create": (engine, { id, name, meta } = {} as any) => {
+  "agent:create": (engine, { id, name, meta } = {} as AgentCreatePayload) => {
     if (!name) throw new Error("name required");
     if (getAgentMap(engine)[name]) throw new Error(`Agent "${name}" already exists`);
     const agent: IEngineAgent = {
@@ -219,19 +239,19 @@ const AgentActions: ActionRegistryType = {
     });
     return agent;
   },
-  "agent:remove": (engine, { name } = {} as any) => {
+  "agent:remove": (engine, { name } = {} as AgentRemovePayload) => {
     if (!getAgentMap(engine)[name]) throw new Error(`Agent "${name}" not found`);
     engine.session.change("agent:remove", (doc: any) => {
       if (doc.agents) delete doc.agents[name];
     });
   },
-  "agent:setActive": (engine, { name, active = true } = {} as any) => {
+  "agent:setActive": (engine, { name, active = true } = {} as AgentSetActivePayload) => {
     findAgent(engine, name); // validate existence
     engine.session.change("agent:setActive", (doc: any) => {
       if (doc.agents?.[name]) doc.agents[name].active = active;
     });
   },
-  "agent:giveResource": (engine, { name, resource, amount = 1 } = {} as any) => {
+  "agent:giveResource": (engine, { name, resource, amount = 1 } = {} as AgentGiveResourcePayload) => {
     findAgent(engine, name); // validate existence
     engine.session.change("agent:giveResource", (doc: any) => {
       if (!doc.agents?.[name]) return;
@@ -239,7 +259,7 @@ const AgentActions: ActionRegistryType = {
       doc.agents[name].resources[resource] = (doc.agents[name].resources[resource] ?? 0) + amount;
     });
   },
-  "agent:takeResource": (engine, { name, resource, amount = 1 } = {} as any) => {
+  "agent:takeResource": (engine, { name, resource, amount = 1 } = {} as AgentTakeResourcePayload) => {
     findAgent(engine, name); // validate existence
     engine.session.change("agent:takeResource", (doc: any) => {
       if (!doc.agents?.[name]) return;
@@ -247,7 +267,7 @@ const AgentActions: ActionRegistryType = {
       doc.agents[name].resources[resource] = (doc.agents[name].resources[resource] ?? 0) - amount;
     });
   },
-  "agent:addToken": (engine, { name, token } = {} as any) => {
+  "agent:addToken": (engine, { name, token } = {} as AgentAddTokenPayload) => {
     findAgent(engine, name); // validate existence
     engine.session.change("agent:addToken", (doc: any) => {
       if (!doc.agents?.[name]) return;
@@ -255,7 +275,7 @@ const AgentActions: ActionRegistryType = {
       doc.agents[name].inventory.push(token);
     });
   },
-  "agent:removeToken": (engine, { name, tokenId } = {} as any) => {
+  "agent:removeToken": (engine, { name, tokenId } = {} as AgentRemoveTokenPayload) => {
     const agent = findAgent(engine, name);
     const idx = (agent.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
     if (idx === -1) throw new Error(`Token "${tokenId}" not found in agent "${name}"`);
@@ -267,13 +287,13 @@ const AgentActions: ActionRegistryType = {
     });
     return removed;
   },
-  "agent:get": (engine, { name } = {} as any) => {
+  "agent:get": (engine, { name } = {} as AgentGetPayload) => {
     return findAgent(engine, name);
   },
   "agent:getAll": (engine) => {
     return engine._agents;
   },
-  "agent:transferResource": (engine, { from, to, resource, amount = 1 } = {} as any) => {
+  "agent:transferResource": (engine, { from, to, resource, amount = 1 } = {} as AgentTransferResourcePayload) => {
     findAgent(engine, from);
     findAgent(engine, to);
     engine.session.change("agent:transferResource", (doc: any) => {
@@ -291,7 +311,7 @@ const AgentActions: ActionRegistryType = {
       to: state.agents?.[to]?.resources?.[resource] ?? 0,
     };
   },
-  "agent:transferToken": (engine, { from, to, tokenId } = {} as any) => {
+  "agent:transferToken": (engine, { from, to, tokenId } = {} as AgentTransferTokenPayload) => {
     const src = findAgent(engine, from);
     findAgent(engine, to);
     const idx = (src.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
@@ -310,7 +330,7 @@ const AgentActions: ActionRegistryType = {
     });
     return token;
   },
-  "agent:stealResource": (engine, { from, to, resource, amount = 1 } = {} as any) => {
+  "agent:stealResource": (engine, { from, to, resource, amount = 1 } = {} as AgentStealResourcePayload) => {
     const src = findAgent(engine, from);
     findAgent(engine, to);
     const available = src.resources?.[resource] ?? 0;
@@ -331,7 +351,7 @@ const AgentActions: ActionRegistryType = {
       to: state.agents?.[to]?.resources?.[resource] ?? 0,
     };
   },
-  "agent:stealToken": (engine, { from, to, tokenId } = {} as any) => {
+  "agent:stealToken": (engine, { from, to, tokenId } = {} as AgentStealTokenPayload) => {
     const src = findAgent(engine, from);
     findAgent(engine, to);
     const idx = (src.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
@@ -350,7 +370,7 @@ const AgentActions: ActionRegistryType = {
     });
     return token;
   },
-  "agent:trade": (engine, { agent1, agent2, offer1, offer2 } = {} as any) => {
+  "agent:trade": (engine, { agent1, agent2, offer1, offer2 } = {} as AgentTradePayload) => {
     findAgent(engine, agent1);
     findAgent(engine, agent2);
     engine.session.change("agent:trade", (doc: any) => {
@@ -383,7 +403,7 @@ const AgentActions: ActionRegistryType = {
       doc.transactions.push({ type: "trade", from: agent1, to: agent2, agent1, agent2, offer1, offer2, timestamp: Date.now() });
     });
   },
-  "agent:drawCards": (engine, { name, count = 1 } = {} as any) => {
+  "agent:drawCards": (engine, { name, count = 1 } = {} as AgentDrawCardsPayload) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     findAgent(engine, name); // validate existence
     const drawn = engine.stack.draw(count);
@@ -395,7 +415,7 @@ const AgentActions: ActionRegistryType = {
     });
     return cards;
   },
-  "agent:discardCards": (engine, { name, tokenIds } = {} as any) => {
+  "agent:discardCards": (engine, { name, tokenIds } = {} as AgentDiscardCardsPayload) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     const agent = findAgent(engine, name);
     const discarded: IToken[] = [];
@@ -464,7 +484,7 @@ const GameActions: ActionRegistryType = {
     engine.emit("game:resumed", { payload: engine._gameState });
     return engine._gameState;
   },
-  "game:nextPhase": (engine, { phase } = {} as any) => {
+  "game:nextPhase": (engine, { phase } = {} as GameNextPhasePayload) => {
     engine.session.change("game:nextPhase", (doc: any) => {
       if (!doc.gameState) doc.gameState = {};
       doc.gameState.phase = phase;
@@ -473,7 +493,7 @@ const GameActions: ActionRegistryType = {
     engine.emit("game:phaseChanged", { payload: { phase, turn: engine._gameState.turn } });
     return engine._gameState;
   },
-  "game:setProperty": (engine, { key, value } = {} as any) => {
+  "game:setProperty": (engine, { key, value } = {} as GameSetPropertyPayload) => {
     if (!key) throw new Error("key required");
     engine.session.change("game:setProperty", (doc: any) => {
       if (!doc.gameState) doc.gameState = {};
@@ -491,7 +511,7 @@ const GameActions: ActionRegistryType = {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 const GameLoopActions: ActionRegistryType = {
-  "game:loopInit": (engine, { maxTurns = 100 } = {} as any) => {
+  "game:loopInit": (engine, { maxTurns = 100 } = {} as GameLoopInitPayload) => {
     engine.session.change("init loop", (doc: any) => {
       doc.gameLoop = {
         turn: 0, running: false, activeAgentIndex: -1,
@@ -509,7 +529,7 @@ const GameLoopActions: ActionRegistryType = {
       }
     });
   },
-  "game:loopStop": (engine, { phase = "stopped" } = {} as any) => {
+  "game:loopStop": (engine, { phase = "stopped" } = {} as GameLoopStopPayload) => {
     engine.session.change("stop loop", (doc: any) => {
       if (doc.gameLoop) {
         doc.gameLoop.running = false;
@@ -517,7 +537,7 @@ const GameLoopActions: ActionRegistryType = {
       }
     });
   },
-  "game:nextTurn": (engine, { agentCount = 0 } = {} as any) => {
+  "game:nextTurn": (engine, { agentCount = 0 } = {} as GameNextTurnPayload) => {
     engine.session.change("next turn", (doc: any) => {
       if (!doc.gameLoop) return;
       doc.gameLoop.turn++;
@@ -526,17 +546,17 @@ const GameLoopActions: ActionRegistryType = {
         : 0;
     });
   },
-  "game:setPhase": (engine, { phase } = {} as any) => {
+  "game:setPhase": (engine, { phase } = {} as GameSetPhasePayload) => {
     engine.session.change("set phase", (doc: any) => {
       if (doc.gameLoop) doc.gameLoop.phase = phase;
     });
   },
-  "game:setMaxTurns": (engine, { maxTurns } = {} as any) => {
+  "game:setMaxTurns": (engine, { maxTurns } = {} as GameSetMaxTurnsPayload) => {
     engine.session.change("set maxTurns", (doc: any) => {
       if (doc.gameLoop) doc.gameLoop.maxTurns = maxTurns;
     });
   },
-  "game:setActiveAgent": (engine, { index } = {} as any) => {
+  "game:setActiveAgent": (engine, { index } = {} as GameSetActiveAgentPayload) => {
     engine.session.change("set active agent", (doc: any) => {
       if (doc.gameLoop) doc.gameLoop.activeAgentIndex = index;
     });
@@ -548,7 +568,7 @@ const GameLoopActions: ActionRegistryType = {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 const RuleActions: ActionRegistryType = {
-  "rule:markFired": (engine, { name, timestamp } = {} as any) => {
+  "rule:markFired": (engine, { name, timestamp } = {} as RuleMarkFiredPayload) => {
     engine.session.change("mark fired", (doc: any) => {
       if (doc.rules) doc.rules.fired[name] = timestamp ?? Date.now();
     });
@@ -565,21 +585,21 @@ const RuleActions: ActionRegistryType = {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 const TokenActions: ActionRegistryType = {
-  "token:transform": (engine, { token, properties = {} } = {} as any) => {
+  "token:transform": (engine, { token, properties = {} } = {} as TokenTransformPayload) => {
     if (!token) throw new Error("token required");
     return { ...token, ...properties, _transformedFrom: token.id };
   },
-  "token:attach": (engine, { host, attachment, attachmentType = "default" } = {} as any) => {
+  "token:attach": (engine, { host, attachment, attachmentType = "default" } = {} as TokenAttachPayload) => {
     if (!host || !attachment) throw new Error("host and attachment required");
     const attachments = [...(host._attachments || []), { ...attachment, _attachmentType: attachmentType }];
     return { ...host, _attachments: attachments };
   },
-  "token:detach": (engine, { host, attachmentId } = {} as any) => {
+  "token:detach": (engine, { host, attachmentId } = {} as TokenDetachPayload) => {
     if (!host) throw new Error("host required");
     const attachments = (host._attachments || []).filter((a: any) => a.id !== attachmentId);
     return { ...host, _attachments: attachments };
   },
-  "token:merge": (engine, { tokens, properties, keepOriginals = false } = {} as any) => {
+  "token:merge": (engine, { tokens, properties, keepOriginals = false } = {} as TokenMergePayload) => {
     if (!tokens || tokens.length < 2) throw new Error("At least 2 tokens required to merge");
     const merged = {
       id: `merged-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -589,7 +609,7 @@ const TokenActions: ActionRegistryType = {
     };
     return { merged, originals: keepOriginals ? tokens : undefined };
   },
-  "token:split": (engine, { token, count = 2, propertiesArray } = {} as any) => {
+  "token:split": (engine, { token, count = 2, propertiesArray } = {} as TokenSplitPayload) => {
     if (!token) throw new Error("token required");
     const parts: any[] = [];
     for (let i = 0; i < count; i++) {

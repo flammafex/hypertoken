@@ -31,7 +31,7 @@ export class Action implements IAction {
   seed?: number | null;
   reversible?: boolean;
   timestamp: number;
-  result?: any; // To store the return value of the action
+  result?: unknown;
 
   constructor(
     type: string,

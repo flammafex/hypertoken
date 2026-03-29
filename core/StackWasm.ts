@@ -26,6 +26,7 @@ import { Emitter } from "./events.js";
 import { Token } from "./Token.js";
 import { IToken, ReversalPolicy } from "./types.js";
 import { Chronicle } from "./Chronicle.js";
+import { sanitizeToken, clone } from "./serialize.js";
 import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmStack } from "./WasmBridge.js";
 
 export interface StackOptions {
@@ -71,7 +72,7 @@ export class StackWasm extends Emitter {
     // Initialize CRDT state if autoInit is true
     if (autoInit && !this.session.state.stack) {
       this.session.change("initialize stack", (doc) => {
-        const cleanStack = this._original.map(t => this._sanitize(t));
+        const cleanStack = this._original.map(t => sanitizeToken(t));
         doc.stack = {
           stack: cleanStack,
           drawn: [],
@@ -126,18 +127,6 @@ export class StackWasm extends Emitter {
     }
   }
 
-  private _sanitize(token: IToken): IToken {
-    const plain = { ...token };
-    if (plain._tags instanceof Set) {
-      // @ts-ignore
-      plain._tags = Array.from(plain._tags);
-    }
-    return JSON.parse(JSON.stringify(plain));
-  }
-
-  private _clone<T>(proxy: T): T {
-    return JSON.parse(JSON.stringify(proxy));
-  }
 
   /**
    * Sync WASM state back to Chronicle after operations
@@ -224,7 +213,7 @@ export class StackWasm extends Emitter {
     const stack = this.session.state.stack?.stack ?? [];
     const count = Math.min(n, stack.length);
     const startIdx = stack.length - count;
-    peeked = this._clone(stack.slice(startIdx));
+    peeked = clone(stack.slice(startIdx));
 
     return peeked;
   }
@@ -272,7 +261,7 @@ export class StackWasm extends Emitter {
         if (!doc.stack || doc.stack.stack.length === 0) return;
         const cardProxy = doc.stack.stack.pop();
         if (cardProxy) {
-          const card = this._clone(cardProxy);
+          const card = clone(cardProxy);
           doc.stack.drawn.push(card);
           drawnCard = card;
         }
@@ -309,7 +298,7 @@ export class StackWasm extends Emitter {
         const count = Math.min(n, doc.stack.stack.length);
         const startIdx = doc.stack.stack.length - count;
         const cardsProxy = doc.stack.stack.splice(startIdx, count);
-        const cards = this._clone(cardsProxy);
+        const cards = clone(cardsProxy);
         doc.stack.drawn.push(...cards);
         drawnCards = cards;
         drawnCards.reverse();
@@ -362,7 +351,7 @@ export class StackWasm extends Emitter {
     // TypeScript fallback
     this.session.change("shuffle stack", (doc) => {
       if (!doc.stack) return;
-      const stack = this._clone(doc.stack.stack);
+      const stack = clone(doc.stack.stack);
       // Note: Would need to import shuffleArray from random.js
       // For now, basic shuffle
       for (let i = stack.length - 1; i > 0; i--) {
@@ -385,7 +374,7 @@ export class StackWasm extends Emitter {
       try {
         // Create reset state
         const resetState = {
-          stack: this._original.map(t => this._sanitize(t)),
+          stack: this._original.map(t => sanitizeToken(t)),
           drawn: [],
           discards: []
         };
@@ -403,7 +392,7 @@ export class StackWasm extends Emitter {
     // TypeScript fallback
     this.session.change("reset stack", (doc) => {
       if (!doc.stack) return;
-      doc.stack.stack = this._original.map(t => this._sanitize(t));
+      doc.stack.stack = this._original.map(t => sanitizeToken(t));
       doc.stack.drawn = [];
       doc.stack.discards = [];
     });
@@ -441,7 +430,7 @@ export class StackWasm extends Emitter {
         const count = Math.min(n, doc.stack.stack.length);
         const startIdx = doc.stack.stack.length - count;
         const cardsProxy = doc.stack.stack.splice(startIdx, count);
-        const cards = this._clone(cardsProxy);
+        const cards = clone(cardsProxy);
         doc.stack.discards.push(...cards);
         burned = cards;
       });
@@ -463,7 +452,7 @@ export class StackWasm extends Emitter {
 
     this.session.change("discard card", (doc) => {
       if (!doc.stack) return;
-      doc.stack.discards.push(this._sanitize(token));
+      doc.stack.discards.push(sanitizeToken(token));
     });
 
     // Sync to WASM if available
@@ -506,7 +495,7 @@ export class StackWasm extends Emitter {
     // TypeScript fallback
     this.session.change("cut stack", (doc) => {
       if (!doc.stack) return;
-      let stack = this._clone(doc.stack.stack);
+      let stack = clone(doc.stack.stack);
       const cutPoint = n;
       const top = stack.splice(cutPoint, len - cutPoint);
       const bottom = stack.splice(0, cutPoint);
@@ -531,7 +520,7 @@ export class StackWasm extends Emitter {
 
     if (this._wasmStack && isWasmAvailable()) {
       try {
-        const cardJson = JSON.stringify(this._sanitize(card));
+        const cardJson = JSON.stringify(sanitizeToken(card));
         this._wasmStack.insertAt(index, cardJson);
         // NO SYNC - lazy sync on getter access
         this.emit("stack:insert", { payload: { card, index } });
@@ -547,7 +536,7 @@ export class StackWasm extends Emitter {
       let idx = index;
       if (idx < 0) idx = 0;
       if (idx > doc.stack.stack.length) idx = doc.stack.stack.length;
-      doc.stack.stack.splice(idx, 0, this._sanitize(card));
+      doc.stack.stack.splice(idx, 0, sanitizeToken(card));
     });
     this.emit("stack:insert", { payload: { card, index } });
     return this;
@@ -583,7 +572,7 @@ export class StackWasm extends Emitter {
         if (!doc.stack) return;
         if (index < 0 || index >= doc.stack.stack.length) return;
         const [itemProxy] = doc.stack.stack.splice(index, 1);
-        removed = this._clone(itemProxy);
+        removed = clone(itemProxy);
       });
     }
 
@@ -617,7 +606,7 @@ export class StackWasm extends Emitter {
     // TypeScript fallback
     this.session.change("swap cards", (doc) => {
       if (!doc.stack) return;
-      const stack = this._clone(doc.stack.stack);
+      const stack = clone(doc.stack.stack);
       if (i < 0 || j < 0 || i >= stack.length || j >= stack.length) return;
       const temp = stack[i];
       stack[i] = stack[j];
@@ -656,7 +645,7 @@ export class StackWasm extends Emitter {
     // TypeScript fallback
     this.session.change("reverse range", (doc) => {
       if (!doc.stack) return;
-      const stack = this._clone(doc.stack.stack);
+      const stack = clone(doc.stack.stack);
       const [a, b] = i < j ? [i, j] : [j, i];
       const segment = stack.splice(a, b - a + 1);
       segment.reverse();

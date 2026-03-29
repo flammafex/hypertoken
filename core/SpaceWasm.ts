@@ -5,6 +5,7 @@
 import { Emitter } from "./events.js";
 import { Chronicle } from "./Chronicle.js";
 import { IPlacementCRDT, IToken } from "./types.js";
+import { sanitizeToken, clone } from "./serialize.js";
 import { Stack } from "./Stack.js";
 import { Source } from "./Source.js";
 import { tryLoadWasm, isWasmAvailable, getWasmModule } from './WasmBridge.js';
@@ -168,21 +169,6 @@ export class SpaceWasm extends Emitter {
     }
   }
 
-  // Helper to sanitize token data for CRDT
-  private _sanitizeToken(token: IToken): any {
-    const plain = { ...token };
-    if (plain._tags instanceof Set) {
-      // @ts-ignore
-      plain._tags = Array.from(plain._tags);
-    }
-    return JSON.parse(JSON.stringify(plain));
-  }
-
-  // Helper to deep clone a proxy object to plain JS object
-  private _clone<T>(proxy: T): T {
-    return JSON.parse(JSON.stringify(proxy));
-  }
-
   get zones(): string[] {
     return this.session.state.zones ? Object.keys(this.session.state.zones) : [];
   }
@@ -248,7 +234,7 @@ export class SpaceWasm extends Emitter {
       return null;
     }
 
-    const safeToken = this._sanitizeToken(token);
+    const safeToken = sanitizeToken(token);
 
     // Try WASM first
     if (this._wasmSpace && isWasmAvailable()) {
@@ -350,7 +336,7 @@ export class SpaceWasm extends Emitter {
       const [placementProxy] = from.splice(idx, 1);
 
       // Clone the proxy to avoid Automerge reference errors
-      const placement = this._clone(placementProxy);
+      const placement = clone(placementProxy);
 
       if (opts.x !== undefined) placement.x = opts.x;
       if (opts.y !== undefined) placement.y = opts.y;
@@ -613,7 +599,7 @@ export class SpaceWasm extends Emitter {
 
       // Clone items to avoid Automerge reference errors
       const itemsProxy = from.splice(0, from.length);
-      const items = this._clone(itemsProxy);
+      const items = clone(itemsProxy);
       doc.zones[toZone].push(...items);
       count = items.length;
     });
@@ -693,7 +679,7 @@ export class SpaceWasm extends Emitter {
     if (!itemsProxy.length) return;
 
     // Clone to plain objects to avoid Automerge reference errors
-    const items = this._clone(itemsProxy);
+    const items = clone(itemsProxy);
     items.sort(() => Math.random() - 0.5);
 
     this.session.change(`shuffle zone ${name}`, (doc) => {
@@ -729,7 +715,7 @@ export class SpaceWasm extends Emitter {
         const amount = Math.min(n, zone.length);
         const drawnProxy = zone.splice(zone.length - amount, amount);
         // Clone to avoid Automerge reference errors
-        drawn = this._clone(drawnProxy);
+        drawn = clone(drawnProxy);
       }
     });
     drawn.reverse();

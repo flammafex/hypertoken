@@ -18,14 +18,14 @@
  */
 import { generateId } from "./crypto.js";
 // Define a generic handler type
-export type EventHandler = (payload: any) => void;
+export type EventHandler = (payload: IEvent) => void;
 
 export interface IEvent {
   id?: string;
   type: string;
   payload: any;
   ts: number;
-  source?: any;
+  source?: string;
 }
 
 export class Emitter {
@@ -48,9 +48,9 @@ export class Emitter {
   }
   
   once(type: string, fn: EventHandler): this {
-    const wrapper: EventHandler = (...args) => { 
-      fn(...args); 
-      this.off(type, wrapper); 
+    const wrapper: EventHandler = (evt) => {
+      fn(evt);
+      this.off(type, wrapper);
     };
     return this.on(type, wrapper);
   }

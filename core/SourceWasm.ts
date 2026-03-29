@@ -31,6 +31,7 @@ import { Emitter } from "./events.js";
 import { Stack } from "./Stack.js";
 import { Chronicle } from "./Chronicle.js";
 import { IToken, ISourceState, ReshufflePolicy } from "./types.js";
+import { sanitizeToken, clone } from "./serialize.js";
 import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmSource } from "./WasmBridge.js";
 import { shuffleArray } from "./random.js";
 
@@ -90,7 +91,7 @@ export class SourceWasm extends Emitter {
       this.session.change("initialize source", (doc) => {
         doc.source = {
           stackIds: stacks.map((_, i) => `stack-${i}`),
-          tokens: this._originalTokens.map(t => this._sanitize(t)),
+          tokens: this._originalTokens.map(t => sanitizeToken(t)),
           burned: [],
           seed: null,
           reshufflePolicy: { threshold: null, mode: "auto" }
@@ -144,17 +145,6 @@ export class SourceWasm extends Emitter {
     }
   }
 
-  private _sanitize(token: IToken): IToken {
-    const plain = { ...token };
-    if (plain._tags instanceof Set) {
-      plain._tags = Array.from(plain._tags) as any;
-    }
-    return JSON.parse(JSON.stringify(plain));
-  }
-
-  private _clone<T>(proxy: T): T {
-    return JSON.parse(JSON.stringify(proxy));
-  }
 
   /**
    * Sync WASM state back to Chronicle after operations
@@ -249,7 +239,7 @@ export class SourceWasm extends Emitter {
     this.session.change("add stack to source", (doc) => {
       if (!doc.source) return;
       doc.source.stackIds.push(stackId);
-      doc.source.tokens.push(...newTokens.map(t => this._sanitize(t)));
+      doc.source.tokens.push(...newTokens.map(t => sanitizeToken(t)));
     });
 
     this.emit("source:addStack", { payload: { stackId } });
@@ -286,7 +276,7 @@ export class SourceWasm extends Emitter {
     this.session.change("remove stack from source", (doc) => {
       if (!doc.source) return;
       doc.source.stackIds.splice(idx, 1);
-      doc.source.tokens = remainingTokens.map(t => this._sanitize(t));
+      doc.source.tokens = remainingTokens.map(t => sanitizeToken(t));
     });
 
     this.emit("source:removeStack", { payload: { stackId } });
@@ -325,7 +315,7 @@ export class SourceWasm extends Emitter {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
       const burnedProxy = doc.source.tokens.splice(-count, count);
-      burned = this._clone(burnedProxy);
+      burned = clone(burnedProxy);
       doc.source.burned.push(...burned);
     });
 
@@ -360,7 +350,7 @@ export class SourceWasm extends Emitter {
       if (newSeed !== undefined) {
         doc.source.seed = newSeed;
       }
-      const tokens = this._clone(doc.source.tokens);
+      const tokens = clone(doc.source.tokens);
       shuffleArray(tokens, doc.source.seed);
       doc.source.tokens = tokens;
     });
@@ -439,13 +429,13 @@ export class SourceWasm extends Emitter {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
       const drawnProxy = doc.source.tokens.splice(-count, count);
-      drawn = this._clone(drawnProxy);
+      drawn = clone(drawnProxy);
 
       // Check reshuffle policy
       if (doc.source.reshufflePolicy.threshold !== null &&
           doc.source.tokens.length <= doc.source.reshufflePolicy.threshold &&
           doc.source.reshufflePolicy.mode === "auto") {
-        const tokens = this._clone(doc.source.tokens);
+        const tokens = clone(doc.source.tokens);
         shuffleArray(tokens, doc.source.seed);
         doc.source.tokens = tokens;
         reshuffled = true;
@@ -489,7 +479,7 @@ export class SourceWasm extends Emitter {
     // TypeScript fallback
     this.session.change("reset source", (doc) => {
       if (!doc.source) return;
-      doc.source.tokens = tokens.map(t => this._sanitize(t));
+      doc.source.tokens = tokens.map(t => sanitizeToken(t));
       doc.source.burned = [];
     });
 
