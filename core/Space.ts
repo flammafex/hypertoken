@@ -4,6 +4,7 @@
 import { Emitter } from "./events.js";
 import { Chronicle } from "./Chronicle.js";
 import { IPlacementCRDT, IToken } from "./types.js";
+import { sanitizeToken } from "./serialize.js";
 import { Stack } from "./Stack.js";
 import { Source } from "./Source.js";
 import { generateId } from "./crypto.js";
@@ -56,14 +57,6 @@ export class Space extends Emitter {
   // --- HELPERS ---
 
   // Helper to sanitize token data for CRDT
-  private _sanitizeToken(token: IToken): any {
-    const plain = { ...token };
-    if (plain._tags instanceof Set) {
-      // @ts-ignore
-      plain._tags = Array.from(plain._tags);
-    }
-    return JSON.parse(JSON.stringify(plain));
-  }
 
   get zones(): string[] {
     return this.session.state.zones ? Object.keys(this.session.state.zones) : [];
@@ -126,7 +119,7 @@ export class Space extends Emitter {
       return null;
     }
 
-    const safeToken = this._sanitizeToken(token);
+    const safeToken = sanitizeToken(token);
 
     const placement: IPlacementCRDT = {
       id: generateId(),

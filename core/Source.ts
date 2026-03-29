@@ -21,6 +21,7 @@ import { shuffleArray } from "./random.js";
 import { Stack } from "./Stack.js";
 import { Chronicle } from "./Chronicle.js";
 import { IToken, ISourceState } from "./types.js";
+import { sanitizeToken, clone } from "./serialize.js";
 
 export interface ReshufflePolicy {
   threshold: number | null;
@@ -49,7 +50,7 @@ export class Source extends Emitter {
       this.session.change("initialize source", (doc) => {
         doc.source = {
           stackIds: stacks.map((_, i) => `stack-${i}`),
-          tokens: tokens.map(t => this._sanitize(t)),
+          tokens: tokens.map(t => sanitizeToken(t)),
           burned: [],
           seed: null,
           reshufflePolicy: { threshold: null, mode: "auto" }
@@ -58,17 +59,6 @@ export class Source extends Emitter {
     }
   }
 
-  private _sanitize(token: IToken): IToken {
-    const plain = { ...token };
-    if (plain._tags instanceof Set) {
-      plain._tags = Array.from(plain._tags) as any;
-    }
-    return JSON.parse(JSON.stringify(plain));
-  }
-
-  private _clone<T>(proxy: T): T {
-    return JSON.parse(JSON.stringify(proxy));
-  }
 
   get tokens(): IToken[] { return this.session.state.source?.tokens ?? []; }
   get burned(): IToken[] { return this.session.state.source?.burned ?? []; }
@@ -93,7 +83,7 @@ export class Source extends Emitter {
       if (!doc.source) return;
       const stackId = `stack-${this._stacks.length - 1}`;
       doc.source.stackIds.push(stackId);
-      doc.source.tokens.push(...newTokens.map(t => this._sanitize(t)));
+      doc.source.tokens.push(...newTokens.map(t => sanitizeToken(t)));
     });
 
     this.emit("source:addStack", { payload: { stackId: `stack-${this._stacks.length - 1}` } });
@@ -116,7 +106,7 @@ export class Source extends Emitter {
     this.session.change("remove stack from source", (doc) => {
       if (!doc.source) return;
       doc.source.stackIds.splice(idx, 1);
-      doc.source.tokens = remainingTokens.map(t => this._sanitize(t));
+      doc.source.tokens = remainingTokens.map(t => sanitizeToken(t));
     });
 
     this.emit("source:removeStack", { payload: { stackId: `stack-${idx}` } });
@@ -137,7 +127,7 @@ export class Source extends Emitter {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
       const burnedProxy = doc.source.tokens.splice(-count, count);
-      burned = this._clone(burnedProxy);
+      burned = clone(burnedProxy);
       doc.source.burned.push(...burned);
     });
 
@@ -156,7 +146,7 @@ export class Source extends Emitter {
       if (newSeed !== undefined) {
         doc.source.seed = newSeed;
       }
-      const tokens = this._clone(doc.source.tokens);
+      const tokens = clone(doc.source.tokens);
       shuffleArray(tokens, doc.source.seed);
       doc.source.tokens = tokens;
     });
@@ -199,13 +189,13 @@ export class Source extends Emitter {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
       const drawnProxy = doc.source.tokens.splice(-count, count);
-      drawn = this._clone(drawnProxy);
+      drawn = clone(drawnProxy);
 
       // Check reshuffle policy
       if (doc.source.reshufflePolicy.threshold !== null &&
           doc.source.tokens.length <= doc.source.reshufflePolicy.threshold &&
           doc.source.reshufflePolicy.mode === "auto") {
-        const tokens = this._clone(doc.source.tokens);
+        const tokens = clone(doc.source.tokens);
         shuffleArray(tokens, doc.source.seed);
         doc.source.tokens = tokens;
         reshuffled = true;
@@ -231,7 +221,7 @@ export class Source extends Emitter {
 
     this.session.change("reset source", (doc) => {
       if (!doc.source) return;
-      doc.source.tokens = tokens.map(t => this._sanitize(t));
+      doc.source.tokens = tokens.map(t => sanitizeToken(t));
       doc.source.burned = [];
     });
 

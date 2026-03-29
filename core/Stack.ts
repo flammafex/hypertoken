@@ -6,6 +6,7 @@ import { shuffleArray } from "./random.js";
 import { Token } from "./Token.js";
 import { IToken, ReversalPolicy } from "./types.js";
 import { Chronicle } from "./Chronicle.js";
+import { sanitizeToken, clone } from "./serialize.js";
 
 export interface StackOptions {
   seed?: number | null;
@@ -45,7 +46,7 @@ export class Stack extends Emitter {
     // Clients should set this to false to avoid overwriting Host state
     if (autoInit && !this.session.state.stack) {
       this.session.change("initialize stack", (doc) => {
-        const cleanStack = this._original.map(t => this._sanitize(t));
+        const cleanStack = this._original.map(t => sanitizeToken(t));
         doc.stack = {
           stack: cleanStack,
           drawn: [],
@@ -53,20 +54,6 @@ export class Stack extends Emitter {
         };
       });
     }
-  }
-
-  private _sanitize(token: IToken): IToken {
-    const plain = { ...token };
-    if (plain._tags instanceof Set) {
-      // @ts-ignore
-      plain._tags = Array.from(plain._tags);
-    }
-    return JSON.parse(JSON.stringify(plain));
-  }
-
-  // Helper to deep clone a proxy object to a plain JS object
-  private _clone<T>(proxy: T): T {
-    return JSON.parse(JSON.stringify(proxy));
   }
 
   // Read directly from CRDT
@@ -106,7 +93,7 @@ export class Stack extends Emitter {
       const cardProxy = doc.stack.stack.pop();
 
       if (cardProxy) {
-        const card = this._clone(cardProxy);
+        const card = clone(cardProxy);
         doc.stack.drawn.push(card);
         drawnCard = card;
       }
@@ -128,7 +115,7 @@ export class Stack extends Emitter {
       const startIdx = doc.stack.stack.length - count;
 
       const cardsProxy = doc.stack.stack.splice(startIdx, count);
-      const cards = this._clone(cardsProxy);
+      const cards = clone(cardsProxy);
 
       doc.stack.drawn.push(...cards);
 
@@ -167,7 +154,7 @@ export class Stack extends Emitter {
     if (newSeed !== undefined) this._seed = newSeed;
     this.session.change("shuffle stack", (doc) => {
       if (!doc.stack) return;
-      const stack = this._clone(doc.stack.stack);
+      const stack = clone(doc.stack.stack);
       shuffleArray(stack, this._seed ?? undefined);
       doc.stack.stack = stack;
     });
@@ -182,7 +169,7 @@ export class Stack extends Emitter {
   reset(): this {
     this.session.change("reset stack", (doc) => {
       if (!doc.stack) return;
-      doc.stack.stack = this._original.map(t => this._sanitize(t));
+      doc.stack.stack = this._original.map(t => sanitizeToken(t));
       doc.stack.drawn = [];
       doc.stack.discards = [];
     });
@@ -207,7 +194,7 @@ export class Stack extends Emitter {
       const count = Math.min(n, doc.stack.stack.length);
       const startIdx = doc.stack.stack.length - count;
       const cardsProxy = doc.stack.stack.splice(startIdx, count);
-      const cards = this._clone(cardsProxy);
+      const cards = clone(cardsProxy);
       doc.stack.discards.push(...cards);
       burned = cards;
     });
@@ -227,7 +214,7 @@ export class Stack extends Emitter {
     }
     this.session.change("discard card", (doc) => {
       if (!doc.stack) return;
-      doc.stack.discards.push(this._sanitize(token));
+      doc.stack.discards.push(sanitizeToken(token));
     });
     this.emit("discard", token);
     return token;
@@ -249,7 +236,7 @@ export class Stack extends Emitter {
     this.session.change("cut stack", (doc) => {
       if (!doc.stack) return;
 
-      let stack = this._clone(doc.stack.stack);
+      let stack = clone(doc.stack.stack);
       const cutPoint = n;
       const top = stack.splice(cutPoint, len - cutPoint);
       const bottom = stack.splice(0, cutPoint);
@@ -280,7 +267,7 @@ export class Stack extends Emitter {
       let idx = index;
       if (idx < 0) idx = 0;
       if (idx > doc.stack.stack.length) idx = doc.stack.stack.length;
-      doc.stack.stack.splice(idx, 0, this._sanitize(card));
+      doc.stack.stack.splice(idx, 0, sanitizeToken(card));
     });
     this.emit("stack:insert", { payload: { card, index } });
     return this;
@@ -303,7 +290,7 @@ export class Stack extends Emitter {
       if (!doc.stack) return;
       if (index < 0 || index >= doc.stack.stack.length) return;
       const [itemProxy] = doc.stack.stack.splice(index, 1);
-      removed = this._clone(itemProxy);
+      removed = clone(itemProxy);
     });
     if (removed) this.emit("stack:remove", { payload: { card: removed, index } });
     return removed;
@@ -324,7 +311,7 @@ export class Stack extends Emitter {
 
     this.session.change("swap cards", (doc) => {
       if (!doc.stack) return;
-      const stack = this._clone(doc.stack.stack);
+      const stack = clone(doc.stack.stack);
       if (i < 0 || j < 0 || i >= stack.length || j >= stack.length) return;
       const temp = stack[i];
       stack[i] = stack[j];
@@ -354,7 +341,7 @@ export class Stack extends Emitter {
 
     this.session.change("reverse range", (doc) => {
       if (!doc.stack) return;
-      const stack = this._clone(doc.stack.stack);
+      const stack = clone(doc.stack.stack);
       const [a, b] = i < j ? [i, j] : [j, i];
       const segment = stack.splice(a, b - a + 1);
       segment.reverse();

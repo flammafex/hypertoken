@@ -42,7 +42,7 @@ export interface ReversalPolicy {
 }
 
 export interface IActionPayload {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface IAction {

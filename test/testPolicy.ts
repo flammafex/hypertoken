@@ -362,7 +362,7 @@ await test('Policy conditions can depend on game state', () => {
 
   const scorePolicy = new Policy(
     'win-check',
-    (eng) => (eng._gameState.score || 0) >= 100,
+    (eng) => ((eng._gameState.score as number) || 0) >= 100,
     (eng) => {
       eng.session.change("win", (doc: any) => {
         if (!doc.gameState) doc.gameState = {};
@@ -433,7 +433,7 @@ await test('Game end policy with multiple conditions', () => {
       const state = eng._gameState;
       const maxScore = Math.max(...eng._agents.map(a => a.resources?.score || 0));
 
-      return state.turns >= state.maxTurns || maxScore >= 100;
+      return (state.turns as number) >= (state.maxTurns as number) || maxScore >= 100;
     },
     (eng) => {
       eng.session.change("end game", (doc: any) => {

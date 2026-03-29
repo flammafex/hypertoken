@@ -27,13 +27,12 @@ import { IToken } from "../core/types.js";
 export interface IEngineAgent {
   id: string;
   name: string;
-  controllerLogic?: any;
-  meta?: Record<string, any>;
+  controllerLogic?: (...args: unknown[]) => unknown;
+  meta?: Record<string, unknown>;
   active: boolean;
   resources: Record<string, number>;
   inventory: IToken[];
-  zones?: Map<string, any>;
-  [key: string]: any; // Allow additional properties for extensibility
+  zones?: Map<string, IToken[]>;
 }
 
 /**
@@ -52,7 +51,7 @@ export interface IGameState {
   turn?: number;
   winner?: string;
   reason?: string;
-  [key: string]: any; // Allow additional game-specific properties
+  [key: string]: unknown; // Allow additional game-specific properties
 }
 
 /**

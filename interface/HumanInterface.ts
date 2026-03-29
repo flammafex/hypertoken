@@ -13,10 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// ./interface/HumanInterface.js
+// ./interface/HumanInterface.ts
 // Handles local human input → dispatches deterministic actions to the Engine.
 
 import { Emitter } from "../core/events.js";
+import type { IEvent } from "../core/events.js";
+import type { Engine } from "../engine/Engine.js";
+
+export interface HumanInterfaceAdapter {
+  cleanup?: () => void;
+}
+
+export interface HumanInterfaceOptions {
+  adapter?: HumanInterfaceAdapter | null;
+  onUpdate?: ((state: unknown) => void) | null;
+  verbose?: boolean;
+}
 
 /**
  * HumanInterface
@@ -25,28 +37,26 @@ import { Emitter } from "../core/events.js";
  * - Updates subscribed UIs when state changes.
  */
 export class HumanInterface extends Emitter {
-  /**
-   * @param {Engine} engine - the running engine instance
-   * @param {object} [options]
-   * @param {HTMLElement|Document} [options.dom] - optional root DOM for UI binding
-   * @param {(state:object)=>void} [options.onUpdate] - callback for UI updates
-   * @param {boolean} [options.verbose=false]
-   */
-constructor(engine, { adapter = null, onUpdate = null, verbose = false } = {}) {
-  super();
-  this.engine = engine;
-  this.adapter = adapter; // could be a DOM adapter, CLI adapter, etc.
-  this.onUpdate = onUpdate;
-  this.verbose = verbose;
+  engine: Engine;
+  adapter: HumanInterfaceAdapter | null;
+  onUpdate: ((state: unknown) => void) | null;
+  verbose: boolean;
 
-  engine.on("stateChange", e => this._update(e));
-  engine.on("engine:action", e => this._logAction(e));
-}
+  constructor(engine: Engine, { adapter = null, onUpdate = null, verbose = false }: HumanInterfaceOptions = {}) {
+    super();
+    this.engine = engine;
+    this.adapter = adapter;
+    this.onUpdate = onUpdate;
+    this.verbose = verbose;
+
+    engine.on("stateChange", (e) => this._update(e));
+    engine.on("engine:action", (e) => this._logAction(e));
+  }
 
   /*───────────────────────────────────────────────
     Core interaction methods
   ───────────────────────────────────────────────*/
-  handleAction(type, payload = {}) {
+  handleAction(type: string, payload: Record<string, unknown> = {}): void {
     try {
       if (this.verbose) console.log("🎮 dispatch", type, payload);
       this.engine.dispatch(type, payload);
@@ -58,37 +68,37 @@ constructor(engine, { adapter = null, onUpdate = null, verbose = false } = {}) {
   }
 
   /** Shortcut helpers for common verbs **/
-  draw(count = 1) { this.handleAction("stack:draw", { count }); }
-  shuffle(seed = null) { this.handleAction("stack:shuffle", { seed }); }
-  resetStack() { this.handleAction("stack:reset"); }
-  place(zone = "space") { this.handleAction("space:place", { zone }); }
-  clearSpace() { this.handleAction("space:clear"); }
+  draw(count = 1): void { this.handleAction("stack:draw", { count }); }
+  shuffle(seed: string | number | null = null): void { this.handleAction("stack:shuffle", { seed: seed ?? undefined }); }
+  resetStack(): void { this.handleAction("stack:reset"); }
+  place(zone = "space"): void { this.handleAction("space:place", { zone }); }
+  clearSpace(): void { this.handleAction("space:clear"); }
 
   /*───────────────────────────────────────────────
     Engine state updates
   ───────────────────────────────────────────────*/
-  _update(e) {
+  private _update(_e: IEvent): void {
     const state = this.engine.describe();
     if (this.onUpdate) this.onUpdate(state);
     this.emit("ui:update", { payload: { state } });
   }
 
-  _logAction(e) {
+  private _logAction(e: IEvent): void {
     if (this.verbose) {
-      console.log(`🧩 Action: ${e?.payload?.type ?? "(unknown)"}`);
+      console.log(`🧩 Action: ${(e?.payload as any)?.type ?? "(unknown)"}`);
     }
   }
 
   /*───────────────────────────────────────────────
     Lifecycle helpers
   ───────────────────────────────────────────────*/
-  refresh() {
+  refresh(): void {
     const state = this.engine.describe();
     this.emit("ui:refresh", { payload: { state } });
     this.onUpdate?.(state);
   }
 
-  detach() {
+  detach(): void {
     this.emit("ui:detach");
     this.adapter?.cleanup?.();
   }
