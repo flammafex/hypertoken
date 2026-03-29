@@ -99,6 +99,12 @@ cuttle/
     └── styles.css   # Styling
 ```
 
+## Design Note
+
+Cuttle is intentionally a **standalone environment** that does not use the HyperToken engine internally. The full game logic (Space zones, token attachments, phase management) is self-contained in `CuttleGame.ts` for clarity and portability.
+
+`CuttleAEC` implements the same `AECEnvironment` interface as engine-backed games and is fully compatible with the HyperToken bridge server and Python client. The `server.js` multiplayer server demonstrates how to build real-time networked play on top of the game layer directly. To add CRDT-backed state replication or engine-driven rule hooks, pass an engine instance and route mutations through `session.change()` following the pattern in `examples/liars-dice` or `examples/coup`.
+
 ## Key Patterns
 
 ```javascript

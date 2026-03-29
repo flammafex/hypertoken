@@ -46,44 +46,40 @@ export function registerRoundRobinTurns(ruleEngine, opts = {}) {
     (engine) => {
       const agents = engine._agents;
       const currentIdx = agents.findIndex(p => p.active);
-      
+
       if (currentIdx === -1) {
         // No active agent, start with first
-        agents[0].active = true;
+        engine.dispatch("agent:setActive", { name: agents[0].name, active: true });
         return;
       }
-      
+
       // Deactivate current agent
-      agents[currentIdx].active = false;
-      
-      // Find next agent (skip inactive if configured)
+      engine.dispatch("agent:setActive", { name: agents[currentIdx].name, active: false });
+
+      // Find next agent (skip eliminated/inactive if configured)
       let nextIdx = (currentIdx + 1) % agents.length;
       let attempts = 0;
-      
+
       while (skipInactive && attempts < agents.length) {
-        if (agents[nextIdx].status !== "eliminated" && 
-            agents[nextIdx].status !== "inactive") {
-          break;
-        }
+        const status = agents[nextIdx].meta?.status;
+        if (status !== "eliminated" && status !== "inactive") break;
         nextIdx = (nextIdx + 1) % agents.length;
         attempts++;
       }
-      
+
       // Activate next agent
-      agents[nextIdx].active = true;
-      
-      // Emit turn change event
+      engine.dispatch("agent:setActive", { name: agents[nextIdx].name, active: true });
+
+      const turnNumber = (engine._gameState?.turnNumber || 0) + 1;
+      engine.dispatch("game:setProperty", { key: "turnNumber", value: turnNumber });
+
       engine.emit("turn:changed", {
         payload: {
           from: agents[currentIdx].name,
           to: agents[nextIdx].name,
-          turnNumber: (engine._gameState?.turnNumber || 0) + 1
+          turnNumber,
         }
       });
-      
-      // Increment turn counter
-      if (!engine._gameState) engine._gameState = {};
-      engine._gameState.turnNumber = (engine._gameState.turnNumber || 0) + 1;
     },
     { priority: 100 }
   );
@@ -111,8 +107,8 @@ export function registerRoundCompletion(ruleEngine, opts = {}) {
       if (agents.length === 0) return false;
       
       // Check if all agents have completed their turn
-      const allComplete = agents.every(p => 
-        p.turnComplete === true || p.status === "eliminated"
+      const allComplete = agents.every(p =>
+        p.meta?.turnComplete === true || p.meta?.status === "eliminated"
       );
       
       const inPlay = engine._gameState?.phase === "play";
@@ -122,28 +118,22 @@ export function registerRoundCompletion(ruleEngine, opts = {}) {
     (engine) => {
       const roundNum = (engine._gameState?.roundNumber || 0) + 1;
       
-      // Emit round complete event
       engine.emit("round:complete", {
         payload: { roundNumber: roundNum }
       });
-      
-      // Reset turn flags
-      engine._agents.forEach(p => {
-        p.turnComplete = false;
-      });
-      
-      // Execute callback if provided
+
+      // Reset turn-complete flags on all agents
+      for (const p of engine._agents) {
+        engine.dispatch("agent:setMeta", { name: p.name, key: "turnComplete", value: false });
+      }
+
       if (onRoundComplete) {
         onRoundComplete(engine);
       }
-      
-      // Advance to next phase
+
+      // Advance to next phase and update counters
       engine.dispatch("game:nextPhase", { phase: nextPhase });
-      
-      // Update state
-      if (!engine._gameState) engine._gameState = {};
-      engine._gameState.roundNumber = roundNum;
-      engine._gameState.turnNumber = 0;
+      engine.dispatch("game:mergeState", { state: { roundNumber: roundNum, turnNumber: 0 } });
     },
     { priority: 90, once: true }
   );
@@ -186,17 +176,13 @@ export function registerTurnTimer(ruleEngine, opts = {}) {
         }
       });
       
-      // Execute callback if provided
       if (onTimeout) {
         onTimeout(engine, activeAgent);
       }
-      
-      // Force skip turn
+
+      // Force skip turn and clear timer state
       engine.dispatch("agent:endTurn", { forced: true });
-      
-      // Clear timer state
-      delete engine._gameState.turnStartTime;
-      delete engine._gameState.waitingForAgent;
+      engine.dispatch("game:mergeState", { state: { turnStartTime: null, waitingForAgent: null } });
     },
     { priority: 95 }
   );
@@ -225,50 +211,40 @@ export function registerFirstAgentSelection(ruleEngine, opts = {}) {
       if (agents.length === 0) return;
       
       let firstAgent;
-      
+
       switch (method) {
         case "random":
           firstAgent = agents[Math.floor(Math.random() * agents.length)];
           break;
-          
         case "youngest":
-          firstAgent = agents.reduce((youngest, p) => 
-            (!youngest || p.age < youngest.age) ? p : youngest
+          firstAgent = agents.reduce((youngest, p) =>
+            (!youngest || (p.meta?.age ?? 0) < (youngest.meta?.age ?? 0)) ? p : youngest
           );
           break;
-          
         case "oldest":
-          firstAgent = agents.reduce((oldest, p) => 
-            (!oldest || p.age > oldest.age) ? p : oldest
+          firstAgent = agents.reduce((oldest, p) =>
+            (!oldest || (p.meta?.age ?? 0) > (oldest.meta?.age ?? 0)) ? p : oldest
           );
           break;
-          
         case "score":
-          firstAgent = agents.reduce((highest, p) => 
-            (!highest || p.score > highest.score) ? p : highest
+          firstAgent = agents.reduce((highest, p) =>
+            (!highest || (p.resources?.score ?? 0) > (highest.resources?.score ?? 0)) ? p : highest
           );
           break;
-          
         default:
           firstAgent = agents[0];
       }
-      
-      // Set first agent as active
-      agents.forEach(p => p.active = false);
-      firstAgent.active = true;
-      
-      // Emit event
+
+      // Deactivate all, activate first
+      for (const p of agents) {
+        engine.dispatch("agent:setActive", { name: p.name, active: p.name === firstAgent.name });
+      }
+
+      engine.dispatch("game:mergeState", { state: { turnNumber: 1, turnStartTime: Date.now() } });
+
       engine.emit("turn:firstAgent", {
-        payload: { 
-          agent: firstAgent.name,
-          method 
-        }
+        payload: { agent: firstAgent.name, method }
       });
-      
-      // Initialize turn state
-      if (!engine._gameState) engine._gameState = {};
-      engine._gameState.turnNumber = 1;
-      engine._gameState.turnStartTime = Date.now();
     },
     { priority: 100, once: true }
   );
@@ -291,36 +267,29 @@ export function registerSimultaneousTurns(ruleEngine, opts = {}) {
       const agents = engine._agents || [];
       if (agents.length === 0) return false;
       
-      const allReady = agents.every(p => 
-        p.actionSubmitted === true || p.status === "eliminated"
+      const allReady = agents.every(p =>
+        p.meta?.actionSubmitted === true || p.meta?.status === "eliminated"
       );
       
-      const waitingForActions = engine._gameState?.waitingForActions;
+      const waitingForActions = engine._gameState?.waitingForActions === true;
       
       return allReady && waitingForActions;
     },
     (engine) => {
-      // Emit all ready event
       engine.emit("turn:allReady", {
-        payload: { 
-          agents: engine._agents.map(p => p.name)
-        }
+        payload: { agents: engine._agents.map(p => p.name) }
       });
-      
-      // Execute callback if provided
+
       if (onAllReady) {
         onAllReady(engine);
       }
-      
-      // Reset action flags
-      engine._agents.forEach(p => {
-        p.actionSubmitted = false;
-      });
-      
-      // Clear waiting state
-      engine._gameState.waitingForActions = false;
-      
-      // Resolve actions
+
+      // Reset per-agent action-submitted flags and clear waiting state
+      for (const p of engine._agents) {
+        engine.dispatch("agent:setMeta", { name: p.name, key: "actionSubmitted", value: false });
+      }
+      engine.dispatch("game:setProperty", { key: "waitingForActions", value: false });
+
       engine.dispatch("game:resolveActions");
     },
     { priority: 90 }

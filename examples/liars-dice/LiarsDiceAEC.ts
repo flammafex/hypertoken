@@ -19,6 +19,7 @@
 
 import { AECEnvironment } from "../../interface/PettingZoo.js";
 import { Observation, ActionID, Space } from "../../interface/Gym.js";
+import { Engine } from "../../engine/Engine.js";
 import {
   LiarsDiceGame,
   LiarsDiceConfig,
@@ -70,8 +71,9 @@ export class LiarsDiceAEC extends AECEnvironment {
     this._seed = this.config.seed;
     this.maxDice = this.config.numPlayers * this.config.startingDice;
 
-    // Create game
-    this.game = new LiarsDiceGame({
+    // Create engine + game
+    const engine = new Engine();
+    this.game = new LiarsDiceGame(engine, {
       numPlayers: this.config.numPlayers,
       startingDice: this.config.startingDice,
       seed: this.config.seed,

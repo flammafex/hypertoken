@@ -213,6 +213,12 @@ import {
 } from "./examples/poker/index.js";
 ```
 
+## Design Note
+
+Poker is intentionally a **standalone RL environment** that does not use the HyperToken engine internally. This is by design: high-throughput reinforcement learning training requires millions of steps per second, and the CRDT overhead of the engine (Automerge, session.change, agent dispatch) would be a bottleneck in hot training loops.
+
+The `PokerAEC` class implements the same `AECEnvironment` interface as engine-backed games, so it is fully compatible with HyperToken's bridge server, vectorized wrappers, and Python client. The tradeoff is that game state is not replicated or networked — for distributed play or persistence, use the engine-backed examples instead.
+
 ## Game Rules
 
 - Heads-up (2 players) No-Limit Texas Hold'em

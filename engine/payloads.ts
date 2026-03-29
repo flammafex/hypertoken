@@ -55,11 +55,13 @@ export interface TradeOffer                   { token?: IToken; resource?: strin
 export interface AgentTradePayload            { agent1: string; agent2: string; offer1?: TradeOffer; offer2?: TradeOffer }
 export interface AgentDrawCardsPayload        { name: string; count?: number }
 export interface AgentDiscardCardsPayload     { name: string; tokenIds: string[] }
+export interface AgentSetMetaPayload          { name: string; key: string; value: unknown }
 
 // ─── Game ────────────────────────────────────────────────────────────────────
 export interface GameEndPayload         { winner?: string; reason?: string }
 export interface GameNextPhasePayload   { phase: string }
 export interface GameSetPropertyPayload { key: string; value: unknown }
+export interface GameMergeStatePayload  { state: Record<string, unknown> }
 
 // ─── GameLoop ────────────────────────────────────────────────────────────────
 export interface GameLoopInitPayload       { maxTurns?: number }

@@ -33,8 +33,8 @@ import type {
   AgentAddTokenPayload, AgentRemoveTokenPayload, AgentGetPayload,
   AgentTransferResourcePayload, AgentTransferTokenPayload,
   AgentStealResourcePayload, AgentStealTokenPayload,
-  AgentTradePayload, AgentDrawCardsPayload, AgentDiscardCardsPayload,
-  GameNextPhasePayload, GameSetPropertyPayload,
+  AgentTradePayload, AgentDrawCardsPayload, AgentDiscardCardsPayload, AgentSetMetaPayload,
+  GameNextPhasePayload, GameSetPropertyPayload, GameMergeStatePayload,
   GameLoopInitPayload, GameLoopStopPayload, GameNextTurnPayload,
   GameSetPhasePayload, GameSetMaxTurnsPayload, GameSetActiveAgentPayload,
   RuleMarkFiredPayload,
@@ -415,6 +415,15 @@ const AgentActions: ActionRegistryType = {
     });
     return cards;
   },
+  "agent:setMeta": (engine, { name, key, value } = {} as AgentSetMetaPayload) => {
+    if (!key) throw new Error("key required");
+    findAgent(engine, name); // validate existence
+    engine.session.change("agent:setMeta", (doc: any) => {
+      if (!doc.agents?.[name]) return;
+      if (!doc.agents[name].meta) doc.agents[name].meta = {};
+      doc.agents[name].meta[key] = value;
+    });
+  },
   "agent:discardCards": (engine, { name, tokenIds } = {} as AgentDiscardCardsPayload) => {
     if (!engine.stack) throw new Error("No stack attached to engine");
     const agent = findAgent(engine, name);
@@ -498,6 +507,14 @@ const GameActions: ActionRegistryType = {
     engine.session.change("game:setProperty", (doc: any) => {
       if (!doc.gameState) doc.gameState = {};
       doc.gameState[key] = value;
+    });
+    return engine._gameState;
+  },
+  "game:mergeState": (engine, { state } = {} as GameMergeStatePayload) => {
+    if (!state || typeof state !== "object") throw new Error("state object required");
+    engine.session.change("game:mergeState", (doc: any) => {
+      if (!doc.gameState) doc.gameState = {};
+      Object.assign(doc.gameState, state);
     });
     return engine._gameState;
   },

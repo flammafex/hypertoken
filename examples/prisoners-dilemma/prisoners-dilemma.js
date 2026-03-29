@@ -71,104 +71,84 @@ export class PrisonersDilemmaGame {
    * Initialize game with two agents
    */
   async initialize(agent1, agent2) {
+    await this.engine.dispatch('game:loopInit', { maxTurns: this.config.rounds });
     await this.engine.dispatch('game:start');
 
-    // Create agents
-    const p1Result = await this.engine.dispatch('agent:create', {
-      name: agent1.name || 'Agent 1',
-      agent: agent1.strategy
+    await this.engine.dispatch('agent:create', { name: agent1.name || 'Agent 1' });
+    await this.engine.dispatch('agent:create', { name: agent2.name || 'Agent 2' });
+
+    // Store agent name references (reads from CRDT state)
+    this.agent1Name = agent1.name || 'Agent 1';
+    this.agent2Name = agent2.name || 'Agent 2';
+    this.agent1Strategy = agent1.strategy;
+    this.agent2Strategy = agent2.strategy;
+
+    await this.engine.dispatch('game:loopStart');
+    await this.engine.dispatch('game:mergeState', {
+      state: { round: 0, moves: { [this.agent1Name]: [], [this.agent2Name]: [] } }
     });
 
-    const p2Result = await this.engine.dispatch('agent:create', {
-      name: agent2.name || 'Agent 2',
-      agent: agent2.strategy
-    });
-
-    // Store agent references
-    this.agent1 = this.engine._agents.find(p => p.name === (agent1.name || 'Agent 1'));
-    this.agent2 = this.engine._agents.find(p => p.name === (agent2.name || 'Agent 2'));
-
-    // Initialize scores
-    await this.engine.dispatch('agent:giveResource', {
-      name: this.agent1.name,
-      resource: 'score',
-      amount: 0
-    });
-
-    await this.engine.dispatch('agent:giveResource', {
-      name: this.agent2.name,
-      resource: 'score',
-      amount: 0
-    });
-
-    this.currentRound = 0;
     this.history = [];
-
     return this;
   }
+
+  get agent1() { return this.engine._agents.find(p => p.name === this.agent1Name); }
+  get agent2() { return this.engine._agents.find(p => p.name === this.agent2Name); }
   
   /**
    * Play a single round
    */
   async playRound() {
-    this.currentRound++;
-    
-    // Get moves from both agents
-    const p1Move = await this.getAgentMove(this.agent1, this.agent1Moves, this.agent2Moves);
-    const p2Move = await this.getAgentMove(this.agent2, this.agent2Moves, this.agent1Moves);
-    
-    // Store moves
-    this.agent1Moves.push(p1Move);
-    this.agent2Moves.push(p2Move);
-    
-    // Calculate payoffs
+    const gstate = this.engine._gameState;
+    const currentRound = (gstate.round ?? 0) + 1;
+    const a1Moves = gstate.moves?.[this.agent1Name] ?? [];
+    const a2Moves = gstate.moves?.[this.agent2Name] ?? [];
+
+    // Get moves from both agents' strategies
+    const p1Move = await this.getAgentMove(this.agent1Strategy, a1Moves, a2Moves, currentRound);
+    const p2Move = await this.getAgentMove(this.agent2Strategy, a2Moves, a1Moves, currentRound);
+
     const outcome = this.calculatePayoffs(p1Move, p2Move);
 
-    // Update scores
-    await this.engine.dispatch('agent:giveResource', {
-      name: this.agent1.name,
-      resource: 'score',
-      amount: outcome.p1
+    await this.engine.dispatch('agent:giveResource', { name: this.agent1Name, resource: 'score', amount: outcome.p1 });
+    await this.engine.dispatch('agent:giveResource', { name: this.agent2Name, resource: 'score', amount: outcome.p2 });
+    await this.engine.dispatch('game:nextTurn', { agentCount: 2 });
+    await this.engine.dispatch('game:mergeState', {
+      state: {
+        round: currentRound,
+        moves: {
+          ...gstate.moves,
+          [this.agent1Name]: [...a1Moves, p1Move],
+          [this.agent2Name]: [...a2Moves, p2Move],
+        },
+      }
     });
 
-    await this.engine.dispatch('agent:giveResource', {
-      name: this.agent2.name,
-      resource: 'score',
-      amount: outcome.p2
-    });
-    
-    // Record round
     const round = {
-      round: this.currentRound,
+      round: currentRound,
       p1Move,
       p2Move,
       p1Payoff: outcome.p1,
       p2Payoff: outcome.p2,
-      p1Score: this.agent1.resources.score,
-      p2Score: this.agent2.resources.score
+      p1Score: this.agent1?.resources?.score ?? 0,
+      p2Score: this.agent2?.resources?.score ?? 0,
     };
-    
+
     this.history.push(round);
-    
     this.engine.emit('round:complete', { payload: round });
-    
     return round;
   }
   
   /**
    * Get move from a agent's strategy
    */
-  async getAgentMove(agent, ownHistory, opponentHistory) {
-    if (typeof agent.agent === 'function') {
-      // Strategy is a function
-      return await agent.agent(ownHistory, opponentHistory, this.currentRound);
-    } else if (agent.agent && typeof agent.agent.decide === 'function') {
-      // Strategy is an object with decide method
-      return await agent.agent.decide(ownHistory, opponentHistory, this.currentRound);
-    } else {
-      // Default to random
-      return Math.random() < 0.5 ? COOPERATE : DEFECT;
+  async getAgentMove(strategy, ownHistory, opponentHistory, round) {
+    if (typeof strategy === 'function') {
+      return await strategy(ownHistory, opponentHistory, round);
+    } else if (strategy && typeof strategy.decide === 'function') {
+      return await strategy.decide(ownHistory, opponentHistory, round);
     }
+    return Math.random() < 0.5 ? COOPERATE : DEFECT;
   }
   
   /**
@@ -183,21 +163,17 @@ export class PrisonersDilemmaGame {
    * Play multiple rounds
    */
   async playGame() {
-    const rounds = this.config.rounds;
-    
-    for (let i = 0; i < rounds; i++) {
+    for (let i = 0; i < this.config.rounds; i++) {
       await this.playRound();
     }
-    
-    // End game
-    const winner = this.determineWinner();
 
+    const winner = this.determineWinner();
     await this.engine.dispatch('game:end', {
       winner: winner?.name || null,
       reason: 'rounds_complete',
       finalScores: {
-        [this.agent1.name]: this.agent1.resources.score,
-        [this.agent2.name]: this.agent2.resources.score
+        [this.agent1Name]: this.agent1?.resources?.score ?? 0,
+        [this.agent2Name]: this.agent2?.resources?.score ?? 0,
       }
     });
 
@@ -208,63 +184,55 @@ export class PrisonersDilemmaGame {
    * Determine winner
    */
   determineWinner() {
-    const p1Score = this.agent1.resources.score;
-    const p2Score = this.agent2.resources.score;
-    
+    const p1Score = this.agent1?.resources?.score ?? 0;
+    const p2Score = this.agent2?.resources?.score ?? 0;
     if (p1Score > p2Score) return this.agent1;
     if (p2Score > p1Score) return this.agent2;
-    return null; // Tie
+    return null;
   }
-  
-  /**
-   * Get game results and statistics
-   */
+
   getResults() {
-    const p1Score = this.agent1.resources.score;
-    const p2Score = this.agent2.resources.score;
+    const gstate = this.engine._gameState;
+    const currentRound = gstate.round ?? this.history.length;
+    const p1Score = this.agent1?.resources?.score ?? 0;
+    const p2Score = this.agent2?.resources?.score ?? 0;
+    const a1Moves = gstate.moves?.[this.agent1Name] ?? [];
+    const a2Moves = gstate.moves?.[this.agent2Name] ?? [];
+
+    const p1Cooperations = a1Moves.filter(m => m === COOPERATE).length;
+    const p2Cooperations = a2Moves.filter(m => m === COOPERATE).length;
+
+    const p1CoopRate = currentRound > 0 ? p1Cooperations / currentRound : 0;
+    const p2CoopRate = currentRound > 0 ? p2Cooperations / currentRound : 0;
     
-    // Calculate cooperation rates
-    const p1Cooperations = this.agent1Moves.filter(m => m === COOPERATE).length;
-    const p2Cooperations = this.agent2Moves.filter(m => m === COOPERATE).length;
-    
-    const p1CoopRate = p1Cooperations / this.currentRound;
-    const p2CoopRate = p2Cooperations / this.currentRound;
-    
-    // Calculate mutual cooperation/defection
-    const mutualCooperation = this.history.filter(r => 
+    const mutualCooperation = this.history.filter(r =>
       r.p1Move === COOPERATE && r.p2Move === COOPERATE
     ).length;
-    
-    const mutualDefection = this.history.filter(r => 
+    const mutualDefection = this.history.filter(r =>
       r.p1Move === DEFECT && r.p2Move === DEFECT
     ).length;
-    
-    const exploitation = this.history.filter(r => 
-      r.p1Move !== r.p2Move
-    ).length;
-    
+    const exploitation = this.history.filter(r => r.p1Move !== r.p2Move).length;
+    const avgDivisor = currentRound > 0 ? currentRound : 1;
+
     return {
-      rounds: this.currentRound,
+      rounds: currentRound,
       winner: this.determineWinner()?.name || 'Tie',
-      scores: {
-        [this.agent1.name]: p1Score,
-        [this.agent2.name]: p2Score
-      },
+      scores: { [this.agent1Name]: p1Score, [this.agent2Name]: p2Score },
       avgScores: {
-        [this.agent1.name]: (p1Score / this.currentRound).toFixed(2),
-        [this.agent2.name]: (p2Score / this.currentRound).toFixed(2)
+        [this.agent1Name]: (p1Score / avgDivisor).toFixed(2),
+        [this.agent2Name]: (p2Score / avgDivisor).toFixed(2),
       },
       cooperationRates: {
-        [this.agent1.name]: (p1CoopRate * 100).toFixed(1) + '%',
-        [this.agent2.name]: (p2CoopRate * 100).toFixed(1) + '%'
+        [this.agent1Name]: (p1CoopRate * 100).toFixed(1) + '%',
+        [this.agent2Name]: (p2CoopRate * 100).toFixed(1) + '%',
       },
       outcomes: {
         mutualCooperation,
         mutualDefection,
         exploitation,
-        cooperationRate: ((mutualCooperation / this.currentRound) * 100).toFixed(1) + '%'
+        cooperationRate: ((mutualCooperation / avgDivisor) * 100).toFixed(1) + '%',
       },
-      history: this.history
+      history: this.history,
     };
   }
   
@@ -281,14 +249,14 @@ export class PrisonersDilemmaGame {
     lines.push(`Winner: ${results.winner}`);
     lines.push('');
     lines.push('Final Scores:');
-    Object.entries(results.scores).forEach(([name, score]) => {
+    for (const [name, score] of Object.entries(results.scores)) {
       lines.push(`  ${name}: ${score} (avg: ${results.avgScores[name]})`);
-    });
+    }
     lines.push('');
     lines.push('Cooperation Rates:');
-    Object.entries(results.cooperationRates).forEach(([name, rate]) => {
+    for (const [name, rate] of Object.entries(results.cooperationRates)) {
       lines.push(`  ${name}: ${rate}`);
-    });
+    }
     lines.push('');
     lines.push('Round Outcomes:');
     lines.push(`  Mutual Cooperation: ${results.outcomes.mutualCooperation} (${results.outcomes.cooperationRate})`);
