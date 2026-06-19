@@ -16151,7 +16151,6 @@ function getTimeRemainingSec(engine) {
 
 // examples/confluence/web/confluence-web.js
 console.log("[Confluence] Modules loaded successfully");
-initApp();
 var state = {
   // Engine
   engine: null,
@@ -16889,6 +16888,7 @@ window.confluence = {
   hideRules
 };
 console.log("[Confluence] Client module loaded. Use window.confluence for debugging.");
+initApp();
 /*! Bundled license information:
 
 ieee754/index.js:

@@ -19,7 +19,6 @@ import {
 } from '../crdt-actions';
 
 console.log('[Confluence] Modules loaded successfully');
-initApp();
 
 // ============================================================================
 // Application State
@@ -1063,3 +1062,6 @@ window.confluence = {
 };
 
 console.log('[Confluence] Client module loaded. Use window.confluence for debugging.');
+
+// Initialize after all declarations are in scope
+initApp();
