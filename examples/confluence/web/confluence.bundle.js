@@ -15111,12 +15111,13 @@ Object.assign(ActionRegistry, {
     const state2 = engine.session.state?.confluence;
     if (!state2) throw new Error("Game not initialized");
     if (state2.phase === "ended") throw new Error("Game already ended");
+    const plainState = JSON.parse(JSON.stringify(state2));
+    const result = deriveResult(plainState);
     engine.session.change("confluence:end", (doc) => {
       doc.confluence.phase = "ended";
-      const result = deriveResult(doc.confluence);
       doc.confluence.winner = result.winner;
     });
-    engine.emit("confluence:ended", { winner: state2.winner });
+    engine.emit("confluence:ended", { winner: result.winner });
   }
 });
 function getBoard(engine) {

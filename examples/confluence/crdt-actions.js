@@ -340,13 +340,17 @@ Object.assign(ActionRegistry, {
     if (!state) throw new Error("Game not initialized");
     if (state.phase === "ended") throw new Error("Game already ended");
 
+    // Compute result BEFORE writing to Chronicle — Automerge proxies
+    // don't work with Object.values() in deriveResult/deriveScores
+    const plainState = JSON.parse(JSON.stringify(state));
+    const result = deriveResult(plainState);
+
     engine.session.change("confluence:end", (doc) => {
       doc.confluence.phase = "ended";
-      const result = deriveResult(doc.confluence);
       doc.confluence.winner = result.winner;
     });
 
-    engine.emit("confluence:ended", { winner: state.winner });
+    engine.emit("confluence:ended", { winner: result.winner });
   },
 });
 
