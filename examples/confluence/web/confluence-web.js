@@ -329,6 +329,12 @@ function startTimer() {
 
     // Check for game end
     if (seconds <= 0 && !state.gameEnded) {
+      // Dispatch confluence:end to compute winner and sync to peers
+      try {
+        state.engine.dispatch('confluence:end', { peerId: state.peerId });
+      } catch (e) {
+        // Game may have already ended via peer sync
+      }
       handleGameEnded();
     }
   };

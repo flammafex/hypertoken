@@ -15352,6 +15352,10 @@ function startTimer() {
       elements.timer.classList.add("critical");
     }
     if (seconds <= 0 && !state.gameEnded) {
+      try {
+        state.engine.dispatch("confluence:end", { peerId: state.peerId });
+      } catch (e) {
+      }
       handleGameEnded();
     }
   };
