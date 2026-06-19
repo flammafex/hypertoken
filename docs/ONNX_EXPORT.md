@@ -45,7 +45,7 @@ export_sb3_to_onnx(
 ### 3. Use in Browser
 
 ```javascript
-import { ONNXAgent } from 'hypertoken/interface/ONNXAgent.js';
+import { ONNXAgent } from 'hypertoken/hypertoken-rl/interface/ONNXAgent.js';
 
 const ai = new ONNXAgent({
   actionMap: { 0: 'blackjack:hit', 1: 'blackjack:stand' }
@@ -152,7 +152,7 @@ verify_onnx("policy.onnx", test_obs)
 Run ONNX models in browser or Node.js. Implements `IAgent` interface for use with HyperToken's Agent system.
 
 ```typescript
-import { ONNXAgent } from 'hypertoken/interface/ONNXAgent.js';
+import { ONNXAgent } from 'hypertoken/hypertoken-rl/interface/ONNXAgent.js';
 
 const agent = new ONNXAgent({
   // Path to model (can also be passed to load())
@@ -325,7 +325,7 @@ verify_onnx("blackjack_policy.onnx", test_obs)
 
 ```javascript
 // game.js
-import { ONNXAgent } from 'hypertoken/interface/ONNXAgent.js';
+import { ONNXAgent } from 'hypertoken/hypertoken-rl/interface/ONNXAgent.js';
 import { Agent } from 'hypertoken/engine/Agent.js';
 
 // Create AI with blackjack-specific observation extractor

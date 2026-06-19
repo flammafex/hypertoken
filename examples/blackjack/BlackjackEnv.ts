@@ -8,7 +8,7 @@
  * - Action masking for invalid actions
  * - Card counting integration (Hi-Lo)
  */
-import { GymEnvironment, Observation, StepResult, Space } from "../../interface/Gym.js";
+import { GymEnvironment, Observation, StepResult, Space } from "../../hypertoken-rl/interface/Gym.js";
 import { Engine } from "../../engine/Engine.js";
 import { MultiagentBlackjackGame } from "./multiagent-game.js";
 import { Agent } from "../../engine/Agent.js";

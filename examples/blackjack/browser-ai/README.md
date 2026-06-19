@@ -12,7 +12,7 @@ First, you need to train a model and export it to ONNX format:
 ```bash
 # Start the HyperToken bridge server
 cd /path/to/hypertoken
-npx tsx bridge/server.ts --env blackjack --port 9999
+npx tsx hypertoken-rl/bridge/server.ts --env blackjack --port 9999
 
 # In another terminal, run the training script
 cd examples/blackjack
@@ -76,7 +76,7 @@ The observation vector includes:
 For more control, use the `ONNXAgent` class from HyperToken:
 
 ```javascript
-import { ONNXAgent } from 'hypertoken/interface/ONNXAgent.js';
+import { ONNXAgent } from 'hypertoken/hypertoken-rl/interface/ONNXAgent.js';
 
 // Create agent
 const ai = new ONNXAgent({

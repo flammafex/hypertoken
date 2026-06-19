@@ -19,7 +19,7 @@
 import readline from "node:readline";
 import { Interpreter } from "./Interpreter.js";
 import { Narrator } from "./Narrator.js";
-import type { Engine } from "../engine/Engine.js";
+import type { Engine } from "../../engine/Engine.js";
 
 export interface CLIInterfaceOptions {
   verbose?: boolean;

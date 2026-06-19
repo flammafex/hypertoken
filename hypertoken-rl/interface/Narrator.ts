@@ -16,9 +16,9 @@
 // ./interface/Narrator.ts
 // Converts engine events into readable commentary or logs.
 
-import { Emitter } from "../core/events.js";
-import type { IEvent } from "../core/events.js";
-import type { Engine } from "../engine/Engine.js";
+import { Emitter } from "../../core/events.js";
+import type { IEvent } from "../../core/events.js";
+import type { Engine } from "../../engine/Engine.js";
 
 export interface NarratorOptions {
   verbose?: boolean;

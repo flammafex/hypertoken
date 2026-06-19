@@ -255,8 +255,8 @@ The server uses a simple JSON protocol over WebSocket.
 
 ## Adding New Environments
 
-1. Implement `AECEnvironment` interface (see `interface/PettingZoo.ts`)
-2. Register in `ENV_REGISTRY` in `bridge/server.ts`:
+1. Implement `AECEnvironment` interface (see `hypertoken-rl/interface/PettingZoo.ts`)
+2. Register in `ENV_REGISTRY` in `hypertoken-rl/bridge/server.ts`:
 
 ```typescript
 const ENV_REGISTRY: Record<string, EnvFactory> = {

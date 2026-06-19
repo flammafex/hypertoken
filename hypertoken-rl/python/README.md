@@ -28,10 +28,10 @@ pip install hypertoken[all]
 
 ```bash
 # From the hypertoken repository
-npx tsx bridge/server.ts --env blackjack --port 9999
+npx tsx hypertoken-rl/bridge/server.ts --env blackjack --port 9999
 
 # Or with npm script
-npm run bridge:blackjack
+npm run bridge
 ```
 
 ### 2. Connect from Python

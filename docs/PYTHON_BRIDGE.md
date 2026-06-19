@@ -6,8 +6,8 @@ This guide covers integrating HyperToken environments with Python-based reinforc
 
 HyperToken provides a WebSocket bridge that allows Python clients to interact with TypeScript-based game environments. The architecture consists of:
 
-1. **Node.js Server** (`bridge/server.ts`) - Hosts the HyperToken environment
-2. **Python Client** (`python/hypertoken/`) - PettingZoo-compatible wrapper
+1. **Node.js Server** (`hypertoken-rl/bridge/server.ts`) - Hosts the HyperToken environment
+2. **Python Client** (`hypertoken-rl/python/hypertoken/`) - PettingZoo-compatible wrapper
 
 ```
 ┌─────────────────────┐     WebSocket      ┌─────────────────────┐
@@ -25,7 +25,7 @@ HyperToken provides a WebSocket bridge that allows Python clients to interact wi
 
 ```bash
 # Python package
-cd python/
+cd hypertoken-rl/python/
 pip install -e .
 
 # Or with optional dependencies
@@ -37,10 +37,10 @@ pip install -e ".[all]"  # Everything
 
 ```bash
 # Basic
-npx tsx bridge/server.ts --env blackjack --port 9999
+npx tsx hypertoken-rl/bridge/server.ts --env blackjack --port 9999
 
 # With options
-npx tsx bridge/server.ts \
+npx tsx hypertoken-rl/bridge/server.ts \
   --env blackjack \
   --port 9999 \
   --agents 3 \
@@ -266,7 +266,7 @@ For best performance, run the server and client on the same machine.
 
 ```typescript
 // my-game/MyGameAEC.ts
-import { AECEnvironment } from "../interface/PettingZoo.js";
+import { AECEnvironment } from "../hypertoken-rl/interface/PettingZoo.js";
 
 export class MyGameAEC extends AECEnvironment {
   observationSpace(agent: string): Space {
@@ -302,7 +302,7 @@ export class MyGameAEC extends AECEnvironment {
 ### 2. Register in Server
 
 ```typescript
-// bridge/server.ts
+// hypertoken-rl/bridge/server.ts
 import { MyGameAEC } from "../my-game/MyGameAEC.js";
 
 const ENV_REGISTRY: Record<string, EnvFactory> = {
@@ -328,7 +328,7 @@ RuntimeError: Not connected. Call connect() first.
 
 Make sure the server is running:
 ```bash
-npx tsx bridge/server.ts --env blackjack --port 9999
+npx tsx hypertoken-rl/bridge/server.ts --env blackjack --port 9999
 ```
 
 ### Timeout
@@ -365,8 +365,8 @@ if mask is not None and not mask[action]:
 
 A: Yes, start multiple servers on different ports:
 ```bash
-npx tsx bridge/server.ts --port 9999 &
-npx tsx bridge/server.ts --port 9998 &
+npx tsx hypertoken-rl/bridge/server.ts --port 9999 &
+npx tsx hypertoken-rl/bridge/server.ts --port 9998 &
 ```
 
 **Q: Can I train with GPU acceleration?**
@@ -381,4 +381,4 @@ A: The current client is synchronous. Async support (using `asyncio` and
 
 **Q: Can I use this with Jupyter notebooks?**
 
-A: Yes! See `python/examples/jupyter_demo.ipynb` for an example.
+A: Yes! See `hypertoken-rl/python/examples/jupyter_demo.ipynb` for an example.

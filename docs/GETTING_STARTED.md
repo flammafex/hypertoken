@@ -181,7 +181,7 @@ hypertoken/
 ├── core/        # Token, Stack, Space, Chronicle (start here)
 ├── engine/      # Engine, GameLoop, Actions (game logic)
 ├── network/     # P2P networking (multiplayer)
-├── interface/   # AI/ML adapters (Gym, ONNX)
+├── hypertoken-rl/ # AI/ML adapters, bridge server, Python client
 ├── examples/    # Complete game implementations
 └── docs/        # Detailed guides
 ```

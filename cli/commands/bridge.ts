@@ -5,7 +5,7 @@
  * Exposes HyperToken environments to Python clients via WebSocket.
  */
 
-import { EnvServer, EnvServerOptions } from '../../bridge/server.js';
+import { EnvServer, EnvServerOptions } from '../../hypertoken-rl/bridge/server.js';
 
 interface BridgeOptions {
   port: number;

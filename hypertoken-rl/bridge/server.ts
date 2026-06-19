@@ -7,7 +7,7 @@
  * Protocol: JSON messages with { cmd, ...args } structure.
  *
  * Usage:
- *   npx tsx bridge/server.ts --env blackjack --port 9999
+ *   npx tsx hypertoken-rl/bridge/server.ts --env blackjack --port 9999
  *
  * Or programmatically:
  *   const server = new EnvServer({ envType: 'blackjack', port: 9999 });
@@ -17,12 +17,12 @@
 import { createServer, IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { AECEnvironment } from "../interface/PettingZoo.js";
-import { BlackjackAEC, BlackjackAECConfig } from "../examples/blackjack/BlackjackAEC.js";
-import { PokerAEC, PokerAECConfig } from "../examples/poker/PokerAEC.js";
-import { HanabiAEC, HanabiAECConfig } from "../examples/hanabi/HanabiAEC.js";
-import { CoupAEC, CoupAECConfig } from "../examples/coup/CoupAEC.js";
-import { LiarsDiceAEC, LiarsDiceAECConfig } from "../examples/liars-dice/LiarsDiceAEC.js";
-import { RateLimiter, RateLimitConfig } from "../network/RateLimiter.js";
+import { BlackjackAEC, BlackjackAECConfig } from "../../examples/blackjack/BlackjackAEC.js";
+import { PokerAEC, PokerAECConfig } from "../../examples/poker/PokerAEC.js";
+import { HanabiAEC, HanabiAECConfig } from "../../examples/hanabi/HanabiAEC.js";
+import { CoupAEC, CoupAECConfig } from "../../examples/coup/CoupAEC.js";
+import { LiarsDiceAEC, LiarsDiceAECConfig } from "../../examples/liars-dice/LiarsDiceAEC.js";
+import { RateLimiter, RateLimitConfig } from "../../network/RateLimiter.js";
 import type { Command, Response, EnvInfoResponse } from "./protocol.js";
 import type { Space } from "../interface/Gym.js";
 
@@ -481,7 +481,7 @@ function printHelp(): void {
   console.log(`
 HyperToken Environment Server
 
-Usage: npx tsx bridge/server.ts [options]
+Usage: npx tsx hypertoken-rl/bridge/server.ts [options]
 
 Options:
   --port, -p <port>     Port to listen on (default: 9999)
@@ -498,8 +498,8 @@ Available Environments:
   poker                 Heads-up Texas Hold'em (AEC)
 
 Examples:
-  npx tsx bridge/server.ts --env blackjack --port 9999
-  npx tsx bridge/server.ts -e blackjack -a 3 -v
+  npx tsx hypertoken-rl/bridge/server.ts --env blackjack --port 9999
+  npx tsx hypertoken-rl/bridge/server.ts -e blackjack -a 3 -v
   `);
 }
 

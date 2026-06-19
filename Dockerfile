@@ -39,7 +39,6 @@ COPY package*.json ./
 
 # Copy node_modules from builder (more efficient than reinstalling)
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
 
 # Copy compiled outputs from builder
 COPY --from=builder /app/dist ./dist
@@ -59,5 +58,4 @@ ENV BRIDGE_ENV=poker
 ENV BRIDGE_HOST=0.0.0.0
 
 # Default command: run the poker bridge server with RL features
-# Override with: docker run ... hypertoken npx hypertoken-quickstart
 CMD ["node", "dist/cli/index.js", "bridge", "poker", "--rich", "--extended", "--shaped", "--port", "9999", "--host", "0.0.0.0"]

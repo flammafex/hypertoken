@@ -181,10 +181,10 @@ hypertoken/
 │   ├── AuthoritativeServer.ts
 │   └── HybridPeerManager.ts
 │
-├── interface/              # RL adapters
-│   ├── Gym.ts             # Single-agent
-│   ├── PettingZoo.ts      # Multi-agent (turn-based)
-│   └── PettingZooParallel.ts  # Multi-agent (simultaneous)
+├── hypertoken-rl/          # RL adapters, bridge server, Python client
+│   ├── interface/         # Gym, PettingZoo, PettingZooParallel, ONNXAgent
+│   ├── bridge/            # Gym/PettingZoo WebSocket bridge
+│   └── python/            # Python client package
 │
 └── examples/               # Working games
     ├── blackjack/
@@ -237,7 +237,7 @@ This applies to cards in blackjack, strategies in game theory, shares in a marke
 ```bash
 docker build -t hypertoken:latest .
 docker compose up relay
-docker compose run --rm quickstart
+npm run help
 ```
 
 ---

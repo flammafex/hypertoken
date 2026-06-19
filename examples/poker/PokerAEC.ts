@@ -17,8 +17,8 @@
  *   Rich mode (75 values): Hand strength, draws, board texture, betting context
  */
 
-import { AECEnvironment } from "../../interface/PettingZoo.js";
-import { Observation, ActionID, Space } from "../../interface/Gym.js";
+import { AECEnvironment } from "../../hypertoken-rl/interface/PettingZoo.js";
+import { Observation, ActionID, Space } from "../../hypertoken-rl/interface/Gym.js";
 import { PokerGame, PokerConfig, PokerGameState } from "./PokerGame.js";
 import { extractFeatures, getFeatureNames } from "./HandFeatures.js";
 import { RewardShaper, RewardShapingConfig, RewardContext, ShapedReward } from "./RewardShaping.js";

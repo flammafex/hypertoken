@@ -14,10 +14,10 @@
  *   await player.think(engine);  // Bot makes decision via ONNX inference
  */
 
-import { Emitter } from "../core/events.js";
-import type { Engine } from "../engine/Engine.js";
-import type { Agent } from "../engine/Agent.js";
-import type { IAgent } from "../engine/Agent.js";
+import { Emitter } from "../../core/events.js";
+import type { Engine } from "../../engine/Engine.js";
+import type { Agent } from "../../engine/Agent.js";
+import type { IAgent } from "../../engine/Agent.js";
 import type { Observation } from "./Gym.js";
 
 // ONNX Runtime types (loaded dynamically)

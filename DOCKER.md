@@ -32,14 +32,6 @@ docker compose up relay
 
 This starts the relay server on `http://localhost:3000`.
 
-### 3. Run Interactive Quickstart
-
-```bash
-docker compose run --rm quickstart
-```
-
-This launches the interactive CLI to explore HyperToken's capabilities.
-
 ## Using Docker Compose Profiles
 
 Docker Compose profiles let you run different service combinations:
@@ -48,12 +40,6 @@ Docker Compose profiles let you run different service combinations:
 
 ```bash
 docker compose up
-```
-
-### CLI Quickstart
-
-```bash
-docker compose --profile cli run quickstart
 ```
 
 ### Run Example Applications
@@ -92,7 +78,6 @@ docker run -it hypertoken:latest bash
 # Now you can run any commands:
 node dist/cli/index.js relay
 node dist/cli/index.js bridge --env blackjack
-npx hypertoken-quickstart
 node dist/examples/blackjack/server.js
 ```
 

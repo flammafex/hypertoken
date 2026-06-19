@@ -21,8 +21,8 @@
 import {
   ParallelEnvironment,
   ParallelStepResult,
-} from "../../interface/PettingZooParallel.js";
-import { Observation, ActionID, Space } from "../../interface/Gym.js";
+} from "../../hypertoken-rl/interface/PettingZooParallel.js";
+import { Observation, ActionID, Space } from "../../hypertoken-rl/interface/Gym.js";
 
 // Action constants
 export const ACTION_COOPERATE = 0;

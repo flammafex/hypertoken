@@ -22,7 +22,7 @@ By decoupling **State** (CRDTs), **Logic** (Rules), and **Time** (GameLoop), Hyp
 ### Pattern 1: The Headless Gym (RL Environment)
 
 **Best For:** Training AI agents (AlphaZero/PPO), solving probability puzzles, Monte Carlo simulations.
-**Mechanism:** OpenAI Gym Interface (`interface/Gym.ts`).
+**Mechanism:** OpenAI Gym Interface (`hypertoken-rl/interface/Gym.ts`).
 
 Instead of building a custom C++ simulator, wrap your business logic in a HyperToken `Env`. The engine handles the state transitions, allowing your ML pipeline to focus purely on **Observation**, **Action**, and **Reward**.
 

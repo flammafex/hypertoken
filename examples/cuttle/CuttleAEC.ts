@@ -5,8 +5,8 @@
  * while disrupting their opponent with one-offs, permanents, and scuttling.
  */
 
-import { AECEnvironment } from "../../interface/PettingZoo.js";
-import { Observation, ActionID, Space } from "../../interface/Gym.js";
+import { AECEnvironment } from "../../hypertoken-rl/interface/PettingZoo.js";
+import { Observation, ActionID, Space } from "../../hypertoken-rl/interface/Gym.js";
 import {
   CuttleGame,
   CuttleConfig,

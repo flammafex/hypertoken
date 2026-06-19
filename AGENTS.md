@@ -17,16 +17,13 @@ HyperToken is a distributed game engine where **all state is a CRDT** (Automerge
 core/          CRDT state primitives (Token, Stack, Space, Source, Chronicle, IChronicle, WasmChronicleAdapter)
 engine/        Game coordination (Engine, actions.ts, Action, GameLoop, RuleEngine, Agent, Policy, Recorder, Script)
 network/       P2P & server (PeerConnection, AuthoritativeServer, HybridPeerManager, StateSyncManager, MessageCodec, E2EEncryption)
-interface/     RL adapters (Gym, PettingZoo, PettingZooParallel, ONNXAgent)
+hypertoken-rl/  RL adapters split (interface/, bridge/, python/) — Gym, PettingZoo, ONNXAgent, bridge server, Python client
 core-rs/       Rust → WASM source (src/lib.rs, src/chronicle_actions/, Cargo.toml, build.sh)
 cli/           CLI entrypoint (index.ts → commands/{relay,bridge,mcp}.ts)
 examples/      10 game dirs (blackjack, poker, cuttle, prisoners-dilemma, hanabi, coup, liars-dice, accordion, dungeon-raiders, browser-demo)
 mcp/           MCP server for LLM play (server.ts, games/)
-bridge/        Python bridge server (server.ts, protocol.ts)
-python/        Python client package (pyproject.toml, setup.py)
 plugins/       analytics, logging, save-state plugins + pluginLoader
 workers/       hypertoken.worker.js (Phase 3 multi-threading is future work)
-packages/      npm workspaces (quickstart)
 docs/          Architecture, getting started, testing, extending, etc.
 schemas/       JSON schemas
 patterns/      Pattern reference

@@ -23,21 +23,6 @@ services:
     networks:
       - hypertoken-network
 
-  # Quickstart CLI (interactive)
-  quickstart:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: hypertoken:latest
-    container_name: hypertoken-quickstart
-    command: ["npx", "hypertoken-quickstart"]
-    stdin_open: true
-    tty: true
-    networks:
-      - hypertoken-network
-    profiles:
-      - cli
-
   # Poker RL Bridge Server (Gym/PettingZoo compatible)
   poker-bridge:
     build:

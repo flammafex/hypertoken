@@ -2,9 +2,6 @@
   "name": "hypertoken-monorepo",
   "version": "0.2.0",
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
   "bin": {
     "hypertoken": "./dist/cli/index.js"
   },

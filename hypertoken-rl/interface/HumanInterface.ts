@@ -16,9 +16,9 @@
 // ./interface/HumanInterface.ts
 // Handles local human input → dispatches deterministic actions to the Engine.
 
-import { Emitter } from "../core/events.js";
-import type { IEvent } from "../core/events.js";
-import type { Engine } from "../engine/Engine.js";
+import { Emitter } from "../../core/events.js";
+import type { IEvent } from "../../core/events.js";
+import type { Engine } from "../../engine/Engine.js";
 
 export interface HumanInterfaceAdapter {
   cleanup?: () => void;

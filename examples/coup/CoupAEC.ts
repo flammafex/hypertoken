@@ -5,8 +5,8 @@
  * The game has multiple phases per turn (action → challenge → block → etc.)
  */
 
-import { AECEnvironment } from "../../interface/PettingZoo.js";
-import { Observation, ActionID, Space } from "../../interface/Gym.js";
+import { AECEnvironment } from "../../hypertoken-rl/interface/PettingZoo.js";
+import { Observation, ActionID, Space } from "../../hypertoken-rl/interface/Gym.js";
 import { Engine } from "../../engine/Engine.js";
 import { CoupGame, CoupConfig, ROLES, ACTIONS, Role, getActionSpaceSize } from "./CoupGame.js";
 
