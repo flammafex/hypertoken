@@ -339,6 +339,14 @@ export class CuttleGame {
   }
 
   /**
+   * Load state from a snapshot (for CRDT sync — when remote peer sends updated state).
+   * Replaces internal state with a deep clone of the provided snapshot.
+   */
+  loadState(snapshot: CuttleGameState): void {
+    this.state = JSON.parse(JSON.stringify(snapshot));
+  }
+
+  /**
    * Get the point goal for a player (affected by Kings)
    */
   getPointGoal(playerIndex: number): number {

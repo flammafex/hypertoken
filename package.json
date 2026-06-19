@@ -31,6 +31,8 @@
     "cuttle": "npx tsx examples/cuttle/cli.js",
     "cuttle:server": "npx tsx examples/cuttle/server.js",
     "cuttle:client": "npx tsx examples/cuttle/network-client.js",
+    "cuttle:crdt:host": "node --loader ./test/ts-esm-loader.js examples/cuttle/crdt-client.ts ws://localhost:3000 --host",
+    "cuttle:crdt:client": "node --loader ./test/ts-esm-loader.js examples/cuttle/crdt-client.ts ws://localhost:3000",
     "prisoners-dilemma": "npx tsx examples/prisoners-dilemma/pd-cli.js",
     "pd:tournament": "npx tsx examples/prisoners-dilemma/tournament.js",
     "dungeon:server": "npx tsx examples/dungeon-raiders/server.js",
@@ -79,6 +81,10 @@
     "test:parallel": "node --loader ./test/ts-esm-loader.js test/testParallel.ts",
     "benchmark:parallel": "node --loader ./test/ts-esm-loader.js test/benchmarkParallel.ts",
     "profile:actions": "node --loader ./test/ts-esm-loader.js benchmark/profileActions.ts",
-    "clean:rust": "cd core-rs && cargo clean && rm -rf pkg"
+    "clean:rust": "cd core-rs && cargo clean && rm -rf pkg",
+    "test:sync:spike": "node --loader ./test/ts-esm-loader.js test/testSyncSpike.ts",
+    "test:cuttle:sync": "node --loader ./test/ts-esm-loader.js test/testCuttleSync.ts",
+    "test:cuttle:crypto": "node --loader ./test/ts-esm-loader.js test/testCuttleCrypto.ts",
+    "test:cuttle:hardening": "node --loader ./test/ts-esm-loader.js test/testCuttleHardening.ts"
   }
 }

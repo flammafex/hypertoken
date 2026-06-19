@@ -37,6 +37,8 @@ export interface EngineOptions {
   autoConnect?: string;
   useWebRTC?: boolean;
   useWorker?: boolean;
+  /** Disable WASM dispatcher and force TypeScript Chronicle path (needed for network sync). */
+  disableWasm?: boolean;
   workerOptions?: {
     debug?: boolean;
     timeout?: number;
@@ -67,7 +69,7 @@ export class Engine extends Emitter {
   private _useWebRTC: boolean;
   private _networkOptions: EngineNetworkOptions;
 
-  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, useWorker = false, workerOptions = {}, networkOptions = {} }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, useWorker = false, disableWasm = false, workerOptions = {}, networkOptions = {} }: EngineOptions = {}) {
     super();
 
     this.session = new Chronicle();
@@ -87,20 +89,22 @@ export class Engine extends Emitter {
     this.loop = new GameLoop(this);
     this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
-    if (useWorker) {
-      this.wasm.initWorker(
-        workerOptions,
-        this.debug,
-        (payload) => this.emit('state:updated', payload),
-        (payload) => this.emit('engine:action', { payload }),
-        (error) => this.emit('engine:error', { payload: { error } }),
-        () => {
-          // Worker init failed, fall back to direct WASM
-          this._initWasm();
-        },
-      );
-    } else {
-      this._initWasm();
+    if (!disableWasm) {
+      if (useWorker) {
+        this.wasm.initWorker(
+          workerOptions,
+          this.debug,
+          (payload) => this.emit('state:updated', payload),
+          (payload) => this.emit('engine:action', { payload }),
+          (error) => this.emit('engine:error', { payload: { error } }),
+          () => {
+            // Worker init failed, fall back to direct WASM
+            this._initWasm();
+          },
+        );
+      } else {
+        this._initWasm();
+      }
     }
 
     if (autoConnect) {

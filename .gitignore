@@ -36,3 +36,6 @@ coverage/
 
 # Rust/WASM build output
 core-rs/pkg/
+
+# Deepwork session state
+.slim/deepwork/
