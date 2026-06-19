@@ -15234,6 +15234,8 @@ function bindEvents() {
   elements.btnOffline.addEventListener("click", toggleOfflineMode);
   elements.btnPlayAgain.addEventListener("click", handlePlayAgain);
   elements.btnNewLobby.addEventListener("click", handleNewLobby);
+  const btnStartGame = document.getElementById("btn-start-game");
+  if (btnStartGame) btnStartGame.addEventListener("click", startGame);
   elements.gameBoard.addEventListener("click", handleBoardClick);
   elements.gameBoard.addEventListener("mouseover", handleBoardHover);
   elements.gameBoard.addEventListener("mouseout", handleBoardHoverOut);
@@ -15293,8 +15295,30 @@ function handleGameReady() {
   state.gameStarted = true;
   elements.startScreen.classList.add("hidden");
   elements.gameScreen.classList.add("active");
-  startTimer();
+  showWaitingOverlay();
   render();
+}
+function showWaitingOverlay() {
+  const overlay = document.getElementById("waiting-overlay");
+  const urlEl = document.getElementById("waiting-url");
+  const playersEl = document.getElementById("waiting-players");
+  if (urlEl) urlEl.textContent = state.serverUrl;
+  if (playersEl) playersEl.textContent = `Players connected: ${getPlayerCount()}`;
+  overlay.classList.add("visible");
+}
+function hideWaitingOverlay() {
+  const overlay = document.getElementById("waiting-overlay");
+  overlay.classList.remove("visible");
+}
+function getPlayerCount() {
+  const confluenceState = state.engine?.session?.state?.confluence;
+  if (!confluenceState?.players) return 1;
+  return Object.keys(confluenceState.players).length;
+}
+function startGame() {
+  hideWaitingOverlay();
+  startTimer();
+  announce("Game started! Place your tokens!");
 }
 function handleStateUpdate(event) {
   requestAnimationFrame(render);
@@ -15322,6 +15346,11 @@ function handlePeerJoined(event) {
   const peerId = event?.peerId || event?.payload?.peerId;
   console.log("[Confluence] Peer joined:", peerId);
   updatePeerCount();
+  const overlay = document.getElementById("waiting-overlay");
+  if (overlay && overlay.classList.contains("visible")) {
+    const playersEl = document.getElementById("waiting-players");
+    if (playersEl) playersEl.textContent = `Players connected: ${getPlayerCount()}`;
+  }
   announce("A player joined the game");
 }
 function handlePeerLeft(event) {
@@ -15732,16 +15761,21 @@ function showGameOver() {
   const winner = confluenceState.winner;
   const winnerPlayer = winner ? confluenceState.players[winner] : null;
   const isTie = !winner && scores.length > 0;
+  const isWinner = winner === state.peerId;
   elements.winnerDisplay.classList.toggle("tie", isTie);
-  if (winnerPlayer) {
+  elements.winnerDisplay.classList.toggle("defeat", !isWinner && !isTie);
+  if (isWinner) {
     elements.gameOverTitle.textContent = "Victory!";
+    elements.gameOverTitle.style.color = "";
     elements.gameOverSubtitle.textContent = `${winnerPlayer.name} controls the most territory!`;
   } else if (isTie) {
     elements.gameOverTitle.textContent = "Draw!";
+    elements.gameOverTitle.style.color = "";
     elements.gameOverSubtitle.textContent = "Multiple players tied for first place";
   } else {
-    elements.gameOverTitle.textContent = "Game Over";
-    elements.gameOverSubtitle.textContent = "Final scores:";
+    elements.gameOverTitle.textContent = "Defeat";
+    elements.gameOverTitle.style.color = "var(--accent-red, #e94560)";
+    elements.gameOverSubtitle.textContent = `${winnerPlayer?.name || "Opponent"} controls the most territory!`;
   }
   elements.finalScores.innerHTML = "";
   const sortedScores = [...scores].sort((a, b) => b.controlledCells - a.controlledCells);

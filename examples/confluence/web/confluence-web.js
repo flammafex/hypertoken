@@ -149,6 +149,10 @@ function bindEvents() {
   elements.btnPlayAgain.addEventListener('click', handlePlayAgain);
   elements.btnNewLobby.addEventListener('click', handleNewLobby);
 
+  // Start game button
+  const btnStartGame = document.getElementById('btn-start-game');
+  if (btnStartGame) btnStartGame.addEventListener('click', startGame);
+
   // Board interactions
   elements.gameBoard.addEventListener('click', handleBoardClick);
   elements.gameBoard.addEventListener('mouseover', handleBoardHover);
@@ -243,11 +247,39 @@ function handleGameReady() {
   elements.startScreen.classList.add('hidden');
   elements.gameScreen.classList.add('active');
 
-  // Start timer
-  startTimer();
+  // Show waiting overlay — don't start timer until players join
+  showWaitingOverlay();
 
   // Initial render
   render();
+}
+
+function showWaitingOverlay() {
+  const overlay = document.getElementById('waiting-overlay');
+  const urlEl = document.getElementById('waiting-url');
+  const playersEl = document.getElementById('waiting-players');
+
+  if (urlEl) urlEl.textContent = state.serverUrl;
+  if (playersEl) playersEl.textContent = `Players connected: ${getPlayerCount()}`;
+
+  overlay.classList.add('visible');
+}
+
+function hideWaitingOverlay() {
+  const overlay = document.getElementById('waiting-overlay');
+  overlay.classList.remove('visible');
+}
+
+function getPlayerCount() {
+  const confluenceState = state.engine?.session?.state?.confluence;
+  if (!confluenceState?.players) return 1;
+  return Object.keys(confluenceState.players).length;
+}
+
+function startGame() {
+  hideWaitingOverlay();
+  startTimer();
+  announce('Game started! Place your tokens!');
 }
 
 function handleStateUpdate(event) {
@@ -285,6 +317,14 @@ function handlePeerJoined(event) {
   const peerId = event?.peerId || event?.payload?.peerId;
   console.log('[Confluence] Peer joined:', peerId);
   updatePeerCount();
+
+  // Update waiting overlay if visible
+  const overlay = document.getElementById('waiting-overlay');
+  if (overlay && overlay.classList.contains('visible')) {
+    const playersEl = document.getElementById('waiting-players');
+    if (playersEl) playersEl.textContent = `Players connected: ${getPlayerCount()}`;
+  }
+
   announce('A player joined the game');
 }
 
@@ -849,18 +889,23 @@ function showGameOver() {
   // Determine winner display
   const winnerPlayer = winner ? confluenceState.players[winner] : null;
   const isTie = !winner && scores.length > 0;
+  const isWinner = winner === state.peerId;
 
   elements.winnerDisplay.classList.toggle('tie', isTie);
+  elements.winnerDisplay.classList.toggle('defeat', !isWinner && !isTie);
 
-  if (winnerPlayer) {
+  if (isWinner) {
     elements.gameOverTitle.textContent = 'Victory!';
+    elements.gameOverTitle.style.color = '';
     elements.gameOverSubtitle.textContent = `${winnerPlayer.name} controls the most territory!`;
   } else if (isTie) {
     elements.gameOverTitle.textContent = 'Draw!';
+    elements.gameOverTitle.style.color = '';
     elements.gameOverSubtitle.textContent = 'Multiple players tied for first place';
   } else {
-    elements.gameOverTitle.textContent = 'Game Over';
-    elements.gameOverSubtitle.textContent = 'Final scores:';
+    elements.gameOverTitle.textContent = 'Defeat';
+    elements.gameOverTitle.style.color = 'var(--accent-red, #e94560)';
+    elements.gameOverSubtitle.textContent = `${winnerPlayer?.name || 'Opponent'} controls the most territory!`;
   }
 
   // Render final scores

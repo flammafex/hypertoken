@@ -1036,6 +1036,64 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   letter-spacing: 0.1em;
 }
 
+/* Waiting for players overlay */
+.waiting-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--speed-normal);
+}
+
+.waiting-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.waiting-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 40px;
+}
+
+.waiting-content h2 {
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.waiting-content p {
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.waiting-content code {
+  background: var(--bg-elevated);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--accent-cyan);
+}
+
+.waiting-content .btn {
+  margin-top: 16px;
+}
+
+/* Defeat styling */
+.winner-display.defeat h2 {
+  color: var(--accent-red, #e94560);
+}
+
 /* Offline demo banner */
 .offline-banner {
   position: fixed;

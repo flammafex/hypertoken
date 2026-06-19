@@ -116,6 +116,16 @@
         <span id="instruction-text">Click an empty cell to place a token</span>
       </div>
 
+      <!-- Waiting for Players Overlay -->
+      <div class="waiting-overlay" id="waiting-overlay" role="dialog" aria-labelledby="waiting-title">
+        <div class="waiting-content">
+          <h2 id="waiting-title">Waiting for Players</h2>
+          <p id="waiting-text">Share this relay URL with a friend: <code id="waiting-url"></code></p>
+          <p id="waiting-players">Players connected: 1</p>
+          <button type="button" id="btn-start-game" class="btn btn-primary">Start Game</button>
+        </div>
+      </div>
+
       <!-- Offline Demo Banner -->
       <div class="offline-banner" id="offline-banner" role="complementary" aria-label="Offline mode demo">
         <div>
