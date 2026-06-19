@@ -33,6 +33,7 @@ export interface IEngineAgent {
   resources: Record<string, number>;
   inventory: IToken[];
   zones?: Map<string, IToken[]>;
+  handZone?: string;
 }
 
 /**

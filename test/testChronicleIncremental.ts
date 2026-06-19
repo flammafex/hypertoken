@@ -172,25 +172,25 @@ await test("TS: engine creates with default state", () => {
   const engine = createTsEngine();
   const state = engine.session.state;
   assert.ok(state.stack, "Should have stack");
-  assert.equal(state.stack.stack.length, 3, "Stack should have 3 tokens");
-  assert.equal(state.stack.drawn.length, 0, "Drawn should be empty");
-  assert.equal(state.gameLoop.phase, "setup", "Phase should be setup");
+  assert.equal(state.stack!.stack.length, 3, "Stack should have 3 tokens");
+  assert.equal(state.stack!.drawn.length, 0, "Drawn should be empty");
+  assert.equal(state.gameLoop!.phase, "setup", "Phase should be setup");
 });
 
 await test("TS: stack:draw removes from stack and adds to drawn", async () => {
   const engine = createTsEngine();
   await engine.dispatch("stack:draw", { count: 2 });
   const state = engine.session.state;
-  assert.equal(state.stack.stack.length, 1, "Stack should have 1 remaining");
-  assert.equal(state.stack.drawn.length, 2, "Drawn should have 2");
+  assert.equal(state.stack!.stack.length, 1, "Stack should have 1 remaining");
+  assert.equal(state.stack!.drawn.length, 2, "Drawn should have 2");
 });
 
 await test("TS: game:loopStart transitions to play phase", async () => {
   const engine = createTsEngine();
   await engine.dispatch("game:loopStart", {});
   const state = engine.session.state;
-  assert.equal(state.gameLoop.running, true, "Should be running");
-  assert.equal(state.gameLoop.phase, "play", "Phase should be play");
+  assert.equal(state.gameLoop!.running, true, "Should be running");
+  assert.equal(state.gameLoop!.phase, "play", "Phase should be play");
 });
 
 await test("TS: save/load round-trip preserves state", async () => {
@@ -301,7 +301,7 @@ if (!wasmLoaded) {
 
     const state = engine1.session.state;
     assert.ok(state.agents?.["Player 1"], "Should have agent from engine1");
-    assert.equal(state.stack.drawn.length, 1, "Should have drawn card from engine2");
+    assert.equal(state.stack!.drawn.length, 1, "Should have drawn card from engine2");
   });
 }
 

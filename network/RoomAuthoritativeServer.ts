@@ -217,7 +217,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     this.clientRooms.set(clientId, roomCode);
 
     // Get player index from room state
-    const state = roomInfo.engine._gameState;
+    const state = roomInfo.engine._gameState as any;
     let playerIndex = -1;
     if (state?.players) {
       for (let i = 0; i < (state.numPlayers || 2); i++) {

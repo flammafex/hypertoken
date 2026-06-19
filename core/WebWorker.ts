@@ -116,7 +116,8 @@ export class WebWorker extends Emitter {
         };
 
         // Wait for worker ready signal, then send init request
-        const readyHandler = (msg: WorkerResponse) => {
+        const readyHandler = (event: any) => {
+          const msg: WorkerResponse = event?.payload ?? event;
           if (msg.type === 'ready') {
             // Worker is ready, now send init request with wasmPath
             this.sendInitRequest()
