@@ -20,6 +20,8 @@ import {
 
 console.log('[Confluence] Modules loaded successfully');
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 // ============================================================================
 // Application State
 // ============================================================================
@@ -197,19 +199,30 @@ async function handleStart(e) {
     state.engine.on('net:peer:connected', handlePeerJoined);
     state.engine.on('net:peer:disconnected', handlePeerLeft);
 
-    // Initialize game
-    await state.engine.dispatch('confluence:init', {
-      width: 10,
-      height: 10,
-      durationMs: 30000,
-    });
-
-    // Connect to relay
+    // Connect to relay first
     state.engine.connect(state.serverUrl);
 
-    // Register player
+    // Wait a moment for connection, then check if a game already exists
+    await sleep(1000);
+
+    const existingState = state.engine.session.state?.confluence;
+    if (!existingState) {
+      // No game exists yet — we're the first player, initialize the game
+      console.log('[Confluence] No existing game found, initializing...');
+      await state.engine.dispatch('confluence:init', {
+        width: 10,
+        height: 10,
+        durationMs: 30000,
+      });
+    } else {
+      console.log('[Confluence] Found existing game, joining...');
+    }
+
+    // Register player (use relay-assigned peerId if available, otherwise temp)
+    const peerId = state.engine.network?.peerId || state.peerId;
+    state.peerId = peerId;
     state.engine.dispatch('confluence:register', {
-      peerId: state.peerId,
+      peerId,
       name: state.playerName,
     });
 

@@ -1,24 +1,20 @@
 /**
  * Browser shim for the 'ws' package — uses native WebSocket.
- * Provides a minimal compatible interface for PeerConnection.
+ *
+ * The 'ws' package (Node.js) passes raw data to the 'message' event handler.
+ * Browser WebSocket passes a MessageEvent (with data in .data).
+ *
+ * PeerConnection.ts already handles both cases:
+ * - Node/ws: socket.on("message", (data) => handleData(data))
+ * - Browser: socket.addEventListener("message", (ev) => handleData(ev.data))
+ *
+ * So we just need to re-export the native browser WebSocket.
+ * PeerConnection detects Node vs browser by checking if socket.on is a function.
  */
 export class WebSocket extends globalThis.WebSocket {
   constructor(url, protocols) {
     super(url, protocols);
   }
 }
-
-// ws package uses EventEmitter-style API (on/off/emit)
-// Browser WebSocket uses addEventListener. This shim bridges them.
-const originalAddEventListener = globalThis.WebSocket.prototype.addEventListener;
-globalThis.WebSocket.prototype.addEventListener = function(type, listener, options) {
-  if (type === 'message') {
-    // ws passes (data), browser passes (MessageEvent)
-    const wrapped = (event) => listener.call(this, event.data);
-    wrapped._original = listener;
-    return originalAddEventListener.call(this, type, wrapped, options);
-  }
-  return originalAddEventListener.call(this, type, listener, options);
-};
 
 export default { WebSocket };

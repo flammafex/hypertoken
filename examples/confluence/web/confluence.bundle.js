@@ -13316,15 +13316,6 @@ var WebSocket = class extends globalThis.WebSocket {
     super(url, protocols);
   }
 };
-var originalAddEventListener = globalThis.WebSocket.prototype.addEventListener;
-globalThis.WebSocket.prototype.addEventListener = function(type, listener, options) {
-  if (type === "message") {
-    const wrapped = (event) => listener.call(this, event.data);
-    wrapped._original = listener;
-    return originalAddEventListener.call(this, type, wrapped, options);
-  }
-  return originalAddEventListener.call(this, type, listener, options);
-};
 
 // network/PeerConnection.ts
 var DEFAULT_RECONNECT_CONFIG = {
@@ -15148,6 +15139,9 @@ function getTimeRemainingSec(engine) {
 
 // examples/confluence/web/confluence-web.js
 console.log("[Confluence] Modules loaded successfully");
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 var state = {
   // Engine
   engine: null,
@@ -15265,14 +15259,23 @@ async function handleStart(e) {
     state.engine.on("net:disconnected", handleDisconnected);
     state.engine.on("net:peer:connected", handlePeerJoined);
     state.engine.on("net:peer:disconnected", handlePeerLeft);
-    await state.engine.dispatch("confluence:init", {
-      width: 10,
-      height: 10,
-      durationMs: 3e4
-    });
     state.engine.connect(state.serverUrl);
+    await sleep(1e3);
+    const existingState = state.engine.session.state?.confluence;
+    if (!existingState) {
+      console.log("[Confluence] No existing game found, initializing...");
+      await state.engine.dispatch("confluence:init", {
+        width: 10,
+        height: 10,
+        durationMs: 3e4
+      });
+    } else {
+      console.log("[Confluence] Found existing game, joining...");
+    }
+    const peerId = state.engine.network?.peerId || state.peerId;
+    state.peerId = peerId;
     state.engine.dispatch("confluence:register", {
-      peerId: state.peerId,
+      peerId,
       name: state.playerName
     });
     announce("Connected to game. Place your tokens!");
