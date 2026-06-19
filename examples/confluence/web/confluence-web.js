@@ -14,7 +14,7 @@ let setupConfluenceSync, getBoard, getScores, getTimeRemainingSec, isGameOver;
 
 (async () => {
   try {
-    // Import Engine from relative path
+    // Import Engine (esbuild resolves this at build time)
     const engineModule = await import('../../engine/Engine.js');
     Engine = engineModule.Engine;
 
