@@ -319,6 +319,94 @@ export class Engine extends Emitter {
     return this;
   }
 
+  // ── Persistence (StorageAdapter) ──────────────────────────────────────────
+
+  private _storageAdapter: any = null;
+  private _autoSaveTimer: any = null;
+
+  /**
+   * Attach a storage adapter for persistence.
+   * After attaching, call persist() to save or resume() to load.
+   *
+   * @param adapter - StorageAdapter instance (FilesystemAdapter, IndexedDBAdapter, etc.)
+   */
+  useStorage(adapter: any): this {
+    this._storageAdapter = adapter;
+    return this;
+  }
+
+  /**
+   * Save the current game state to the storage adapter.
+   *
+   * @param name - Unique name for this save (default: 'autosave')
+   * @param description - Optional description
+   */
+  async persist(name: string = 'autosave', description?: string): Promise<void> {
+    if (!this._storageAdapter) throw new Error('No storage adapter attached. Call engine.useStorage(adapter) first.');
+    const data = this.session.saveToBase64();
+    await this._storageAdapter.save(name, data, description);
+    this.emit('engine:saved', { payload: { name } });
+  }
+
+  /**
+   * Load a saved game state from the storage adapter.
+   *
+   * @param name - Name of the save to load (default: 'autosave')
+   * @returns true if a save was found and loaded, false if no save exists
+   */
+  async resume(name: string = 'autosave'): Promise<boolean> {
+    if (!this._storageAdapter) throw new Error('No storage adapter attached. Call engine.useStorage(adapter) first.');
+    const saved = await this._storageAdapter.load(name);
+    if (!saved) return false;
+    this.session.loadFromBase64(saved.data);
+    this.emit('engine:restored', { payload: { name, timestamp: saved.metadata.timestamp } });
+    return true;
+  }
+
+  /**
+   * List all saved games.
+   */
+  async listSaves(): Promise<any[]> {
+    if (!this._storageAdapter) throw new Error('No storage adapter attached. Call engine.useStorage(adapter) first.');
+    return this._storageAdapter.list();
+  }
+
+  /**
+   * Delete a saved game.
+   */
+  async deleteSave(name: string): Promise<void> {
+    if (!this._storageAdapter) throw new Error('No storage adapter attached. Call engine.useStorage(adapter) first.');
+    await this._storageAdapter.delete(name);
+    this.emit('engine:saveDeleted', { payload: { name } });
+  }
+
+  /**
+   * Enable auto-save at a regular interval.
+   *
+   * @param intervalMs - Interval in milliseconds (default: 30000)
+   * @param name - Save name (default: 'autosave')
+   */
+  enableAutoSave(intervalMs: number = 30000, name: string = 'autosave'): this {
+    if (this._autoSaveTimer) clearInterval(this._autoSaveTimer);
+    this._autoSaveTimer = setInterval(() => {
+      this.persist(name).catch(err => {
+        if (this.debug) console.warn('[Engine] Auto-save failed:', err.message);
+      });
+    }, intervalMs);
+    return this;
+  }
+
+  /**
+   * Disable auto-save.
+   */
+  disableAutoSave(): this {
+    if (this._autoSaveTimer) {
+      clearInterval(this._autoSaveTimer);
+      this._autoSaveTimer = null;
+    }
+    return this;
+  }
+
   // ── State / Describe ───────────────────────────────────────────────────────
 
   get state(): IEngineState {

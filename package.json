@@ -91,6 +91,7 @@
     "test:confluence:rules": "node --loader ./test/ts-esm-loader.js test/testConfluenceRules.ts",
     "test:confluence:sync": "node --loader ./test/ts-esm-loader.js test/testConfluenceSync.ts",
     "test:sync:hardening": "node --loader ./test/ts-esm-loader.js test/testSyncHardening.ts",
+    "test:persistence": "node --loader ./test/ts-esm-loader.js test/testPersistence.ts",
     "confluence:build": "node --loader ./test/ts-esm-loader.js core/browser/build.js --entry examples/confluence/web/confluence-web.js --out examples/confluence/web/confluence.bundle.js",
     "confluence:web": "npm run confluence:build && cd examples/confluence/web && python3 -m http.server 8080",
     "build:browser": "node --loader ./test/ts-esm-loader.js core/browser/build.js"
