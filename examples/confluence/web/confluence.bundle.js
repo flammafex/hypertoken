@@ -15726,6 +15726,8 @@ function hideOfflineBanner() {
 function showGameOver() {
   const confluenceState = state.engine?.session?.state?.confluence;
   if (!confluenceState) return;
+  elements.provenanceTooltip.classList.remove("visible");
+  elements.provenanceTooltip.setAttribute("aria-hidden", "true");
   const scores = getScores(state.engine);
   const winner = confluenceState.winner;
   const winnerPlayer = winner ? confluenceState.players[winner] : null;

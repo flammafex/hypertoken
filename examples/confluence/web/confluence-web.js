@@ -839,6 +839,10 @@ function showGameOver() {
   const confluenceState = state.engine?.session?.state?.confluence;
   if (!confluenceState) return;
 
+  // Hide provenance tooltip
+  elements.provenanceTooltip.classList.remove('visible');
+  elements.provenanceTooltip.setAttribute('aria-hidden', 'true');
+
   const scores = getScores(state.engine);
   const winner = confluenceState.winner;
 
