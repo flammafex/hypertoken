@@ -1091,7 +1091,11 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
 
 /* Defeat styling */
 .winner-display.defeat h2 {
-  color: var(--accent-red, #e94560);
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: #e94560;
+  background-clip: initial;
+  color: #e94560;
 }
 
 /* Offline demo banner */

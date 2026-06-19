@@ -197,6 +197,7 @@ async function handleStart(e) {
     // Listen for state updates
     state.engine.on('confluence:updated', handleStateUpdate);
     state.engine.on('confluence:ready', handleGameReady);
+    state.engine.on('confluence:started', handleGameStarted);
     state.engine.on('confluence:ended', handleGameEnded);
     state.engine.on('net:ready', handleConnected);
     state.engine.on('net:disconnected', handleDisconnected);
@@ -277,12 +278,29 @@ function getPlayerCount() {
 }
 
 function startGame() {
+  // Dispatch confluence:start — syncs to all peers via CRDT
+  try {
+    state.engine.dispatch('confluence:start', { peerId: state.peerId });
+  } catch (e) {
+    console.warn('[Confluence] Start dispatch failed:', e.message);
+  }
+  // handleGameStarted will be called by the event listener
+}
+
+function handleGameStarted() {
   hideWaitingOverlay();
   startTimer();
   announce('Game started! Place your tokens!');
 }
 
 function handleStateUpdate(event) {
+  // Check if game has started via CRDT sync (remote peer clicked Start)
+  const confluenceState = state.engine?.session?.state?.confluence;
+  if (confluenceState && confluenceState.phase === "playing" && !state.gameStarted) {
+    state.gameStarted = true;
+    handleGameStarted();
+  }
+
   // Re-render on state update
   requestAnimationFrame(render);
 }
@@ -904,7 +922,7 @@ function showGameOver() {
     elements.gameOverSubtitle.textContent = 'Multiple players tied for first place';
   } else {
     elements.gameOverTitle.textContent = 'Defeat';
-    elements.gameOverTitle.style.color = 'var(--accent-red, #e94560)';
+    elements.gameOverTitle.style.color = '';
     elements.gameOverSubtitle.textContent = `${winnerPlayer?.name || 'Opponent'} controls the most territory!`;
   }
 

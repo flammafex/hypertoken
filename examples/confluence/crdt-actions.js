@@ -333,6 +333,22 @@ Object.assign(ActionRegistry, {
   },
 
   /**
+   * Start the game (syncs to all peers via CRDT).
+   * Sets startTime and phase to "playing" so the timer begins for everyone.
+   */
+  "confluence:start": (engine, { peerId } = {}) => {
+    const state = engine.session.state?.confluence;
+    if (!state) throw new Error("Game not initialized");
+
+    engine.session.change("confluence:start", (doc) => {
+      doc.confluence.startTime = Date.now();
+      doc.confluence.phase = "playing";
+    });
+
+    engine.emit("confluence:started", {});
+  },
+
+  /**
    * End the game and compute final scores.
    */
   "confluence:end": (engine, { peerId } = {}) => {

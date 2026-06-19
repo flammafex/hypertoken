@@ -15105,6 +15105,19 @@ Object.assign(ActionRegistry, {
     engine.emit("confluence:split", { newTokenId1, newTokenId2, tokenId, peerId });
   },
   /**
+   * Start the game (syncs to all peers via CRDT).
+   * Sets startTime and phase to "playing" so the timer begins for everyone.
+   */
+  "confluence:start": (engine, { peerId } = {}) => {
+    const state2 = engine.session.state?.confluence;
+    if (!state2) throw new Error("Game not initialized");
+    engine.session.change("confluence:start", (doc) => {
+      doc.confluence.startTime = Date.now();
+      doc.confluence.phase = "playing";
+    });
+    engine.emit("confluence:started", {});
+  },
+  /**
    * End the game and compute final scores.
    */
   "confluence:end": (engine, { peerId } = {}) => {
@@ -15258,6 +15271,7 @@ async function handleStart(e) {
     setupConfluenceSync(state.engine);
     state.engine.on("confluence:updated", handleStateUpdate);
     state.engine.on("confluence:ready", handleGameReady);
+    state.engine.on("confluence:started", handleGameStarted);
     state.engine.on("confluence:ended", handleGameEnded);
     state.engine.on("net:ready", handleConnected);
     state.engine.on("net:disconnected", handleDisconnected);
@@ -15316,11 +15330,23 @@ function getPlayerCount() {
   return Object.keys(confluenceState.players).length;
 }
 function startGame() {
+  try {
+    state.engine.dispatch("confluence:start", { peerId: state.peerId });
+  } catch (e) {
+    console.warn("[Confluence] Start dispatch failed:", e.message);
+  }
+}
+function handleGameStarted() {
   hideWaitingOverlay();
   startTimer();
   announce("Game started! Place your tokens!");
 }
 function handleStateUpdate(event) {
+  const confluenceState = state.engine?.session?.state?.confluence;
+  if (confluenceState && confluenceState.phase === "playing" && !state.gameStarted) {
+    state.gameStarted = true;
+    handleGameStarted();
+  }
   requestAnimationFrame(render);
 }
 function handleConnected(event) {
@@ -15774,7 +15800,7 @@ function showGameOver() {
     elements.gameOverSubtitle.textContent = "Multiple players tied for first place";
   } else {
     elements.gameOverTitle.textContent = "Defeat";
-    elements.gameOverTitle.style.color = "var(--accent-red, #e94560)";
+    elements.gameOverTitle.style.color = "";
     elements.gameOverSubtitle.textContent = `${winnerPlayer?.name || "Opponent"} controls the most territory!`;
   }
   elements.finalScores.innerHTML = "";
