@@ -104,12 +104,6 @@ var init_events = __esm({
   }
 });
 
-// node_modules/@automerge/automerge/dist/mjs/wasm_bindgen_output/bundler/automerge_wasm_bg.wasm
-var require_automerge_wasm_bg = __commonJS({
-  "node_modules/@automerge/automerge/dist/mjs/wasm_bindgen_output/bundler/automerge_wasm_bg.wasm"() {
-  }
-});
-
 // node_modules/base64-js/index.js
 var require_base64_js = __commonJS({
   "node_modules/base64-js/index.js"(exports) {
@@ -5243,7 +5237,7 @@ __export(automerge_wasm_exports2, {
   __wbg_set_3f1d0b984ed272ed: () => __wbg_set_3f1d0b984ed272ed,
   __wbg_set_453345bcda80b89a: () => __wbg_set_453345bcda80b89a,
   __wbg_set_90f6c0f7bd8c0415: () => __wbg_set_90f6c0f7bd8c0415,
-  __wbg_set_wasm: () => __wbg_set_wasm,
+  __wbg_set_wasm: () => __wbg_set_wasm2,
   __wbg_slice_974daea329f5c01d: () => __wbg_slice_974daea329f5c01d,
   __wbg_stack_0ed75d68575b0f3c: () => __wbg_stack_0ed75d68575b0f3c,
   __wbg_stringify_4a34a65f0d4e236f: () => __wbg_stringify_4a34a65f0d4e236f,
@@ -5286,11 +5280,26 @@ __export(automerge_wasm_exports2, {
   load: () => load,
   readBundle: () => readBundle
 });
-var wasm3 = __toESM(require_automerge_wasm_bg(), 1);
+
+// examples/confluence/web/wasm-stub.js
+var wasm_stub_exports = {};
+__export(wasm_stub_exports, {
+  __wbg_set_wasm: () => __wbg_set_wasm,
+  __wbindgen_start: () => __wbindgen_start,
+  default: () => wasm_stub_default
+});
+function __wbg_set_wasm() {
+}
+function __wbindgen_start() {
+}
+var wasm_stub_default = {
+  __wbg_set_wasm,
+  __wbindgen_start
+};
 
 // node_modules/@automerge/automerge/dist/mjs/wasm_bindgen_output/bundler/automerge_wasm_bg.js
 var wasm2;
-function __wbg_set_wasm(val) {
+function __wbg_set_wasm2(val) {
   wasm2 = val;
 }
 var cachedUint8ArrayMemory02 = null;
@@ -6817,8 +6826,8 @@ function __wbindgen_init_externref_table() {
 }
 
 // node_modules/@automerge/automerge/dist/mjs/wasm_bindgen_output/bundler/automerge_wasm.js
-__wbg_set_wasm(wasm3);
-(void 0)();
+__wbg_set_wasm2(wasm_stub_exports);
+__wbindgen_start();
 
 // node_modules/@automerge/automerge/dist/mjs/constants.js
 var STATE = /* @__PURE__ */ Symbol.for("_am_meta");
@@ -8228,9 +8237,9 @@ var WasmManager = class {
       return;
     }
     try {
-      const wasm4 = getWasmModule();
-      if (!wasm4) return;
-      this._dispatcher = new wasm4.ActionDispatcher();
+      const wasm3 = getWasmModule();
+      if (!wasm3) return;
+      this._dispatcher = new wasm3.ActionDispatcher();
       this._dispatchTable = this._buildDispatchTable(this._dispatcher);
       this._dispatcher.initializeState(getStateJson());
       const newSession = new WasmChronicleAdapter(this._dispatcher);
@@ -8243,9 +8252,9 @@ var WasmManager = class {
   }
   async _tryLoadAsync(getStateJson, debug, onSessionReplace, onStateChanged) {
     try {
-      const wasm4 = await tryLoadWasm();
-      if (!wasm4 || this._dispatcher) return;
-      this._dispatcher = new wasm4.ActionDispatcher();
+      const wasm3 = await tryLoadWasm();
+      if (!wasm3 || this._dispatcher) return;
+      this._dispatcher = new wasm3.ActionDispatcher();
       this._dispatchTable = this._buildDispatchTable(this._dispatcher);
       this._dispatcher.initializeState(getStateJson());
       const newSession = new WasmChronicleAdapter(this._dispatcher);

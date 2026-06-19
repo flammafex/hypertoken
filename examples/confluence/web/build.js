@@ -35,10 +35,20 @@ async function build() {
         'events': 'events',
         'ws': join(__dirname, 'ws-shim.js'),
       },
-      // Handle .wasm files as binary assets
+      // Handle .wasm files — stub them out (we use disableWasm: true)
       loader: {
         '.wasm': 'empty',
       },
+      // Redirect the Automerge WASM binary import to our stub
+      // (the 'empty' loader creates a broken module; this provides a working one)
+      plugins: [{
+        name: 'wasm-stub',
+        setup(build) {
+          build.onResolve({ filter: /automerge_wasm_bg\.wasm$/ }, () => ({
+            path: join(__dirname, 'wasm-stub.js'),
+          }));
+        },
+      }],
       define: {
         'process.env.NODE_ENV': '"production"',
         'global': 'globalThis',
