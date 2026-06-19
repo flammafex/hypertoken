@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#e94560">
+  <meta name="description" content="Confluence — A real-time CRDT territory game showcasing HyperToken's distributed game engine">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Confluence">
+  <title>Confluence — CRDT Territory Game</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app" role="application" aria-label="Confluence Territory Game">
+    <!-- Screen reader announcements -->
+    <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="start-screen" role="dialog" aria-labelledby="start-title" aria-modal="true">
+      <h1 id="start-title" class="game-logo" tabindex="0">CONFLUENCE</h1>
+      <p class="game-tagline">Real-Time CRDT Territory Game</p>
+
+      <form id="start-form" class="start-form" autocomplete="off">
+        <div class="form-group">
+          <label for="player-name">Your Name</label>
+          <input type="text" id="player-name" class="input" placeholder="Enter your name" maxlength="20" required>
+        </div>
+
+        <div class="form-group">
+          <label for="server-url">Relay Server</label>
+          <div class="server-input-group">
+            <input type="url" id="server-url" class="input" placeholder="ws://localhost:3000" value="ws://localhost:3000">
+            <button type="button" id="btn-scan" class="btn-icon" title="Scan for servers" aria-label="Scan for available servers">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12h2m4 0h10M3 6h2m4 0h10M3 18h2m4 0h10"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="start-actions">
+          <button type="submit" id="btn-join" class="btn btn-primary">
+            <span>Join Game</span>
+          </button>
+          <button type="button" id="btn-rules" class="btn btn-secondary">
+            <span>View Rules</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="start-footer">
+        <span style="color: var(--text-dim); font-size: 0.85rem;">Powered by HyperToken</span>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="game-screen" role="main" aria-label="Game board">
+      <!-- Header -->
+      <header class="game-header">
+        <div class="game-title">
+          <h1>Confluence</h1>
+          <div class="sync-status" aria-label="Connection status">
+            <span class="sync-indicator" id="sync-indicator" aria-hidden="true"></span>
+            <span id="sync-text">Connecting...</span>
+            <span class="peer-count" id="peer-count"></span>
+          </div>
+        </div>
+
+        <div class="timer-display" id="timer" aria-label="Time remaining" role="timer">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          <span id="timer-value">30</span>
+        </div>
+
+        <div class="header-actions">
+          <button type="button" id="btn-rules-inline" class="btn-icon" title="View rules" aria-label="View rules">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+            </svg>
+          </button>
+          <button type="button" id="btn-end" class="btn btn-secondary" title="End game early" aria-label="End game">
+            End Game
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Game Area -->
+      <main class="game-main">
+        <!-- Score Panel (Left) -->
+        <aside class="score-panel" id="score-panel" role="region" aria-label="Player scores">
+          <!-- Dynamically populated -->
+        </aside>
+
+        <!-- Game Board (Center) -->
+        <div class="board-container">
+          <div class="game-board" id="game-board" role="grid" aria-label="10 by 10 game board">
+            <!-- 100 cells + tokens dynamically generated -->
+          </div>
+        </div>
+
+        <!-- Score Panel (Right - mobile shows below) -->
+        <aside class="score-panel mobile-score" id="mobile-score-panel" role="region" aria-label="Mobile scores">
+          <!-- Dynamically populated for mobile -->
+        </aside>
+      </main>
+
+      <!-- Action Instructions -->
+      <div class="action-instructions" id="action-instructions" role="status" aria-live="polite">
+        <span id="instruction-text">Click an empty cell to place a token</span>
+      </div>
+
+      <!-- Offline Demo Banner -->
+      <div class="offline-banner" id="offline-banner" role="complementary" aria-label="Offline mode demo">
+        <div>
+          <h4 id="offline-title">Go Offline Demo</h4>
+          <p id="offline-desc">Test CRDT merge by placing tokens offline, then reconnect</p>
+        </div>
+        <button type="button" id="btn-offline" class="btn btn-secondary" aria-pressed="false">
+          Go Offline
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="game-over-screen" role="dialog" aria-labelledby="game-over-title" aria-modal="true">
+      <div class="winner-display" id="winner-display">
+        <h2 id="game-over-title">Game Over</h2>
+        <p id="game-over-subtitle" style="color: var(--text-secondary); font-size: 1.2rem;"></p>
+      </div>
+
+      <div class="final-scores" id="final-scores" role="region" aria-label="Final scores">
+        <!-- Dynamically populated -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-play-again" class="btn btn-primary">
+          Play Again
+        </button>
+        <button type="button" id="btn-new-lobby" class="btn btn-secondary">
+          New Lobby
+        </button>
+      </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div class="modal-overlay" id="rules-overlay" role="dialog" aria-labelledby="rules-title" aria-modal="true">
+      <div class="modal rules-content">
+        <h2 id="rules-title">How to Play</h2>
+        <p>Confluence is a real-time territory game where 2-4 players compete to control the most cells on a 10×10 grid.</p>
+
+        <div class="modal-content">
+          <h3>Objective</h3>
+          <p>Control the most territory when the 30-second timer runs out. You control cells by placing tokens adjacent to them.</p>
+
+          <h3>Actions</h3>
+          <ul>
+            <li><strong>Place:</strong> Click an empty cell to place a strength-1 token</li>
+            <li><strong>Merge:</strong> Click your token, then an adjacent token to combine them (max strength 3)</li>
+            <li><strong>Split:</strong> Click a strength-2+ token, then an adjacent empty cell to split it</li>
+          </ul>
+
+          <h3>Scoring</h3>
+          <ul>
+            <li>Cells with only your tokens = <strong>controlled</strong> (1 point)</li>
+            <li>Cells with tokens from multiple players = <strong>contested</strong> (no points, but blocks opponents)</li>
+            <li>Empty cells adjacent to only your tokens = <strong>influence</strong> (1 point)</li>
+          </ul>
+
+          <div class="crdt-highlight">
+            <strong class="highlight">CRDT Magic:</strong> When two players place on the same cell simultaneously,
+            BOTH tokens are preserved as a contested cell. No last-write-wins — the CRDT merges concurrent edits!
+          </div>
+
+          <h3>Pro Tips</h3>
+          <ul>
+            <li>Higher strength tokens don't score more, but they can split to expand faster</li>
+            <li>Contested cells block your opponent from controlling that area</li>
+            <li>Watch the provenance: merged tokens show their parent history on hover</li>
+          </ul>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-close-rules" class="btn btn-primary">Got It</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Provenance Tooltip -->
+    <div class="provenance-tooltip" id="provenance-tooltip" role="tooltip" aria-hidden="true">
+      <h4>Token History</h4>
+      <div class="provenance-tree" id="provenance-tree">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="confluence-web.js"></script>
+</body>
+</html>

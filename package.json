@@ -85,6 +85,9 @@
     "test:sync:spike": "node --loader ./test/ts-esm-loader.js test/testSyncSpike.ts",
     "test:cuttle:sync": "node --loader ./test/ts-esm-loader.js test/testCuttleSync.ts",
     "test:cuttle:crypto": "node --loader ./test/ts-esm-loader.js test/testCuttleCrypto.ts",
-    "test:cuttle:hardening": "node --loader ./test/ts-esm-loader.js test/testCuttleHardening.ts"
+    "test:cuttle:hardening": "node --loader ./test/ts-esm-loader.js test/testCuttleHardening.ts",
+    "test:confluence:rules": "node --loader ./test/ts-esm-loader.js test/testConfluenceRules.ts",
+    "test:confluence:sync": "node --loader ./test/ts-esm-loader.js test/testConfluenceSync.ts",
+    "confluence:web": "cd examples/confluence/web && python3 -m http.server 8080"
   }
 }
