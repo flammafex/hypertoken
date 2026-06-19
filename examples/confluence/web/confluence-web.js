@@ -8,31 +8,18 @@
  * - Offline editing with seamless reconnection
  */
 
-// Import Engine dynamically (browser-compatible)
-let Engine;
-let setupConfluenceSync, getBoard, getScores, getTimeRemainingSec, isGameOver;
+// Static imports — esbuild bundles these into the output file
+import { Engine } from '../../../engine/Engine';
+import {
+  setupConfluenceSync,
+  getBoard,
+  getScores,
+  getTimeRemainingSec,
+  isGameOver,
+} from '../crdt-actions';
 
-(async () => {
-  try {
-    // Import Engine (esbuild resolves this at build time)
-    const engineModule = await import('../../engine/Engine.js');
-    Engine = engineModule.Engine;
-
-    // Import Confluence CRDT actions
-    const crdtModule = await import('../crdt-actions.js');
-    setupConfluenceSync = crdtModule.setupConfluenceSync;
-    getBoard = crdtModule.getBoard;
-    getScores = crdtModule.getScores;
-    getTimeRemainingSec = crdtModule.getTimeRemainingSec;
-    isGameOver = crdtModule.isGameOver;
-
-    console.log('[Confluence] Modules loaded successfully');
-    initApp();
-  } catch (error) {
-    console.error('[Confluence] Failed to load modules:', error);
-    showError('Failed to load game modules. Check console for details.');
-  }
-})();
+console.log('[Confluence] Modules loaded successfully');
+initApp();
 
 // ============================================================================
 // Application State
