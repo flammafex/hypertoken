@@ -26,6 +26,19 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // Application State
 // ============================================================================
 
+// Auto-detect WebSocket URL from page location
+// In production behind nginx, this becomes wss://yourdomain.com/ws
+// In dev, defaults to ws://localhost:3000
+function autoDetectWsUrl() {
+  if (window.location.protocol === 'file:') return 'ws://localhost:3000';
+  const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // If served from standard ports (production behind nginx), use /ws path
+  if (window.location.port === '8080' || window.location.port === '') {
+    return wsProto + '//' + window.location.host + '/ws';
+  }
+  return wsProto + '//' + window.location.hostname + ':3000';
+}
+
 const state = {
   // Engine
   engine: null,
@@ -35,7 +48,7 @@ const state = {
   // Player
   peerId: null,
   playerName: '',
-  serverUrl: 'ws://localhost:3000',
+  serverUrl: autoDetectWsUrl(),
 
   // Game
   gameStarted: false,
@@ -174,7 +187,7 @@ async function handleStart(e) {
   e.preventDefault();
 
   const name = elements.playerNameInput.value.trim() || 'Player';
-  const serverUrl = elements.serverUrlInput.value.trim() || 'ws://localhost:3000';
+  const serverUrl = elements.serverUrlInput.value.trim() || autoDetectWsUrl();
 
   // Save preferences
   localStorage.setItem('confluence playerName', name);
