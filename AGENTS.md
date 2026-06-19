@@ -15,12 +15,16 @@ HyperToken is a distributed game engine where **all state is a CRDT** (Automerge
 
 ```
 core/          CRDT state primitives (Token, Stack, Space, Source, Chronicle, IChronicle, WasmChronicleAdapter)
+core/browser/  Browser build infrastructure (shims.js, build.js)
+core/storage/  Storage adapters (MemoryAdapter, FilesystemAdapter, IndexedDBAdapter)
+core/StorageAdapter.ts  Storage adapter interface
 engine/        Game coordination (Engine, actions.ts, Action, GameLoop, RuleEngine, Agent, Policy, Recorder, Script)
-network/       P2P & server (PeerConnection, AuthoritativeServer, HybridPeerManager, StateSyncManager, MessageCodec, E2EEncryption)
+network/       P2P & server (PeerConnection, AuthoritativeServer, HybridPeerManager, MessageCodec, E2EEncryption)
 hypertoken-rl/  RL adapters split (interface/, bridge/, python/) — Gym, PettingZoo, ONNXAgent, bridge server, Python client
 core-rs/       Rust → WASM source (src/lib.rs, src/chronicle_actions/, Cargo.toml, build.sh)
 cli/           CLI entrypoint (index.ts → commands/{relay,bridge,mcp}.ts)
 examples/      10 game dirs (blackjack, poker, cuttle, prisoners-dilemma, hanabi, coup, liars-dice, accordion, dungeon-raiders, browser-demo)
+examples/confluence/  Confluence CRDT showcase game (real-time territory game)
 mcp/           MCP server for LLM play (server.ts, games/)
 plugins/       analytics, logging, save-state plugins + pluginLoader
 workers/       hypertoken.worker.js (Phase 3 multi-threading is future work)
@@ -38,6 +42,7 @@ test/          Custom test runner (no Jest/Vitest)
 ```bash
 npm install              # install deps
 npm run build            # tsc + copy examples/WASM to dist/
+npm run build:browser    # Build any game for browser (shared esbuild config)
 npm run build:rust       # optional: compile Rust → WASM (prebuilt binaries included)
 npm run clean            # rm -rf dist
 
@@ -47,6 +52,14 @@ npm run test:unit        # ~30s: core + engine + exporters + token + batch + tra
 npm run test            # ~2min: full suite incl. integration & network
 npm run test:rust       # cargo test (native target, requires Rust)
 npm run test:wasm       # WASM bridge tests
+npm run test:sync:spike  # Phase 1 CRDT sync spike tests
+npm run test:sync:hardening  # Phase B sync hardening tests
+npm run test:persistence  # Phase C persistence tests
+npm run test:cuttle:sync  # Cuttle CRDT sync tests
+npm run test:cuttle:crypto  # Cuttle encrypted hands tests
+npm run test:cuttle:hardening  # Cuttle hardening tests
+npm run test:confluence:rules  # Confluence game rules tests
+npm run test:confluence:sync  # Confluence CRDT sync tests
 
 # Single test file (custom ESM loader resolves .js → .ts):
 node --loader ./test/ts-esm-loader.js test/testCore.js
@@ -56,6 +69,7 @@ npm run blackjack        # Casino with AI & betting
 npm run poker            # Texas Hold'em
 npm run cuttle           # Card combat
 npm run prisoners-dilemma  # Game theory tournament
+npm run confluence:web   # Build + serve Confluence browser client
 
 # Infrastructure
 npm run relay            # P2P relay server
@@ -77,6 +91,9 @@ npm run mcp              # LLM MCP server
 - **Tokens are immutable** — never modified, only created/destroyed. Provenance via `_mergedFrom` / `_splitFrom`.
 - **State mutations go through `engine.dispatch()`** — not direct `session.change()`. Recent refactor migrated call sites; preserve this pattern.
 - **Dual-path dispatch** — WASM `ActionDispatcher` if available + action supported, else TS `ActionRegistry` fallback. `IChronicle` interface abstracts both backends. Any new action needs both paths or an explicit fallback.
+- **disableWasm option** — use `new Engine({ disableWasm: true })` when network sync is needed (WASM dispatcher doesn't support sync).
+- **StorageAdapter pattern** — use `engine.useStorage(adapter)` + `await engine.persist(name)` / `await engine.resume(name)` for persistence (not the old save-state-plugin monkey-patching).
+- **Automerge proxy issue** — `Object.values()` may not work on Automerge proxies; use `JSON.parse(JSON.stringify(state))` before derivation logic.
 - **Seeded randomness** — `mulberry32` + `shuffleArray` (`core/random.js`). Tests use fixed seeds for reproducibility.
 - **Apache 2.0 license header** on source files (see `core/index.js:1-15`).
 
@@ -107,6 +124,7 @@ npm run mcp              # LLM MCP server
 5. **`package.json` scripts** — many test scripts are referenced by CI and docs; renaming breaks tooling.
 6. **`tsconfig.json` strict mode** — do not relax `strict: true` to silence errors; fix the errors.
 7. **License headers** — preserve Apache 2.0 headers on source files.
+8. **`core/StorageAdapter.ts` interface** — breaking this interface breaks all storage adapters. Add new methods with defaults.
 
 ## Definition of done
 
@@ -116,6 +134,7 @@ A change is complete when **all** of the following hold:
 - [ ] Relevant test category passes: `npm run test:quick` minimum; `npm run test:unit` for engine/core changes; `npm run test` for network/integration changes
 - [ ] If you touched an action with a Rust counterpart: `npm run test:wasm` passes (TS/WASM parity)
 - [ ] If you touched Rust: `npm run test:rust` passes
+- [ ] If you touched storage/persistence code: `npm run test:persistence` passes
 - [ ] No new `console.log` left in production code (use `Emitter` events or `engine.debug = true`)
 - [ ] Docs updated if behavior changed (README, `docs/`, `engine/ACTIONS.md`, `WASM_INTEGRATION.md` as relevant)
 - [ ] No secrets, no `.env` files, no large binary artifacts committed

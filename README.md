@@ -40,6 +40,7 @@ npm run blackjack          # Casino with AI & betting
 npm run prisoners-dilemma  # Game theory tournament
 npm run poker              # Texas Hold'em
 npm run cuttle             # Card combat
+npm run confluence:web     # CRDT territory game in browser
 
 # Multiplayer
 npm run blackjack:server   # Host
@@ -163,6 +164,9 @@ hypertoken/
 │   ├── Chronicle.ts       # Automerge CRDT wrapper
 │   └── ConsensusCore.ts   # P2P synchronization
 │
+├── core/browser/          # Browser build infrastructure (shims, esbuild config)
+├── core/storage/          # Storage adapters (IndexedDB, Filesystem, Memory)
+│
 ├── core-rs/                # Rust → WASM (67 typed actions)
 │   └── src/
 │       ├── stack.rs       # 10 stack operations
@@ -190,7 +194,8 @@ hypertoken/
     ├── blackjack/
     ├── poker/
     ├── prisoners-dilemma/
-    └── hanabi/
+    ├── hanabi/
+    └── confluence/         # CRDT showcase game (real-time territory)
 ```
 
 ---
@@ -226,6 +231,8 @@ This applies to cards in blackjack, strategies in game theory, shares in a marke
 
 - [Action Reference](./engine/ACTIONS.md) — All 77 actions
 - [Architecture Guide](./docs/ARCHITECTURE.md) — How components connect
+- [Browser Guide](./docs/BROWSER.md) — Building games for the browser
+- [Persistence Guide](./docs/PERSISTENCE.md) — Save/load game state
 - [Python Bridge](./docs/PYTHON_BRIDGE.md) — PettingZoo integration
 - [ONNX Export](./docs/ONNX_EXPORT.md) — Deploy trained policies
 - [Docker Guide](./DOCKER.md) — Container deployment

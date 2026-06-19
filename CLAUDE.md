@@ -38,11 +38,14 @@ HyperToken is a distributed game engine where all state is a CRDT (Automerge). T
 ### Layer structure
 
 - **core/** — CRDT state primitives: `Chronicle` (Automerge wrapper), `IChronicle` (interface), `WasmChronicleAdapter` (dirty-section caching proxy for WASM), `Stack` (ordered token collections), `Space` (2D zones), `Source` (multi-deck manager), `Token` (immutable game entities with provenance tracking)
+- **core/browser/** — Browser build infrastructure
+- **core/storage/** — Storage adapters (`MemoryAdapter`, `FilesystemAdapter`, `IndexedDBAdapter`)
 - **engine/** — Game coordination: `Engine` (main dispatcher), `Action` (registry), `actions.ts` (75+ built-in actions), `GameLoop` (turn/phase control), `RuleEngine` (condition-triggered), `Agent` (player/NPC), `Policy` (post-action evaluation), `Recorder` (history/replay), `Script` (programmatic execution)
-- **network/** — P2P & server networking: `PeerConnection` (WebSocket + WebRTC), `AuthoritativeServer`, `HybridPeerManager`, `StateSyncManager`, `MessageCodec` (MessagePack binary), `E2EEncryption`
+- **network/** — P2P & server networking: `PeerConnection` (WebSocket + WebRTC), `AuthoritativeServer`, `HybridPeerManager`, `MessageCodec` (MessagePack binary), `E2EEncryption`
 - **hypertoken-rl/** — AI/ML adapters and bridge: `interface/` (`Gym`, `PettingZoo`, `PettingZooParallel`, `ONNXAgent`), `bridge/` server, `python/` client
 - **core-rs/** — Rust WASM implementation: `Chronicle` (incremental Automerge CRDT with 54 field-level action methods), `ActionDispatcher` (delegates to Chronicle), `chronicle_actions/` (stack, space, source, agent, game_loop, game_state, rules modules)
 - **examples/** — 10 working games, each with game logic, CLI, and optional networking/RL files
+- **examples/confluence/** — CRDT showcase game
 - **cli/** — CLI entry point (`relay`, `bridge`, `mcp` subcommands)
 
 ### Data flow
@@ -72,6 +75,8 @@ Actions use `category:verb` format across 7 categories:
 - **All components extend Emitter** from `core/events.ts` for event-based communication
 - **Tokens are immutable** — never modified, only created/destroyed. Provenance tracked via `_mergedFrom`, `_splitFrom`
 - **State mutations go through `engine.dispatch()`** — routes to WASM Chronicle (incremental field-level ops) or TS ActionRegistry (`session.change()` fallback). `IChronicle` interface abstracts over both backends.
+- **Network sync requires `disableWasm: true`** — use `new Engine({ disableWasm: true })` for networked games because the WASM dispatcher doesn't support sync.
+- **Persistence uses StorageAdapter** — call `engine.useStorage(adapter)` then `await engine.persist(name)` / `await engine.resume(name)`.
 - **Events use `type:name`** format (e.g., `state:updated`, `net:ready`)
 
 ## Project Configuration

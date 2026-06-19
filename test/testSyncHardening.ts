@@ -14,7 +14,6 @@
 import { Engine } from "../engine/Engine.js";
 import { Chronicle } from "../core/Chronicle.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
-import { StateSyncManager } from "../network/StateSyncManager.js";
 
 let passed = 0;
 let failed = 0;
@@ -388,22 +387,15 @@ async function runTests(): Promise<void> {
   });
 
   // ========================================================================
-  // 6. StateSyncManager — verify it's dead code
+  // 6. StateSyncManager — removed (was dead code)
   // ========================================================================
   console.log("\n── StateSyncManager ──\n");
 
-  await runTest("StateSyncManager is not used by Engine or ConsensusCore", async () => {
-    // StateSyncManager is only referenced in its own file (confirmed by grep).
-    // This test documents that it's dead code.
-    const ssm = new StateSyncManager({ maxDeltas: 100 } as any);
-
-    // Verify it's functional (not broken) but unused
-    assert(ssm !== null, "StateSyncManager should be constructable");
-    assert(typeof ssm.recordDelta === "function", "Should have recordDelta method");
-    assert(typeof ssm.getDeltasSince === "function", "Should have getDeltasSince method");
-
-    console.log("    StateSyncManager is functional but NOT wired into Engine or ConsensusCore");
-    console.log("    Recommendation: remove dead code or wire it into reconnect path");
+  await runTest("StateSyncManager has been removed (was dead code)", async () => {
+    // StateSyncManager was confirmed as dead code in Phase B.
+    // It was not referenced by Engine, ConsensusCore, or NetworkManager.
+    // The file has been removed. This test documents the removal.
+    console.log("    StateSyncManager was removed — was not wired into any sync path");
   });
 
   // ========================================================================
