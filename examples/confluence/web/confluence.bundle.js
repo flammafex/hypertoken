@@ -2633,7 +2633,8 @@ var init_WebWorker = __esm({
             this.worker.onerror = (event) => {
               this.handleError(new Error(event.message || "Worker error"));
             };
-            const readyHandler = (msg) => {
+            const readyHandler = (event) => {
+              const msg = event?.payload ?? event;
               if (msg.type === "ready") {
                 this.sendInitRequest().then(() => {
                   this._isReady = true;
@@ -14507,6 +14508,9 @@ var _Engine = class _Engine extends Emitter {
     __publicField(this, "net");
     __publicField(this, "_useWebRTC");
     __publicField(this, "_networkOptions");
+    // ── Persistence (StorageAdapter) ──────────────────────────────────────────
+    __publicField(this, "_storageAdapter", null);
+    __publicField(this, "_autoSaveTimer", null);
     this.session = new Chronicle();
     this.space = space ?? new Space(this.session, "main-space");
     this.stack = stack;
@@ -14724,6 +14728,82 @@ var _Engine = class _Engine extends Emitter {
     this.emit("engine:restored", { payload: { history: this.historyManager.history.length } });
     return this;
   }
+  /**
+   * Attach a storage adapter for persistence.
+   * After attaching, call persist() to save or resume() to load.
+   *
+   * @param adapter - StorageAdapter instance (FilesystemAdapter, IndexedDBAdapter, etc.)
+   */
+  useStorage(adapter) {
+    this._storageAdapter = adapter;
+    return this;
+  }
+  /**
+   * Save the current game state to the storage adapter.
+   *
+   * @param name - Unique name for this save (default: 'autosave')
+   * @param description - Optional description
+   */
+  async persist(name = "autosave", description) {
+    if (!this._storageAdapter) throw new Error("No storage adapter attached. Call engine.useStorage(adapter) first.");
+    const data = this.session.saveToBase64();
+    await this._storageAdapter.save(name, data, description);
+    this.emit("engine:saved", { payload: { name } });
+  }
+  /**
+   * Load a saved game state from the storage adapter.
+   *
+   * @param name - Name of the save to load (default: 'autosave')
+   * @returns true if a save was found and loaded, false if no save exists
+   */
+  async resume(name = "autosave") {
+    if (!this._storageAdapter) throw new Error("No storage adapter attached. Call engine.useStorage(adapter) first.");
+    const saved = await this._storageAdapter.load(name);
+    if (!saved) return false;
+    this.session.loadFromBase64(saved.data);
+    this.emit("engine:restored", { payload: { name, timestamp: saved.metadata.timestamp } });
+    return true;
+  }
+  /**
+   * List all saved games.
+   */
+  async listSaves() {
+    if (!this._storageAdapter) throw new Error("No storage adapter attached. Call engine.useStorage(adapter) first.");
+    return this._storageAdapter.list();
+  }
+  /**
+   * Delete a saved game.
+   */
+  async deleteSave(name) {
+    if (!this._storageAdapter) throw new Error("No storage adapter attached. Call engine.useStorage(adapter) first.");
+    await this._storageAdapter.delete(name);
+    this.emit("engine:saveDeleted", { payload: { name } });
+  }
+  /**
+   * Enable auto-save at a regular interval.
+   *
+   * @param intervalMs - Interval in milliseconds (default: 30000)
+   * @param name - Save name (default: 'autosave')
+   */
+  enableAutoSave(intervalMs = 3e4, name = "autosave") {
+    if (this._autoSaveTimer) clearInterval(this._autoSaveTimer);
+    this._autoSaveTimer = setInterval(() => {
+      this.persist(name).catch((err2) => {
+        if (this.debug) console.warn("[Engine] Auto-save failed:", err2.message);
+      });
+    }, intervalMs);
+    return this;
+  }
+  /**
+   * Disable auto-save.
+   */
+  disableAutoSave() {
+    if (this._autoSaveTimer) {
+      clearInterval(this._autoSaveTimer);
+      this._autoSaveTimer = null;
+    }
+    return this;
+  }
   // ── State / Describe ───────────────────────────────────────────────────────
   get state() {
     return {
@@ -14790,6 +14870,89 @@ var _Engine = class _Engine extends Emitter {
 };
 __publicField(_Engine, "ACTION_FAILED", /* @__PURE__ */ Symbol("ACTION_FAILED"));
 var Engine = _Engine;
+
+// core/StorageAdapter.ts
+var STORAGE_VERSION = "1.0.0";
+
+// core/storage/IndexedDBAdapter.ts
+var DB_NAME = "hypertoken";
+var DB_VERSION = 1;
+var STORE_NAME = "saves";
+var IndexedDBAdapter = class {
+  constructor(options = {}) {
+    __publicField(this, "dbName");
+    __publicField(this, "dbPromise", null);
+    this.dbName = options.dbName ?? DB_NAME;
+  }
+  getDB() {
+    if (this.dbPromise) return this.dbPromise;
+    this.dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: "metadata.name" });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return this.dbPromise;
+  }
+  async save(name, data, description) {
+    const db = await this.getDB();
+    const metadata = {
+      name,
+      timestamp: Date.now(),
+      version: STORAGE_VERSION,
+      description,
+      size: data.length
+    };
+    const savedGame = { metadata, data };
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put(savedGame);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+  async load(name) {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(name);
+      request.onsuccess = () => resolve(request.result ?? null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+  async delete(name) {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.delete(name);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+  async list() {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const results = request.result ?? [];
+        const saves = results.map((s) => s.metadata);
+        saves.sort((a, b) => b.timestamp - a.timestamp);
+        resolve(saves);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+};
 
 // examples/confluence/ConfluenceGame.ts
 function isTokenConsumed(state2, tokenId) {
@@ -15240,10 +15403,12 @@ var elements = {
   serverUrlInput: document.getElementById("server-url"),
   // Buttons
   btnJoin: document.getElementById("btn-join"),
+  btnResume: document.getElementById("btn-resume"),
   btnRules: document.getElementById("btn-rules"),
   btnRulesInline: document.getElementById("btn-rules-inline"),
   btnScan: document.getElementById("btn-scan"),
   btnEnd: document.getElementById("btn-end"),
+  btnSave: document.getElementById("btn-save"),
   btnOffline: document.getElementById("btn-offline"),
   btnPlayAgain: document.getElementById("btn-play-again"),
   btnNewLobby: document.getElementById("btn-new-lobby"),
@@ -15282,6 +15447,66 @@ function initApp() {
   bindEvents();
   state.peerId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   console.log("[Confluence] App initialized, temp peerId:", state.peerId);
+  checkForSavedGames();
+}
+async function checkForSavedGames() {
+  try {
+    const adapter = new IndexedDBAdapter();
+    const saves = await adapter.list();
+    if (saves.length > 0) {
+      const btn = document.getElementById("btn-resume");
+      if (btn) {
+        btn.style.display = "";
+        const latest = saves[0];
+        btn.querySelector("span").textContent = `Resume Saved Game (${new Date(latest.timestamp).toLocaleDateString()})`;
+      }
+    }
+  } catch (e) {
+  }
+}
+async function handleSaveGame() {
+  if (!state.engine || !state.storageAdapter) return;
+  try {
+    await state.engine.persist("confluence-save", "Manual save");
+    announce("Game saved!");
+    if (elements.btnSave) {
+      elements.btnSave.textContent = "Saved!";
+      setTimeout(() => {
+        elements.btnSave.textContent = "Save";
+      }, 2e3);
+    }
+  } catch (e) {
+    console.error("[Confluence] Save failed:", e);
+    announce("Save failed: " + e.message);
+  }
+}
+async function handleResumeGame() {
+  try {
+    state.engine = new Engine({ disableWasm: true });
+    state.storageAdapter = new IndexedDBAdapter();
+    state.engine.useStorage(state.storageAdapter);
+    setupConfluenceSync(state.engine);
+    state.engine.on("confluence:updated", handleStateUpdate);
+    state.engine.on("confluence:ready", handleGameReady);
+    state.engine.on("confluence:started", handleGameStarted);
+    state.engine.on("confluence:ended", handleGameEnded);
+    const loaded = await state.engine.resume("confluence-save");
+    if (loaded) {
+      console.log("[Confluence] Game resumed from save");
+      state.gameStarted = true;
+      state.playerName = "Resumed Player";
+      state.peerId = state.engine.network?.peerId || state.peerId;
+      elements.startScreen.classList.add("hidden");
+      elements.gameScreen.classList.add("active");
+      render();
+      announce("Game resumed from save");
+    } else {
+      announce("No saved game found");
+    }
+  } catch (e) {
+    console.error("[Confluence] Resume failed:", e);
+    announce("Resume failed: " + e.message);
+  }
 }
 function bindEvents() {
   elements.startForm.addEventListener("submit", handleStart);
@@ -15292,9 +15517,13 @@ function bindEvents() {
   });
   elements.btnRulesInline.addEventListener("click", () => showRules());
   elements.btnEnd.addEventListener("click", handleEndGame);
+  elements.btnSave.addEventListener("click", handleSaveGame);
   elements.btnOffline.addEventListener("click", toggleOfflineMode);
   elements.btnPlayAgain.addEventListener("click", handlePlayAgain);
   elements.btnNewLobby.addEventListener("click", handleNewLobby);
+  if (elements.btnResume) {
+    elements.btnResume.addEventListener("click", handleResumeGame);
+  }
   const btnStartGame = document.getElementById("btn-start-game");
   if (btnStartGame) btnStartGame.addEventListener("click", startGame);
   elements.gameBoard.addEventListener("click", handleBoardClick);
@@ -15316,6 +15545,8 @@ async function handleStart(e) {
   elements.btnJoin.textContent = "Connecting...";
   try {
     state.engine = new Engine({ disableWasm: true });
+    state.storageAdapter = new IndexedDBAdapter();
+    state.engine.useStorage(state.storageAdapter);
     setupConfluenceSync(state.engine);
     state.engine.on("confluence:updated", handleStateUpdate);
     state.engine.on("confluence:ready", handleGameReady);
@@ -15441,6 +15672,10 @@ function updatePeerCount() {
 function handleGameEnded(event) {
   state.gameEnded = true;
   stopTimer();
+  if (state.engine && state.storageAdapter) {
+    state.engine.persist("confluence-save", "Game over save").catch(() => {
+    });
+  }
   showGameOver();
 }
 function startTimer() {

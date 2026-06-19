@@ -10,6 +10,7 @@
 
 // Static imports — esbuild bundles these into the output file
 import { Engine } from '../../../engine/Engine';
+import { IndexedDBAdapter } from '../../../core/storage/IndexedDBAdapter';
 import {
   setupConfluenceSync,
   getBoard,
@@ -85,10 +86,12 @@ const elements = {
 
   // Buttons
   btnJoin: document.getElementById('btn-join'),
+  btnResume: document.getElementById('btn-resume'),
   btnRules: document.getElementById('btn-rules'),
   btnRulesInline: document.getElementById('btn-rules-inline'),
   btnScan: document.getElementById('btn-scan'),
   btnEnd: document.getElementById('btn-end'),
+  btnSave: document.getElementById('btn-save'),
   btnOffline: document.getElementById('btn-offline'),
   btnPlayAgain: document.getElementById('btn-play-again'),
   btnNewLobby: document.getElementById('btn-new-lobby'),
@@ -144,6 +147,73 @@ function initApp() {
   state.peerId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   console.log('[Confluence] App initialized, temp peerId:', state.peerId);
+
+  // Check for existing saves and show Resume button
+  checkForSavedGames();
+}
+
+async function checkForSavedGames() {
+  try {
+    const adapter = new IndexedDBAdapter();
+    const saves = await adapter.list();
+    if (saves.length > 0) {
+      const btn = document.getElementById('btn-resume');
+      if (btn) {
+        btn.style.display = '';
+        const latest = saves[0];
+        btn.querySelector('span').textContent = `Resume Saved Game (${new Date(latest.timestamp).toLocaleDateString()})`;
+      }
+    }
+  } catch (e) {
+    // IndexedDB might not be available
+  }
+}
+
+async function handleSaveGame() {
+  if (!state.engine || !state.storageAdapter) return;
+  try {
+    await state.engine.persist('confluence-save', 'Manual save');
+    announce('Game saved!');
+    if (elements.btnSave) {
+      elements.btnSave.textContent = 'Saved!';
+      setTimeout(() => { elements.btnSave.textContent = 'Save'; }, 2000);
+    }
+  } catch (e) {
+    console.error('[Confluence] Save failed:', e);
+    announce('Save failed: ' + e.message);
+  }
+}
+
+async function handleResumeGame() {
+  try {
+    state.engine = new Engine({ disableWasm: true });
+    state.storageAdapter = new IndexedDBAdapter();
+    state.engine.useStorage(state.storageAdapter);
+    setupConfluenceSync(state.engine);
+
+    state.engine.on('confluence:updated', handleStateUpdate);
+    state.engine.on('confluence:ready', handleGameReady);
+    state.engine.on('confluence:started', handleGameStarted);
+    state.engine.on('confluence:ended', handleGameEnded);
+
+    const loaded = await state.engine.resume('confluence-save');
+    if (loaded) {
+      console.log('[Confluence] Game resumed from save');
+      state.gameStarted = true;
+      state.playerName = 'Resumed Player';
+      state.peerId = state.engine.network?.peerId || state.peerId;
+
+      elements.startScreen.classList.add('hidden');
+      elements.gameScreen.classList.add('active');
+      render();
+      announce('Game resumed from save');
+    } else {
+      announce('No saved game found');
+    }
+  } catch (e) {
+    console.error('[Confluence] Resume failed:', e);
+    announce('Resume failed: ' + e.message);
+  }
 }
 
 function bindEvents() {
@@ -158,9 +228,15 @@ function bindEvents() {
   // Game controls
   elements.btnRulesInline.addEventListener('click', () => showRules());
   elements.btnEnd.addEventListener('click', handleEndGame);
+  elements.btnSave.addEventListener('click', handleSaveGame);
   elements.btnOffline.addEventListener('click', toggleOfflineMode);
   elements.btnPlayAgain.addEventListener('click', handlePlayAgain);
   elements.btnNewLobby.addEventListener('click', handleNewLobby);
+
+  // Resume button
+  if (elements.btnResume) {
+    elements.btnResume.addEventListener('click', handleResumeGame);
+  }
 
   // Start game button
   const btnStartGame = document.getElementById('btn-start-game');
@@ -203,6 +279,10 @@ async function handleStart(e) {
   try {
     // Create engine with WASM disabled for browser compatibility
     state.engine = new Engine({ disableWasm: true });
+
+    // Set up persistence with IndexedDB
+    state.storageAdapter = new IndexedDBAdapter();
+    state.engine.useStorage(state.storageAdapter);
 
     // Set up Confluence sync
     setupConfluenceSync(state.engine);
@@ -376,6 +456,12 @@ function updatePeerCount() {
 function handleGameEnded(event) {
   state.gameEnded = true;
   stopTimer();
+
+  // Auto-save the final game state
+  if (state.engine && state.storageAdapter) {
+    state.engine.persist('confluence-save', 'Game over save').catch(() => {});
+  }
+
   showGameOver();
 }
 
