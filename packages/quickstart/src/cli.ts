@@ -70,7 +70,7 @@ Build multiplayer games with:
   if (!response.action || response.action === 'exit') {
     console.log(chalk.cyan('\n👋 Thanks for checking out HyperToken!\n'));
     console.log(chalk.gray('Learn more: https://hypertoken.ai'));
-    console.log(chalk.gray('GitHub: https://github.com/flammafex/hypertoken\n'));
+    console.log(chalk.gray('GitHub: https://git.carpocratian.org/sibyl/hypertoken\n'));
     process.exit(0);
   }
 

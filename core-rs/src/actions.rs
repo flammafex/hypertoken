@@ -311,6 +311,12 @@ impl ActionDispatcher {
         self.chronicle.agent_set_active(name, active)
     }
 
+    /// Set agent metadata
+    #[wasm_bindgen(js_name = agentSetMeta)]
+    pub fn agent_set_meta(&mut self, name: &str, key: &str, value_json: &str) -> Result<()> {
+        self.chronicle.agent_set_meta(name, key, value_json)
+    }
+
     /// Give resource to agent
     #[wasm_bindgen(js_name = agentGiveResource)]
     pub fn agent_give_resource(&mut self, name: &str, resource: &str, amount: f64) -> Result<()> {
@@ -478,6 +484,12 @@ impl ActionDispatcher {
     #[wasm_bindgen(js_name = gameSetProperty)]
     pub fn game_set_property(&mut self, key: &str, value_json: &str) -> Result<()> {
         self.chronicle.game_state_set_property(key, value_json)
+    }
+
+    /// Merge properties into game state
+    #[wasm_bindgen(js_name = gameMergeState)]
+    pub fn game_merge_state(&mut self, state_json: &str) -> Result<()> {
+        self.chronicle.game_state_merge_state(state_json)
     }
 
     //━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

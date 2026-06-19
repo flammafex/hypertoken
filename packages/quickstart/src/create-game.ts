@@ -226,9 +226,9 @@ ${name}/
 
 ## Learn More
 
-- [HyperToken Documentation](https://github.com/flammafex/hypertoken)
-- [Examples](https://github.com/flammafex/hypertoken/tree/main/examples)
-- [Action Reference](https://github.com/flammafex/hypertoken/blob/main/engine/ACTIONS.md)
+- [HyperToken Documentation](https://git.carpocratian.org/sibyl/hypertoken)
+- [Examples](https://git.carpocratian.org/sibyl/hypertoken/tree/main/examples)
+- [Action Reference](https://git.carpocratian.org/sibyl/hypertoken/blob/main/engine/ACTIONS.md)
 
 ## License
 

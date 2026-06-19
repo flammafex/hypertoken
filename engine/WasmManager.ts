@@ -35,8 +35,8 @@ export class WasmManager {
     // Source actions (7)
     "source:draw", "source:shuffle", "source:burn",
     "source:addStack", "source:removeStack", "source:reset", "source:inspect",
-    // Agent actions (16)
-    "agent:create", "agent:remove", "agent:setActive",
+    // Agent actions (17)
+    "agent:create", "agent:remove", "agent:setActive", "agent:setMeta",
     "agent:giveResource", "agent:takeResource",
     "agent:addToken", "agent:removeToken", "agent:get",
     "agent:transferResource", "agent:transferToken",
@@ -48,9 +48,9 @@ export class WasmManager {
     // GameLoop actions (6)
     "game:loopInit", "game:loopStart", "game:loopStop",
     "game:nextTurn", "game:setPhase", "game:setMaxTurns",
-    // GameState actions (7)
+    // GameState actions (8)
     "game:start", "game:end", "game:pause", "game:resume",
-    "game:nextPhase", "game:setProperty", "game:getState",
+    "game:nextPhase", "game:setProperty", "game:mergeState", "game:getState",
     // Rules actions (1)
     "rule:markFired",
     // Batch operations (8)
@@ -183,6 +183,7 @@ export class WasmManager {
       "agent:create":           (p) => JSON.parse(d.agentCreate(p.id, p.name, p.meta ? JSON.stringify(p.meta) : undefined)),
       "agent:remove":           (p) => { d.agentRemove(p.name); },
       "agent:setActive":        (p) => { d.agentSetActive(p.name, p.active ?? true); },
+      "agent:setMeta":          (p) => { d.agentSetMeta(p.name, p.key, JSON.stringify(p.value)); },
       "agent:giveResource":     (p) => { d.agentGiveResource(p.name, p.resource, p.amount ?? 1); },
       "agent:takeResource":     (p) => { d.agentTakeResource(p.name, p.resource, p.amount ?? 1); },
       "agent:addToken":         (p) => { d.agentAddToken(p.name, JSON.stringify(p.token)); },
@@ -213,6 +214,7 @@ export class WasmManager {
       "game:resume":      (_) => { d.gameResume(); return {}; },
       "game:nextPhase":   (p) => { d.gameNextPhase(p.phase ? String(p.phase) : undefined); return {}; },
       "game:setProperty": (p) => { d.gameSetProperty(p.key, JSON.stringify(p.value)); return {}; },
+      "game:mergeState":  (p) => { d.gameMergeState(JSON.stringify(p.state)); return {}; },
       "game:getState":    (_) => JSON.parse(d.gameGetState()),
       // Rules
       "rule:markFired": (p) => { d.ruleMarkFired(p.name, p.timestamp ?? Date.now()); },

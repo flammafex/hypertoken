@@ -51,7 +51,7 @@ npm run blackjack:client   # Join
 ## ⚡ Quick Start
 
 ```bash
-git clone https://github.com/flammafex/hypertoken.git
+git clone https://git.carpocratian.org/sibyl/hypertoken.git
 cd hypertoken
 npm install
 npm run build
@@ -224,7 +224,7 @@ This applies to cards in blackjack, strategies in game theory, shares in a marke
 
 ## 📖 Documentation
 
-- [Action Reference](./engine/ACTIONS.md) — All 67 actions
+- [Action Reference](./engine/ACTIONS.md) — All 77 actions
 - [Architecture Guide](./docs/ARCHITECTURE.md) — How components connect
 - [Python Bridge](./docs/PYTHON_BRIDGE.md) — PettingZoo integration
 - [ONNX Export](./docs/ONNX_EXPORT.md) — Deploy trained policies

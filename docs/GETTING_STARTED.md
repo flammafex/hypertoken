@@ -19,7 +19,7 @@ npm --version    # Should be v9.0.0 or higher
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/anthropics/hypertoken.git
+git clone https://git.carpocratian.org/sibyl/hypertoken.git
 cd hypertoken
 npm install
 ```

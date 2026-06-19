@@ -33,3 +33,6 @@ coverage/
 *.tmp
 .cache/
 .worktrees/
+
+# Rust/WASM build output
+core-rs/pkg/

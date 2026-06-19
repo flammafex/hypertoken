@@ -327,6 +327,6 @@ spec:
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/flammafex/hypertoken/issues)
+- GitHub Issues: [Report bugs or request features](https://git.carpocratian.org/sibyl/hypertoken/issues)
 - Documentation: [Full HyperToken docs](./docs/)
 - Examples: See `examples/` for complete working applications

@@ -42,7 +42,7 @@ HyperToken is a distributed game engine where all state is a CRDT (Automerge). T
 - **network/** — P2P & server networking: `PeerConnection` (WebSocket + WebRTC), `AuthoritativeServer`, `HybridPeerManager`, `StateSyncManager`, `MessageCodec` (MessagePack binary), `E2EEncryption`
 - **interface/** — AI/ML adapters: `Gym` (single-agent RL), `PettingZoo` (multi-agent turn-based), `PettingZooParallel` (simultaneous), `ONNXAgent` (neural net policies)
 - **core-rs/** — Rust WASM implementation: `Chronicle` (incremental Automerge CRDT with 54 field-level action methods), `ActionDispatcher` (delegates to Chronicle), `chronicle_actions/` (stack, space, source, agent, game_loop, game_state, rules modules)
-- **examples/** — 12 working games, each with game logic, CLI, and optional networking/RL files
+- **examples/** — 10 working games, each with game logic, CLI, and optional networking/RL files
 - **cli/** — CLI entry point (`relay`, `bridge`, `mcp` subcommands)
 
 ### Data flow

@@ -21,3 +21,4 @@ export { Chronicle as Chronicle } from "./Chronicle.js";
 export { Emitter, EventRegistry } from "./events.js";
 export { mulberry32, shuffleArray } from "./random.js";
 export { loadTokenSetJSON, parseTokenSetObject } from "./loaders/tokenSetLoader.js";
+export { Engine } from "../engine/Engine.js";

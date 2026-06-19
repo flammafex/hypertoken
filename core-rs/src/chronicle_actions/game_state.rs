@@ -144,6 +144,41 @@ impl Chronicle {
         self.dirty.game_state = true;
         Ok(())
     }
+
+    /// Merge an object of properties into the gameState map.
+    pub fn game_state_merge_state(&mut self, state_json: &str) -> Result<()> {
+        let gs_id = self.ensure_section("gameState")?;
+
+        let parsed: serde_json::Value = serde_json::from_str(state_json)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Invalid JSON state: {}", e)))?;
+        let state = parsed.as_object()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("state object required".into()))?;
+
+        let entries: Vec<(String, serde_json::Value)> = state.iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        self.doc.transact::<_, _, AutomergeError>(|tx| {
+            for (key, value) in &entries {
+                match value {
+                    serde_json::Value::String(s) => { tx.put(&gs_id, key.as_str(), s.as_str())?; }
+                    serde_json::Value::Number(n) => {
+                        if let Some(i) = n.as_i64() { tx.put(&gs_id, key.as_str(), i)?; }
+                        else if let Some(f) = n.as_f64() { tx.put(&gs_id, key.as_str(), f)?; }
+                    }
+                    serde_json::Value::Bool(b) => { tx.put(&gs_id, key.as_str(), *b)?; }
+                    _ => {
+                        let s = serde_json::to_string(value).unwrap_or_default();
+                        tx.put(&gs_id, key.as_str(), s.as_str())?;
+                    }
+                }
+            }
+            Ok(())
+        }).map_err(|e| HyperTokenError::CrdtError(format!("Transaction failed: {:?}", e)))?;
+
+        self.dirty.game_state = true;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -260,6 +295,24 @@ mod tests {
         assert_eq!(gs["mode"], "tournament");
         assert_eq!(gs["roundNumber"], 5);
         assert_eq!(gs["overtime"], true);
+    }
+
+    #[test]
+    fn test_game_state_merge_state() {
+        let mut c = Chronicle::new();
+        c.game_state_start().unwrap();
+        c.dirty.clear();
+
+        c.game_state_merge_state(r#"{"phase":"combat","turn":3,"paused":false}"#).unwrap();
+        assert!(c.dirty.game_state);
+
+        let state_json = c.get_state().unwrap();
+        let state: HyperTokenState = serde_json::from_str(&state_json).unwrap();
+        let gs = state.gameState.unwrap();
+        assert_eq!(gs["phase"], "combat");
+        assert_eq!(gs["turn"], 3);
+        assert_eq!(gs["paused"], false);
+        assert_eq!(gs["started"], true);
     }
 
     #[test]

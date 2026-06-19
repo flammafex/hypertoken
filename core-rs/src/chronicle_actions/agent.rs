@@ -119,6 +119,55 @@ impl Chronicle {
         Ok(())
     }
 
+    /// Set a metadata key on an agent (creates meta map if missing).
+    pub fn agent_set_meta(&mut self, agent_name: &str, key: &str, value_json: &str) -> Result<()> {
+        let agents_id = self.agents_id.clone()
+            .ok_or_else(|| HyperTokenError::InvalidOperation("No agents section".into()))?;
+
+        let parsed: serde_json::Value = serde_json::from_str(value_json)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Invalid JSON value: {}", e)))?;
+
+        let agent_obj_id = self.doc.get(&agents_id, agent_name)
+            .map_err(|e| HyperTokenError::CrdtError(e.to_string()))?
+            .ok_or_else(|| HyperTokenError::InvalidOperation(format!("Agent '{}' not found", agent_name)))?
+            .1;
+
+        if self.doc.get(&agent_obj_id, "meta")
+            .map_err(|e| HyperTokenError::CrdtError(e.to_string()))?
+            .is_none() {
+            self.doc.transact::<_, _, AutomergeError>(|tx| {
+                tx.put_object(&agent_obj_id, "meta", ObjType::Map)?;
+                Ok(())
+            }).map_err(|e| HyperTokenError::CrdtError(format!("Transaction failed: {:?}", e)))?;
+        }
+
+        let meta_obj_id = self.doc.get(&agent_obj_id, "meta")
+            .map_err(|e| HyperTokenError::CrdtError(e.to_string()))?
+            .ok_or_else(|| HyperTokenError::InvalidOperation("Agent has no meta map".into()))?
+            .1;
+
+        let key_str = key.to_string();
+
+        self.doc.transact::<_, _, AutomergeError>(|tx| {
+            match &parsed {
+                serde_json::Value::String(s) => { tx.put(&meta_obj_id, key_str.as_str(), s.as_str())?; }
+                serde_json::Value::Number(n) => {
+                    if let Some(i) = n.as_i64() { tx.put(&meta_obj_id, key_str.as_str(), i)?; }
+                    else if let Some(f) = n.as_f64() { tx.put(&meta_obj_id, key_str.as_str(), f)?; }
+                }
+                serde_json::Value::Bool(b) => { tx.put(&meta_obj_id, key_str.as_str(), *b)?; }
+                _ => {
+                    let s = serde_json::to_string(&parsed).unwrap_or_default();
+                    tx.put(&meta_obj_id, key_str.as_str(), s.as_str())?;
+                }
+            }
+            Ok(())
+        }).map_err(|e| HyperTokenError::CrdtError(format!("Transaction failed: {:?}", e)))?;
+
+        self.dirty.agents = true;
+        Ok(())
+    }
+
     /// Add amount to an agent's resource (creates resource key if missing).
     pub fn agent_give_resource(&mut self, agent_name: &str, resource: &str, amount: f64) -> Result<()> {
         let agents_id = self.agents_id.clone()
@@ -683,6 +732,23 @@ mod tests {
         let agents = state.agents.unwrap();
         let bob = &agents["Bob"];
         assert_eq!(bob["meta"]["role"], "dealer");
+    }
+
+    #[test]
+    fn test_agent_set_meta() {
+        let mut c = setup_with_agents();
+        c.agent_create("a1", "Alice", None).unwrap();
+        c.dirty.clear();
+
+        c.agent_set_meta("Alice", "status", r#""ready""#).unwrap();
+        c.agent_set_meta("Alice", "score", "10").unwrap();
+        assert!(c.dirty.agents);
+
+        let state_json = c.get_state().unwrap();
+        let state: HyperTokenState = serde_json::from_str(&state_json).unwrap();
+        let alice = &state.agents.unwrap()["Alice"];
+        assert_eq!(alice["meta"]["status"], "ready");
+        assert_eq!(alice["meta"]["score"], 10.0);
     }
 
     #[test]

@@ -98,16 +98,20 @@ try {
   console.log(`   Created zones: ${space.getZoneNames().join(', ')}`);
 
   // Place tokens
+  let firstPlacementId: string | null = null;
   for (let i = 0; i < 10; i++) {
     const token = { id: `token-${i}`, index: i, char: '□', group: 'test', kind: 'default', label: `Token ${i}`, text: '□', meta: {} };
     const tokenJson = JSON.stringify(token);
-    space.place('hand', tokenJson, i * 10, 0);
+    const placementJson = space.place('hand', tokenJson, i * 10, 0);
+    if (i === 0) {
+      firstPlacementId = JSON.parse(placementJson).id;
+    }
   }
   console.log(`   Placed 10 tokens in 'hand' zone`);
   console.log(`   Hand count: ${space.count('hand')}`);
 
-  // Move a token
-  space.move('token-0', 'hand', 'table', 100, 100);
+  // Move a token (by placement ID, not token ID)
+  space.move(firstPlacementId!, 'hand', 'table', 100, 100);
   console.log(`   Moved token-0 from hand to table`);
   console.log(`   Hand count: ${space.count('hand')}`);
   console.log(`   Table count: ${space.count('table')}`);
