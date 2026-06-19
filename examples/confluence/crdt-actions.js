@@ -343,6 +343,7 @@ Object.assign(ActionRegistry, {
     // Compute result BEFORE writing to Chronicle — Automerge proxies
     // don't work with Object.values() in deriveResult/deriveScores
     const plainState = JSON.parse(JSON.stringify(state));
+    plainState.phase = "ended"; // deriveResult only computes winner when phase === "ended"
     const result = deriveResult(plainState);
 
     engine.session.change("confluence:end", (doc) => {

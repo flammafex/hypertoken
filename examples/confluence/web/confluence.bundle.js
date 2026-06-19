@@ -15112,6 +15112,7 @@ Object.assign(ActionRegistry, {
     if (!state2) throw new Error("Game not initialized");
     if (state2.phase === "ended") throw new Error("Game already ended");
     const plainState = JSON.parse(JSON.stringify(state2));
+    plainState.phase = "ended";
     const result = deriveResult(plainState);
     engine.session.change("confluence:end", (doc) => {
       doc.confluence.phase = "ended";
