@@ -80,7 +80,7 @@ export function createHash(algorithm) {
 
 export class Worker {
   constructor() {
-    throw new Error('Worker not available in browser — use disableWasm: true');
+    throw new Error('Worker not available in browser — Web Workers require separate configuration');
   }
 }
 

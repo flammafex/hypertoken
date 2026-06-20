@@ -53,7 +53,7 @@ var init_shims = __esm({
     webcrypto = globalThis.crypto;
     Worker2 = class {
       constructor() {
-        throw new Error("Worker not available in browser \u2014 use disableWasm: true");
+        throw new Error("Worker not available in browser \u2014 Web Workers require separate configuration");
       }
     };
     WebSocket = class extends globalThis.WebSocket {
@@ -7103,6 +7103,21 @@ var HistoryManager = class {
 
 // core/WasmChronicleAdapter.ts
 init_events();
+function base64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+function uint8ArrayToBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 var WasmChronicleAdapter = class extends Emitter {
   constructor(wasmDispatcher) {
     super();
@@ -7162,16 +7177,41 @@ var WasmChronicleAdapter = class extends Emitter {
     this._cache = {};
     this.emit("state:changed", { doc: this.state, source: "merge" });
   }
-  // Sync protocol — not supported with WASM backend.
-  // Engine.connect() guards against this by returning early when WASM is active.
+  // Sync protocol — delegates to WASM Chronicle backend.
+  // The Rust side already implements automerge sync (sync::SyncDoc).
+  // The WASM API uses Option<Vec<u8>> for sync state (None = create new)
+  // and returns JSON strings with base64-encoded data.
+  // We bridge this to the IChronicle interface that ConsensusCore expects.
   initSyncState() {
-    throw new Error("Sync protocol not supported with WASM Chronicle backend.");
+    return null;
   }
   generateSyncMessage(syncState) {
-    throw new Error("Sync protocol not supported with WASM Chronicle backend.");
+    let syncStateBytes;
+    if (syncState) {
+      syncStateBytes = base64ToUint8Array(syncState);
+    }
+    const resultJson = this._wasm.generateSyncMessage(syncStateBytes);
+    const result = JSON.parse(resultJson);
+    return {
+      nextSyncState: result.syncState,
+      // base64 string — passed back on next call
+      message: result.message ? base64ToUint8Array(result.message) : null
+    };
   }
   receiveSyncMessage(syncState, message, source) {
-    throw new Error("Sync protocol not supported with WASM Chronicle backend.");
+    let syncStateBytes;
+    if (syncState) {
+      syncStateBytes = base64ToUint8Array(syncState);
+    }
+    const messageBase64 = uint8ArrayToBase64(message);
+    const resultJson = this._wasm.receiveSyncMessage(messageBase64, syncStateBytes);
+    const result = JSON.parse(resultJson);
+    this._cache = {};
+    this.emit("state:changed", { doc: this.state, source: source || "sync" });
+    return {
+      nextSyncState: result.syncState
+      // base64 string
+    };
   }
 };
 
@@ -14595,10 +14635,6 @@ var _Engine = class _Engine extends Emitter {
   }
   // ── Network ────────────────────────────────────────────────────────────────
   connect(url) {
-    if (this.wasm.dispatcher) {
-      console.warn("[Engine] Network sync is not yet supported with WASM Chronicle backend");
-      return;
-    }
     this.net.connect(url, this.session, this, {
       useWebRTC: this._useWebRTC,
       codec: this._networkOptions.codec,
