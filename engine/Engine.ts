@@ -162,10 +162,6 @@ export class Engine extends Emitter {
   // ── Network ────────────────────────────────────────────────────────────────
 
   connect(url: string): void {
-    if (this.wasm.dispatcher) {
-      console.warn('[Engine] Network sync is not yet supported with WASM Chronicle backend');
-      return;
-    }
     this.net.connect(url, this.session, this, {
       useWebRTC: this._useWebRTC,
       codec: this._networkOptions.codec,
