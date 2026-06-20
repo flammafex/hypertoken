@@ -9,7 +9,7 @@
  * 3. Disconnect and reconnect (state catches up)
  * 4. Concurrent edits (both dispatch simultaneously, CRDT merges)
  *
- * Uses disableWasm: true to force TS Chronicle path (required for network sync).
+ * Uses disableWasm: true to force TS Chronicle path (optional — WASM sync also works).
  */
 import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";

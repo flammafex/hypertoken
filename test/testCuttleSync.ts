@@ -9,7 +9,7 @@
  * 3. Player 0 (on A) draws → state syncs to B
  * 4. State converges — both engines see the same game state
  *
- * Uses disableWasm: true (required for network sync) and crdt-actions.js
+ * Uses disableWasm: true (optional — WASM sync also works) and crdt-actions.js
  * (CRDT-aware action handlers that write snapshots to Chronicle).
  */
 import { Engine } from "../engine/Engine.js";

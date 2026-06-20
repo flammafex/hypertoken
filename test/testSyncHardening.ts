@@ -365,25 +365,35 @@ async function runTests(): Promise<void> {
     await sleep(200);
   });
 
-  await runTest("Engine without disableWasm has WASM dispatcher (and can't sync)", async () => {
-    // This test documents the known limitation: Engine without disableWasm
-    // auto-initializes WASM, which disables network sync.
-    const engine = new Engine(); // no disableWasm
+  await runTest("Engine with WASM enabled can also sync (sync no longer requires disableWasm)", async () => {
+    // WASM sync is now supported — the WasmChronicleAdapter delegates
+    // to the Rust sync methods (automerge::sync::SyncDoc).
+    const server = new UniversalRelayServer({ port: 9309, verbose: false });
+    await server.start();
+
+    const engineA = new Engine(); // WASM auto-initializes
+    const engineB = new Engine(); // WASM auto-initializes
 
     // Wait for async WASM init
     await sleep(2000);
 
-    // WASM dispatcher may or may not be initialized (depends on whether
-    // the WASM binary is available), but the engine should not crash
-    assert(engine.session !== null, "Engine should have a session");
+    engineA.connect("ws://localhost:9309");
+    engineB.connect("ws://localhost:9309");
+    await sleep(1000);
 
-    // If WASM is active, connect() should warn (not crash)
-    if (engine.wasm.dispatcher) {
-      console.log("    WASM dispatcher is active — connect() will warn and skip sync");
-      console.log("    Use disableWasm: true for network sync");
-    } else {
-      console.log("    WASM not available — TS path active, sync would work");
-    }
+    // Write and verify sync works with WASM
+    engineA.session.change("wasm-sync-test", (doc: any) => { doc.wasmSync = true; });
+    await sleep(1500);
+
+    const stateB = engineB.session.state as any;
+    assert(stateB.wasmSync === true, `B should see wasmSync=true via WASM sync, sees ${stateB.wasmSync}`);
+
+    console.log("    WASM sync works — disableWasm: true is no longer required");
+
+    engineA.disconnect();
+    engineB.disconnect();
+    server.stop();
+    await sleep(200);
   });
 
   // ========================================================================

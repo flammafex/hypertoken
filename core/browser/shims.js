@@ -7,8 +7,8 @@
  * - node:buffer (Buffer for base64 encoding)
  * - node:crypto (randomBytes, createHash, randomUUID)
  * - node:events (EventEmitter — provided by the 'events' npm package)
- * - node:worker_threads (Worker — only used by WASM, disabled with disableWasm)
- * - node:url / node:path (fileURLToPath, dirname, join — WASM only)
+ * - node:worker_threads (Worker — only used by WASM worker mode, not needed for sync)
+ * - node:url / node:path (fileURLToPath, dirname, join — WASM worker mode only)
  * - ws (WebSocket — browser has native WebSocket)
  *
  * This file provides shims for the Node.js-only APIs. The 'buffer' and
@@ -75,7 +75,7 @@ export function createHash(algorithm) {
 }
 
 // ============================================================================
-// Worker shim — not available in browser (disableWasm: true)
+// Worker shim — not available in browser (only needed for WASM worker mode)
 // ============================================================================
 
 export class Worker {
@@ -85,7 +85,7 @@ export class Worker {
 }
 
 // ============================================================================
-// Path/URL shim — not used in browser (disableWasm: true)
+// Path/URL shim — not used in browser (only needed for WASM worker mode)
 // ============================================================================
 
 export function fileURLToPath() { return ''; }

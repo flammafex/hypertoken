@@ -75,7 +75,7 @@ Actions use `category:verb` format across 7 categories:
 - **All components extend Emitter** from `core/events.ts` for event-based communication
 - **Tokens are immutable** — never modified, only created/destroyed. Provenance tracked via `_mergedFrom`, `_splitFrom`
 - **State mutations go through `engine.dispatch()`** — routes to WASM Chronicle (incremental field-level ops) or TS ActionRegistry (`session.change()` fallback). `IChronicle` interface abstracts over both backends.
-- **Network sync requires `disableWasm: true`** — use `new Engine({ disableWasm: true })` for networked games because the WASM dispatcher doesn't support sync.
+- **Network sync works with both backends** — WASM and TS Chronicle both support sync. Use `disableWasm: true` only to force the TS path (e.g., for simpler browser bundling).
 - **Persistence uses StorageAdapter** — call `engine.useStorage(adapter)` then `await engine.persist(name)` / `await engine.resume(name)`.
 - **Events use `type:name`** format (e.g., `state:updated`, `net:ready`)
 

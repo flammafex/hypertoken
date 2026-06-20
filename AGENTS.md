@@ -91,7 +91,7 @@ npm run mcp              # LLM MCP server
 - **Tokens are immutable** — never modified, only created/destroyed. Provenance via `_mergedFrom` / `_splitFrom`.
 - **State mutations go through `engine.dispatch()`** — not direct `session.change()`. Recent refactor migrated call sites; preserve this pattern.
 - **Dual-path dispatch** — WASM `ActionDispatcher` if available + action supported, else TS `ActionRegistry` fallback. `IChronicle` interface abstracts both backends. Any new action needs both paths or an explicit fallback.
-- **disableWasm option** — use `new Engine({ disableWasm: true })` when network sync is needed (WASM dispatcher doesn't support sync).
+- **disableWasm option** — `new Engine({ disableWasm: true })` forces the TypeScript Chronicle path. Optional — WASM sync is now supported. Useful for browser builds to avoid WASM binary loading.
 - **StorageAdapter pattern** — use `engine.useStorage(adapter)` + `await engine.persist(name)` / `await engine.resume(name)` for persistence (not the old save-state-plugin monkey-patching).
 - **Automerge proxy issue** — `Object.values()` may not work on Automerge proxies; use `JSON.parse(JSON.stringify(state))` before derivation logic.
 - **Seeded randomness** — `mulberry32` + `shuffleArray` (`core/random.js`). Tests use fixed seeds for reproducibility.

@@ -257,18 +257,17 @@ const pieces = engine.dispatch("token:split", {
 // pieces[0]._splitFrom = goldPile.id</code></pre>
 
   <h3>State Syncs Automatically</h3>
-  <pre><code>// disableWasm: true is required for network sync
-const host = new Engine({ disableWasm: true });
+  <pre><code>const host = new Engine();
 host.connect("ws://relay.local:8080");
 
-const client = new Engine({ disableWasm: true });
+const client = new Engine();
 client.connect("ws://relay.local:8080");
 
 // Both make changes → CRDTs merge → identical final state
 // No conflict resolution code. It just works.</code></pre>
 
   <h3>Persistence</h3>
-  <pre><code>const engine = new Engine({ disableWasm: true });
+  <pre><code>const engine = new Engine();
 
 // Use storage adapter (IndexedDB in browser,
 // FilesystemAdapter in Node.js)
