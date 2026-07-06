@@ -95,12 +95,12 @@ interface Measurement {
 function measure(engine: Engine, actionCount: number): Measurement {
   const docSize = engine.session.saveToBase64().length;
 
-  // HistoryManager._snapshots is private — access via the history array length
-  // and estimate. Each snapshot is a full saveToBase64() at that point in time.
-  // We can measure the actual snapshots by accessing the private field.
-  const snapshots = (engine.historyManager as any)._snapshots as string[];
+  // HistoryManager now stores checkpoints (periodic snapshots) instead of per-action snapshots
+  const checkpoints = (engine.historyManager as any)._checkpoints as { index: number; snapshot: string }[];
   let historySize = 0;
-  for (const s of snapshots) historySize += s.length;
+  if (checkpoints) {
+    for (const cp of checkpoints) historySize += cp.snapshot.length;
+  }
 
   return {
     actions: actionCount,

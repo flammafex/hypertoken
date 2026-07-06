@@ -172,7 +172,11 @@ export class Engine extends Emitter {
     const action = new Action(type, payload, opts);
     if (this.debug) console.log("🧩 dispatch:", type, payload);
 
-    const snapshot = this.session.saveToBase64();
+    // Only snapshot at checkpoint intervals (fixes O(n²) memory + CPU)
+    const snapshot = this.historyManager.shouldCheckpoint()
+      ? this.session.saveToBase64()
+      : null;
+
     let result: any;
 
     result = this.apply(action);
@@ -255,6 +259,55 @@ export class Engine extends Emitter {
     this.history = snapshot.history ?? [];
     this.emit("engine:restored", { payload: { history: this.historyManager.history.length } });
     return this;
+  }
+
+  // ── Compaction / Fork / Merge ──────────────────────────────────────────────
+
+  /**
+   * Compact the CRDT document by discarding history.
+   * Creates a fresh document from current state, dropping all change history.
+   * This dramatically reduces document size (e.g., 208 KB → 0.1 KB at 100k ops).
+   *
+   * Important: After compaction, the document cannot merge with pre-compaction
+   * documents. All peers must compact at the same point (epoch boundary).
+   * Use this at game-phase boundaries or when document size becomes problematic.
+   */
+  compact(): void {
+    this.session.newEpoch();
+    // Clear history — old snapshots are invalid after compaction
+    this.historyManager.clear();
+    this.emit("engine:compacted", {});
+  }
+
+  /**
+   * Fork the engine: create a divergent copy with its own CRDT branch.
+   * Changes to the fork can be merged back via mergeFrom().
+   *
+   * The fork shares ancestry with the original, so divergent changes merge
+   * via CRDT conflict resolution (last-write-wins for scalars, CRDT semantics
+   * for collections).
+   *
+   * Use case: explore alternative game timelines, "what-if" scenarios.
+   */
+  fork(): Engine {
+    const forkedSession = this.session.fork();
+    const forkedEngine = new Engine({ disableWasm: true }); // fork uses TS path
+    forkedEngine.session = forkedSession as any;
+    forkedEngine.space = new Space(forkedSession as any, "main-space");
+    // Copy current state references — Stack/Source are stateless views over the session
+    forkedEngine.stack = this.stack;
+    forkedEngine.source = this.source;
+    return forkedEngine;
+  }
+
+  /**
+   * Merge changes from a forked engine back into this one.
+   * CRDT conflict resolution handles divergent changes automatically.
+   */
+  mergeFrom(fork: Engine): void {
+    this.session.merge(fork.session);
+    this.emit("engine:merged", { from: fork });
+    this.emit("state:updated", { source: "merge" });
   }
 
   // ── Persistence (StorageAdapter) ──────────────────────────────────────────

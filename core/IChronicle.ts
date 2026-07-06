@@ -16,6 +16,10 @@ export interface IChronicle<T = HyperTokenState> {
     merge(other: any): void;
     change(message: string, callback: (doc: T) => void, source?: string): void;
     update(newDoc: any, source?: string): void;
+    /** Compact the document by discarding history. Creates a fresh document from current state. */
+    newEpoch(): void;
+    /** Create a divergent branch with a new actor ID. Changes can be merged back via merge(). */
+    fork(): IChronicle;
     // Sync protocol (used by ConsensusCore)
     initSyncState(): any;
     generateSyncMessage(syncState: any): { nextSyncState: any; message: Uint8Array | null };

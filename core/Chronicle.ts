@@ -33,9 +33,25 @@ export class Chronicle extends Emitter {
   }
 
   // ... (merge, save, load methods remain the same)
-  merge(remoteDoc: A.Doc<HyperTokenState>): void {
+  merge(other: Chronicle | A.Doc<HyperTokenState>): void {
+    const remoteDoc = other instanceof Chronicle ? other._doc : other;
     this._doc = A.merge(this._doc, remoteDoc);
     this.emit("state:changed", { doc: this._doc, source: "merge" });
+  }
+
+  /** Compact the document by discarding history. Creates a fresh document from current state. */
+  newEpoch(): void {
+    const currentState = A.toJS(this._doc);
+    this._doc = A.from<HyperTokenState>(currentState);
+    this.emit("state:compacted", { doc: this._doc });
+    this.emit("state:changed", { doc: this._doc, source: "epoch" });
+  }
+
+  /** Create a divergent branch with a new actor ID. Changes can be merged back via merge(). */
+  fork(): Chronicle {
+    const forked = new Chronicle();
+    forked._doc = A.clone(this._doc); // clone with new actor ID
+    return forked;
   }
 
   save(): Uint8Array {

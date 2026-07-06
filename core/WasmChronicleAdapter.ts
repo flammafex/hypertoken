@@ -99,6 +99,20 @@ export class WasmChronicleAdapter extends Emitter implements IChronicle<HyperTok
         this.emit("state:changed", { doc: this.state, source: "merge" });
     }
 
+    newEpoch(): void {
+        // The WASM dispatcher holds its own Automerge doc internally and does not
+        // expose a compaction primitive. The TS Chronicle path is the primary
+        // implementation for newEpoch(); disableWasm should be used when compaction is required.
+        throw new Error("newEpoch not yet supported on WASM path");
+    }
+
+    fork(): IChronicle {
+        // The Rust backend manages its own doc; forking at the TS level would
+        // diverge from the WASM-held document. Use the TS Chronicle path (disableWasm)
+        // for fork/merge workflows.
+        throw new Error("fork not yet supported on WASM path");
+    }
+
     // Sync protocol — delegates to WASM Chronicle backend.
     // The Rust side already implements automerge sync (sync::SyncDoc).
     // The WASM API uses Option<Vec<u8>> for sync state (None = create new)
