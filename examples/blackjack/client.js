@@ -22,16 +22,9 @@ async function main() {
   engine.connect("ws://localhost:9090");
 
   engine.on("state:updated", () => {
-    const remoteAgents = engine.session.state.agents;
-    if (remoteAgents) {
-        engine._agents.forEach(p => {
-            const remote = remoteAgents[p.name];
-            if (remote) {
-                p.resources.bankroll = remote.bankroll;
-                p.resources.currentBet = remote.currentBet;
-            }
-        });
-    }
+    // Agent resources are loaded from the CRDT document by the game's
+    // loadFromChronicle() hook (registered in the BlackjackGame constructor).
+    // No manual mirroring required here — just re-render and check turn.
     render(engine, game);
     checkTurn(engine, game, rl);
   });
@@ -146,6 +139,7 @@ function checkTurn(engine, game, rl) {
                 const amount = parseInt(arg) || 10;
                 const p = engine._agents.find(p => p.name === agentName);
                 if (p) p.resources.currentBet = amount;
+                game.syncToChronicle();
                 console.log(`Placed bet: $${amount}`);
             }
             else {

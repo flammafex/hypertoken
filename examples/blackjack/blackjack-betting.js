@@ -1,6 +1,6 @@
 /**
  * Blackjack Betting System
- * 
+ *
  * Adds comprehensive betting functionality to HyperToken Blackjack:
  * - Bankroll/chip tracking
  * - Bet placement and validation
@@ -8,8 +8,6 @@
  * - Bet sizing constraints
  * - Session statistics
  */
-
-import { ActionRegistry } from '../../engine/actions.js';
 
 /**
  * BettingManager - Handles all betting operations
@@ -389,51 +387,6 @@ export class BettingManager {
       minBankroll: this.bankroll
     };
   }
-}
-
-/**
- * Extend ActionRegistry with betting actions
- */
-export function registerBettingActions() {
-  Object.assign(ActionRegistry, {
-    "blackjack:place-bet": (engine, payload) => {
-      const { amount } = payload;
-      if (!engine._bettingManager) {
-        throw new Error("BettingManager not initialized");
-      }
-      
-      engine._bettingManager.placeBet(amount);
-      engine._gameState.currentBet = amount;
-    },
-    
-    "blackjack:resolve-bet": (engine) => {
-      if (!engine._bettingManager) {
-        throw new Error("BettingManager not initialized");
-      }
-      
-      const result = engine._gameState.result;
-      if (!result) {
-        throw new Error("Cannot resolve bet: no result yet");
-      }
-      
-      const payoutDetails = engine._bettingManager.resolveBet(result);
-      engine._gameState.payout = payoutDetails;
-      
-      return payoutDetails;
-    },
-    
-    "blackjack:check-bankroll": (engine) => {
-      if (!engine._bettingManager) {
-        throw new Error("BettingManager not initialized");
-      }
-      
-      return {
-        bankroll: engine._bettingManager.bankroll,
-        currentBet: engine._bettingManager.currentBet,
-        canContinue: !engine._bettingManager.isBroke()
-      };
-    }
-  });
 }
 
 /**

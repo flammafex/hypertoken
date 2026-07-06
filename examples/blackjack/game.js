@@ -18,7 +18,6 @@ import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { Stack } from '../../core/Stack.js';
 import { Space } from '../../core/Space.js';
 import { Engine } from '../../engine/Engine.js';
-import { RuleEngine } from '../../engine/RuleEngine.js';
 import { Agent } from '../../engine/Agent.js';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -33,7 +32,6 @@ import {
   canSplit,
   canTakeInsurance
 } from './blackjack-utils.js';
-import { registerBlackjackRules } from './blackjack-rules.js';
 import { SideBetManager } from './side-bets.js';
 
 // Get the directory of this file (works in both source and compiled contexts)
@@ -127,14 +125,88 @@ export class BlackjackGame {
     // Side bets manager
     this.sideBetManager = new SideBetManager();
 
-    // Setup rules
-    this.ruleEngine = new RuleEngine(this.engine);
-    this.engine.useRuleEngine(this.ruleEngine);
-    registerBlackjackRules(this.ruleEngine);
+    // No RuleEngine integration — the previous blackjack-rules.js registered
+    // blackjack:* actions that were never dispatched (dead code, now removed).
+    // Game flow is driven by direct method calls below.
+
+    // Re-load any state already present in Chronicle (e.g. when constructing
+    // a game over an existing engine that has synced state).
+    this.loadFromChronicle();
+
+    // When state arrives from a peer (CRDT sync/merge), load it back into
+    // local gameState / agent.resources. The source check avoids re-syncing
+    // our own local writes (which would be a no-op but could recurse).
+    this.engine.on("state:updated", (e) => {
+      if (e && (e.source === "sync" || e.source === "merge" || e.source === "load")) {
+        this.loadFromChronicle();
+      }
+    });
 
     this.debug = false;
   }
   
+  /**
+   * Sync game state and agent resources to the CRDT document.
+   * Called after each state mutation so peers receive updates via CRDT sync.
+   *
+   * This mirrors the snapshot-sync pattern used by examples/cuttle/crdt-actions.js:
+   * full-state replacement via session.change(). Card movements (deal/hit/etc.)
+   * are already CRDT-backed via Stack/Space; this method covers the remaining
+   * plain-JS state: this.gameState and agent.resources.
+   */
+  syncToChronicle() {
+    // Deep clone to strip undefined values (Automerge rejects undefined).
+    const bjState = JSON.parse(JSON.stringify(this.gameState));
+
+    this.engine.session.change("sync blackjack state", (doc) => {
+      // Avoid reassigning existing Automerge proxies to themselves — that
+      // throws "Cannot create a reference to an existing document object".
+      // Use conditional initialization instead of `doc.x = doc.x || {}`.
+      if (!doc.gameState) doc.gameState = {};
+      doc.gameState.blackjack = bjState;
+
+      if (this.engine._agents && this.engine._agents.length > 0) {
+        if (!doc.agents) doc.agents = {};
+        for (const agent of this.engine._agents) {
+          if (!doc.agents[agent.name]) doc.agents[agent.name] = {};
+          doc.agents[agent.name].resources = {
+            bankroll: agent.resources?.bankroll,
+            currentBet: agent.resources?.currentBet,
+            insuranceBet: agent.resources?.insuranceBet,
+          };
+        }
+      }
+    });
+  }
+
+  /**
+   * Load game state from the CRDT document into local instance fields.
+   * Called when state:updated is received from a peer (source sync/merge/load).
+   */
+  loadFromChronicle() {
+    const state = this.engine.session.state;
+    if (!state) return;
+
+    if (state.gameState && state.gameState.blackjack) {
+      const bj = state.gameState.blackjack;
+      // Merge synced fields into local gameState without replacing the object
+      // reference (other code holds references to this.gameState).
+      Object.assign(this.gameState, bj);
+    }
+
+    if (state.agents && this.engine._agents) {
+      for (const agent of this.engine._agents) {
+        const synced = state.agents[agent.name];
+        if (synced && synced.resources) {
+          agent.resources = agent.resources || {};
+          agent.resources.bankroll = synced.resources.bankroll;
+          agent.resources.currentBet = synced.resources.currentBet;
+          agent.resources.insuranceBet = synced.resources.insuranceBet;
+        }
+      }
+    }
+  }
+
   /**
    * Start a new round
    */
@@ -173,6 +245,7 @@ export class BlackjackGame {
       if (d2) this.engine.space.place("dealer-hand", d2, { faceUp: true });
     }
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -202,6 +275,7 @@ export class BlackjackGame {
       this.gameState.result = "dealer";
     }
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -238,6 +312,7 @@ export class BlackjackGame {
     // Play out dealer's hand
     this.playDealerHand();
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -285,6 +360,7 @@ export class BlackjackGame {
     if (isBusted(newHand)) {
       this.gameState.gameOver = true;
       this.gameState.result = "dealer";
+      this.syncToChronicle();
       return this.getGameState();
     }
 
@@ -304,6 +380,7 @@ export class BlackjackGame {
     // Play out dealer's hand
     this.playDealerHand();
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -345,6 +422,7 @@ export class BlackjackGame {
     this.gameState.insuranceTaken = true;
     this.gameState.insuranceOffered = true;
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -365,6 +443,8 @@ export class BlackjackGame {
     }
 
     agent.resources.insuranceBet = 0;
+
+    this.syncToChronicle();
   }
 
   /**
@@ -411,6 +491,7 @@ export class BlackjackGame {
     this.gameState.gameOver = true;
     this.gameState.result = "surrender";
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -463,6 +544,7 @@ export class BlackjackGame {
     this.gameState.gameOver = true;
     this.gameState.result = "surrender";
 
+    this.syncToChronicle();
     return this.getGameState();
   }
 
@@ -522,6 +604,7 @@ export class BlackjackGame {
     this.gameState.splitHandsCount = 2;
     this.gameState.splitHandZones = ["agent-hand", "agent-hand-split"];
 
+    this.syncToChronicle();
     return this.getSplitGameState();
   }
 
@@ -577,6 +660,7 @@ export class BlackjackGame {
     this.gameState.splitHandsCount++;
     this.gameState.splitHandZones.push(newSplitZone);
 
+    this.syncToChronicle();
     return this.getSplitGameState();
   }
 

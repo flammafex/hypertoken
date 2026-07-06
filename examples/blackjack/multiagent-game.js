@@ -7,7 +7,6 @@ import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { Stack } from '../../core/Stack.js';
 import { Space } from '../../core/Space.js';
 import { Engine } from '../../engine/Engine.js';
-import { RuleEngine } from '../../engine/RuleEngine.js';
 import { Agent } from '../../engine/Agent.js';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -22,14 +21,16 @@ import {
   canSplit,
   canTakeInsurance
 } from './blackjack-utils.js';
-import { registerBlackjackRules } from './blackjack-rules.js';
-import { registerBettingActions } from './blackjack-betting.js';
 
 // Get the directory of this file (works in both source and compiled contexts)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-try { registerBettingActions(); } catch (e) {}
+// NOTE: The previous blackjack-rules.js (RuleEngine rules) and
+// registerBettingActions() (ActionRegistry extensions) were dead code —
+// neither was ever dispatched. Both have been removed. Game flow is driven
+// by direct method calls below, and CRDT sync is handled by
+// syncToChronicle()/loadFromChronicle() (mirroring examples/blackjack/game.js).
 
 export class MultiagentBlackjackGame {
   constructor(engine, {
@@ -104,9 +105,80 @@ export class MultiagentBlackjackGame {
       agent.handZone = handZone;
     }
 
-    this.ruleEngine = new RuleEngine(this.engine);
-    this.engine.useRuleEngine(this.ruleEngine);
-    registerBlackjackRules(this.ruleEngine);
+    // Re-load any state already present in Chronicle (e.g. when constructing
+    // a game over an existing engine that has synced state).
+    this.loadFromChronicle();
+
+    // When state arrives from a peer (CRDT sync/merge), load it back into
+    // local agent.resources. The source check avoids re-syncing our own
+    // local writes (which would be a no-op but could recurse).
+    this.engine.on("state:updated", (e) => {
+      if (e && (e.source === "sync" || e.source === "merge" || e.source === "load")) {
+        this.loadFromChronicle();
+      }
+    });
+  }
+
+  /**
+   * Sync agent resources to the CRDT document.
+   * Called after each state mutation so peers receive updates via CRDT sync.
+   *
+   * Card movements (deal/hit/split/etc.) are already CRDT-backed via
+   * Stack/Space; this method covers the remaining plain-JS state:
+   * agent.resources (bankroll, currentBet, insuranceBet, stood, busted,
+   * hasSplit, splitHandZone, splitHandBet, playingSplitHand).
+   */
+  syncToChronicle() {
+    if (!this.engine._agents || this.engine._agents.length === 0) return;
+
+    this.engine.session.change("sync multiagent blackjack state", (doc) => {
+      // Avoid reassigning existing Automerge proxies to themselves — that
+      // throws "Cannot create a reference to an existing document object".
+      // Use conditional initialization instead of `doc.x = doc.x || {}`.
+      if (!doc.agents) doc.agents = {};
+      for (const agent of this.engine._agents) {
+        if (!doc.agents[agent.name]) doc.agents[agent.name] = {};
+        doc.agents[agent.name].resources = {
+          bankroll: agent.resources?.bankroll,
+          currentBet: agent.resources?.currentBet,
+          insuranceBet: agent.resources?.insuranceBet,
+          stood: agent.resources?.stood,
+          busted: agent.resources?.busted,
+          hasSplit: agent.resources?.hasSplit,
+          splitHandZone: agent.resources?.splitHandZone,
+          splitHandBet: agent.resources?.splitHandBet,
+          playingSplitHand: agent.resources?.playingSplitHand,
+        };
+      }
+    });
+  }
+
+  /**
+   * Load agent resources from the CRDT document into local instance fields.
+   * Called when state:updated is received from a peer (source sync/merge/load).
+   */
+  loadFromChronicle() {
+    const state = this.engine.session.state;
+    if (!state || !state.agents || !this.engine._agents) return;
+
+    for (const agent of this.engine._agents) {
+      const synced = state.agents[agent.name];
+      if (synced && synced.resources) {
+        agent.resources = agent.resources || {};
+        // Only overwrite fields that are actually present in the synced doc
+        // (Automerge omits undefined values; missing fields stay local).
+        const r = synced.resources;
+        if (r.bankroll !== undefined) agent.resources.bankroll = r.bankroll;
+        if (r.currentBet !== undefined) agent.resources.currentBet = r.currentBet;
+        if (r.insuranceBet !== undefined) agent.resources.insuranceBet = r.insuranceBet;
+        if (r.stood !== undefined) agent.resources.stood = r.stood;
+        if (r.busted !== undefined) agent.resources.busted = r.busted;
+        if (r.hasSplit !== undefined) agent.resources.hasSplit = r.hasSplit;
+        if (r.splitHandZone !== undefined) agent.resources.splitHandZone = r.splitHandZone;
+        if (r.splitHandBet !== undefined) agent.resources.splitHandBet = r.splitHandBet;
+        if (r.playingSplitHand !== undefined) agent.resources.playingSplitHand = r.playingSplitHand;
+      }
+    }
   }
 
   deal() {
@@ -158,6 +230,7 @@ export class MultiagentBlackjackGame {
 
     // REMOVED MANUAL EMIT
     this.checkTurnState();
+    this.syncToChronicle();
   }
 
   nextAgent() {
@@ -227,6 +300,7 @@ export class MultiagentBlackjackGame {
         this.nextAgent();
       }
     }
+    this.syncToChronicle();
   }
 
   stand() {
@@ -241,6 +315,7 @@ export class MultiagentBlackjackGame {
       agent.resources.stood = 1;
       this.nextAgent();
     }
+    this.syncToChronicle();
   }
 
   doubleDown() {
@@ -297,6 +372,7 @@ export class MultiagentBlackjackGame {
       agent.resources.stood = 1;
       this.nextAgent();
     }
+    this.syncToChronicle();
   }
 
   takeInsurance(amount = null) {
@@ -331,6 +407,7 @@ export class MultiagentBlackjackGame {
     agent.resources.bankroll -= insuranceAmount;
     agent.resources.insuranceBet = insuranceAmount;
     console.log(`${agent.name} took insurance for $${insuranceAmount}`);
+    this.syncToChronicle();
   }
 
   /**
@@ -391,6 +468,7 @@ export class MultiagentBlackjackGame {
     // End the round
     this.engine.dispatch("game:loopStop", { phase: "complete" });
 
+    this.syncToChronicle();
     return true;
   }
 
@@ -441,6 +519,7 @@ export class MultiagentBlackjackGame {
     agent.resources.playingSplitHand = 0; // Start with first hand
 
     console.log(`${agent.name} split their hand! Playing first hand...`);
+    this.syncToChronicle();
   }
 
   playDealer() {
@@ -550,6 +629,8 @@ export class MultiagentBlackjackGame {
 
       agent.resources.currentBet = 0;
     });
+
+    this.syncToChronicle();
   }
 
   calculatePayout(result, bet) {

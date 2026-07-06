@@ -26,32 +26,9 @@ async function main() {
     initialBankroll: 1000
   });
 
-  setInterval(() => {
-    let hasChanges = false;
-    const currentDoc = engine.session.state;
-    
-    engine._agents.forEach(p => {
-      const remote = currentDoc.agents?.[p.name];
-      if (!remote || 
-          remote.bankroll !== p.resources.bankroll || 
-          remote.currentBet !== p.resources.currentBet ||
-          remote.active !== p.active) {
-        hasChanges = true;
-      }
-    });
-
-    if (hasChanges) {
-      const agentSnapshot = {};
-      engine._agents.forEach(p => {
-        agentSnapshot[p.name] = {
-          bankroll: p.resources.bankroll,
-          currentBet: p.resources.currentBet,
-          active: p.active
-        };
-      });
-      engine.dispatch("game:setProperty", { key: "agents", value: agentSnapshot });
-    }
-  }, 500);
+  // Agent resources (bankroll, currentBet, etc.) are synced to the CRDT
+  // document via MultiagentBlackjackGame.syncToChronicle() — no polling shim
+  // required. Peers receive updates through the normal state:updated event.
 
   console.log("\n⏳ Waiting for 2 agents to connect...");
 
@@ -77,6 +54,7 @@ function startGameSequence(engine, game) {
         engine._agents.forEach(p => {
             p.resources.currentBet = 10;
         });
+        game.syncToChronicle();
 
         setTimeout(() => {
             console.log("🚀 Initial Deal...");
@@ -103,6 +81,7 @@ function startGameSequence(engine, game) {
                 console.log("\n🎰 NEW ROUND - Place your bets!");
                 
                 engine._agents.forEach(p => p.resources.currentBet = 0);
+                game.syncToChronicle();
                 
                 setTimeout(() => {
                     let autoBet = false;
