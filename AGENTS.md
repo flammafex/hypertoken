@@ -25,7 +25,6 @@ cli/           CLI entrypoint (index.ts → commands/{relay,mcp}.ts)
 examples/      3 games (blackjack, cuttle, watershed)
 examples/watershed/  Watershed CRDT showcase game (real-time territory game)
 mcp/           MCP server for LLM play (server.ts, games/)
-workers/       hypertoken.worker.js (Phase 3 multi-threading is future work)
 docs/          Architecture, getting started, testing, extending, etc.
 patterns/      Pattern reference
 benchmark/     Benchmark scripts
@@ -87,7 +86,10 @@ npm run mcp              # LLM MCP server
 - **Dual-path dispatch** — WASM `ActionDispatcher` if available + action supported, else TS `ActionRegistry` fallback. `IChronicle` interface abstracts both backends. Any new action needs both paths or an explicit fallback.
 - **disableWasm option** — `new Engine({ disableWasm: true })` forces the TypeScript Chronicle path. Optional — WASM sync is now supported. Useful for browser builds to avoid WASM binary loading.
 - **StorageAdapter pattern** — use `engine.useStorage(adapter)` + `await engine.persist(name)` / `await engine.resume(name)` for persistence (not the old save-state-plugin monkey-patching).
-- **Automerge proxy issue** — `Object.values()` may not work on Automerge proxies; use `JSON.parse(JSON.stringify(state))` before derivation logic.
+- **HistoryManager uses periodic checkpoints** — not per-action snapshots. Checkpoints are taken every 50 actions, capped at 5. This bounds memory to O(checkpoints × docSize) instead of O(actions × docSize). Undo restores to the nearest checkpoint.
+- **Document compaction** — `engine.compact()` discards CRDT history via `A.from(A.toJS(doc))`, keeping only current state. Use at game-phase boundaries to bound document size. All peers must compact at the same epoch boundary.
+- **Forkable worlds** — `engine.fork()` creates a divergent CRDT branch with a new actor ID. `engine.mergeFrom(fork)` merges changes back via CRDT conflict resolution. Forked engines use the TS path (disableWasm).
+- **Automerge proxy issue** — `Object.values()` may not work on Automerge proxies; use `JSON.parse(JSON.stringify(state))` before derivation logic. Also, `doc.x = doc.x || {}` throws on existing objects — use `if (!doc.x) doc.x = {};`.
 - **Seeded randomness** — `mulberry32` + `shuffleArray` (`core/random.js`). Tests use fixed seeds for reproducibility.
 - **Apache 2.0 license header** on source files (see `core/index.js:1-15`).
 
@@ -97,7 +99,7 @@ npm run mcp              # LLM MCP server
 - **ESM loader required** for `.ts` test files: `node --loader ./test/ts-esm-loader.js test/<file>`.
 - **Use fixed seeds** for any randomness in tests (e.g., `stack.shuffle(123)`).
 - **WASM parity** — changes to action handlers that exist in both TS and Rust must keep `test/testChronicleIncremental.ts` passing (TS/WASM behavioral parity).
-- **Test categories:** core, engine, exporters, recorder, script, agent, policy, crypto, random, plugins, plugin-loader, integration, sync, rule-sync, wasm, chronicle-incremental, parallel.
+- **Test categories:** core, engine, exporters, script, agent, policy, crypto, random, integration, sync, rule-sync, wasm, chronicle-incremental, stress.
 - ⚠️ `test/testCore.js` is a bare `console.log` script without assertions — it does **not** follow the documented `test()`/`assert()` pattern and always exits 0. Do not use it as a template for new tests; follow `docs/TESTING.md` instead.
 
 ## PR / review expectations

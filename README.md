@@ -95,18 +95,17 @@ client.connect("ws://relay.local:8080");
 ### Fork State for What-If Exploration
 
 ```javascript
-const snapshot = engine.snapshot();
+// Fork the engine — creates a divergent CRDT branch
+const fork = engine.fork();
 
-// Try option A
-engine.dispatch('agent:cooperate');
-const cooperateOutcome = engine.getState();
+// Try option A in the fork
+fork.dispatch('token:merge', { tokens: [sword, fireEnchantment] });
 
-// Rewind, try option B
-engine.restore(snapshot);
-engine.dispatch('agent:defect');
-const defectOutcome = engine.getState();
+// Merge changes back — CRDT conflict resolution handles divergence
+engine.mergeFrom(fork);
 
-// Compare and decide
+// Or compact the document to discard history and bound size
+engine.compact();
 ```
 
 ---
@@ -162,7 +161,7 @@ Tokens derive meaning from context:
 - **What it came from** — merge/split provenance
 - **What rules govern it** — constraints, triggers
 
-This applies to cards in blackjack, strategies in game theory, shares in a market, or NPCs in a world. The same engine handles all of them because the abstraction is right.
+This applies to cards in blackjack, tokens in watershed, or NPCs in a world. The same engine handles all of them because the abstraction is right.
 
 ---
 

@@ -180,7 +180,7 @@
     <tr><td>Conflicts</td><td>Last-write-wins</td><td>Consensus delay</td><td>Mathematical merge</td></tr>
     <tr><td>Offline</td><td>Disconnected</td><td>Cannot act</td><td>Diverge and merge safely</td></tr>
     <tr><td>History</td><td>Server logs</td><td>On-chain events</td><td>Perfect replay, built-in</td></tr>
-    <tr><td>Forkable</td><td>Manual snapshots</td><td>Impossible</td><td>Snapshot and restore API</td></tr>
+    <tr><td>Forkable</td><td>Manual snapshots</td><td>Impossible</td><td>Fork, diverge, merge back</td></tr>
   </table>
 </section>
 
@@ -277,16 +277,15 @@ await engine.persist("my-game-session");
 await engine.resume("my-game-session");</code></pre>
 
   <h3>Forkable Worlds</h3>
-  <pre><code>// Snapshot current state
-const snapshot = engine.snapshot();
+  <pre><code>// Fork the engine — divergent branch with new actor ID
+const fork = engine.fork();
 
 // Explore timeline A
-engine.dispatch('token:merge', { tokens: [sword, fireEnchantment] });
-const outcomeA = engine.getState();
+fork.dispatch('token:merge', { tokens: [sword, fireEnchantment] });
+const outcomeA = fork.getState();
 
-// Rewind, explore timeline B
-engine.restore(snapshot);
-engine.dispatch('token:split', { token: sword, count: 2 });
+// Merge changes back — CRDT conflict resolution
+engine.mergeFrom(fork);
 const outcomeB = engine.getState();</code></pre>
 </section>
 
@@ -302,7 +301,9 @@ const outcomeB = engine.getState();</code></pre>
     <li><strong>Persistence</strong> — IndexedDB (browser) and Filesystem (Node.js) adapters with auto-save</li>
     <li><strong>Browser builds</strong> — one command bundles any game for the browser</li>
     <li><strong>MCP server</strong> — LLM integration via Model Context Protocol</li>
-    <li><strong>3 example games</strong> — Blackjack (card game with AI), Cuttle (CRDT multiplayer combat), Watershed (real-time territory showcase)</li>
+    <li><strong>3 example games</strong> — Blackjack (fully CRDT-backed card game), Cuttle (snapshot CRDT sync with encrypted hands), Watershed (field-level CRDT real-time showcase)</li>
+    <li><strong>Document compaction</strong> — discard CRDT history at phase boundaries to bound document size</li>
+    <li><strong>Forkable worlds</strong> — fork engine state, explore divergent timelines, merge back via CRDT conflict resolution</li>
   </ul>
 </section>
 
@@ -317,8 +318,10 @@ const outcomeB = engine.getState();</code></pre>
     <li>WASM acceleration</li>
     <li>P2P sync (ConsensusCore)</li>
     <li>Persistence layer (IndexedDB + Filesystem)</li>
+    <li>Document compaction (epoch-based history pruning)</li>
+    <li>Forkable worlds (fork / mergeFrom)</li>
     <li>Browser build support</li>
-    <li>Watershed CRDT showcase game</li>
+    <li>3 example games (Blackjack, Cuttle, Watershed)</li>
     <li>Documentation (AGENTS.md, BROWSER.md, PERSISTENCE.md, ARCHITECTURE.md)</li>
   </ul>
 </section>

@@ -34,7 +34,6 @@ npm run test:random        # Random number generation
 #### Engine Tests
 ```bash
 npm run test:engine        # Engine dispatch, actions
-npm run test:recorder      # Action recording/replay
 npm run test:script        # Script execution
 npm run test:agent         # Agent system
 npm run test:policy        # Policy evaluation
@@ -54,11 +53,9 @@ npm run test:chronicle-incremental   # Chronicle incremental CRDT TS/WASM parity
 npm run test:rust                    # Rust unit tests (requires Rust)
 ```
 
-#### Plugin Tests
+#### Stress Tests
 ```bash
-npm run test:plugins       # Plugin system
-npm run test:plugin-loader # Plugin loading
-npm run test:plugins-all   # All plugin tests
+npm run test:stress        # CRDT document growth & HistoryManager memory
 ```
 
 #### Integration
@@ -70,7 +67,7 @@ npm run test:integration   # End-to-end tests
 
 ```bash
 npm run test:unit              # core + engine + exporters
-npm run test:engine-components # recorder + script + agent + policy
+npm run test:engine-components # script + agent + policy
 npm run test:core-components   # crypto + random
 ```
 
