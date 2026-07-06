@@ -72,7 +72,6 @@ npm run test:plugins-all   # All plugin tests
 #### Integration
 ```bash
 npm run test:integration   # End-to-end tests
-npm run test:pd            # Prisoner's Dilemma example
 ```
 
 ### Composite Commands

@@ -26,9 +26,7 @@ Test files are in `test/` named `test<Feature>.js` or `test<Feature>.ts`. The pr
 
 ```bash
 npm run blackjack          # Casino with AI & betting
-npm run poker              # Texas Hold'em
 npm run cuttle             # Card combat
-npm run prisoners-dilemma  # Game theory tournament
 ```
 
 ## Architecture
@@ -42,11 +40,10 @@ HyperToken is a distributed game engine where all state is a CRDT (Automerge). T
 - **core/storage/** — Storage adapters (`MemoryAdapter`, `FilesystemAdapter`, `IndexedDBAdapter`)
 - **engine/** — Game coordination: `Engine` (main dispatcher), `Action` (registry), `actions.ts` (75+ built-in actions), `GameLoop` (turn/phase control), `RuleEngine` (condition-triggered), `Agent` (player/NPC), `Policy` (post-action evaluation), `Script` (programmatic execution)
 - **network/** — P2P & server networking: `PeerConnection` (WebSocket + WebRTC), `AuthoritativeServer`, `HybridPeerManager`, `MessageCodec` (MessagePack binary), `E2EEncryption`
-- **hypertoken-rl/** — AI/ML adapters and bridge: `interface/` (`Gym`, `PettingZoo`, `PettingZooParallel`, `ONNXAgent`), `bridge/` server, `python/` client
 - **core-rs/** — Rust WASM implementation: `Chronicle` (incremental Automerge CRDT with 54 field-level action methods), `ActionDispatcher` (delegates to Chronicle), `chronicle_actions/` (stack, space, source, agent, game_loop, game_state, rules modules)
-- **examples/** — 10 working games, each with game logic, CLI, and optional networking/RL files
+- **examples/** — 3 working games (blackjack, cuttle, watershed), each with game logic, CLI, and optional networking
 - **examples/watershed/** — CRDT showcase game
-- **cli/** — CLI entry point (`relay`, `bridge`, `mcp` subcommands)
+- **cli/** — CLI entry point (`relay`, `mcp` subcommands)
 
 ### Data flow
 
@@ -84,5 +81,4 @@ Actions use `category:verb` format across 7 categories:
 - **TypeScript strict mode** — `tsconfig.json` has `strict: true`
 - **`allowJs: true`** — supports mixed .ts/.js (file-by-file migration)
 - **Target: ES2022, Module: NodeNext**
-- **Package layout** — single root npm package; RL bridge/client code lives under `hypertoken-rl/`
 - **Key dependencies**: `@automerge/automerge`, `@modelcontextprotocol/sdk`, `@msgpack/msgpack`, `ws`

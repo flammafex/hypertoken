@@ -8,8 +8,4 @@
  */
 
 export * from "./CuttleGame.js";
-export * from "./CuttleAEC.js";
-
 export { CuttleGame } from "./CuttleGame.js";
-export { CuttleAEC } from "./CuttleAEC.js";
-export { default } from "./CuttleAEC.js";

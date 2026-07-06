@@ -9,17 +9,14 @@
  *
  * Commands:
  *   relay    Start the P2P relay server
- *   bridge   Start the Gym/PettingZoo bridge server
  *   mcp      Start the MCP server for LLM integration
  *
  * Examples:
  *   hypertoken relay --port 3000
- *   hypertoken bridge --env blackjack --port 9999
  *   hypertoken mcp
  */
 
 import { runRelay } from './commands/relay.js';
-import { runBridge } from './commands/bridge.js';
 import { runMcp } from './commands/mcp.js';
 
 const VERSION = '0.2.0';
@@ -33,7 +30,6 @@ USAGE:
 
 COMMANDS:
   relay     Start the P2P relay server for WebRTC signaling
-  bridge    Start the Gym/PettingZoo environment bridge server
   mcp       Start the MCP server for LLM integration
 
 OPTIONS:
@@ -44,10 +40,6 @@ EXAMPLES:
   hypertoken relay                          # Start relay on port 3000
   hypertoken relay --port 8080              # Start relay on custom port
   hypertoken relay --mode authoritative     # Start in authoritative mode
-
-  hypertoken bridge                         # Start bridge with default env
-  hypertoken bridge --env blackjack         # Start blackjack environment
-  hypertoken bridge -e blackjack -p 9999    # Custom port
 
   hypertoken mcp                            # Start MCP server
 
@@ -79,10 +71,6 @@ async function main(): Promise<void> {
   switch (command) {
     case 'relay':
       await runRelay(commandArgs);
-      break;
-
-    case 'bridge':
-      await runBridge(commandArgs);
       break;
 
     case 'mcp':

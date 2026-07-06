@@ -4,7 +4,7 @@ Guidance for Codex / AI agents working in this repository. Read this before maki
 
 ## Repository at a glance
 
-HyperToken is a distributed game engine where **all state is a CRDT** (Automerge). One architectural decision yields serverless multiplayer, perfect replay, and forkable worlds. Optional Rust→WASM acceleration for hot paths. Ships with card/strategy game examples and Gym/PettingZoo RL interfaces.
+HyperToken is a distributed game engine where **all state is a CRDT** (Automerge). One architectural decision yields serverless multiplayer, perfect replay, and forkable worlds. Optional Rust→WASM acceleration for hot paths. Ships with card/strategy game examples.
 
 - **Runtime:** Node.js 18+ (server/CLI), browser (WASM + examples)
 - **Language:** TypeScript (ESM, strict) + Rust (optional WASM)
@@ -20,16 +20,14 @@ core/storage/  Storage adapters (MemoryAdapter, FilesystemAdapter, IndexedDBAdap
 core/StorageAdapter.ts  Storage adapter interface
 engine/        Game coordination (Engine, actions.ts, Action, GameLoop, RuleEngine, Agent, Policy, Script)
 network/       P2P & server (PeerConnection, AuthoritativeServer, HybridPeerManager, MessageCodec, E2EEncryption)
-hypertoken-rl/  RL adapters split (interface/, bridge/, python/) — Gym, PettingZoo, ONNXAgent, bridge server, Python client
 core-rs/       Rust → WASM source (src/lib.rs, src/chronicle_actions/, Cargo.toml, build.sh)
-cli/           CLI entrypoint (index.ts → commands/{relay,bridge,mcp}.ts)
-examples/      10 game dirs (blackjack, poker, cuttle, prisoners-dilemma, hanabi, coup, liars-dice, accordion, dungeon-raiders, browser-demo)
+cli/           CLI entrypoint (index.ts → commands/{relay,mcp}.ts)
+examples/      3 games (blackjack, cuttle, watershed)
 examples/watershed/  Watershed CRDT showcase game (real-time territory game)
 mcp/           MCP server for LLM play (server.ts, games/)
 plugins/       analytics, logging, save-state plugins + pluginLoader
 workers/       hypertoken.worker.js (Phase 3 multi-threading is future work)
 docs/          Architecture, getting started, testing, extending, etc.
-schemas/       JSON schemas
 patterns/      Pattern reference
 benchmark/     Benchmark scripts
 test/          Custom test runner (no Jest/Vitest)
@@ -66,14 +64,11 @@ node --loader ./test/ts-esm-loader.js test/testCore.js
 
 # Run games
 npm run blackjack        # Casino with AI & betting
-npm run poker            # Texas Hold'em
 npm run cuttle           # Card combat
-npm run prisoners-dilemma  # Game theory tournament
 npm run watershed:web   # Build + serve Watershed browser client
 
 # Infrastructure
 npm run relay            # P2P relay server
-npm run bridge           # Python bridge server
 npm run mcp              # LLM MCP server
 ```
 
@@ -148,4 +143,4 @@ A change is complete when **all** of the following hold:
 3. Run `npm run blackjack` to see an end-to-end game.
 4. For action questions: `engine/ACTIONS.md` + per-category docs in `engine/actions/`.
 5. For WASM questions: `WASM_INTEGRATION.md` + `core-rs/README.md`.
-6. For networking questions: `docs/GOSSIP_SCALING.md`, `network/` source.
+6. For networking questions: `network/` source.

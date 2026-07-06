@@ -13,9 +13,6 @@ const COMMANDS = {
   'Play Games': {
     'blackjack': 'Play Blackjack vs AI with betting',
     'cuttle': 'Play Cuttle card combat game',
-    'poker': 'Play Texas Hold\'em poker',
-    'prisoners-dilemma': 'Run Prisoner\'s Dilemma simulation',
-    'pd:tournament': 'Run full PD tournament with all strategies',
   },
 
   'Multiplayer': {
@@ -23,13 +20,10 @@ const COMMANDS = {
     'blackjack:client': 'Connect to Blackjack server as client',
     'cuttle:server': 'Start Cuttle multiplayer server',
     'cuttle:client': 'Connect to Cuttle server as client',
-    'dungeon:server': 'Start Dungeon Raiders server',
-    'dungeon:client': 'Connect to Dungeon Raiders server',
   },
 
   'Infrastructure': {
     'relay': 'Start P2P relay server for matchmaking',
-    'bridge': 'Start Python/JSON-RPC bridge for ML training',
     'mcp': 'Start Model Context Protocol server for LLMs',
   },
 

@@ -56,8 +56,6 @@ npm run help              # See all available commands
 
 # Other games to try:
 npm run cuttle            # Card combat game
-npm run prisoners-dilemma # Game theory simulation
-npm run poker             # Texas Hold'em
 ```
 
 ## Verify Your Installation
@@ -93,8 +91,7 @@ Read the [Architecture Guide](./ARCHITECTURE.md) to learn how HyperToken's compo
 |---------|---------|-------------------|
 | Blackjack | `npm run blackjack` | Card games, betting, AI opponents |
 | Cuttle | `npm run cuttle` | Combat mechanics, special abilities |
-| Prisoner's Dilemma | `npm run prisoners-dilemma` | Game theory, strategies, tournaments |
-| Poker | `npm run poker` | RL training environment |
+| Watershed | `npm run watershed:web` | CRDT territory game in browser |
 
 ### Build Something
 
@@ -181,7 +178,6 @@ hypertoken/
 ├── core/        # Token, Stack, Space, Chronicle (start here)
 ├── engine/      # Engine, GameLoop, Actions (game logic)
 ├── network/     # P2P networking (multiplayer)
-├── hypertoken-rl/ # AI/ML adapters, bridge server, Python client
 ├── examples/    # Complete game implementations
 └── docs/        # Detailed guides
 ```
@@ -201,10 +197,8 @@ npm run test           # Full test suite (~2min)
 # Games
 npm run blackjack      # Play Blackjack
 npm run cuttle         # Play Cuttle
-npm run poker          # Play Poker
 
 # Infrastructure
 npm run relay          # Start P2P relay server
-npm run bridge         # Start Python bridge
 npm run mcp            # Start LLM integration server
 ```

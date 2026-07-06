@@ -61,12 +61,6 @@ docker compose run blackjack-bob
 ```bash
 # Run the relay server on custom port
 docker run -p 8080:8080 -e PORT=8080 hypertoken:latest node dist/cli/index.js relay --port 8080
-
-# Run Prisoner's Dilemma example
-docker run -it hypertoken:latest node dist/examples/prisoners-dilemma/pd-cli.js
-
-# Run Accordion example
-docker run -it hypertoken:latest node dist/examples/accordion/accordion.js
 ```
 
 ### Interactive Shell Access
@@ -77,7 +71,6 @@ docker run -it hypertoken:latest bash
 
 # Now you can run any commands:
 node dist/cli/index.js relay
-node dist/cli/index.js bridge --env blackjack
 node dist/examples/blackjack/server.js
 ```
 

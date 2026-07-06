@@ -2,7 +2,7 @@
 
 **A game engine where the entire state is a CRDT.**
 
-Deterministic replay, serverless multiplayer, forkable worlds—all from one architectural decision. Built on **[Automerge](https://automerge.org/)** for distributed consensus, with **[OpenAI Gym](https://gymnasium.farama.org/)/[PettingZoo](https://pettingzoo.farama.org/)** interfaces so any game doubles as a training environment.
+Deterministic replay, serverless multiplayer, forkable worlds—all from one architectural decision. Built on **[Automerge](https://automerge.org/)** for distributed consensus.
 
 ---
 
@@ -13,7 +13,6 @@ Deterministic replay, serverless multiplayer, forkable worlds—all from one arc
 | **Serverless multiplayer** | CRDTs sync state across peers without a server |
 | **Perfect replay** | Every action recorded with actor and timestamp |
 | **Forkable worlds** | Snapshot state, explore alternatives, compare outcomes |
-| **AI training environments** | Gym/PettingZoo interfaces out of the box |
 | **Offline-first** | Peers diverge safely, converge mathematically |
 
 ```
@@ -26,19 +25,15 @@ HyperToken:            CRDTs merge → everyone agrees → zero infrastructure
 
 ## 🎮 What You Can Build
 
-**Card Games** — Blackjack, Poker, Cuttle, custom TCGs. Tokens compose with provenance tracking.
+**Card Games** — Blackjack, Cuttle, custom TCGs. Tokens compose with provenance tracking.
 
-**Strategy Games** — Game theory simulations, tournaments, agent competitions. 14 Prisoner's Dilemma strategies included.
+**Strategy Games** — Game theory simulations, agent competitions.
 
 **Multiplayer Worlds** — P2P sync, no servers, games that outlive their creators.
-
-**Training Environments** — Any game is automatically a Gym environment. Multi-agent via PettingZoo.
 
 ```bash
 # Play now
 npm run blackjack          # Casino with AI & betting
-npm run prisoners-dilemma  # Game theory tournament
-npm run poker              # Texas Hold'em
 npm run cuttle             # Card combat
 npm run watershed:web     # CRDT territory game in browser
 
@@ -97,26 +92,6 @@ client.connect("ws://relay.local:8080");
 // No conflict resolution code. No server logic. It just works.
 ```
 
-### Any Game Becomes a Training Environment
-
-```typescript
-class BlackjackEnv extends GymEnvironment {
-  get observationSpace() { return { shape: [6] }; }
-  get actionSpace() { return { n: 4 }; } // hit, stand, double, split
-  
-  async step(action: number) {
-    const result = this.game.act(action);
-    return {
-      observation: this.encodeState(),
-      reward: result.reward,
-      terminated: result.done,
-      truncated: false,
-      info: {}
-    };
-  }
-}
-```
-
 ### Fork State for What-If Exploration
 
 ```javascript
@@ -132,23 +107,6 @@ engine.dispatch('agent:defect');
 const defectOutcome = engine.getState();
 
 // Compare and decide
-```
-
----
-
-## 🤖 AI & ML Integration
-
-**Gym/PettingZoo** — Single-agent and multi-agent interfaces. Turn-based (AEC) and simultaneous (Parallel).
-
-**ONNX Export** — Train anywhere, deploy the policy in browser or Node.js.
-
-**Python Bridge** — Connect to the TypeScript engine from Python for training.
-
-**MCP Server** — Let LLMs play games via [Model Context Protocol](https://modelcontextprotocol.io/).
-
-```bash
-npm run mcp             # LLM integration
-npm run bridge          # Python bridge
 ```
 
 ---
@@ -185,16 +143,9 @@ hypertoken/
 │   ├── AuthoritativeServer.ts
 │   └── HybridPeerManager.ts
 │
-├── hypertoken-rl/          # RL adapters, bridge server, Python client
-│   ├── interface/         # Gym, PettingZoo, PettingZooParallel, ONNXAgent
-│   ├── bridge/            # Gym/PettingZoo WebSocket bridge
-│   └── python/            # Python client package
-│
 └── examples/               # Working games
     ├── blackjack/
-    ├── poker/
-    ├── prisoners-dilemma/
-    ├── hanabi/
+    ├── cuttle/
     └── watershed/         # CRDT showcase game (real-time territory)
 ```
 
@@ -223,7 +174,6 @@ This applies to cards in blackjack, strategies in game theory, shares in a marke
 | **Colyseus** | P2P, no server required |
 | **Blockchain games** | Same guarantees, zero gas fees |
 | **Automerge/Yjs** | Game-aware abstractions (tokens, agents, rules) |
-| **OpenAI Gym** | Built-in multiplayer, compositional tokens |
 
 ---
 
@@ -233,8 +183,6 @@ This applies to cards in blackjack, strategies in game theory, shares in a marke
 - [Architecture Guide](./docs/ARCHITECTURE.md) — How components connect
 - [Browser Guide](./docs/BROWSER.md) — Building games for the browser
 - [Persistence Guide](./docs/PERSISTENCE.md) — Save/load game state
-- [Python Bridge](./docs/PYTHON_BRIDGE.md) — PettingZoo integration
-- [ONNX Export](./docs/ONNX_EXPORT.md) — Deploy trained policies
 - [Docker Guide](./DOCKER.md) — Container deployment
 
 ---
