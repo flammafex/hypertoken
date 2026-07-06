@@ -731,6 +731,95 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   font-style: italic;
 }
 
+/* ============================================================================
+   Bot Opponent Selector (Lobby)
+   ============================================================================ */
+
+.bot-section {
+  margin: 0 0 22px;
+  text-align: left;
+}
+
+.bot-section-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.bot-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.btn-bot-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  background: var(--bg-dark);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--speed-fast) var(--ease-out);
+  font-family: var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-bot-toggle:hover {
+  background: var(--bg-surface);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.btn-bot-toggle .preset-name {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.btn-bot-toggle .preset-desc {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.btn-bot-toggle.active {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(233, 69, 96, 0.12));
+  border-color: var(--player-4);
+  color: var(--text-primary);
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
+}
+
+.btn-bot-toggle.active .preset-desc {
+  color: var(--text-secondary);
+}
+
+.bot-section-hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin: 8px 0 0;
+  font-style: italic;
+}
+
+/* Bot player badge in score panel / lobby */
+.lobby-player.bot-player .player-label::after {
+  content: ' 🤖';
+  font-size: 0.8em;
+}
+
 /* Main game area */
 .game-main {
   flex: 1;

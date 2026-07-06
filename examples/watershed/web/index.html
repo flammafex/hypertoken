@@ -240,6 +240,29 @@
             <p class="energy-preset-hint">Host's choice applies to all players</p>
           </div>
 
+          <div class="bot-section">
+            <p class="bot-section-label">Opponent</p>
+            <div id="bot-toggle-group" class="bot-toggle-group" role="group" aria-label="Opponent selection">
+              <button type="button" class="btn btn-bot-toggle active" data-bot="none" aria-pressed="true">
+                <span class="preset-name">Human</span>
+                <span class="preset-desc">Wait for players</span>
+              </button>
+              <button type="button" class="btn btn-bot-toggle" data-bot="easy" aria-pressed="false">
+                <span class="preset-name">AI: Easy</span>
+                <span class="preset-desc">Slow, random</span>
+              </button>
+              <button type="button" class="btn btn-bot-toggle" data-bot="normal" aria-pressed="false">
+                <span class="preset-name">AI: Normal</span>
+                <span class="preset-desc">Clusters &amp; merges</span>
+              </button>
+              <button type="button" class="btn btn-bot-toggle" data-bot="hard" aria-pressed="false">
+                <span class="preset-name">AI: Hard</span>
+                <span class="preset-desc">Fortifies &amp; blocks</span>
+              </button>
+            </div>
+            <p class="bot-section-hint">AI starts immediately — no waiting</p>
+          </div>
+
           <button type="button" id="btn-start-game" class="btn btn-primary btn-lobby-cta">Start Game</button>
         </div>
 
@@ -286,7 +309,7 @@
     <div class="modal-overlay" id="rules-overlay" role="dialog" aria-labelledby="rules-title" aria-modal="true">
       <div class="modal rules-content">
         <h2 id="rules-title">How to Play</h2>
-        <p>Watershed is a real-time territory game where 2-4 players compete to control the most cells on a 10×10 grid.</p>
+        <p>Watershed is a real-time territory game where 2-4 players compete to control the most cells on a 10×10 grid. Play against humans online, or against an AI opponent (Easy / Normal / Hard) for solo practice.</p>
 
         <div class="modal-content">
           <h3>Objective</h3>
@@ -304,6 +327,14 @@
             <li>Placing costs energy; merging and splitting are free</li>
             <li>Energy regenerates over time — choose placements wisely</li>
             <li>When energy is low, use free merge/split to reposition</li>
+          </ul>
+
+          <h3>AI Opponents</h3>
+          <ul>
+            <li><strong>Easy:</strong> Places slowly, mostly random — good for learning</li>
+            <li><strong>Normal:</strong> Builds clusters, occasionally merges</li>
+            <li><strong>Hard:</strong> Prioritizes influence, merges to fortify, blocks your clusters</li>
+            <li>The AI uses the same energy system as you — it can't spam either</li>
           </ul>
 
           <h3>Scoring</h3>

@@ -79,6 +79,12 @@ const state = {
 
   // Energy display timer
   energyInterval: null,
+
+  // Bot opponent (single-player mode)
+  botEnabled: false,
+  botDifficulty: 'normal', // 'easy' | 'normal' | 'hard'
+  botTimer: null,
+  botPeerId: null,
 };
 
 // ============================================================================
@@ -166,6 +172,9 @@ const elements = {
   energyValue: document.getElementById('energy-value'),
   energyMax: document.getElementById('energy-max'),
   energyPresetGroup: document.getElementById('energy-preset-group'),
+
+  // Bot opponent
+  botToggleGroup: document.getElementById('bot-toggle-group'),
 };
 
 // ============================================================================
@@ -320,6 +329,26 @@ function bindEvents() {
       if (!preset || !ENERGY_PRESETS[preset]) return;
       state.energyPreset = preset;
       elements.energyPresetGroup.querySelectorAll('.btn-preset').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+    });
+  }
+
+  // Bot opponent selector (lobby)
+  if (elements.botToggleGroup) {
+    elements.botToggleGroup.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-bot-toggle');
+      if (!btn) return;
+      const bot = btn.dataset.bot;
+      if (!bot) return;
+      state.botDifficulty = bot;
+      state.botEnabled = bot !== 'none';
+      // Assign a stable bot peer ID for this game session
+      state.botPeerId = state.botEnabled
+        ? `bot-${state.botDifficulty}-${Date.now()}`
+        : null;
+      elements.botToggleGroup.querySelectorAll('.btn-bot-toggle').forEach((b) => {
         b.classList.toggle('active', b === btn);
         b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
       });
@@ -554,10 +583,12 @@ function updateLobbyPlayers() {
     const color = p?.color || 'var(--success)';
     const isHost = peerId === state.peerId && state.isHost;
     const isYou = peerId === state.peerId;
+    const isBot = peerId === state.botPeerId;
     const youTag = isYou ? ' <span class="you-tag">(You)</span>' : '';
     const hostBadge = isHost ? '<span class="host-badge">Host</span>' : '';
+    const botClass = isBot ? ' bot-player' : '';
     parts.push(
-      `<div class="lobby-player" style="--player-color: ${color}">` +
+      `<div class="lobby-player${botClass}" style="--player-color: ${color}">` +
       `<span class="dot"></span>` +
       `<span class="player-label">${name}${youTag}</span>` +
       `${hostBadge}` +
@@ -651,6 +682,20 @@ function getPlayerCount() {
 }
 
 function startGame() {
+  // If a bot opponent is enabled, register the bot as player 2 before
+  // starting. The bot dispatches through the engine just like a human —
+  // energy, fortification, and CRDT sync all apply to it automatically.
+  if (state.botEnabled && state.botPeerId) {
+    try {
+      state.engine.dispatch('watershed:register', {
+        peerId: state.botPeerId,
+        name: `AI (${state.botDifficulty})`,
+      });
+    } catch (e) {
+      console.warn('[Watershed] Bot register failed:', e.message);
+    }
+  }
+
   // Dispatch watershed:start — syncs to all peers via CRDT
   try {
     state.engine.dispatch('watershed:start', { peerId: state.peerId });
@@ -666,6 +711,7 @@ function handleGameStarted() {
   hideLobby();
   startTimer();
   startEnergyTimer();
+  if (state.botEnabled) startBot();
   announce('Game started! Place your tokens!');
 }
 
@@ -752,6 +798,7 @@ function handleGameEnded(event) {
   state.gameEnded = true;
   stopTimer();
   stopEnergyTimer();
+  stopBot();
 
   // Auto-save the final game state
   if (state.engine && state.storageAdapter) {
@@ -880,6 +927,291 @@ function handlePlacementRejected(event) {
     announce('That cell is fortified — cannot be contested!');
     showError('Fortified cell — cannot place here');
   }
+}
+
+// ============================================================================
+// AI Opponent (Bot)
+// ============================================================================
+//
+// The bot is a client-side player that dispatches through the engine just
+// like a human. Energy, fortification, and CRDT sync all apply to it. In a
+// multiplayer game only the host's client runs the bot; its actions sync to
+// other peers via CRDT.
+
+const BOT_INTERVALS = { easy: 1500, normal: 1000, hard: 700 };
+
+function startBot() {
+  stopBot();
+  if (!state.botPeerId) return;
+  const interval = BOT_INTERVALS[state.botDifficulty] || 1000;
+  state.botTimer = setInterval(runBotTick, interval);
+  // Don't fire immediately — let the first tick happen after the interval
+  // so the human has a moment to act first.
+}
+
+function stopBot() {
+  if (state.botTimer) {
+    clearInterval(state.botTimer);
+    state.botTimer = null;
+  }
+}
+
+function runBotTick() {
+  if (!state.engine || state.gameEnded || !state.botPeerId) return;
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (!watershedState || watershedState.phase !== 'playing') return;
+
+  const board = getBoard(state.engine);
+  if (!board) return;
+
+  const cfg = watershedState.config?.energy || ENERGY_PRESETS.standard;
+  const botPlayer = watershedState.players?.[state.botPeerId];
+  if (!botPlayer) return;
+
+  const energy = computeEnergy(botPlayer, cfg);
+  if (energy < (cfg.placeCost ?? 1)) return; // wait for regen
+
+  // Gather token lists
+  const ownTokens = [];
+  const opponentTokens = [];
+  for (const t of Object.values(watershedState.tokens || {})) {
+    const consumed = watershedState.consumed[t.id];
+    if (consumed && Object.keys(consumed).length > 0) continue;
+    if (t.playerId === state.botPeerId) ownTokens.push(t);
+    else opponentTokens.push(t);
+  }
+
+  const move = getBotMove(state.botDifficulty, board, ownTokens, opponentTokens, energy, cfg, watershedState);
+  if (!move) return;
+
+  try {
+    if (move.action === 'place') {
+      state.engine.dispatch('watershed:place', { x: move.x, y: move.y, peerId: state.botPeerId });
+    } else if (move.action === 'merge') {
+      state.engine.dispatch('watershed:merge', {
+        tokenIdA: move.tokenIdA,
+        tokenIdB: move.tokenIdB,
+        peerId: state.botPeerId,
+      });
+    }
+  } catch (e) {
+    // Move was rejected (energy, fortification, etc.) — silently retry next tick
+  }
+}
+
+/**
+ * Decide a bot move based on difficulty.
+ * Returns { action: 'place', x, y } | { action: 'merge', tokenIdA, tokenIdB } | null
+ */
+function getBotMove(difficulty, board, ownTokens, opponentTokens, energy, cfg, watershedState) {
+  if (difficulty === 'easy') return getEasyMove(board, ownTokens, cfg, energy);
+  if (difficulty === 'hard') return getHardMove(board, ownTokens, opponentTokens, cfg, energy, watershedState);
+  return getNormalMove(board, ownTokens, opponentTokens, cfg, energy);
+}
+
+// --- Helpers --------------------------------------------------------------
+
+function isCellEmpty(board, x, y) {
+  if (x < 0 || y < 0 || x >= board.width || y >= board.height) return false;
+  return board.cells[y][x].tokens.length === 0;
+}
+
+function isCellFortifiedByOpponent(board, x, y, selfId) {
+  if (x < 0 || y < 0 || x >= board.width || y >= board.height) return false;
+  const cell = board.cells[y][x];
+  for (const t of cell.tokens) {
+    if (t.playerId !== selfId && t.strength >= 3) return true;
+  }
+  return false;
+}
+
+function getNeighbors(x, y, w, h) {
+  const out = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && nx < w && ny >= 0 && ny < h) out.push([nx, ny]);
+    }
+  }
+  return out;
+}
+
+function randomChoice(arr) {
+  if (!arr || arr.length === 0) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/** Collect all empty cells on the board. */
+function getEmptyCells(board) {
+  const out = [];
+  for (let y = 0; y < board.height; y++) {
+    for (let x = 0; x < board.width; x++) {
+      if (board.cells[y][x].tokens.length === 0) out.push([x, y]);
+    }
+  }
+  return out;
+}
+
+/** Empty cells adjacent to at least one of the bot's own tokens. */
+function getEmptyCellsNearOwn(board, ownTokens) {
+  const set = new Set();
+  for (const t of ownTokens) {
+    for (const [nx, ny] of getNeighbors(t.x, t.y, board.width, board.height)) {
+      if (board.cells[ny][nx].tokens.length === 0) set.add(`${nx},${ny}`);
+    }
+  }
+  return [...set].map((s) => s.split(',').map(Number));
+}
+
+/** Find a pair of adjacent own tokens that can be merged (both < strength 3). */
+function findMergeOp(ownTokens) {
+  for (const a of ownTokens) {
+    if (a.strength >= 3) continue;
+    for (const b of ownTokens) {
+      if (a.id === b.id || b.strength >= 3) continue;
+      const dx = Math.abs(a.x - b.x);
+      const dy = Math.abs(a.y - b.y);
+      if (dx <= 1 && dy <= 1 && (dx + dy > 0)) {
+        return { tokenIdA: a.id, tokenIdB: b.id };
+      }
+    }
+  }
+  return null;
+}
+
+/** Find a merge that produces a strength-3 (fortified) token. */
+function findFortifyOp(ownTokens) {
+  for (const a of ownTokens) {
+    if (a.strength + 1 < 3) continue; // need a +1 partner to reach 3 → a must be strength 2
+    if (a.strength !== 2) continue;
+    for (const b of ownTokens) {
+      if (a.id === b.id || b.strength !== 1) continue;
+      const dx = Math.abs(a.x - b.x);
+      const dy = Math.abs(a.y - b.y);
+      if (dx <= 1 && dy <= 1 && (dx + dy > 0)) {
+        return { tokenIdA: a.id, tokenIdB: b.id };
+      }
+    }
+  }
+  return null;
+}
+
+// --- Easy -----------------------------------------------------------------
+
+function getEasyMove(board, ownTokens, cfg, energy) {
+  if (energy < (cfg.placeCost ?? 1)) return null;
+  const empty = getEmptyCells(board);
+  if (empty.length === 0) return null;
+
+  // 50% random, 50% near own tokens (if any)
+  const nearOwn = getEmptyCellsNearOwn(board, ownTokens);
+  if (nearOwn.length > 0 && Math.random() < 0.5) {
+    const [x, y] = randomChoice(nearOwn);
+    return { action: 'place', x, y };
+  }
+  const [x, y] = randomChoice(empty);
+  return { action: 'place', x, y };
+}
+
+// --- Normal ---------------------------------------------------------------
+
+function getNormalMove(board, ownTokens, opponentTokens, cfg, energy) {
+  // 20% chance to merge if a merge opportunity exists
+  const mergeOp = findMergeOp(ownTokens);
+  if (mergeOp && Math.random() < 0.2) {
+    return { action: 'merge', ...mergeOp };
+  }
+
+  if (energy < (cfg.placeCost ?? 1)) return null;
+
+  // Prefer cells adjacent to own tokens (build clusters for merging)
+  const nearOwn = getEmptyCellsNearOwn(board, ownTokens);
+  // Filter out cells adjacent to opponent's fortified tokens
+  const safe = nearOwn.filter(([x, y]) => {
+    for (const [nx, ny] of getNeighbors(x, y, board.width, board.height)) {
+      const ncell = board.cells[ny][nx];
+      for (const t of ncell.tokens) {
+        if (t.playerId !== state.botPeerId && t.strength >= 3) return false;
+      }
+    }
+    return true;
+  });
+
+  const pool = safe.length > 0 ? safe : (nearOwn.length > 0 ? nearOwn : getEmptyCells(board));
+  if (pool.length === 0) return null;
+  const [x, y] = randomChoice(pool);
+  return { action: 'place', x, y };
+}
+
+// --- Hard -----------------------------------------------------------------
+
+function getHardMove(board, ownTokens, opponentTokens, cfg, energy, watershedState) {
+  // Priority 1: merge to strength-3 (fortify) when possible
+  const fortify = findFortifyOp(ownTokens);
+  if (fortify) return { action: 'merge', ...fortify };
+
+  // Priority 2: merge to strength-2 when possible (concentrate scoring)
+  const mergeOp = findMergeOp(ownTokens);
+  if (mergeOp) return { action: 'merge', ...mergeOp };
+
+  if (energy < (cfg.placeCost ?? 1)) return null;
+
+  // Priority 3: place on a cell that would create influence (empty cell
+  // adjacent to exactly one of our tokens and no opponent tokens).
+  const empty = getEmptyCells(board);
+  const influenceCells = [];
+  const clusterCells = [];
+  for (const [x, y] of empty) {
+    let ownAdj = 0, oppAdj = 0;
+    for (const [nx, ny] of getNeighbors(x, y, board.width, board.height)) {
+      const ncell = board.cells[ny][nx];
+      for (const t of ncell.tokens) {
+        if (t.playerId === state.botPeerId) ownAdj++;
+        else oppAdj++;
+      }
+    }
+    if (ownAdj > 0 && oppAdj === 0) influenceCells.push([x, y, ownAdj]);
+    else if (ownAdj > 0) clusterCells.push([x, y]);
+  }
+
+  if (influenceCells.length > 0) {
+    // Pick the one with the most own-adjacency (most influence)
+    influenceCells.sort((a, b) => b[2] - a[2]);
+    const [x, y] = influenceCells[0];
+    return { action: 'place', x, y };
+  }
+
+  // Priority 4: cluster near own tokens for future merging
+  if (clusterCells.length > 0) {
+    const [x, y] = randomChoice(clusterCells);
+    return { action: 'place', x, y };
+  }
+
+  // Priority 5: block opponent clusters — place adjacent to an opponent token
+  // (but not on a fortified cell)
+  const blockCells = [];
+  for (const [x, y] of empty) {
+    let oppAdj = 0;
+    for (const [nx, ny] of getNeighbors(x, y, board.width, board.height)) {
+      const ncell = board.cells[ny][nx];
+      for (const t of ncell.tokens) {
+        if (t.playerId !== state.botPeerId) oppAdj++;
+      }
+    }
+    if (oppAdj > 0) blockCells.push([x, y]);
+  }
+  if (blockCells.length > 0) {
+    const [x, y] = randomChoice(blockCells);
+    return { action: 'place', x, y };
+  }
+
+  // Fallback: random empty cell
+  if (empty.length > 0) {
+    const [x, y] = randomChoice(empty);
+    return { action: 'place', x, y };
+  }
+  return null;
 }
 
 // ============================================================================
@@ -1481,14 +1813,28 @@ function handlePlayAgain() {
     energyConfig: ENERGY_PRESETS[state.energyPreset] || ENERGY_PRESETS.standard,
   });
 
-  // Re-register
+  // Re-register human player
   state.engine.dispatch('watershed:register', {
     peerId: state.peerId,
     name: state.playerName,
   });
 
+  // Re-register bot if enabled (new peer ID for the new game)
+  if (state.botEnabled) {
+    state.botPeerId = `bot-${state.botDifficulty}-${Date.now()}`;
+    try {
+      state.engine.dispatch('watershed:register', {
+        peerId: state.botPeerId,
+        name: `AI (${state.botDifficulty})`,
+      });
+    } catch (e) {
+      console.warn('[Watershed] Bot re-register failed:', e.message);
+    }
+  }
+
   // Restart timer
   startTimer();
+  if (state.botEnabled) startBot();
 
   announce('New game started!');
 }
@@ -1501,6 +1847,7 @@ function handleNewLobby() {
     state.engine.disconnect();
   }
 
+  stopBot();
   state.gameEnded = false;
   state.gameStarted = false;
   state.connected = false;
@@ -1633,6 +1980,7 @@ function releaseFocusTrap(modal) {
 }
 
 function handleUnload() {
+  stopBot();
   if (state.engine) {
     state.engine.disconnect();
   }
@@ -1654,6 +2002,8 @@ window.watershed = {
   render,
   showRules,
   hideRules,
+  startBot,
+  stopBot,
 };
 
 console.log('[Watershed] Client module loaded. Use window.watershed for debugging.');
