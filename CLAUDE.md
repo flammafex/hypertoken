@@ -40,12 +40,12 @@ HyperToken is a distributed game engine where all state is a CRDT (Automerge). T
 - **core/** — CRDT state primitives: `Chronicle` (Automerge wrapper), `IChronicle` (interface), `WasmChronicleAdapter` (dirty-section caching proxy for WASM), `Stack` (ordered token collections), `Space` (2D zones), `Source` (multi-deck manager), `Token` (immutable game entities with provenance tracking)
 - **core/browser/** — Browser build infrastructure
 - **core/storage/** — Storage adapters (`MemoryAdapter`, `FilesystemAdapter`, `IndexedDBAdapter`)
-- **engine/** — Game coordination: `Engine` (main dispatcher), `Action` (registry), `actions.ts` (75+ built-in actions), `GameLoop` (turn/phase control), `RuleEngine` (condition-triggered), `Agent` (player/NPC), `Policy` (post-action evaluation), `Recorder` (history/replay), `Script` (programmatic execution)
+- **engine/** — Game coordination: `Engine` (main dispatcher), `Action` (registry), `actions.ts` (75+ built-in actions), `GameLoop` (turn/phase control), `RuleEngine` (condition-triggered), `Agent` (player/NPC), `Policy` (post-action evaluation), `Script` (programmatic execution)
 - **network/** — P2P & server networking: `PeerConnection` (WebSocket + WebRTC), `AuthoritativeServer`, `HybridPeerManager`, `MessageCodec` (MessagePack binary), `E2EEncryption`
 - **hypertoken-rl/** — AI/ML adapters and bridge: `interface/` (`Gym`, `PettingZoo`, `PettingZooParallel`, `ONNXAgent`), `bridge/` server, `python/` client
 - **core-rs/** — Rust WASM implementation: `Chronicle` (incremental Automerge CRDT with 54 field-level action methods), `ActionDispatcher` (delegates to Chronicle), `chronicle_actions/` (stack, space, source, agent, game_loop, game_state, rules modules)
 - **examples/** — 10 working games, each with game logic, CLI, and optional networking/RL files
-- **examples/confluence/** — CRDT showcase game
+- **examples/watershed/** — CRDT showcase game
 - **cli/** — CLI entry point (`relay`, `bridge`, `mcp` subcommands)
 
 ### Data flow
@@ -54,10 +54,9 @@ HyperToken is a distributed game engine where all state is a CRDT (Automerge). T
 2. Engine routes to WASM `ActionDispatcher` (if available) or TS `ActionRegistry` fallback
 3. WASM path: Chronicle applies incremental field-level Automerge operations, sets dirty flags
 4. TS path: Action handler calls `engine.session.change()` (Automerge proxy)
-5. Recorder logs action with actor + timestamp
-6. RuleEngine evaluates triggered conditions
-7. Policy evaluates post-action
-8. Network layer syncs CRDT changes to peers (if connected, Chronicle mode only)
+5. RuleEngine evaluates triggered conditions
+6. Policy evaluates post-action
+7. Network layer syncs CRDT changes to peers (if connected, Chronicle mode only)
 
 ### Action naming convention
 

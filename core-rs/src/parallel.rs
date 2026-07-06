@@ -140,30 +140,6 @@ where
     }
 }
 
-/// Chunked processing for large datasets
-///
-/// Processes data in cache-friendly chunks for better performance.
-pub struct ChunkedIterator<T> {
-    data: Vec<T>,
-    chunk_size: usize,
-}
-
-impl<T> ChunkedIterator<T> {
-    pub fn new(data: Vec<T>, chunk_size: usize) -> Self {
-        Self { data, chunk_size }
-    }
-
-    pub fn process<F, R>(&mut self, mut processor: F) -> Vec<R>
-    where
-        F: FnMut(&[T]) -> R,
-    {
-        self.data
-            .chunks(self.chunk_size)
-            .map(|chunk| processor(chunk))
-            .collect()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,16 +191,5 @@ mod tests {
         let items = vec![1, 2, 3, 4, 5, 6];
         let results = parallel_filter(&items, |x| x % 2 == 0);
         assert_eq!(results, vec![2, 4, 6]);
-    }
-
-    #[test]
-    fn test_chunked_iterator() {
-        let data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut chunked = ChunkedIterator::new(data, 3);
-
-        let sums = chunked.process(|chunk| chunk.iter().sum::<i32>());
-
-        // Chunks: [1,2,3], [4,5,6], [7,8,9], [10]
-        assert_eq!(sums, vec![6, 15, 24, 10]);
     }
 }

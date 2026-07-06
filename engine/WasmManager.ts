@@ -1,25 +1,13 @@
 import { WasmChronicleAdapter } from '../core/WasmChronicleAdapter.js';
 import { tryLoadWasm, isWasmAvailable, getWasmModule, type WasmActionDispatcher } from "../core/WasmBridge.js";
-import type { UniversalWorker } from "../core/UniversalWorker.js";
 import type { IChronicle } from "../core/IChronicle.js";
 import type { IActionPayload } from "../core/types.js";
 
 export type SessionReplaceCallback = (newSession: IChronicle) => void;
 
-export interface WorkerInitOptions {
-  debug?: boolean;
-  timeout?: number;
-  enableBatching?: boolean;
-  batchWindow?: number;
-  workerPath?: string;
-  wasmPath?: string;
-}
-
 export class WasmManager {
   private _dispatcher: WasmActionDispatcher | null = null;
   private _dispatchTable: Record<string, (p: any) => unknown> | null = null;
-  private _worker: UniversalWorker | null = null;
-  private _useWorker: boolean = false;
 
   static readonly WASM_ACTIONS = new Set([
     // Stack actions (10)
@@ -61,50 +49,11 @@ export class WasmManager {
   ]);
 
   get dispatcher(): WasmActionDispatcher | null { return this._dispatcher; }
-  get worker(): UniversalWorker | null { return this._worker; }
-  get useWorker(): boolean { return this._useWorker; }
 
   /** Override dispatcher (for test compatibility). Rebuilds dispatch table. */
   setDispatcher(v: WasmActionDispatcher | null): void {
     this._dispatcher = v;
     this._dispatchTable = v ? this._buildDispatchTable(v) : null;
-  }
-
-  async initWorker(
-    options: WorkerInitOptions,
-    debug: boolean,
-    onStateChanged: (payload: any) => void,
-    onAction: (payload: any) => void,
-    onError: (payload: any) => void,
-    fallback: () => void,
-  ): Promise<void> {
-    try {
-      const { UniversalWorker } = await import('../core/UniversalWorker.js');
-      this._worker = new UniversalWorker({
-        debug: options.debug ?? debug,
-        timeout: options.timeout,
-        enableBatching: options.enableBatching,
-        batchWindow: options.batchWindow,
-        workerPath: options.workerPath,
-        wasmPath: options.wasmPath,
-      });
-
-      await this._worker.init();
-
-      this._worker.on('state_changed', onStateChanged);
-      this._worker.on('action_completed', onAction);
-      this._worker.on('error', onError);
-
-      if (debug) {
-        const env = this._worker.environment;
-        console.log(`✅ Engine: UniversalWorker initialized (${env} mode)`);
-      }
-    } catch (error) {
-      console.error('❌ Engine: UniversalWorker initialization failed:', error);
-      this._useWorker = false;
-      this._worker = null;
-      fallback();
-    }
   }
 
   initDispatcher(
@@ -234,17 +183,7 @@ export class WasmManager {
     return handler(payload);
   }
 
-  /** Dispatch via worker (async). Throws if worker not ready. */
-  async dispatchWorker(type: string, payload: IActionPayload): Promise<unknown> {
-    if (!this._worker?.ready) throw new Error("Worker not ready");
-    return this._worker.dispatch(type, payload);
-  }
-
   async terminate(): Promise<void> {
-    if (this._worker) {
-      await this._worker.terminate();
-      this._worker = null;
-    }
-    this._useWorker = false;
+    // No-op: worker cleanup removed. Kept for Engine.shutdown() compatibility.
   }
 }

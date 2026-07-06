@@ -344,20 +344,6 @@ export class RoomManager extends Emitter {
   }
 
   /**
-   * Get rooms a peer is in
-   */
-  getPeerRooms(peerId: string): Room[] {
-    const roomIds = this.peerRooms.get(peerId);
-    if (!roomIds) {
-      return [];
-    }
-
-    return Array.from(roomIds)
-      .map((id) => this.rooms.get(id))
-      .filter((r): r is Room => r !== undefined);
-  }
-
-  /**
    * Join a room
    */
   joinRoom(

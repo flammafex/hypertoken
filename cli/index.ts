@@ -22,7 +22,7 @@ import { runRelay } from './commands/relay.js';
 import { runBridge } from './commands/bridge.js';
 import { runMcp } from './commands/mcp.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 function showHelp(): void {
   console.log(`

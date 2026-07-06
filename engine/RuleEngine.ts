@@ -51,12 +51,6 @@ export class RuleEngine {
     return this;
   }
 
-  removeRule(name: string): this {
-    this.rules = this.rules.filter(r => r.name !== name);
-    this.engine?.emit("rule:removed", { payload: { name } });
-    return this;
-  }
-
   clear(): this {
     this.rules = [];
     this.engine?.emit("rule:cleared");

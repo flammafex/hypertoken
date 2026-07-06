@@ -104,16 +104,11 @@ window.initEngine = async function() {
     // For this demo, we're importing directly from the source
     const { Engine } = await import('../../engine/Engine.js');
 
-    setStatus('loading', 'Creating Engine with Web Worker...');
-    log('Creating Engine with useWorker: true', 'info');
+    setStatus('loading', 'Creating Engine...');
+    log('Creating Engine', 'info');
 
     engine = new Engine({
-      useWorker: true,
-      workerOptions: {
-        debug: true,
-        workerPath: '/workers/hypertoken.worker.js',
-        wasmPath: '/wasm'
-      }
+      debug: true
     });
 
     // Set debug mode
@@ -132,30 +127,19 @@ window.initEngine = async function() {
       log('State updated', 'info');
     });
 
-    // Wait for worker to be ready
-    // The Engine initializes the worker asynchronously
-    setStatus('loading', 'Waiting for worker initialization...');
-    log('Waiting for worker to initialize...', 'info');
+    // Wait for engine to be ready
+    // The Engine initializes asynchronously
+    setStatus('loading', 'Waiting for engine initialization...');
+    log('Waiting for engine to initialize...', 'info');
 
-    // Give the worker time to initialize
+    // Give the engine time to initialize
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Check if worker is ready
-    if (engine._wasmWorker && engine._wasmWorker.ready) {
-      isReady = true;
-      const env = engine._wasmWorker.environment || 'browser';
-      envBadge.textContent = env;
-      setStatus('ready', 'Engine ready');
-      log(`Engine initialized successfully in ${env} mode`, 'success');
-      updateButtons(true);
-    } else {
-      // Worker might have fallen back to sync mode
-      log('Worker may have fallen back to sync mode', 'warn');
-      setStatus('ready', 'Engine ready (sync fallback)');
-      envBadge.textContent = 'sync';
-      isReady = true;
-      updateButtons(true);
-    }
+    isReady = true;
+    envBadge.textContent = 'browser';
+    setStatus('ready', 'Engine ready');
+    log('Engine initialized successfully', 'success');
+    updateButtons(true);
 
   } catch (error) {
     log(`Failed to initialize: ${error.message}`, 'error');
@@ -226,15 +210,10 @@ window.testPing = async function() {
   }
 
   try {
-    log('Pinging worker...', 'info');
+    log('Pinging engine...', 'info');
 
-    if (engine._wasmWorker && engine._wasmWorker.ping) {
-      const latency = await engine._wasmWorker.ping();
-      log(`Worker responded in ${latency}ms`, 'success');
-      workerPingEl.textContent = latency.toFixed(2);
-    } else {
-      log('Worker ping not available (sync mode?)', 'warn');
-    }
+    // No worker ping available in sync mode
+    log('Worker ping not available (sync mode)', 'warn');
 
   } catch (error) {
     log(`Ping error: ${error.message}`, 'error');

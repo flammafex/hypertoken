@@ -42,13 +42,13 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "hypertoken": {
       "command": "npx",
-      "args": ["tsx", "/path/to/hypertoken/mcp/server.ts"]
+      "args": ["hypertoken", "mcp"]
     }
   }
 }
 ```
 
-Replace `/path/to/hypertoken` with the actual path to your HyperToken installation.
+Replace `/path/to/hypertoken` with the actual path to your HyperToken installation, or use `npm run mcp` to launch directly.
 
 Restart Claude Desktop after adding the configuration.
 
@@ -57,13 +57,7 @@ Restart Claude Desktop after adding the configuration.
 You can also run the server directly:
 
 ```bash
-npm run mcp:server
-```
-
-Or:
-
-```bash
-npx tsx mcp/server.ts
+npm run mcp
 ```
 
 ## Usage
@@ -148,11 +142,12 @@ Pre-built conversation starters:
 
 ```
 mcp/
-├── server.ts           # Main MCP server
 ├── games/
 │   ├── blackjack-mcp.ts    # Blackjack game wrapper
 │   └── tictactoe-mcp.ts    # Tic-Tac-Toe game wrapper
 └── README.md           # This file
+
+(Server entrypoint lives at cli/commands/mcp.ts, launched via `npm run mcp`.)
 ```
 
 ## Development
@@ -162,7 +157,7 @@ mcp/
 You can test the server using the MCP Inspector:
 
 ```bash
-npx @anthropic-ai/mcp-inspector npx tsx mcp/server.ts
+npx @anthropic-ai/mcp-inspector npm run mcp
 ```
 
 ### Adding New Games
@@ -186,7 +181,7 @@ export class MyGame {
 }
 ```
 
-2. Import and register in `server.ts`:
+2. Import and register in `cli/commands/mcp.ts`:
    - Add tools in `ListToolsRequestSchema` handler
    - Add tool handling in `CallToolRequestSchema` handler
    - Update `getOrCreateSession()` to support the new game type
@@ -199,7 +194,7 @@ export class MyGame {
 
 - Ensure all dependencies are installed: `npm install`
 - Check that the path in Claude Desktop config is correct
-- Try running manually to see error messages: `npx tsx mcp/server.ts`
+- Try running manually to see error messages: `npm run mcp`
 
 ### Tools not showing in Claude
 

@@ -37,11 +37,6 @@ export class HistoryManager {
     return last;
   }
 
-  /** Pop next action from redo stack (caller must save current snapshot and apply the action). */
-  popRedo(): Action | null {
-    return this.future.pop() ?? null;
-  }
-
   /** Push a snapshot (used before re-applying a redo action). */
   pushSnapshot(snapshot: string): void {
     this._snapshots.push(snapshot);

@@ -92,14 +92,6 @@ export class GameLoop extends Emitter {
     this._syncState();
   }
 
-  nextTurn() {
-    const agentCount = this.engine._agents.length;
-    if (!agentCount) return;
-
-    this.engine.dispatch("game:nextTurn", { agentCount });
-    this._syncState();
-  }
-
   get activeAgent(): IEngineAgent | null {
     const idx = this.activeAgentIndex;
     if (idx >= 0 && idx < this.engine._agents.length) {

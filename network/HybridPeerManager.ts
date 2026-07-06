@@ -87,13 +87,6 @@ export class HybridPeerManager extends Emitter {
   }
 
   /**
-   * Get the number of reconnection attempts
-   */
-  getReconnectAttempts(): number {
-    return this.wsConnection.getReconnectAttempts();
-  }
-
-  /**
    * Connect to the server via WebSocket
    */
   connect(): void {

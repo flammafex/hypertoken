@@ -145,13 +145,13 @@ Engine.resume()
       → Automerge.load(bytes) → doc
 ```
 
-## Migration from save-state-plugin
+## Migration from save-state-plugin (removed)
 
 The old `plugins/save-state-plugin.js` monkey-patched methods onto the engine.
 The new API is first-class:
 
 ```typescript
-// Old (monkey-patch)
+// Old (monkey-patch) — REMOVED, no longer available
 import saveStatePlugin from './plugins/save-state-plugin.js';
 saveStatePlugin.init(engine, { storageType: 'file' });
 await engine.saveGame('my-game');
@@ -164,8 +164,9 @@ await engine.persist('my-game');
 await engine.resume('my-game');
 ```
 
-The old plugin still works for backward compatibility, but the new API is
-recommended for new code.
+Note: The `save-state-plugin.js` has been removed. Use `engine.useStorage()`
+instead. Migration to the first-class API is now mandatory since the plugin
+no longer exists.
 
 ## Files
 

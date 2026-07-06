@@ -18,13 +18,13 @@ core/          CRDT state primitives (Token, Stack, Space, Source, Chronicle, IC
 core/browser/  Browser build infrastructure (shims.js, build.js)
 core/storage/  Storage adapters (MemoryAdapter, FilesystemAdapter, IndexedDBAdapter)
 core/StorageAdapter.ts  Storage adapter interface
-engine/        Game coordination (Engine, actions.ts, Action, GameLoop, RuleEngine, Agent, Policy, Recorder, Script)
+engine/        Game coordination (Engine, actions.ts, Action, GameLoop, RuleEngine, Agent, Policy, Script)
 network/       P2P & server (PeerConnection, AuthoritativeServer, HybridPeerManager, MessageCodec, E2EEncryption)
 hypertoken-rl/  RL adapters split (interface/, bridge/, python/) — Gym, PettingZoo, ONNXAgent, bridge server, Python client
 core-rs/       Rust → WASM source (src/lib.rs, src/chronicle_actions/, Cargo.toml, build.sh)
 cli/           CLI entrypoint (index.ts → commands/{relay,bridge,mcp}.ts)
 examples/      10 game dirs (blackjack, poker, cuttle, prisoners-dilemma, hanabi, coup, liars-dice, accordion, dungeon-raiders, browser-demo)
-examples/confluence/  Confluence CRDT showcase game (real-time territory game)
+examples/watershed/  Watershed CRDT showcase game (real-time territory game)
 mcp/           MCP server for LLM play (server.ts, games/)
 plugins/       analytics, logging, save-state plugins + pluginLoader
 workers/       hypertoken.worker.js (Phase 3 multi-threading is future work)
@@ -35,7 +35,7 @@ benchmark/     Benchmark scripts
 test/          Custom test runner (no Jest/Vitest)
 ```
 
-**Library entrypoint:** `core/index.js` exports `Token, Stack, Space, Source, Chronicle, Engine, Emitter, EventRegistry, random helpers, token-set loaders`. Note: `package.json` has **no `main`/`exports`** — consumers import directly from `core/index.js` or specific module paths.
+**Library entrypoint:** `core/index.js` exports `Token, Stack, Space, Source, Chronicle, Engine, Emitter, random helpers, token-set loaders`. Note: `package.json` has **no `main`/`exports`** — consumers import directly from `core/index.js` or specific module paths.
 
 ## Setup, run, test, lint, build
 
@@ -58,8 +58,8 @@ npm run test:persistence  # Phase C persistence tests
 npm run test:cuttle:sync  # Cuttle CRDT sync tests
 npm run test:cuttle:crypto  # Cuttle encrypted hands tests
 npm run test:cuttle:hardening  # Cuttle hardening tests
-npm run test:confluence:rules  # Confluence game rules tests
-npm run test:confluence:sync  # Confluence CRDT sync tests
+npm run test:watershed:rules  # Watershed game rules tests
+npm run test:watershed:sync  # Watershed CRDT sync tests
 
 # Single test file (custom ESM loader resolves .js → .ts):
 node --loader ./test/ts-esm-loader.js test/testCore.js
@@ -69,7 +69,7 @@ npm run blackjack        # Casino with AI & betting
 npm run poker            # Texas Hold'em
 npm run cuttle           # Card combat
 npm run prisoners-dilemma  # Game theory tournament
-npm run confluence:web   # Build + serve Confluence browser client
+npm run watershed:web   # Build + serve Watershed browser client
 
 # Infrastructure
 npm run relay            # P2P relay server

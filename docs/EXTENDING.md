@@ -252,14 +252,12 @@ engine.registerPolicy('turn-end-checks', {
 ### Managing Policies
 
 ```javascript
-// Register
+// Register a policy (evaluates after every dispatched action)
 engine.registerPolicy('my-policy', { evaluate: fn });
 
-// Unregister
-engine.unregisterPolicy('my-policy');
-
-// Clear all
-engine.clearPolicies();
+// Note: Policies are registered via registerPolicy() only.
+// To replace a policy, re-register with the same name.
+// All policies are cleared on engine.shutdown().
 ```
 
 ---

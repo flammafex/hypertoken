@@ -259,7 +259,15 @@ export async function runMcp(args: string[]): Promise<void> {
             content: [
               {
                 type: 'text',
-                text: `Available games:\n\n1. Blackjack - blackjack_new_game, blackjack_hit, blackjack_stand\n2. Tic-Tac-Toe - tictactoe_new_game, tictactoe_move`,
+                text: `Available games:
+
+1. **Blackjack** - Classic casino card game
+   - Tools: blackjack_new_game, blackjack_hit, blackjack_stand, blackjack_state
+
+2. **Tic-Tac-Toe** - Classic strategy game
+   - Tools: tictactoe_new_game, tictactoe_move, tictactoe_state
+
+Start a game by calling the appropriate new_game tool!`,
               },
             ],
           };
@@ -279,8 +287,18 @@ export async function runMcp(args: string[]): Promise<void> {
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
     return {
       resources: [
-        { uri: 'hypertoken://game/state', name: 'Current Game State', mimeType: 'text/plain' },
-        { uri: 'hypertoken://game/history', name: 'Game History', mimeType: 'text/plain' },
+        {
+          uri: 'hypertoken://game/state',
+          name: 'Current Game State',
+          description: 'The current state of the active game',
+          mimeType: 'text/plain',
+        },
+        {
+          uri: 'hypertoken://game/history',
+          name: 'Game History',
+          description: 'History of moves in the current game',
+          mimeType: 'text/plain',
+        },
       ],
     };
   });
@@ -308,14 +326,25 @@ export async function runMcp(args: string[]): Promise<void> {
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
     return {
       prompts: [
-        { name: 'play_blackjack', description: 'Play Blackjack with strategy advice', arguments: [] },
-        { name: 'play_tictactoe', description: 'Play Tic-Tac-Toe optimally', arguments: [] },
+        { name: 'play_blackjack', description: 'Play a game of Blackjack with strategic advice', arguments: [] },
+        { name: 'play_tictactoe', description: 'Play Tic-Tac-Toe with optimal strategy', arguments: [] },
+        {
+          name: 'teach_game',
+          description: 'Learn how to play a game',
+          arguments: [
+            {
+              name: 'game',
+              description: 'The game to learn (blackjack, tictactoe)',
+              required: true,
+            },
+          ],
+        },
       ],
     };
   });
 
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    const { name } = request.params;
+    const { name, arguments: promptArgs } = request.params;
 
     switch (name) {
       case 'play_blackjack':
@@ -325,7 +354,23 @@ export async function runMcp(args: string[]): Promise<void> {
               role: 'user',
               content: {
                 type: 'text',
-                text: "Let's play Blackjack! Start with blackjack_new_game and help me make optimal decisions.",
+                text: `Let's play Blackjack! I'll be the player and you help me make optimal decisions.
+
+First, start a new game using the blackjack_new_game tool.
+
+Then, for each hand:
+1. Look at my cards and the dealer's visible card
+2. Recommend whether to hit or stand based on basic strategy
+3. Execute my choice using blackjack_hit or blackjack_stand
+4. Tell me the result
+
+Basic strategy reminders:
+- Always hit on 11 or less
+- Stand on 17 or higher
+- On 12-16, hit if dealer shows 7 or higher
+- Double down on 10-11 when dealer is weak
+
+Let's play!`,
               },
             },
           ],
@@ -337,11 +382,50 @@ export async function runMcp(args: string[]): Promise<void> {
               role: 'user',
               content: {
                 type: 'text',
-                text: "Let's play Tic-Tac-Toe! Start with tictactoe_new_game. You play as X.",
+                text: `Let's play Tic-Tac-Toe! You play as X, and I want you to try to win.
+
+Start a new game with tictactoe_new_game, then make moves with tictactoe_move.
+
+The board positions are:
+  0 | 1 | 2
+  ---------
+  3 | 4 | 5
+  ---------
+  6 | 7 | 8
+
+Strategy tips:
+- Take center (4) if available
+- Take corners (0, 2, 6, 8) over edges
+- Block opponent's winning moves
+- Create forks when possible
+
+Start the game and play to win!`,
               },
             },
           ],
         };
+      case 'teach_game': {
+        const game = (promptArgs as { game?: string })?.game || 'blackjack';
+        return {
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Teach me how to play ${game}!
+
+Please:
+1. Explain the basic rules
+2. Start a practice game
+3. Walk me through each decision, explaining the strategy
+4. Let me make choices and give feedback
+
+I'm a beginner, so please be patient and explain everything!`,
+              },
+            },
+          ],
+        };
+      }
       default:
         throw new Error(`Unknown prompt: ${name}`);
     }

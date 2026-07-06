@@ -91,13 +91,6 @@ export class UniversalRelayServer extends Emitter {
   }
 
   /**
-   * Get the current message codec
-   */
-  getCodec(): MessageCodec {
-    return this.codec;
-  }
-
-  /**
    * Start the relay server with HTTP health endpoint
    */
   async start(): Promise<void> {
@@ -199,13 +192,6 @@ export class UniversalRelayServer extends Emitter {
    */
   get clientCount(): number {
     return this.clients.size;
-  }
-
-  /**
-   * Get all connected peer IDs
-   */
-  getPeerIds(): string[] {
-    return Array.from(this.clients.values()).map(info => info.peerId);
   }
 
   /*───────────────────────────────────────────────

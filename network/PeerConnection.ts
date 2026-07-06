@@ -140,28 +140,6 @@ export class PeerConnection extends Emitter {
     return this.connectionState;
   }
 
-  /**
-   * Get number of reconnection attempts
-   */
-  getReconnectAttempts(): number {
-    return this.reconnectAttempts;
-  }
-
-  /**
-   * Get the current message codec
-   */
-  getCodec(): MessageCodec {
-    return this.codec;
-  }
-
-  /**
-   * Set a new message codec
-   */
-  setCodec(codec: MessageCodec): void {
-    this.codec = codec;
-    this.binaryMode = codec.getConfig().format === "msgpack";
-  }
-
   connect(): void {
     this.intentionalClose = false;
     this._connect();
@@ -220,14 +198,6 @@ export class PeerConnection extends Emitter {
       this.socket.close(1000, "Client disconnect");
     }
     this.connectionState = ConnectionState.Disconnected;
-  }
-
-  /**
-   * Reset reconnection state (call before re-connecting after intentional disconnect)
-   */
-  resetReconnection(): void {
-    this.reconnectAttempts = 0;
-    this.intentionalClose = false;
   }
 
   sendToPeer(targetPeerId: string, payload: any): void {

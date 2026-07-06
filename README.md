@@ -40,7 +40,7 @@ npm run blackjack          # Casino with AI & betting
 npm run prisoners-dilemma  # Game theory tournament
 npm run poker              # Texas Hold'em
 npm run cuttle             # Card combat
-npm run confluence:web     # CRDT territory game in browser
+npm run watershed:web     # CRDT territory game in browser
 
 # Multiplayer
 npm run blackjack:server   # Host
@@ -147,8 +147,8 @@ const defectOutcome = engine.getState();
 **MCP Server** — Let LLMs play games via [Model Context Protocol](https://modelcontextprotocol.io/).
 
 ```bash
-npm run mcp:server       # LLM integration
-npm run bridge:blackjack # Python bridge
+npm run mcp             # LLM integration
+npm run bridge          # Python bridge
 ```
 
 ---
@@ -195,7 +195,7 @@ hypertoken/
     ├── poker/
     ├── prisoners-dilemma/
     ├── hanabi/
-    └── confluence/         # CRDT showcase game (real-time territory)
+    └── watershed/         # CRDT showcase game (real-time territory)
 ```
 
 ---

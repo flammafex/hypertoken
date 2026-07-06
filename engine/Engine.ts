@@ -13,9 +13,6 @@ import type { IChronicle } from '../core/IChronicle.js';
 import { GameLoop } from "./GameLoop.js";
 import { RuleEngine } from "./RuleEngine.js";
 import { IEngineAgent, IGameState, ITransaction, IEngineSnapshot, IEngineState } from "./types.js";
-import type { StackWasm } from "../core/StackWasm.js";
-import type { SpaceWasm } from "../core/SpaceWasm.js";
-import type { SourceWasm } from "../core/SourceWasm.js";
 import type { INetworkConnection } from "../core/ConsensusCore.js";
 import type { ConsensusCore } from "../core/ConsensusCore.js";
 import type { MessageCodec, CodecConfig } from "../network/MessageCodec.js";
@@ -31,29 +28,20 @@ export interface EngineNetworkOptions {
 }
 
 export interface EngineOptions {
-  stack?: Stack | StackWasm | null;
-  space?: Space | SpaceWasm | null;
-  source?: Source | SourceWasm | null;
+  stack?: Stack | null;
+  space?: Space | null;
+  source?: Source | null;
   autoConnect?: string;
   useWebRTC?: boolean;
-  useWorker?: boolean;
   /** Disable WASM dispatcher and force TypeScript Chronicle path (needed for network sync). */
   disableWasm?: boolean;
-  workerOptions?: {
-    debug?: boolean;
-    timeout?: number;
-    enableBatching?: boolean;
-    batchWindow?: number;
-    workerPath?: string;
-    wasmPath?: string;
-  };
   networkOptions?: EngineNetworkOptions;
 }
 
 export class Engine extends Emitter {
-  stack: Stack | StackWasm | null;
-  space: Space | SpaceWasm;
-  source: Source | SourceWasm | null;
+  stack: Stack | null;
+  space: Space;
+  source: Source | null;
 
   session: IChronicle;
   loop: GameLoop;
@@ -69,7 +57,7 @@ export class Engine extends Emitter {
   private _useWebRTC: boolean;
   private _networkOptions: EngineNetworkOptions;
 
-  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, useWorker = false, disableWasm = false, workerOptions = {}, networkOptions = {} }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, disableWasm = false, networkOptions = {} }: EngineOptions = {}) {
     super();
 
     this.session = new Chronicle();
@@ -90,21 +78,7 @@ export class Engine extends Emitter {
     this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
     if (!disableWasm) {
-      if (useWorker) {
-        this.wasm.initWorker(
-          workerOptions,
-          this.debug,
-          (payload) => this.emit('state:updated', payload),
-          (payload) => this.emit('engine:action', { payload }),
-          (error) => this.emit('engine:error', { payload: { error } }),
-          () => {
-            // Worker init failed, fall back to direct WASM
-            this._initWasm();
-          },
-        );
-      } else {
-        this._initWasm();
-      }
+      this._initWasm();
     }
 
     if (autoConnect) {
@@ -192,18 +166,6 @@ export class Engine extends Emitter {
     return this;
   }
 
-  unregisterPolicy(name: string): this {
-    this._policies.delete(name);
-    this.emit("engine:policy:removed", { payload: { name } });
-    return this;
-  }
-
-  clearPolicies(): this {
-    this._policies.clear();
-    this.emit("engine:policy:cleared");
-    return this;
-  }
-
   // ── Dispatch ───────────────────────────────────────────────────────────────
 
   async dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<any> {
@@ -213,17 +175,7 @@ export class Engine extends Emitter {
     const snapshot = this.session.saveToBase64();
     let result: any;
 
-    if (this.wasm.useWorker && this.wasm.worker?.ready) {
-      try {
-        result = await this.wasm.dispatchWorker(type, payload);
-        action.result = result;
-      } catch (error) {
-        if (this.debug) console.log('⚠️  Worker dispatch failed, falling back to sync:', error);
-        result = this.apply(action);
-      }
-    } else {
-      result = this.apply(action);
-    }
+    result = this.apply(action);
 
     if (result !== Engine.ACTION_FAILED) {
       this.historyManager.recordAction(action, snapshot);
@@ -278,16 +230,6 @@ export class Engine extends Emitter {
     if (!action) return null;
     this.emit("engine:undo", { payload: action });
     return action;
-  }
-
-  redo(): Action | null {
-    const next = this.historyManager.popRedo();
-    if (!next) return null;
-    this.historyManager.pushSnapshot(this.session.saveToBase64());
-    this.apply(next);
-    this.historyManager.pushHistory(next);
-    this.emit("engine:redo", { payload: next });
-    return next;
   }
 
   // ── Snapshot / Restore ─────────────────────────────────────────────────────
@@ -442,33 +384,5 @@ export class Engine extends Emitter {
       spaceState: space?.snapshot?.() ?? null,
       sourceState: source?.inspect?.() ?? null
     };
-  }
-
-  availableActions(): any[] {
-    const actions = [];
-    if (this.state.stack) {
-      actions.push(
-        { type: "stack:draw", payload: { count: 1 } },
-        { type: "stack:shuffle", payload: {} },
-        { type: "stack:reset", payload: {} }
-      );
-    }
-    if (this.state.space) {
-      actions.push(
-        { type: "space:place", payload: { zone: "altar" } },
-        { type: "space:clear", payload: {} }
-      );
-    }
-    if (this.state.source) {
-      actions.push(
-        { type: "source:draw", payload: { count: 1 } },
-        { type: "source:shuffle", payload: {} }
-      );
-    }
-    actions.push(
-      { type: "loop:start", payload: {} },
-      { type: "loop:stop", payload: {} }
-    );
-    return actions;
   }
 }

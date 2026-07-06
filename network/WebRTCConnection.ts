@@ -82,20 +82,6 @@ export class WebRTCConnection extends Emitter {
   }
 
   /**
-   * Get the current message codec
-   */
-  getCodec(): MessageCodec {
-    return this.codec;
-  }
-
-  /**
-   * Set a new message codec
-   */
-  setCodec(codec: MessageCodec): void {
-    this.codec = codec;
-  }
-
-  /**
    * Initialize or re-initialize the peer connection
    */
   private initializePeerConnection(): void {
@@ -217,20 +203,6 @@ export class WebRTCConnection extends Emitter {
 
     this.peerConnection.close();
     this.emit('rtc:disconnected', { peerId: this.remotePeerId });
-  }
-
-  /**
-   * Check if currently using TURN servers
-   */
-  isUsingTurn(): boolean {
-    return this.usingTurn;
-  }
-
-  /**
-   * Get current retry count
-   */
-  getRetryCount(): number {
-    return this.retryCount;
   }
 
   /**
