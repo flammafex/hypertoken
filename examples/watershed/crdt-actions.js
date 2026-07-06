@@ -91,6 +91,32 @@ function generateOpId(peerId, seq) {
   return `${peerId}-${seq}`;
 }
 
+/**
+ * Get the next sequence number for a peer.
+ * Uses a local in-memory counter to avoid the race condition where two
+ * actions dispatched before the first's CRDT write is visible would
+ * compute the same seq → same opId → silent token loss (last-write-wins).
+ *
+ * The counter is per-engine, per-peer. It initializes from the existing
+ * ops count on first use (for reconnect/resume scenarios) then increments
+ * monotonically.
+ */
+function nextSeq(engine, peerId) {
+  if (!engine._watershedSeq) engine._watershedSeq = {};
+  if (engine._watershedSeq[peerId] === undefined) {
+    // Initialize from existing ops count (handles reconnect/resume)
+    const state = engine.session.state?.watershed;
+    if (state?.ops) {
+      engine._watershedSeq[peerId] = Object.keys(state.ops).filter(
+        (id) => state.ops[id].actor === peerId
+      ).length;
+    } else {
+      engine._watershedSeq[peerId] = 0;
+    }
+  }
+  return engine._watershedSeq[peerId]++;
+}
+
 // Register Watershed actions
 Object.assign(ActionRegistry, {
   /**
@@ -200,8 +226,8 @@ Object.assign(ActionRegistry, {
       }
     }
 
-    // Generate unique IDs
-    const seq = Object.keys(state.ops).filter((id) => state.ops[id].actor === peerId).length;
+    // Generate unique IDs (local monotonic counter — avoids race condition)
+    const seq = nextSeq(engine, peerId);
     const opId = generateOpId(peerId, seq);
     const tokenId = `tok-${opId}`;
 
@@ -264,7 +290,7 @@ Object.assign(ActionRegistry, {
     const dy = Math.abs(tokenA.y - tokenB.y);
     if (dx > 1 || dy > 1 || (dx === 0 && dy === 0)) throw new Error("Tokens not adjacent");
 
-    const seq = Object.keys(state.ops).filter((id) => state.ops[id].actor === peerId).length;
+    const seq = nextSeq(engine, peerId);
     const opId = generateOpId(peerId, seq);
     const newTokenId = `tok-${opId}`;
     const newStrength = Math.min(3, tokenA.strength + tokenB.strength);
@@ -329,7 +355,7 @@ Object.assign(ActionRegistry, {
     if (targetX < 0 || targetX >= state.config.width) throw new Error("targetX out of bounds");
     if (targetY < 0 || targetY >= state.config.height) throw new Error("targetY out of bounds");
 
-    const seq = Object.keys(state.ops).filter((id) => state.ops[id].actor === peerId).length;
+    const seq = nextSeq(engine, peerId);
     const opId = generateOpId(peerId, seq);
     const newTokenId1 = `tok-${opId}-a`;
     const newTokenId2 = `tok-${opId}-b`;
