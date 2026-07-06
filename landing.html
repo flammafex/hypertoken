@@ -232,10 +232,7 @@ npm run watershed:web     # Terminal 2: build + serve
 npm run blackjack
 
 # Play Cuttle
-npm run cuttle
-
-# Play Prisoner's Dilemma
-npm run prisoners-dilemma</code></pre>
+npm run cuttle</code></pre>
 </section>
 
 <hr>
@@ -284,12 +281,12 @@ await engine.resume("my-game-session");</code></pre>
 const snapshot = engine.snapshot();
 
 // Explore timeline A
-engine.dispatch('agent:cooperate');
+engine.dispatch('token:merge', { tokens: [sword, fireEnchantment] });
 const outcomeA = engine.getState();
 
 // Rewind, explore timeline B
 engine.restore(snapshot);
-engine.dispatch('agent:defect');
+engine.dispatch('token:split', { token: sword, count: 2 });
 const outcomeB = engine.getState();</code></pre>
 </section>
 
@@ -305,8 +302,7 @@ const outcomeB = engine.getState();</code></pre>
     <li><strong>Persistence</strong> — IndexedDB (browser) and Filesystem (Node.js) adapters with auto-save</li>
     <li><strong>Browser builds</strong> — one command bundles any game for the browser</li>
     <li><strong>MCP server</strong> — LLM integration via Model Context Protocol</li>
-    <li><strong>10 example games</strong> — Blackjack, Poker, Cuttle, Watershed, Prisoner's Dilemma, Hanabi, Coup, Liars Dice, Accordion, Dungeon Raiders</li>
-    <li><strong>RL interfaces</strong> — Gym and PettingZoo adapters in <code>hypertoken-rl/</code> for engine-backed evaluation environments</li>
+    <li><strong>3 example games</strong> — Blackjack (card game with AI), Cuttle (CRDT multiplayer combat), Watershed (real-time territory showcase)</li>
   </ul>
 </section>
 
