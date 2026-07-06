@@ -18,16 +18,45 @@
 
 export type Phase = "playing" | "ended";
 
+/**
+ * Energy system config — gates placement to make merge/split strategically
+ * valuable. Place costs energy; merge & split are free.
+ */
+export interface EnergyConfig {
+  max: number;           // max energy a player can hold
+  regenIntervalMs: number; // regen 1 energy every X ms
+  placeCost: number;     // cost to place a token
+  mergeCost: number;     // cost to merge (free)
+  splitCost: number;     // cost to split (free)
+}
+
+/**
+ * Energy config presets selectable by the game host in the lobby.
+ */
+export const ENERGY_PRESETS: Record<string, EnergyConfig> = {
+  blitz: { max: 25, regenIntervalMs: 1000, placeCost: 1, mergeCost: 0, splitCost: 0 },
+  standard: { max: 15, regenIntervalMs: 2000, placeCost: 1, mergeCost: 0, splitCost: 0 },
+  strategic: { max: 8, regenIntervalMs: 3000, placeCost: 1, mergeCost: 0, splitCost: 0 },
+};
+
 export interface WatershedConfig {
   width: number;
   height: number;
   durationMs: number;
+  energy: EnergyConfig;
 }
 
 export const DEFAULT_CONFIG: WatershedConfig = {
   width: 10,
   height: 10,
   durationMs: 30000, // 30s for demo
+  energy: {
+    max: 15,           // max energy a player can hold
+    regenIntervalMs: 2000,  // regen 1 energy every 2s
+    placeCost: 1,      // cost to place a token
+    mergeCost: 0,      // cost to merge (free)
+    splitCost: 0,      // cost to split (free)
+  },
 };
 
 export interface WatershedToken {
@@ -54,6 +83,8 @@ export interface WatershedPlayer {
   name: string;
   color: string;
   joinedAt: number;
+  energy?: number;        // current energy (may be stale — compute regen on read)
+  lastEnergyTime?: number; // timestamp of last energy update
 }
 
 export interface WatershedState {
@@ -143,9 +174,33 @@ export function registerPlayer(
     name,
     color: PLAYER_COLORS[colorIndex],
     joinedAt: Date.now(),
+    energy: state.config.energy.max, // start with full energy
+    lastEnergyTime: Date.now(),
   };
   state.players[peerId] = player;
   return player;
+}
+
+// ============================================================================
+// Energy
+// ============================================================================
+
+/**
+ * Compute current energy given stored values, accounting for passive regen.
+ * Energy regenerates `+1` per `regenIntervalMs` since `lastEnergyTime`,
+ * capped at `max`. This is eventually consistent across CRDT peers — different
+ * peers may compute slightly different values, but last-write-wins on the
+ * `energy` / `lastEnergyTime` fields converges.
+ */
+export function computeEnergy(
+  player: { energy?: number; lastEnergyTime?: number },
+  config: { max: number; regenIntervalMs: number },
+): number {
+  const stored = player.energy ?? config.max;
+  const lastTime = player.lastEnergyTime ?? Date.now();
+  const elapsed = Date.now() - lastTime;
+  const regenerated = Math.floor(elapsed / config.regenIntervalMs);
+  return Math.min(config.max, stored + regenerated);
 }
 
 // ============================================================================

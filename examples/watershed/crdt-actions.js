@@ -28,6 +28,8 @@ import {
   deriveResult,
   getTimeRemaining,
   isTimeUp,
+  computeEnergy,
+  ENERGY_PRESETS,
 } from "./WatershedGame.js";
 
 /**
@@ -93,11 +95,17 @@ Object.assign(ActionRegistry, {
   /**
    * Initialize a new Watershed game.
    */
-  "watershed:init": (engine, { width, height, durationMs } = {}) => {
+  "watershed:init": (engine, { width, height, durationMs, energyConfig } = {}) => {
     const config = { width: width ?? 10, height: height ?? 10, durationMs: durationMs ?? 30000 };
+    const energy = energyConfig || ENERGY_PRESETS.standard;
     engine.session.change("watershed:init", (doc) => {
       doc.watershed = {
-        config: { width: config.width, height: config.height, durationMs: config.durationMs },
+        config: {
+          width: config.width,
+          height: config.height,
+          durationMs: config.durationMs,
+          energy,
+        },
         players: {},
         tokens: {},
         consumed: {},
@@ -131,6 +139,7 @@ Object.assign(ActionRegistry, {
 
     const colors = ["#e94560", "#00d4ff", "#4ade80", "#fbbf24"];
     const colorIndex = Object.keys(state.players).length % colors.length;
+    const energyMax = state.config?.energy?.max ?? 15;
 
     engine.session.change("watershed:register", (doc) => {
       doc.watershed.players[peerId] = {
@@ -138,6 +147,8 @@ Object.assign(ActionRegistry, {
         name: name || `Player ${Object.keys(doc.watershed.players).length + 1}`,
         color: colors[colorIndex],
         joinedAt: Date.now(),
+        energy: energyMax, // start with full energy
+        lastEnergyTime: Date.now(),
       };
     });
 
@@ -160,6 +171,16 @@ Object.assign(ActionRegistry, {
     if (x < 0 || x >= state.config.width) throw new Error(`x out of bounds: ${x}`);
     if (y < 0 || y >= state.config.height) throw new Error(`y out of bounds: ${y}`);
 
+    // Energy check: placement costs energy. Merge/split are free, so this
+    // makes them strategically valuable vs. spam-clicking placements.
+    const player = state.players[peerId];
+    const energyConfig = state.config?.energy || ENERGY_PRESETS.standard;
+    const currentEnergy = computeEnergy(player, energyConfig);
+    if (currentEnergy < energyConfig.placeCost) {
+      engine.emit("watershed:rejected", { reason: "insufficient_energy", peerId, x, y });
+      return;
+    }
+
     // Generate unique IDs
     const seq = Object.keys(state.ops).filter((id) => state.ops[id].actor === peerId).length;
     const opId = generateOpId(peerId, seq);
@@ -167,6 +188,10 @@ Object.assign(ActionRegistry, {
 
     // Field-level write: only add the new token and op
     engine.session.change(`watershed:place ${peerId} (${x},${y})`, (doc) => {
+      // Deduct energy and update timestamp
+      doc.watershed.players[peerId].energy = currentEnergy - energyConfig.placeCost;
+      doc.watershed.players[peerId].lastEnergyTime = Date.now();
+
       doc.watershed.tokens[tokenId] = {
         id: tokenId,
         playerId: peerId,

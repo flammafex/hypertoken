@@ -18,6 +18,7 @@ import {
   getTimeRemainingSec,
   isGameOver,
 } from '../crdt-actions';
+import { computeEnergy, ENERGY_PRESETS } from '../WatershedGame';
 
 console.log('[Watershed] Modules loaded successfully');
 
@@ -72,6 +73,12 @@ const state = {
   roomCode: null,
   isHost: false,
   lobbyVisible: false,
+
+  // Energy preset (selected in lobby)
+  energyPreset: 'standard',
+
+  // Energy display timer
+  energyInterval: null,
 };
 
 // ============================================================================
@@ -152,6 +159,13 @@ const elements = {
   btnStartGame: document.getElementById('btn-start-game'),
   btnLobbyRetry: document.getElementById('btn-lobby-retry'),
   btnLobbyCancel: document.getElementById('btn-lobby-cancel'),
+
+  // Energy
+  energyBar: document.getElementById('energy-bar'),
+  energyFill: document.getElementById('energy-fill'),
+  energyValue: document.getElementById('energy-value'),
+  energyMax: document.getElementById('energy-max'),
+  energyPresetGroup: document.getElementById('energy-preset-group'),
 };
 
 // ============================================================================
@@ -221,6 +235,7 @@ async function handleResumeGame() {
     state.engine.on('watershed:ready', handleGameReady);
     state.engine.on('watershed:started', handleGameStarted);
     state.engine.on('watershed:ended', handleGameEnded);
+    state.engine.on('watershed:rejected', handlePlacementRejected);
 
     const loaded = await state.engine.resume('watershed-save');
     if (loaded) {
@@ -296,6 +311,21 @@ function bindEvents() {
     showLobbyState('room-select');
   });
 
+  // Energy preset selector (lobby)
+  if (elements.energyPresetGroup) {
+    elements.energyPresetGroup.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-preset');
+      if (!btn) return;
+      const preset = btn.dataset.preset;
+      if (!preset || !ENERGY_PRESETS[preset]) return;
+      state.energyPreset = preset;
+      elements.energyPresetGroup.querySelectorAll('.btn-preset').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+    });
+  }
+
   // Board interactions
   elements.gameBoard.addEventListener('click', handleBoardClick);
   elements.gameBoard.addEventListener('mouseover', handleBoardHover);
@@ -350,6 +380,7 @@ async function handleStart(e) {
     state.engine.on('net:disconnected', handleDisconnected);
     state.engine.on('net:peer:connected', handlePeerJoined);
     state.engine.on('net:peer:disconnected', handlePeerLeft);
+    state.engine.on('watershed:rejected', handlePlacementRejected);
 
     // Show lobby in connecting state, then connect
     showLobby();
@@ -421,6 +452,7 @@ async function initGameState() {
         width: 10,
         height: 10,
         durationMs: 30000,
+        energyConfig: ENERGY_PRESETS[state.energyPreset] || ENERGY_PRESETS.standard,
       });
     } catch (e) {
       // A peer may have already initialized — ignore concurrent init errors
@@ -633,6 +665,7 @@ function handleGameStarted() {
   state.gameStarted = true;
   hideLobby();
   startTimer();
+  startEnergyTimer();
   announce('Game started! Place your tokens!');
 }
 
@@ -718,6 +751,7 @@ function updatePeerCount() {
 function handleGameEnded(event) {
   state.gameEnded = true;
   stopTimer();
+  stopEnergyTimer();
 
   // Auto-save the final game state
   if (state.engine && state.storageAdapter) {
@@ -770,6 +804,79 @@ function stopTimer() {
 }
 
 // ============================================================================
+// Energy Display
+// ============================================================================
+
+function startEnergyTimer() {
+  stopEnergyTimer();
+  // Recompute energy frequently so the bar visibly regenerates.
+  state.energyInterval = setInterval(renderEnergy, 100);
+  renderEnergy();
+}
+
+function stopEnergyTimer() {
+  if (state.energyInterval) {
+    clearInterval(state.energyInterval);
+    state.energyInterval = null;
+  }
+}
+
+function getEnergyConfig() {
+  const watershedState = state.engine?.session?.state?.watershed;
+  return watershedState?.config?.energy || ENERGY_PRESETS.standard;
+}
+
+function renderEnergy() {
+  if (!elements.energyFill) return;
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (!watershedState) return;
+
+  const player = watershedState.players?.[state.peerId];
+  const cfg = getEnergyConfig();
+  const max = cfg.max ?? 15;
+  const placeCost = cfg.placeCost ?? 1;
+
+  if (!player) {
+    elements.energyFill.style.width = '0%';
+    elements.energyValue.textContent = '0';
+    elements.energyMax.textContent = String(max);
+    return;
+  }
+
+  const current = computeEnergy(player, cfg);
+  const pct = Math.max(0, Math.min(100, (current / max) * 100));
+
+  elements.energyFill.style.width = `${pct}%`;
+  elements.energyValue.textContent = String(Math.floor(current));
+  elements.energyMax.textContent = String(max);
+
+  // Color shift: green → yellow → red as energy depletes
+  elements.energyBar.classList.remove('energy-low', 'energy-mid', 'energy-full', 'energy-depleted');
+  if (current < placeCost) {
+    elements.energyBar.classList.add('energy-depleted');
+  } else if (pct < 34) {
+    elements.energyBar.classList.add('energy-low');
+  } else if (pct < 67) {
+    elements.energyBar.classList.add('energy-mid');
+  } else {
+    elements.energyBar.classList.add('energy-full');
+  }
+}
+
+function handlePlacementRejected(event) {
+  const reason = event?.reason || event?.payload?.reason;
+  if (reason !== 'insufficient_energy') return;
+  announce('Not enough energy!');
+  if (elements.energyBar) {
+    elements.energyBar.classList.remove('shake');
+    // Force reflow to restart animation
+    void elements.energyBar.offsetWidth;
+    elements.energyBar.classList.add('shake');
+    setTimeout(() => elements.energyBar.classList.remove('shake'), 500);
+  }
+}
+
+// ============================================================================
 // Board Rendering
 // ============================================================================
 
@@ -782,6 +889,7 @@ function render() {
   renderBoard(board);
   renderScores(scores);
   renderInstructions();
+  renderEnergy();
 }
 
 function renderBoard(board) {
@@ -1343,6 +1451,7 @@ function handlePlayAgain() {
     width: 10,
     height: 10,
     durationMs: 30000,
+    energyConfig: ENERGY_PRESETS[state.energyPreset] || ENERGY_PRESETS.standard,
   });
 
   // Re-register
