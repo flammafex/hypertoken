@@ -73,6 +73,8 @@ const state = {
   roomCode: null,
   isHost: false,
   lobbyVisible: false,
+  registered: false,
+  gameReady: false,
 
   // Energy preset (selected in lobby)
   energyPreset: 'standard',
@@ -320,8 +322,36 @@ function bindEvents() {
   });
   elements.btnCopyCode?.addEventListener('click', copyRoomCode);
   elements.btnCopyLink?.addEventListener('click', copyRoomLink);
-  elements.btnStartGame?.addEventListener('click', () => {
-    state.engine.dispatch('watershed:start', { peerId: state.peerId });
+  elements.btnStartGame?.addEventListener('click', async () => {
+    // Initialize game with selected settings (if not already done)
+    const existingState = state.engine.session.state?.watershed;
+    if (!existingState) {
+      try {
+        await state.engine.dispatch('watershed:init', {
+          width: 10,
+          height: 10,
+          durationMs: DURATION_PRESETS[state.durationPreset] || DURATION_PRESETS.sprint,
+          energyConfig: ENERGY_PRESETS[state.energyPreset] || ENERGY_PRESETS.standard,
+        });
+      } catch (e) {
+        console.warn('[Watershed] init dispatch failed (likely concurrent):', e.message);
+      }
+    }
+
+    // Register self if not already registered
+    const peerId = state.engine.network?.peerId || state.peerId;
+    state.peerId = peerId;
+    try {
+      state.engine.dispatch('watershed:register', {
+        peerId,
+        name: state.playerName,
+      });
+    } catch (e) {
+      // Already registered — fine
+    }
+
+    // startGame() registers bot (if enabled) and dispatches watershed:start
+    startGame();
   });
   elements.btnLobbyCancel?.addEventListener('click', () => {
     state.engine?.disconnect();
@@ -462,8 +492,7 @@ async function handleStart(e) {
           window.history.replaceState({}, '', createUrl);
           showLobbyState('waiting');
           updateLobbyPlayers();
-          // Host initializes the game state
-          initGameState();
+          // Don't initialize game yet — host picks settings then clicks Start
           break;
         }
         case 'room:joined': {
@@ -473,8 +502,7 @@ async function handleStart(e) {
           joinUrl.searchParams.set('room', msg.roomCode);
           window.history.replaceState({}, '', joinUrl);
           showLobbyState('waiting');
-          // Joiner waits for CRDT sync, then registers
-          initGameState();
+          // Joiner waits for host to start the game (CRDT sync will deliver state)
           break;
         }
         case 'room:error':
@@ -534,15 +562,11 @@ async function initGameState() {
 }
 
 function handleGameReady() {
-  console.log('[Watershed] Game ready');
-  state.gameStarted = true;
-
-  // Show game screen
-  elements.startScreen.classList.add('hidden');
-  elements.gameScreen.classList.add('active');
-
-  // Initial render
-  render();
+  console.log('[Watershed] Game ready — waiting in lobby for host to start');
+  state.gameReady = true;
+  // Do NOT switch to game screen — stay in lobby so host can pick settings
+  // and wait for players. Game screen is shown when handleGameStarted() fires
+  // (after host clicks "Start Game" or receives start via CRDT sync).
 }
 
 // ============================================================================
@@ -738,15 +762,34 @@ function handleGameStarted() {
   console.log('[Watershed] Game started');
   state.gameStarted = true;
   hideLobby();
+  elements.startScreen.classList.add('hidden');
+  elements.gameScreen.classList.add('active');
   startTimer();
   startEnergyTimer();
   if (state.botEnabled) startBot();
   announce('Game started! Place your tokens!');
+  render();
 }
 
 function handleStateUpdate(event) {
-  // Check if game has started via CRDT sync (remote peer clicked Start)
   const watershedState = state.engine?.session?.state?.watershed;
+  
+  // Auto-register when joiner receives game state via CRDT sync
+  if (watershedState && !state.registered) {
+    state.registered = true;
+    const peerId = state.engine.network?.peerId || state.peerId;
+    state.peerId = peerId;
+    try {
+      state.engine.dispatch('watershed:register', {
+        peerId,
+        name: state.playerName,
+      });
+    } catch (e) {
+      // Already registered or game not ready — fine
+    }
+  }
+
+  // Check if game has started via CRDT sync (remote host clicked Start)
   if (watershedState && watershedState.phase === "playing" && !state.gameStarted) {
     state.gameStarted = true;
     handleGameStarted();
@@ -2029,6 +2072,8 @@ function handleNewLobby() {
   resetBoardRender();
   state.gameEnded = false;
   state.gameStarted = false;
+  state.gameReady = false;
+  state.registered = false;
   state.connected = false;
   state.selectedTokenId = null;
   state.interactionMode = null;
