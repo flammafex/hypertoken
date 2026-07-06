@@ -18,7 +18,7 @@ import {
   getTimeRemainingSec,
   isGameOver,
 } from '../crdt-actions';
-import { computeEnergy, ENERGY_PRESETS } from '../WatershedGame';
+import { computeEnergy, ENERGY_PRESETS, DURATION_PRESETS } from '../WatershedGame';
 
 console.log('[Watershed] Modules loaded successfully');
 
@@ -77,6 +77,9 @@ const state = {
   // Energy preset (selected in lobby)
   energyPreset: 'standard',
 
+  // Game length preset (selected in lobby)
+  durationPreset: 'sprint',
+
   // Energy display timer
   energyInterval: null,
 
@@ -85,6 +88,14 @@ const state = {
   botDifficulty: 'normal', // 'easy' | 'normal' | 'hard'
   botTimer: null,
   botPeerId: null,
+
+  // Incremental board rendering — maps tokenId → { element, token } across
+  // renders so we can diff and animate additions / removals / changes
+  // instead of rebuilding the whole 10×10 grid each frame.
+  renderedTokens: new Map(),
+  // Maps "x,y" → cell DOM element (rebuilt only when grid dimensions change)
+  cellElements: new Map(),
+  boardGridKey: '',
 };
 
 // ============================================================================
@@ -175,6 +186,9 @@ const elements = {
 
   // Bot opponent
   botToggleGroup: document.getElementById('bot-toggle-group'),
+
+  // Game length
+  durationToggleGroup: document.getElementById('duration-toggle-group'),
 };
 
 // ============================================================================
@@ -355,6 +369,21 @@ function bindEvents() {
     });
   }
 
+  // Game length selector (lobby)
+  if (elements.durationToggleGroup) {
+    elements.durationToggleGroup.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-duration-toggle');
+      if (!btn) return;
+      const duration = btn.dataset.duration;
+      if (!duration || !DURATION_PRESETS[duration]) return;
+      state.durationPreset = duration;
+      elements.durationToggleGroup.querySelectorAll('.btn-duration-toggle').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+    });
+  }
+
   // Board interactions
   elements.gameBoard.addEventListener('click', handleBoardClick);
   elements.gameBoard.addEventListener('mouseover', handleBoardHover);
@@ -480,7 +509,7 @@ async function initGameState() {
       await state.engine.dispatch('watershed:init', {
         width: 10,
         height: 10,
-        durationMs: 30000,
+        durationMs: DURATION_PRESETS[state.durationPreset] || DURATION_PRESETS.sprint,
         energyConfig: ENERGY_PRESETS[state.energyPreset] || ENERGY_PRESETS.standard,
       });
     } catch (e) {
@@ -1217,6 +1246,20 @@ function getHardMove(board, ownTokens, opponentTokens, cfg, energy, watershedSta
 // ============================================================================
 // Board Rendering
 // ============================================================================
+//
+// Incremental rendering: the 10×10 cell grid is built once (and rebuilt only
+// when dimensions change). Tokens are tracked by ID across renders in
+// `state.renderedTokens` so we can diff and animate:
+//   - new token  → entrance scale-in + ping ring ripple in player color
+//   - removed    → fade-out + scale-down (consumed by merge/split)
+//   - changed    → pulse (strength changed) + reposition (x/y changed)
+
+function resetBoardRender() {
+  elements.gameBoard.innerHTML = '';
+  state.cellElements.clear();
+  state.renderedTokens.clear();
+  state.boardGridKey = '';
+}
 
 function render() {
   if (!state.engine?.session?.state?.watershed) return;
@@ -1233,27 +1276,49 @@ function render() {
 function renderBoard(board) {
   if (!board) return;
 
-  // Clear board
-  elements.gameBoard.innerHTML = '';
+  // Ensure the cell grid exists and matches the current board dimensions.
+  // Only rebuild the grid when dimensions change — not on every render.
+  const gridKey = `${board.width}x${board.height}`;
+  if (state.boardGridKey !== gridKey) {
+    resetBoardRender();
+    state.boardGridKey = gridKey;
 
-  // Create cells
+    elements.gameBoard.style.gridTemplateColumns = `repeat(${board.width}, var(--cell-size))`;
+    elements.gameBoard.style.gridTemplateRows = `repeat(${board.height}, var(--cell-size))`;
+
+    for (let y = 0; y < board.height; y++) {
+      for (let x = 0; x < board.width; x++) {
+        const cellEl = document.createElement('div');
+        cellEl.className = 'cell';
+        cellEl.dataset.x = x;
+        cellEl.dataset.y = y;
+        cellEl.setAttribute('role', 'gridcell');
+        cellEl.setAttribute('aria-label', `Cell ${x}, ${y}`);
+        cellEl.setAttribute('tabindex', '0');
+        // Token container holds 0+ tokens for this cell (contested cells
+        // can have multiple). Persist across renders so tokens can be
+        // added/removed individually.
+        const container = document.createElement('div');
+        container.className = 'token-container';
+        cellEl.appendChild(container);
+        elements.gameBoard.appendChild(cellEl);
+        state.cellElements.set(`${x},${y}`, cellEl);
+      }
+    }
+  }
+
+  // Update per-cell state (contested, highlights) — cheap, do every render.
   for (let y = 0; y < board.height; y++) {
     for (let x = 0; x < board.width; x++) {
       const cell = board.cells[y][x];
-      const cellEl = document.createElement('div');
-      cellEl.className = 'cell';
-      cellEl.dataset.x = x;
-      cellEl.dataset.y = y;
-      cellEl.setAttribute('role', 'gridcell');
+      const cellEl = state.cellElements.get(`${x},${y}`);
+      if (!cellEl) continue;
+
+      cellEl.classList.toggle('contested', !!cell.contested);
       cellEl.setAttribute('aria-label', `Cell ${x}, ${y}${cell.contested ? ', contested' : ''}`);
-      cellEl.setAttribute('tabindex', '0');
 
-      // Contested styling
-      if (cell.contested) {
-        cellEl.classList.add('contested');
-      }
-
-      // Highlight modes
+      // Split-target highlight (depends on selection, recomputed each render)
+      cellEl.classList.remove('highlighted', 'targetable');
       if (state.interactionMode === 'split' && cell.tokens.length === 0) {
         const selectedToken = getTokenById(state.selectedTokenId);
         if (selectedToken && isAdjacent(selectedToken, x, y)) {
@@ -1261,28 +1326,67 @@ function renderBoard(board) {
           cellEl.classList.add('targetable');
         }
       }
+    }
+  }
 
-      // Render tokens
-      if (cell.tokens.length > 0) {
-        const container = document.createElement('div');
-        container.className = 'token-container';
-
-        for (const token of cell.tokens) {
-          const tokenEl = createTokenElement(token);
-          container.appendChild(tokenEl);
-        }
-
-        cellEl.appendChild(container);
+  // --- Token diff ---
+  // Build a map of currently-active tokens from the board state.
+  const currentTokens = new Map(); // tokenId → token
+  for (let y = 0; y < board.height; y++) {
+    for (let x = 0; x < board.width; x++) {
+      for (const t of board.cells[y][x].tokens) {
+        currentTokens.set(t.id, t);
       }
+    }
+  }
 
-      elements.gameBoard.appendChild(cellEl);
+  // (a) Remove tokens that are no longer active (consumed by merge/split).
+  for (const [tokenId, entry] of state.renderedTokens) {
+    if (!currentTokens.has(tokenId)) {
+      const el = entry.element;
+      el.classList.add('token-exiting');
+      // Detach from layout immediately so siblings reflow, but keep the
+      // element alive briefly to play the exit animation.
+      el.style.pointerEvents = 'none';
+      setTimeout(() => { el.remove(); }, 180);
+      state.renderedTokens.delete(tokenId);
+    }
+  }
+
+  // (b) Add or update tokens that are active.
+  for (const [tokenId, token] of currentTokens) {
+    const existing = state.renderedTokens.get(tokenId);
+    if (existing) {
+      // (d) Update if changed (strength, position, selection, merge-target).
+      updateTokenElement(existing, token);
+    } else {
+      // (c) New token — create with entrance animation + ping ring.
+      const cellEl = state.cellElements.get(`${token.x},${token.y}`);
+      if (!cellEl) continue;
+      const container = cellEl.querySelector('.token-container');
+      const tokenEl = createTokenElement(token);
+      container.appendChild(tokenEl);
+
+      // Ping ring — a ripple in the player's color, more prominent for
+      // remote placements. We can't always tell local vs remote reliably
+      // (CRDT sync doesn't tag the origin), so animate all new tokens.
+      const playerState = state.engine.session.state.watershed.players[token.playerId];
+      const color = playerState?.color || '#888888';
+      const ping = document.createElement('span');
+      ping.className = 'token-ping-ring';
+      ping.style.setProperty('--ping-color', color);
+      cellEl.appendChild(ping);
+      // Remove the ping ring after the animation completes.
+      setTimeout(() => { ping.remove(); }, 650);
+
+      state.renderedTokens.set(tokenId, { element: tokenEl, token });
     }
   }
 }
 
 function createTokenElement(token) {
   const tokenEl = document.createElement('div');
-  tokenEl.className = `token strength-${token.strength}`;
+  tokenEl.className = `token strength-${token.strength} token-entering`;
   tokenEl.dataset.tokenId = token.id;
   tokenEl.textContent = token.strength;
   tokenEl.setAttribute('role', 'button');
@@ -1349,7 +1453,78 @@ function createTokenElement(token) {
     hideProvenance();
   });
 
+  // Drop the entering class once the entrance animation has played so it
+  // doesn't replay on subsequent class updates.
+  setTimeout(() => { tokenEl.classList.remove('token-entering'); }, 320);
+
   return tokenEl;
+}
+
+/**
+ * Update an already-rendered token element in place when its underlying
+ * token data changes (strength after merge, position, selection state, or
+ * merge-target highlight). Pulses on strength change.
+ */
+function updateTokenElement(entry, token) {
+  const el = entry.element;
+  const prev = entry.token;
+
+  // Strength changed (e.g., merged from strength-1 → strength-2) — pulse.
+  if (prev.strength !== token.strength) {
+    el.className = `token strength-${token.strength} token-pulsing`;
+    el.textContent = String(token.strength);
+    // Re-apply fortified class + shield if it became strength-3
+    if (token.strength >= 3) {
+      el.classList.add('fortified');
+      if (!el.querySelector('.fortified-shield')) {
+        const shield = document.createElement('span');
+        shield.className = 'fortified-shield';
+        shield.setAttribute('aria-hidden', 'true');
+        shield.textContent = '🛡';
+        el.appendChild(shield);
+      }
+      el.setAttribute('aria-label',
+        token.playerId === state.peerId
+          ? `Your fortified token, strength ${token.strength} — cannot be contested`
+          : `Opponent fortified token, strength ${token.strength} — cannot be contested or placed on`);
+    } else {
+      el.classList.remove('fortified');
+      const shield = el.querySelector('.fortified-shield');
+      if (shield) shield.remove();
+    }
+    // Update player color in case ownership somehow changed
+    const playerState = state.engine.session.state.watershed.players[token.playerId];
+    const color = playerState?.color || '#888888';
+    el.style.color = color;
+    el.style.setProperty('--player-color', color);
+    setTimeout(() => { el.classList.remove('token-pulsing'); }, 220);
+  }
+
+  // Position changed — move to a new cell's container.
+  if (prev.x !== token.x || prev.y !== token.y) {
+    const newCell = state.cellElements.get(`${token.x},${token.y}`);
+    if (newCell) {
+      const container = newCell.querySelector('.token-container');
+      container.appendChild(el);
+    }
+  }
+
+  // Selection / merge-target highlight (depends on UI state, recompute each render)
+  el.classList.remove('selected', 'merge-target');
+  if (state.selectedTokenId === token.id) {
+    el.classList.add('selected');
+  }
+  if (state.interactionMode === 'merge' && state.selectedTokenId) {
+    const selectedToken = getTokenById(state.selectedTokenId);
+    if (selectedToken &&
+        selectedToken.playerId === token.playerId &&
+        selectedToken.id !== token.id &&
+        isAdjacent(selectedToken, token.x, token.y)) {
+      el.classList.add('merge-target');
+    }
+  }
+
+  entry.token = token;
 }
 
 function renderScores(scores) {
@@ -1802,6 +1977,9 @@ function handlePlayAgain() {
   state.selectedTokenId = null;
   state.interactionMode = null;
 
+  // Clear the board so the new game's tokens animate in fresh
+  resetBoardRender();
+
   // Hide game over screen
   elements.gameOverScreen.classList.remove('active');
 
@@ -1809,7 +1987,7 @@ function handlePlayAgain() {
   state.engine.dispatch('watershed:init', {
     width: 10,
     height: 10,
-    durationMs: 30000,
+    durationMs: DURATION_PRESETS[state.durationPreset] || DURATION_PRESETS.sprint,
     energyConfig: ENERGY_PRESETS[state.energyPreset] || ENERGY_PRESETS.standard,
   });
 
@@ -1848,6 +2026,7 @@ function handleNewLobby() {
   }
 
   stopBot();
+  resetBoardRender();
   state.gameEnded = false;
   state.gameStarted = false;
   state.connected = false;

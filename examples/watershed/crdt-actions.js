@@ -30,6 +30,7 @@ import {
   isTimeUp,
   computeEnergy,
   ENERGY_PRESETS,
+  DURATION_PRESETS,
 } from "./WatershedGame.js";
 
 /**
@@ -96,7 +97,11 @@ Object.assign(ActionRegistry, {
    * Initialize a new Watershed game.
    */
   "watershed:init": (engine, { width, height, durationMs, energyConfig } = {}) => {
-    const config = { width: width ?? 10, height: height ?? 10, durationMs: durationMs ?? 30000 };
+    const config = {
+      width: width ?? 10,
+      height: height ?? 10,
+      durationMs: durationMs ?? DURATION_PRESETS.sprint,
+    };
     const energy = energyConfig || ENERGY_PRESETS.standard;
     engine.session.change("watershed:init", (doc) => {
       doc.watershed = {

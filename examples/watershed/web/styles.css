@@ -732,6 +732,81 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
 }
 
 /* ============================================================================
+   Game Length Selector (Lobby)
+   ============================================================================ */
+
+.duration-section {
+  margin: 0 0 22px;
+  text-align: left;
+}
+
+.duration-section-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.duration-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.btn-duration-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--bg-dark);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--speed-fast) var(--ease-out);
+  font-family: var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-duration-toggle:hover {
+  background: var(--bg-surface);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.btn-duration-toggle .preset-name {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.btn-duration-toggle .preset-desc {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.btn-duration-toggle.active {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.18), rgba(74, 222, 128, 0.12));
+  border-color: var(--player-2);
+  color: var(--text-primary);
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.35);
+}
+
+.btn-duration-toggle.active .preset-desc {
+  color: var(--text-secondary);
+}
+
+/* ============================================================================
    Bot Opponent Selector (Lobby)
    ============================================================================ */
 
@@ -1058,8 +1133,14 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   cursor: pointer;
   transition: all var(--speed-fast) var(--ease-bounce);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  animation: token-enter var(--speed-normal) var(--ease-bounce);
   user-select: none;
+}
+
+/* Entrance animation — plays once when a new token element is created
+   (incremental rendering: only genuinely new tokens get this, not the
+   whole board on every state update). */
+.token.token-entering {
+  animation: token-enter 320ms var(--ease-bounce);
 }
 
 @keyframes token-enter {
@@ -1074,6 +1155,61 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
     transform: scale(1) rotate(0deg);
     opacity: 1;
   }
+}
+
+/* Ping ring — a circular ripple in the placing player's color, spawned
+   alongside a newly-placed token. More visually prominent for remote
+   placements so the player notices sync activity. */
+.token-ping-ring {
+  position: absolute;
+  inset: calc(var(--cell-size) * 0.1);
+  width: calc(var(--cell-size) * var(--token-scale));
+  height: calc(var(--cell-size) * var(--token-scale));
+  border-radius: 50%;
+  border: 2px solid var(--ping-color, currentColor);
+  pointer-events: none;
+  animation: token-ping 650ms ease-out forwards;
+  z-index: 5;
+}
+
+@keyframes token-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* Exit animation — consumed tokens (merged/split) fade + shrink before
+   being removed from the DOM. */
+.token.token-exiting {
+  animation: token-exit 180ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes token-exit {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+/* Pulse animation — plays when a token's strength changes (e.g. merged
+   from strength-1 → strength-2). */
+.token.token-pulsing {
+  animation: token-pulse 220ms ease-in-out;
+}
+
+@keyframes token-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }
 
 .token:hover {
@@ -1103,6 +1239,12 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   box-shadow: 0 0 20px currentColor, inset 0 0 10px rgba(255,255,255,0.5);
   animation: token-legendary 2s ease-in-out infinite;
 }
+
+/* Entrance/pulse/exit animations must override the legendary loop when
+   present (higher specificity wins over .token.strength-3). */
+.token.strength-3.token-entering { animation: token-enter 320ms var(--ease-bounce); }
+.token.strength-3.token-pulsing { animation: token-pulse 220ms ease-in-out; }
+.token.strength-3.token-exiting { animation: token-exit 180ms ease-in forwards; }
 
 /* Fortified token (strength-3) — cannot be contested */
 .token.fortified {

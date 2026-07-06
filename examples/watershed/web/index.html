@@ -240,6 +240,24 @@
             <p class="energy-preset-hint">Host's choice applies to all players</p>
           </div>
 
+          <div class="duration-section">
+            <p class="duration-section-label">Game Length</p>
+            <div id="duration-toggle-group" class="duration-toggle-group" role="group" aria-label="Game length selection">
+              <button type="button" class="btn btn-duration-toggle active" data-duration="sprint" aria-pressed="true">
+                <span class="preset-name">Sprint</span>
+                <span class="preset-desc">30 seconds</span>
+              </button>
+              <button type="button" class="btn btn-duration-toggle" data-duration="standard" aria-pressed="false">
+                <span class="preset-name">Standard</span>
+                <span class="preset-desc">2 minutes</span>
+              </button>
+              <button type="button" class="btn btn-duration-toggle" data-duration="extended" aria-pressed="false">
+                <span class="preset-name">Extended</span>
+                <span class="preset-desc">5 minutes</span>
+              </button>
+            </div>
+          </div>
+
           <div class="bot-section">
             <p class="bot-section-label">Opponent</p>
             <div id="bot-toggle-group" class="bot-toggle-group" role="group" aria-label="Opponent selection">

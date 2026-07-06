@@ -39,6 +39,16 @@ export const ENERGY_PRESETS: Record<string, EnergyConfig> = {
   strategic: { max: 8, regenIntervalMs: 3000, placeCost: 1, mergeCost: 0, splitCost: 0 },
 };
 
+/**
+ * Game length presets selectable by the game host in the lobby.
+ * The default (sprint) preserves the original 30s demo behavior.
+ */
+export const DURATION_PRESETS: Record<string, number> = {
+  sprint: 30_000,     // 30s — fast, original default
+  standard: 120_000,  // 2 min — balanced
+  extended: 300_000,  // 5 min — deep strategy
+};
+
 export interface WatershedConfig {
   width: number;
   height: number;
