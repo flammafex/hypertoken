@@ -465,4 +465,3 @@ For typical games, TypeScript is fast enough.
 - [Getting Started](./GETTING_STARTED.md) - Installation and quick start
 - [First Game Tutorial](./FIRST_GAME.md) - Build your first game
 - [Actions Reference](../engine/ACTIONS.md) - All available actions
-- [Worker Mode](./WORKER_MODE.md) - WASM performance optimization

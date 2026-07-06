@@ -148,4 +148,4 @@ A change is complete when **all** of the following hold:
 3. Run `npm run blackjack` to see an end-to-end game.
 4. For action questions: `engine/ACTIONS.md` + per-category docs in `engine/actions/`.
 5. For WASM questions: `WASM_INTEGRATION.md` + `core-rs/README.md`.
-6. For networking questions: `docs/GOSSIP_SCALING.md`, `docs/WORKER_MODE.md`, `network/` source.
+6. For networking questions: `docs/GOSSIP_SCALING.md`, `network/` source.

@@ -243,8 +243,6 @@ npm run build:rust:release
 - ✅ Performance benchmarks (<0.2ms overhead)
 - 🚧 Web Worker support (browser) - Coming soon
 
-**See:** [Worker Mode Guide](../docs/WORKER_MODE.md) for usage details.
-
 ---
 
 ## 📁 File Structure

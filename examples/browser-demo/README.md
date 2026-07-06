@@ -164,6 +164,4 @@ await engine.shutdown();
 
 ## See Also
 
-- [WORKER_MODE.md](../../docs/WORKER_MODE.md) - Complete worker mode documentation
-- [core/UniversalWorker.ts](../../core/UniversalWorker.ts) - Environment-agnostic worker wrapper
-- [core/WebWorker.ts](../../core/WebWorker.ts) - Browser Web Worker implementation
+- [WASM Integration](../../WASM_INTEGRATION.md) - WASM bridge and ActionDispatcher documentation

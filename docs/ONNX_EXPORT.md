@@ -419,6 +419,5 @@ ort.env.webgl.disabled = true;
 ## See Also
 
 - [Python Bridge Documentation](./PYTHON_BRIDGE.md)
-- [Worker Mode Documentation](./WORKER_MODE.md)
 - [ONNX Runtime Web](https://onnxruntime.ai/docs/get-started/with-javascript.html)
 - [Stable-Baselines3](https://stable-baselines3.readthedocs.io/)

@@ -18,7 +18,6 @@ export class WasmManager {
     "space:place", "space:remove", "space:move", "space:flip",
     "space:createZone", "space:deleteZone", "space:clearZone",
     "space:lockZone", "space:shuffleZone",
-    "space:fanZone", "space:spreadZone", "space:stackZone",
     "space:transferZone", "space:clear",
     // Source actions (7)
     "source:draw", "source:shuffle", "source:burn",
@@ -44,8 +43,7 @@ export class WasmManager {
     // Batch operations (8)
     "tokens:shuffle", "tokens:draw", "tokens:filter", "tokens:map",
     "tokens:find", "tokens:count", "tokens:collect", "tokens:forEach",
-    // Debug
-    "debug:log",
+
   ]);
 
   get dispatcher(): WasmActionDispatcher | null { return this._dispatcher; }
@@ -124,6 +122,8 @@ export class WasmManager {
       "space:clearZone":   (p) => { d.spaceClearZone(p.zone); },
       "space:lockZone":    (p) => { d.spaceLockZone(p.zone, p.locked ?? true); },
       "space:shuffleZone": (p) => { d.spaceShuffleZone(p.zone, p.seed !== undefined ? String(p.seed) : undefined); },
+      "space:transferZone": (p) => { d.spaceTransferZone(p.fromZone, p.toZone); },
+      "space:clear": (_) => { d.spaceClear(); },
       // Source
       "source:draw":    (p) => JSON.parse(d.sourceDraw(p.count ?? 1)),
       "source:shuffle": (p) => { d.sourceShuffle(p.seed !== undefined ? String(p.seed) : undefined); },
@@ -172,6 +172,10 @@ export class WasmManager {
       "tokens:draw":    (p) => JSON.parse(d.batchDraw(JSON.stringify(p.decks), JSON.stringify(p.counts))),
       "tokens:filter":  (p) => JSON.parse(d.batchFilter(JSON.stringify(p.tokens), p.predicate ?? "reversed")),
       "tokens:map":     (p) => JSON.parse(d.batchMap(JSON.stringify(p.tokens), p.operation ?? "flip")),
+      "tokens:find":    (p) => JSON.parse(d.batchFind(JSON.stringify(p.tokens), p.predicate ?? "reversed")),
+      "tokens:count":   (p) => d.batchCount(JSON.stringify(p.tokens), p.predicate ?? "reversed"),
+      "tokens:forEach": (p) => JSON.parse(d.batchForEach(JSON.stringify(p.tokens), p.operation ?? "flip")),
+      "tokens:collect": (p) => JSON.parse(d.batchCollect(JSON.stringify(p.sources))),
     };
   }
 
