@@ -25,7 +25,6 @@ cli/           CLI entrypoint (index.ts → commands/{relay,mcp}.ts)
 examples/      3 games (blackjack, cuttle, watershed)
 examples/watershed/  Watershed CRDT showcase game (real-time territory game)
 mcp/           MCP server for LLM play (server.ts, games/)
-plugins/       analytics, logging, save-state plugins + pluginLoader
 workers/       hypertoken.worker.js (Phase 3 multi-threading is future work)
 docs/          Architecture, getting started, testing, extending, etc.
 patterns/      Pattern reference
@@ -98,7 +97,7 @@ npm run mcp              # LLM MCP server
 - **ESM loader required** for `.ts` test files: `node --loader ./test/ts-esm-loader.js test/<file>`.
 - **Use fixed seeds** for any randomness in tests (e.g., `stack.shuffle(123)`).
 - **WASM parity** — changes to action handlers that exist in both TS and Rust must keep `test/testChronicleIncremental.ts` passing (TS/WASM behavioral parity).
-- **Test categories:** core, engine, exporters, token, batch, player-transfers, recorder, script, agent, policy, crypto, random, plugins, plugin-loader, integration, sync, rule-sync, wasm, wasm:stack, wasm:space, parallel.
+- **Test categories:** core, engine, exporters, token, batch, player-transfers, recorder, script, agent, policy, crypto, random, plugins, plugin-loader, integration, sync, rule-sync, wasm, parallel.
 - ⚠️ `test/testCore.js` is a bare `console.log` script without assertions — it does **not** follow the documented `test()`/`assert()` pattern and always exits 0. Do not use it as a template for new tests; follow `docs/TESTING.md` instead.
 
 ## PR / review expectations

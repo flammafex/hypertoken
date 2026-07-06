@@ -56,9 +56,7 @@ npm run test:network       # All network tests
 
 #### WASM Tests
 ```bash
-npm run test:wasm          # WASM bridge
-npm run test:wasm:stack    # StackWasm
-npm run test:wasm:space    # SpaceWasm
+npm run test:wasm          # WASM bridge + Chronicle incremental CRDT parity
 npm run test:rust          # Rust unit tests (requires Rust)
 ```
 

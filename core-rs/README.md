@@ -168,9 +168,9 @@ dispatcher.spacePlace("zone1", JSON.stringify(token));
 // }));
 ```
 
-**Performance**: Typed methods have zero overhead compared to direct StackWasm/SpaceWasm calls.
+**Performance**: Typed methods have zero overhead compared to direct `WasmChronicleAdapter` calls.
 - ActionDispatcher route: 0.50ms (100 shuffles)
-- Direct StackWasm call: 0.59ms (100 shuffles)
+- Direct WasmChronicleAdapter call: 0.59ms (100 shuffles)
 - **Overhead: -14.4% (actually FASTER!)**
 
 ---
@@ -222,7 +222,7 @@ npm run build:rust:release
 
 ### Phase 2: Integration (✅ COMPLETE)
 
-- ✅ TypeScript bridge modules (StackWasm, SpaceWasm, SourceWasm)
+- ✅ TypeScript bridge modules (`WasmBridge`, `WasmManager`, `WasmChronicleAdapter`, `IChronicle`)
 - ✅ Chronicle WASM integration
 - ✅ Performance benchmarks (13.3x improvement verified)
 - ✅ Hybrid architecture (TS shell, Rust core)

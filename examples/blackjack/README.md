@@ -13,12 +13,7 @@ A complete **casino-grade** Blackjack implementation using the HyperToken engine
 - **🎰 Full casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender**
 - **🎲 Side bets: Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack**
 - **🇪🇺 European blackjack variant with delayed hole card**
-- **📊 Card counting agents: Hi-Lo, Hi-Opt I, Omega II, Zen Count**
 - **👥 Multi-agent support (2-6 agents at one space)**
-- **🤖 OpenAI Gym-compatible RL training environment**
-- **🏆 Elimination tournaments with shared table play**
-- **🎰 Sit-and-Go tournaments with escalating blinds and prize pools**
-- **🌐 Multi-Table Tournaments (MTT) with table balancing and final table**
 
 ## Quick Start
 
@@ -76,21 +71,6 @@ Play blackjack in your terminal against the dealer. Standard casino rules apply:
 - Track session statistics including doubles, splits, and insurance
 - See your profit/loss in real-time
 
-### Play Multi-agent (2-6 agents)
-```bash
-node --loader ../../test/ts-esm-loader.js multiagent-cli.js [numAgents]
-
-# Examples:
-node --loader ../../test/ts-esm-loader.js multiagent-cli.js 2  # 2 players
-node --loader ../../test/ts-esm-loader.js multiagent-cli.js 4  # 4 players
-```
-
-Play blackjack with multiple human agents at one table:
-- Each agent has their own bankroll
-- Sequential turn-taking
-- Individual betting
-- Shared dealer
-
 ### Run AI Tournament
 ```bash
 # Run 1000 rounds with default agents
@@ -107,22 +87,6 @@ Watch different AI strategies compete:
 - **Conservative**: Stands on 17+
 - **Aggressive**: Stands on 19+
 - **Always Hit**: Hits until bust (for comparison)
-
-### Run Betting Strategy Tournament
-```bash
-node --loader ../../test/ts-esm-loader.js tournament.js [rounds] [seed] [initialBankroll]
-
-# Examples:
-node --loader ../../test/ts-esm-loader.js tournament.js 1000       # 1000 rounds
-node --loader ../../test/ts-esm-loader.js tournament.js 5000 42    # With seed 42
-node --loader ../../test/ts-esm-loader.js tournament.js 1000 42 2000  # Custom bankroll
-```
-
-Compare AI playing strategies combined with different betting strategies:
-- **Flat Betting**: Consistent bet size
-- **Martingale**: Double after loss
-- **Percentage**: Bet % of bankroll
-- **Progressive**: Increase after wins
 
 ## Project Structure
 ```
@@ -148,22 +112,11 @@ blackjack/
 ├── multiagent-game.js              # Multi-agent game (advanced)
 ├── blackjack-betting.js            # Betting system & strategies
 ├── blackjack-game-browser.js       # Browser-compatible game wrapper
-├── side-bets.js                    # Side bet logic (Perfect Pairs, 21+3, etc.)
-├── card-counting-agents.js         # Hi-Lo card counting agents
+├── side-bets.js                    # Side bet logic (Perfect Pairs, 21+3, etc.) — internal module of game.js
 ├── cli.js                          # Interactive CLI (supports --betting flag)
 ├── multiagent-cli.js               # Multi-agent CLI (2-6 players)
-├── tournament.js                   # Betting strategy tournament
-├── elimination-tournament.js       # Elimination tournament class
-├── elimination-cli.js              # Elimination tournament CLI
-├── sit-and-go-tournament.js        # Sit-and-Go tournament class
-├── sit-and-go-cli.js               # Sit-and-Go tournament CLI
-├── multi-table-tournament.js       # Multi-Table Tournament (MTT) class
-├── mtt-cli.js                      # MTT CLI runner
 ├── server.js                       # Network server for multiplayer
 ├── client.js                       # Network client for multiplayer
-├── BlackjackEnv.ts                 # Gym environment for RL training
-├── train.js                        # Training script using Gym env
-├── test.js                         # Quick test script
 └── README.md                       # This file
 ```
 
@@ -201,47 +154,6 @@ console.log(betting.getStats());
 const kellyStrategy = new KellyCriterionStrategy(0.005, 0.005);
 const oscarStrategy = new OscarsGrindStrategy(10, 10);
 const betSize = kellyStrategy.getBetSize(gameState, betting, null, trueCount);
-```
-
-### 🎯 Card Counting Agents
-
-Multiple professional card counting systems with bet spread adjustment:
-
-**Features:**
-- Running count tracking
-- True count calculation (accounts for decks remaining)
-- Automatic bet sizing based on advantage
-- Strategy deviations at key counts
-- Multiple counting styles (aggressive, conservative)
-- Multi-level counting systems for advanced play
-- Ace side-counting for precision
-
-**Counting Systems:**
-- **HiLoCountingAgent**: Classic balanced system (1-8x bet spread)
-  - Simple: 2-6 = +1, 10-A = -1
-- **HiOptICountingAgent**: More accurate with Ace side-count (1-8x spread)
-  - 3-6 = +1, 10-K = -1, Aces tracked separately
-- **OmegaIICountingAgent**: Multi-level balanced system (1-10x spread)
-  - 2,3,7 = +1, 4,5,6 = +2, 9 = -1, 10-K = -2
-- **ZenCountAgent**: Balanced multi-level system (1-8x spread)
-  - 2,3,7 = +1, 4,5,6 = +2, A = -1, 10-K = -2
-- **AggressiveCountingAgent**: Wide spread Hi-Lo variant (1-12x spread)
-- **ConservativeCountingAgent**: Small spread Hi-Lo variant (1-4x spread)
-
-**Usage:**
-```javascript
-import { HiLoCountingAgent, HiOptICountingAgent, OmegaIICountingAgent, ZenCountAgent } from './card-counting-agents.js';
-
-// Basic Hi-Lo counter
-const hiloCounter = new HiLoCountingAgent("Hi-Lo Counter", 10, 8);
-
-// Advanced multi-level counter
-const omegaCounter = new OmegaIICountingAgent("Omega II Counter", 10, 10);
-
-// Get count statistics
-const betSize = hiloCounter.getBetSize(gameState, bettingManager);
-const decision = hiloCounter.decide(gameState);
-console.log(hiloCounter.getCountStats()); // { runningCount, trueCount, ... }
 ```
 
 ### 👥 Multi-Agent Support
@@ -374,18 +286,7 @@ const state = game.stand();
 console.log(state.payout); // { bet, payout, netGain, bankroll }
 ```
 
-### 2. Card Counting
-```javascript
-// Counting agent decides bet and play
-const counter = new HiLoCountingAgent();
-const betSize = counter.getBetSize(gameState, bettingManager);
-const decision = counter.decide(gameState); // "hit" or "stand"
-
-// Count is updated automatically from visible cards
-console.log(counter.trueCount); // +2 (agent has advantage)
-```
-
-### 3. Multi-agent Management
+### 2. Multi-agent Management
 ```javascript
 // Agents take turns sequentially
 while (!gameState.allAgentsFinished) {
@@ -420,14 +321,9 @@ while (!gameState.allAgentsFinished) {
 5. **CLI Integration** - Making your simulation interactive
 6. **Tournament Mode** - Running bulk simulations for analysis
 7. **Betting Systems** - Money management and bankroll tracking
-8. **Card Counting** - Adaptive strategy based on game state
-9. **Multi-agent Architecture** - Sequential turn-based multiagent
-10. **Web UI** - Browser bundling and PWA integration
-11. **Side Bets** - Extensible bonus bet system
-12. **Gym Environment** - OpenAI Gym-compatible RL training
-13. **Elimination Tournaments** - Multi-agent competitive play
-14. **Sit-and-Go Tournaments** - Escalating blinds and prize pools
-15. **Multi-Table Tournaments** - Table balancing and final table
+8. **Multi-agent Architecture** - Sequential turn-based multiagent
+9. **Web UI** - Browser bundling and PWA integration
+10. **Side Bets** - Extensible bonus bet system
 
 ## Casino Features (Fully Implemented!) 🎰
 
@@ -633,462 +529,13 @@ This example provides **three complementary implementations**:
 Choose the right one for your needs:
 - **Learning HyperToken?** Start with `game.js`
 - **Building a multiplayer game?** Use `multiagent-game.js`
-- **Just want to play?** Use `cli.js`, `multiagent-cli.js`, or the Web UI
-
-## Reinforcement Learning Training
-
-The `BlackjackEnv.ts` provides a full **OpenAI Gym-compatible** environment for training RL agents.
-
-### Quick Start
-
-```bash
-# Run with basic strategy policy (100 episodes)
-node --loader ../../test/ts-esm-loader.js train.js
-
-# Run 1000 episodes with verbose output
-node --loader ../../test/ts-esm-loader.js train.js -e 1000 -v
-
-# Compare random vs basic strategy
-node --loader ../../test/ts-esm-loader.js train.js -p random -e 500
-```
-
-### Action Space (6 Discrete Actions)
-
-| Action | ID | Description |
-|--------|-----|-------------|
-| Hit | 0 | Take another card |
-| Stand | 1 | Keep current hand |
-| Double | 2 | Double bet, take one card |
-| Split | 3 | Split pair into two hands |
-| Surrender | 4 | Forfeit half bet |
-| Insurance | 5 | Side bet on dealer blackjack |
-
-### Observation Space (19 Features)
-
-```javascript
-import { BlackjackEnv, Actions, ObsIndex } from "./BlackjackEnv.js";
-
-const env = new BlackjackEnv({
-  agentName: "RLAgent",
-  initialBankroll: 1000,
-  numDecks: 6,
-  baseBet: 10,
-  allowSurrender: true
-});
-
-// Observation features (all normalized 0-1):
-// obs[ObsIndex.HAND_VALUE]       - Player hand value (0-30)
-// obs[ObsIndex.DEALER_VALUE]     - Dealer visible card (0-12)
-// obs[ObsIndex.IS_SOFT]          - Is soft hand (Ace as 11)
-// obs[ObsIndex.DECK_PENETRATION] - Cards remaining in shoe
-// obs[ObsIndex.CURRENT_BET]      - Current bet amount
-// obs[ObsIndex.BANKROLL]         - Player bankroll
-// obs[ObsIndex.CAN_HIT]          - Can hit action
-// obs[ObsIndex.CAN_STAND]        - Can stand action
-// obs[ObsIndex.CAN_DOUBLE]       - Can double down
-// obs[ObsIndex.CAN_SPLIT]        - Can split pair
-// obs[ObsIndex.CAN_SURRENDER]    - Can surrender
-// obs[ObsIndex.CAN_INSURANCE]    - Can take insurance
-// obs[ObsIndex.IS_SPLIT_HAND]    - Playing split hand
-// obs[ObsIndex.SPLIT_HAND_VALUE] - Split hand value
-// obs[ObsIndex.RUNNING_COUNT]    - Hi-Lo running count
-// obs[ObsIndex.TRUE_COUNT]       - True count (adjusted for decks)
-// obs[ObsIndex.DEALER_SHOWS_ACE] - Dealer shows Ace
-// obs[ObsIndex.HAND_IS_BLACKJACK]- Player has blackjack
-// obs[ObsIndex.NUM_CARDS_IN_HAND]- Number of cards in hand
-```
-
-### Action Masking
-
-The environment provides action masking to prevent invalid actions:
-
-```javascript
-const obs = await env.reset();
-const actionMask = env.getActionMask();
-
-// actionMask = [true, true, true, false, true, false]
-//               Hit   Stand Double Split  Surr  Ins
-
-// Only select from valid actions
-const validActions = actionMask
-  .map((valid, i) => valid ? i : -1)
-  .filter(i => i >= 0);
-
-const action = validActions[Math.floor(Math.random() * validActions.length)];
-const result = await env.step(action);
-```
-
-### Card Counting Features
-
-The environment includes Hi-Lo card counting:
-
-```javascript
-// Observation includes count info
-const rc = obs[ObsIndex.RUNNING_COUNT] * 40 - 20; // Denormalize: -20 to +20
-const tc = obs[ObsIndex.TRUE_COUNT] * 20 - 10;    // Denormalize: -10 to +10
-
-// True count > +2 favors player (increase bets)
-// True count < -2 favors house (decrease bets)
-```
-
-## Elimination Tournaments
-
-Run competitive blackjack tournaments where players compete at a shared table until only one remains.
-
-### Quick Start
-
-```bash
-# Run a 6-player elimination tournament
-node --loader ../../test/ts-esm-loader.js elimination-cli.js
-
-# 8 players with $500 starting bankroll
-node --loader ../../test/ts-esm-loader.js elimination-cli.js -p 8 -b 500
-
-# Verbose mode to see each hand
-node --loader ../../test/ts-esm-loader.js elimination-cli.js -v
-
-# Reproducible tournament with seed
-node --loader ../../test/ts-esm-loader.js elimination-cli.js -s 12345
-```
-
-### CLI Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --players <n>` | Number of players (2-10) | 6 |
-| `-b, --bankroll <n>` | Starting bankroll | 1000 |
-| `-m, --min-bet <n>` | Minimum bet | 10 |
-| `-r, --max-rounds <n>` | Max rounds before end | 500 |
-| `-s, --seed <n>` | Random seed | random |
-| `-v, --verbose` | Show hand-by-hand detail | false |
-
-### Features
-
-- **Shared Table**: All players compete against the same dealer each round
-- **Elimination**: Players are eliminated when bankroll drops below minimum bet
-- **Multiple AI Agents**: Basic Strategy, Conservative, Aggressive, Card Counter, Risky, Cautious
-- **Statistics Tracking**: Wins, losses, blackjacks, doubles, splits, peak bankroll
-- **Final Rankings**: Medal positions based on survival and final bankroll
-
-### Programmatic Usage
-
-```javascript
-import { EliminationTournament } from './elimination-tournament.js';
-import { BasicStrategyAgent, AggressiveAgent } from './agents/basic-strategy.js';
-
-const agents = [
-  new BasicStrategyAgent("Player 1"),
-  new AggressiveAgent("Player 2"),
-  // ...more agents
-];
-
-const tournament = new EliminationTournament(agents, {
-  initialBankroll: 1000,
-  minBet: 10,
-  maxRounds: 500,
-  verbose: true
-});
-
-await tournament.run();
-```
-
-## Sit-and-Go Tournaments
-
-Poker-style tournaments with escalating blinds, forced bets, and prize pool distribution.
-
-### Quick Start
-
-```bash
-# Run a 6-player Sit-and-Go
-node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js
-
-# Turbo structure (faster blind increases)
-node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js --turbo
-
-# Hyper-turbo for quick games
-node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js --hyper -p 4
-
-# Custom buy-in and chip stack
-node --loader ../../test/ts-esm-loader.js sit-and-go-cli.js -b 50 -c 1000 -p 9
-```
-
-### CLI Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --players <n>` | Number of players (2-10) | 6 |
-| `-b, --buy-in <n>` | Buy-in amount in dollars | 100 |
-| `-c, --chips <n>` | Starting chip count | 1500 |
-| `-l, --level-time <n>` | Hands per blind level | 10 |
-| `--turbo` | Turbo structure (5 hands/level) | - |
-| `--hyper` | Hyper-turbo (3 hands/level) | - |
-| `-r, --max-rounds <n>` | Maximum hands | 500 |
-| `-s, --seed <n>` | Random seed | random |
-| `-v, --verbose` | Show hand-by-hand detail | false |
-
-### Features
-
-- **Escalating Blinds**: Small blind/big blind increase every N hands
-- **Forced Bets**: Small blind, big blind, and antes rotate around the table
-- **Prize Pool**: Buy-in based pool distributed to top finishers
-- **Payout Structure**: Automatic payouts (e.g., 60%/25%/15% for top 3)
-- **Position Play**: Dealer button, SB, and BB positions rotate each hand
-- **Tournament-Aware Agents**: Agents that adjust strategy near the bubble
-
-### Payout Structure
-
-Payouts are automatically calculated based on player count:
-
-| Players | Paid Places | Distribution |
-|---------|-------------|--------------|
-| 2 | 1 | 100% |
-| 3 | 2 | 65% / 35% |
-| 4-6 | 3 | 60% / 25% / 15% |
-| 7-8 | 4 | 45% / 27% / 18% / 10% |
-| 9-10 | 5 | 40% / 25% / 18% / 10% / 7% |
-
-### Blind Structure
-
-Default blind levels (10 hands per level):
-
-| Level | Small | Big | Ante |
-|-------|-------|-----|------|
-| 1 | 10 | 20 | - |
-| 2 | 15 | 30 | - |
-| 3 | 25 | 50 | - |
-| 4 | 50 | 100 | - |
-| 5 | 75 | 150 | - |
-| 6 | 100 | 200 | 25 |
-| 7 | 150 | 300 | 25 |
-| ... | | | |
-
-### Programmatic Usage
-
-```javascript
-import { SitAndGoTournament } from './sit-and-go-tournament.js';
-import { BasicStrategyAgent } from './agents/basic-strategy.js';
-
-const agents = [
-  new BasicStrategyAgent("Player 1"),
-  new BasicStrategyAgent("Player 2"),
-  // ...more agents
-];
-
-const tournament = new SitAndGoTournament(agents, {
-  buyIn: 100,
-  startingChips: 1500,
-  blindLevels: [
-    { small: 10, big: 20, ante: 0, duration: 10 },
-    { small: 25, big: 50, ante: 0, duration: 10 },
-    { small: 50, big: 100, ante: 10, duration: 10 },
-    // ...escalating levels
-  ],
-  payoutStructure: [0.5, 0.3, 0.2],  // Top 3 paid
-  verbose: true
-});
-
-await tournament.run();
-```
-
-### Tournament Agent Interface
-
-Agents can implement tournament-aware betting:
-
-```javascript
-class TournamentAgent {
-  constructor(name) {
-    this.name = name;
-  }
-
-  decide(gameState) {
-    // gameState includes tournament info:
-    // - blindLevel: current level number
-    // - smallBlind, bigBlind, ante: current blinds
-    // - playersRemaining: players still in tournament
-
-    if (gameState.agentHand.value >= 17) return "stand";
-    return "hit";
-  }
-
-  getBetSize({ bankroll, minBet, maxBet, bigBlind }) {
-    // Adjust strategy based on stack size
-    const chipsToBB = bankroll / bigBlind;
-
-    if (chipsToBB < 10) {
-      // Short stack: all-in or fold
-      return bankroll;
-    }
-
-    // Standard raise: 2.5x big blind
-    return Math.min(bigBlind * 2.5, maxBet, bankroll);
-  }
-}
-```
-
-## Multi-Table Tournaments (MTT)
-
-Large-scale tournaments with multiple tables, automatic balancing, and final table transition.
-
-### Quick Start
-
-```bash
-# Run an 18-player MTT (3 tables of 6)
-node --loader ../../test/ts-esm-loader.js mtt-cli.js
-
-# Larger tournament with 36 players
-node --loader ../../test/ts-esm-loader.js mtt-cli.js -p 36 -t 6
-
-# Turbo MTT (faster blinds)
-node --loader ../../test/ts-esm-loader.js mtt-cli.js -p 27 --turbo
-
-# Custom settings
-node --loader ../../test/ts-esm-loader.js mtt-cli.js -p 45 -b 50 -c 5000 -f 9 -v
-```
-
-### CLI Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --players <n>` | Number of players (min: 10) | 18 |
-| `-t, --table-size <n>` | Players per table | 6 |
-| `-f, --final-table <n>` | Final table size | 9 |
-| `-b, --buy-in <n>` | Buy-in amount ($) | 100 |
-| `-c, --chips <n>` | Starting chips | 3000 |
-| `--turbo` | Faster blind structure | - |
-| `-r, --max-rounds <n>` | Maximum hands | 1000 |
-| `-s, --seed <n>` | Random seed | random |
-| `-v, --verbose` | Detailed output | false |
-
-### Features
-
-- **Multiple Tables**: Players distributed across tables based on field size
-- **Automatic Balancing**: When tables become uneven (difference > 1), players are moved
-- **Table Collapse**: Tables with < 2 players merge into other tables
-- **Final Table Transition**: When players reach final table size, all merge to one table
-- **Tiered Payouts**: Automatic payout structure based on field size
-
-### Payout Structure
-
-Payouts scale with field size:
-
-| Field Size | Paid Places | Top 3 Distribution |
-|------------|-------------|-------------------|
-| 10-18 | 3 | 50% / 30% / 20% |
-| 19-27 | 5 | 40% / 25% / 15% |
-| 28-45 | 7 | 35% / 20% / 14% |
-| 46+ | 10 | 30% / 18% / 12% |
-
-### Table Balancing Algorithm
-
-The balancing algorithm ensures fair play:
-
-1. After each elimination, check table sizes
-2. If largest table - smallest table > 1, balance needed
-3. Move player from largest to smallest table
-4. Prefer moving players who have moved least
-5. Continue until all tables are balanced (within 1 player)
-
-```javascript
-// Example: 4 tables after an elimination
-// Table 1: 6 players
-// Table 2: 5 players
-// Table 3: 4 players  <- player eliminated here
-// Table 4: 5 players
-
-// Balance action: Move player from Table 1 → Table 3
-// Result: 5, 5, 5, 5 (balanced)
-```
-
-### Final Table Dynamics
-
-When remaining players fit at one table:
-
-```javascript
-// Transition triggers when:
-// - Players remaining <= finalTableSize (default: 9)
-// - More than one active table exists
-
-// All players merge to Table 1
-// Chip stacks preserved
-// New random seating arrangement
-// Tournament continues as single-table Sit-and-Go
-```
-
-### Programmatic Usage
-
-```javascript
-import { MultiTableTournament } from './multi-table-tournament.js';
-import { BasicStrategyAgent } from './agents/basic-strategy.js';
-
-// Create agents
-const agents = [];
-for (let i = 0; i < 36; i++) {
-  agents.push(new BasicStrategyAgent(`Player ${i + 1}`));
-}
-
-const tournament = new MultiTableTournament(agents, {
-  buyIn: 100,
-  startingChips: 3000,
-  playersPerTable: 6,
-  finalTableSize: 9,
-  verbose: true,
-  showBalancing: true
-});
-
-await tournament.run();
-
-// Access results
-for (const player of tournament.players) {
-  console.log(`${player.name}: ${player.finalRank} - $${player.prize}`);
-}
-```
-
-### MTT Agent Interface
-
-Agents receive additional tournament context:
-
-```javascript
-class MTTAgent {
-  constructor(name) {
-    this.name = name;
-  }
-
-  decide(gameState) {
-    // MTT-specific info available:
-    // - gameState.playersRemaining: total players left
-    // - gameState.tablesRemaining: active tables
-    // - gameState.isFinalTable: at final table?
-    // - gameState.blindLevel: current level
-
-    const atFinalTable = gameState.isFinalTable;
-    const nearBubble = gameState.playersRemaining <= 5;
-
-    // Tighten up at final table or near bubble
-    if (atFinalTable || nearBubble) {
-      if (gameState.agentHand.value >= 15) return "stand";
-    }
-
-    // Standard strategy otherwise
-    if (gameState.agentHand.value >= 17) return "stand";
-    return "hit";
-  }
-
-  getBetSize({ bankroll, bigBlind, playersRemaining }) {
-    // ICM-aware betting near payouts
-    if (playersRemaining <= 5) {
-      return bigBlind; // Min bet near bubble
-    }
-    return bigBlind * 2.5;
-  }
-}
-```
+- **Just want to play?** Use `cli.js` or the Web UI
 
 ## Future Enhancements
 
 ### Community Contributions Welcome
 
 - Additional betting strategies (e.g., Labouchere, D'Alembert, Fibonacci)
-- More card counting systems (e.g., Wong Halves, Red Seven, KO Count)
 - Additional side bets (Royal Match, Super Sevens)
 
 ## License
@@ -1097,4 +544,4 @@ Same as HyperToken (Apache 2.0)
 
 ---
 
-**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents with professional card counting systems, advanced betting strategies, multiagent architecture, OpenAI Gym-compatible RL training environment, and a complete tournament suite: elimination tournaments, Sit-and-Go tournaments with escalating blinds, and Multi-Table Tournaments (MTT) with table balancing and final table transition. A comprehensive example of building complex card games with HyperToken.
+**HyperToken Blackjack** - A complete **casino-grade** blackjack simulation with all major casino features: Double Down, Split, Insurance, Re-Split, Early & Late Surrender, Side Bets (Perfect Pairs, 21+3, Lucky Ladies, Buster Blackjack), and European variant. Includes a full browser-based Web UI with PWA support, AI agents, advanced betting strategies, and multiagent architecture. A comprehensive example of building complex card games with HyperToken.

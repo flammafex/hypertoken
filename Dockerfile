@@ -49,13 +49,7 @@ COPY examples/ ./examples/
 
 # Expose default ports
 # 3000 - Relay server
-# 9999 - Bridge server (Gym/PettingZoo)
-EXPOSE 3000 9999
+EXPOSE 3000
 
-# Environment variables for bridge server
-ENV BRIDGE_PORT=9999
-ENV BRIDGE_ENV=poker
-ENV BRIDGE_HOST=0.0.0.0
-
-# Default command: run the poker bridge server with RL features
-CMD ["node", "dist/cli/index.js", "bridge", "poker", "--rich", "--extended", "--shaped", "--port", "9999", "--host", "0.0.0.0"]
+# Default command: run the relay server
+CMD ["node", "dist/cli/index.js", "relay"]

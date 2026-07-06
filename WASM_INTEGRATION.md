@@ -14,12 +14,11 @@ HyperToken's performance-critical operations are implemented in Rust and compile
 
 | Component | Rust Implementation | TypeScript Integration | Status |
 |-----------|---------------------|----------------------|--------|
-| **Token** | ✅ Complete | ⏳ TODO | Rust ready, needs TS wrapper |
-| **Stack** | ✅ Complete | ✅ Complete | **READY** - ~20x faster |
-| **Space** | ✅ Complete | ✅ Complete | **READY** - ~20x faster |
 | **Chronicle** | ✅ Complete (54 incremental actions) | ✅ `WasmChronicleAdapter` + `IChronicle` | **READY** - Field-level CRDT ops with dirty-section caching |
 | **Actions** | ✅ Complete | ✅ Dual-path dispatch in Engine | **READY** - WASM or TS fallback per action |
 | **WasmBridge** | ✅ Complete | ✅ Complete | Module loader working |
+
+The engine uses `WasmChronicleAdapter` → `ActionDispatcher` → `chronicle_actions/` for WASM dispatch. There are no per-component WASM wrappers — the previous per-component wrapper classes have been removed in favor of the unified `ActionDispatcher` + `WasmChronicleAdapter` architecture.
 
 ---
 
@@ -39,16 +38,14 @@ This compiles the Rust code to WASM and generates TypeScript bindings in:
 ### 2. Test WASM Integration
 
 ```bash
-npm run test:wasm        # Basic WASM module loading
-npm run test:wasm:stack  # StackWasm integration tests
-npm run test:wasm:space  # SpaceWasm integration tests
+npm run test:wasm        # WASM module loading + Chronicle incremental CRDT parity
 ```
 
 This runs integration tests that verify:
 - WASM module loads successfully
-- StackWasm: draw, shuffle, burn, events, Chronicle sync
-- SpaceWasm: place, move, flip, zones, events, Chronicle sync
-- Performance improvements (~20x faster)
+- `WasmChronicleAdapter` correctly proxies Chronicle operations
+- TS/WASM behavioral parity for all 54 incremental action methods
+- Dirty-section caching minimizes WASM↔JS boundary crossings
 
 ### 3. Run Rust Unit Tests
 
@@ -68,9 +65,7 @@ hypertoken/
 │   ├── IChronicle.ts         # ✅ Interface abstracting Chronicle / WasmChronicleAdapter
 │   ├── WasmChronicleAdapter.ts # ✅ Dirty-section caching proxy for WASM Chronicle
 │   ├── WasmBridge.ts         # ✅ WASM module loader
-│   ├── ChronicleWasm.ts      # ✅ Hybrid Chronicle (TS + WASM hooks)
-│   ├── StackWasm.ts          # ✅ WASM-accelerated Stack
-│   └── SpaceWasm.ts          # ✅ WASM-accelerated Space
+│   └── WasmManager.ts        # ✅ Creates ActionDispatcher + WasmChronicleAdapter, builds _dispatchTable
 │
 ├── core-rs/
 │   ├── src/
@@ -98,113 +93,70 @@ hypertoken/
 │   └── README.md             # Rust docs
 │
 └── test/
-    ├── testWasmBridge.ts     # ✅ WASM module loading tests
-    ├── testChronicleIncremental.ts # ✅ Chronicle incremental CRDT parity tests
-    ├── testStackWasm.ts      # ✅ StackWasm integration tests
-    └── testSpaceWasm.ts      # ✅ SpaceWasm integration tests
+    ├── testWasmBridge.ts          # ✅ WASM module loading tests
+    └── testChronicleIncremental.ts # ✅ Chronicle incremental CRDT parity tests
 ```
 
 ---
 
 ## 🔌 Using WASM in Your Code
 
-### Option A: Direct WASM Usage (Lowest Level)
+### Option A: Engine with WASM Dispatch (Recommended)
+
+The standard way to use WASM is through the `Engine`, which transparently routes supported actions to the Rust `ActionDispatcher` and falls back to the TS `ActionRegistry` otherwise.
 
 ```typescript
-import { loadWasm } from './core/WasmBridge.js';
+import { Engine } from './engine/Engine.js';
 
-// Load WASM module
-const wasm = await loadWasm();
+// WASM is loaded automatically if available; falls back to TS if not.
+const engine = new Engine();
 
-// Create a WASM Stack
-const WasmStack = wasm.Stack;
-const stack = new WasmStack();
+// All dispatch goes through engine.dispatch() — WASM or TS path is chosen per action.
+await engine.dispatch('stack:draw', { count: 5 });
+await engine.dispatch('space:place', { zone: 'hand', token: card });
+```
 
-// Initialize with tokens
-const tokens = [/* your tokens */];
-stack.initializeWithTokens(JSON.stringify(tokens));
+To force the TypeScript path (e.g. for browser builds that don't ship the WASM binary):
 
-// Use WASM methods
-stack.shuffle('my-seed');
-const drawnJson = stack.draw(5);
-const drawn = JSON.parse(drawnJson);
+```typescript
+const engine = new Engine({ disableWasm: true });
+```
+
+### Option B: WasmChronicleAdapter + ActionDispatcher (Low Level)
+
+For direct access to the WASM Chronicle without the Engine, use `WasmManager` to wire up an `ActionDispatcher` and `WasmChronicleAdapter`:
+
+```typescript
+import { WasmManager } from './core/WasmManager.js';
+import { WasmChronicleAdapter } from './core/WasmChronicleAdapter.js';
+
+// WasmManager loads the WASM module via WasmBridge, instantiates the Rust
+// ActionDispatcher, and builds a _dispatchTable mapping action types to
+// typed dispatcher methods.
+const manager = new WasmManager();
+await manager.init();
+
+// The adapter is an IChronicle implementation that caches dirty sections
+// and re-exports only changed sections across the WASM↔JS boundary.
+const chronicle: IChronicle = new WasmChronicleAdapter(manager);
+
+// Dispatch a typed action — routed through manager._dispatchTable → Rust.
+chronicle.applyAction('stack:draw', { count: 5 });
 ```
 
 **Pros:**
-- Maximum performance
-- Direct access to WASM
-
-**Cons:**
-- JSON serialization at boundary
-- No event system
-- No Chronicle integration
-
-### Option B: TypeScript Wrappers (✅ IMPLEMENTED)
-
-```typescript
-import { StackWasm } from './core/StackWasm.js';
-import { SpaceWasm } from './core/SpaceWasm.js';
-import { Chronicle } from './core/Chronicle.js';
-import { Token } from './core/Token.js';
-
-// Create Chronicle (TypeScript Automerge for now)
-const chronicle = new Chronicle();
-
-// Create tokens
-const tokens = [];
-for (let i = 0; i < 52; i++) {
-  tokens.push(new Token({ id: `card-${i}`, index: i }));
-}
-
-// Create WASM-backed Stack with TypeScript API
-const stack = new StackWasm(chronicle, tokens);
-
-// Same API as TypeScript Stack, but 20x faster
-stack.shuffle();
-const card = stack.draw();
-
-// Events work
-stack.on('draw', (card) => console.log('Drew:', card));
-
-// Create WASM-backed Space
-const space = new SpaceWasm(chronicle, 'game-table');
-space.createZone('hand');
-space.createZone('table');
-
-// Place cards
-if (card) {
-  space.place('hand', card, { x: 100, y: 100 });
-}
-```
-
-**Pros:**
-- ✅ Drop-in replacement for existing code
-- ✅ Event system works
-- ✅ Chronicle integration
-- ✅ Graceful fallback to TypeScript
-- ✅ ~20x performance improvement
-
-**Implementation:**
-- `StackWasm` - 590 lines, all Stack operations accelerated
-- `SpaceWasm` - 776 lines, all Space operations accelerated
-- Comprehensive test suites with 100% pass rate
+- ✅ Field-level Automerge operations (no full-state replacement)
+- ✅ Dirty-section caching minimizes WASM↔JS boundary crossings
+- ✅ TS `ActionRegistry` fallback for any action not yet supported in WASM
+- ✅ `IChronicle` interface abstracts both backends
 
 ---
 
 ## 📊 Performance Targets
 
-Based on benchmarks from M2 MacBook Air:
+The Rust Chronicle uses incremental field-level Automerge operations (54 action methods) with dirty-section caching. This avoids full-state replacement on every action.
 
-| Operation | TypeScript | Rust/WASM Target | Expected Improvement |
-|-----------|-----------|------------------|---------------------|
-| Stack shuffle (1000 tokens) | 986 ms | <50 ms | **~20x** |
-| Stack create (1000 tokens) | 388 ms | <20 ms | **~20x** |
-| Space placement (1000 tokens) | 958 ms | <50 ms | **~20x** |
-| Space query (100 tokens) | 82 ms | <5 ms | **~16x** |
-| Large simulation memory | 377 MB | <50 MB | **~8x** |
-| Chronicle merge | TBD | TBD | **TBD** (see note) |
-
-> **Note on Chronicle Performance:** The Rust Chronicle now uses incremental field-level Automerge operations (54 action methods) with dirty-section caching. This avoids full-state replacement on every action. Performance benchmarks are pending. Run `npm run benchmark:chronicle` to measure.
+> **Note on Chronicle Performance:** Performance benchmarks are pending. Run `npm run benchmark:chronicle` to measure incremental action performance (field-level ops vs full-state replacement), dirty-section caching impact on WASM↔JS boundary overhead, and Chronicle CRDT merge performance (Rust vs TS).
 
 ---
 
@@ -238,16 +190,7 @@ Based on benchmarks from M2 MacBook Air:
 - ✅ WasmBridge module loader
 - ✅ Basic integration tests
 
-### Phase 2B: TypeScript Wrappers (✅ COMPLETE)
-
-- ✅ Create `StackWasm.ts` - WASM-backed Stack with TS API (590 lines)
-- ✅ Create `SpaceWasm.ts` - WASM-backed Space with TS API (776 lines)
-- ✅ Add comprehensive integration tests (16 tests each, 100% pass rate)
-- ✅ Test scripts: `npm run test:wasm:stack`, `npm run test:wasm:space`
-- ⏳ Benchmark comparison scripts (coming in Phase 2D)
-- ⏳ Update existing tests to use WASM (optional flag)
-
-### Phase 2C: Chronicle Incremental CRDT (✅ COMPLETE)
+### Phase 2B: Chronicle Incremental CRDT (✅ COMPLETE)
 
 - ✅ Implement full HyperTokenState in Rust Chronicle (types.rs)
 - ✅ **54 incremental action methods** — field-level Automerge operations (no full-state replacement)
