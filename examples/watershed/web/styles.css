@@ -830,6 +830,17 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   margin-top: 2px;
 }
 
+/* Highlight the Score stat in the player card */
+.stat-score .stat-value {
+  color: var(--warning);
+  text-shadow: 0 0 8px rgba(255, 170, 0, 0.4);
+}
+
+.stat-score .stat-label {
+  color: var(--warning);
+  opacity: 0.8;
+}
+
 .territory-bar {
   height: 6px;
   background: var(--bg-dark);
@@ -1002,6 +1013,50 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   background: linear-gradient(135deg, currentColor, #ffffff, currentColor);
   box-shadow: 0 0 20px currentColor, inset 0 0 10px rgba(255,255,255,0.5);
   animation: token-legendary 2s ease-in-out infinite;
+}
+
+/* Fortified token (strength-3) — cannot be contested */
+.token.fortified {
+  position: relative;
+}
+
+.token.fortified::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.7;
+  animation: fortified-ring 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.token.fortified .fortified-shield {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: calc(var(--cell-size) * 0.3);
+  line-height: 1;
+  background: var(--bg-deep);
+  border-radius: 50%;
+  width: calc(var(--cell-size) * 0.4);
+  height: calc(var(--cell-size) * 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 8px currentColor;
+  pointer-events: none;
+}
+
+@keyframes fortified-ring {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.4;
+  }
 }
 
 @keyframes token-legendary {
@@ -1225,6 +1280,13 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); }
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+}
+
+.final-score-card .score-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  font-family: var(--font-mono);
 }
 
 /* ============================================================================

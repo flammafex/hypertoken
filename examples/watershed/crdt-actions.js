@@ -181,6 +181,20 @@ Object.assign(ActionRegistry, {
       return;
     }
 
+    // Fortification check: cannot place on a cell containing another player's
+    // strength-3 (fortified) token. Such cells are locked to their owner.
+    const existingTokens = Object.values(state.tokens || {}).filter((t) => {
+      if (t.x !== x || t.y !== y) return false;
+      const consumed = state.consumed[t.id];
+      return !(consumed && Object.keys(consumed).length > 0);
+    });
+    for (const t of existingTokens) {
+      if (t.playerId !== peerId && t.strength >= 3) {
+        engine.emit("watershed:rejected", { reason: "fortified", peerId, x, y });
+        return;
+      }
+    }
+
     // Generate unique IDs
     const seq = Object.keys(state.ops).filter((id) => state.ops[id].actor === peerId).length;
     const opId = generateOpId(peerId, seq);

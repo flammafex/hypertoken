@@ -294,17 +294,30 @@
 
           <h3>Actions</h3>
           <ul>
-            <li><strong>Place:</strong> Click an empty cell to place a strength-1 token</li>
-            <li><strong>Merge:</strong> Click your token, then an adjacent token to combine them (max strength 3)</li>
-            <li><strong>Split:</strong> Click a strength-2+ token, then an adjacent empty cell to split it</li>
+            <li><strong>Place:</strong> Click an empty cell to place a strength-1 token (costs 1 energy)</li>
+            <li><strong>Merge:</strong> Click your token, then an adjacent token to combine them (max strength 3, free)</li>
+            <li><strong>Split:</strong> Click a strength-2+ token, then an adjacent empty cell to split it (free)</li>
+          </ul>
+
+          <h3>Energy</h3>
+          <ul>
+            <li>Placing costs energy; merging and splitting are free</li>
+            <li>Energy regenerates over time — choose placements wisely</li>
+            <li>When energy is low, use free merge/split to reposition</li>
           </ul>
 
           <h3>Scoring</h3>
           <ul>
-            <li>Cells with only your tokens = <strong>controlled</strong> (1 point)</li>
+            <li>A controlled cell scores points equal to the <strong>token's strength</strong> (strength-2 token = 2 points, strength-3 = 3 points)</li>
             <li>Cells with tokens from multiple players = <strong>contested</strong> (no points, but blocks opponents)</li>
-            <li>Empty cells adjacent to only your tokens = <strong>influence</strong> (1 point)</li>
+            <li>Empty cells adjacent to only your tokens = <strong>influence</strong> (1 point each)</li>
+            <li>Merging concentrates scoring on a defensible position; spreading gains more influence</li>
           </ul>
+
+          <div class="crdt-highlight">
+            <strong class="highlight">Fortification:</strong> A strength-3 token <strong>fortifies</strong> its cell —
+            opponents cannot place on it and it can never be contested. Merge to lock down key positions!
+          </div>
 
           <div class="crdt-highlight">
             <strong class="highlight">CRDT Magic:</strong> When two players place on the same cell simultaneously,
@@ -313,7 +326,10 @@
 
           <h3>Pro Tips</h3>
           <ul>
-            <li>Higher strength tokens don't score more, but they can split to expand faster</li>
+            <li>Merging two strength-1 tokens into strength-2 keeps the same score (2) but on one cell — useful for stacking toward a strength-3 fortification</li>
+            <li>Strength-3 tokens score 3 points AND can't be contested — fortify chokepoints and high-value positions</li>
+            <li>Spread strength-1 tokens for maximum influence, or merge for concentrated defensible scoring</li>
+            <li>When low on energy, use free merge/split to reposition instead of placing</li>
             <li>Contested cells block your opponent from controlling that area</li>
             <li>Watch the provenance: merged tokens show their parent history on hover</li>
           </ul>

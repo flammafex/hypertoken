@@ -108,6 +108,7 @@ export interface Cell {
   tokens: WatershedToken[]; // active tokens on this cell
   contested: boolean; // multiple players have tokens here
   controller: string | null; // playerId who controls this cell, or null
+  fortified: boolean; // a strength-3 token is present — cannot be contested
 }
 
 export interface Board {
@@ -123,6 +124,7 @@ export interface PlayerScore {
   tokenCount: number;
   controlledCells: number;
   contestedCells: number;
+  score: number; // strength-weighted: controlled cells score sum(token.strength)
 }
 
 export interface GameResult {
@@ -252,10 +254,19 @@ export function deriveBoard(state: WatershedState): Board {
       const key = `${x},${y}`;
       const tokens = cellMap[key] || [];
       const playerIds = new Set(tokens.map((t) => t.playerId));
-      const contested = playerIds.size > 1;
-      const controller = contested ? null : (tokens[0]?.playerId ?? null);
 
-      cells[y][x] = { x, y, tokens, contested, controller };
+      // Fortification: a strength-3 token locks the cell. It is never
+      // contested and always controlled by its owner — even if another
+      // player's token is somehow co-located (defensive; the placement
+      // check in crdt-actions.js prevents this in normal play).
+      const fortifyingToken = tokens.find((t) => t.strength >= 3) || null;
+      const fortified = fortifyingToken !== null;
+      const contested = !fortified && playerIds.size > 1;
+      const controller = fortified
+        ? fortifyingToken!.playerId
+        : (contested ? null : (tokens[0]?.playerId ?? null));
+
+      cells[y][x] = { x, y, tokens, contested, controller, fortified };
     }
   }
 
@@ -280,6 +291,7 @@ export function deriveScores(state: WatershedState): PlayerScore[] {
       tokenCount: 0,
       controlledCells: 0,
       contestedCells: 0,
+      score: 0,
     };
   }
 
@@ -290,7 +302,11 @@ export function deriveScores(state: WatershedState): PlayerScore[] {
     }
   }
 
-  // Score occupied cells
+  // Score occupied cells — strength-weighted: a controlled cell scores
+  // sum(token.strength) for the controlling tokens. This makes merging
+  // valuable: a strength-2 token on one cell scores 2 (vs. 2 separate
+  // strength-1 tokens on 2 cells scoring 2 + influence). The tradeoff
+  // is concentrated defensible scoring vs. spread influence.
   for (let y = 0; y < board.height; y++) {
     for (let x = 0; x < board.width; x++) {
       const cell = board.cells[y][x];
@@ -305,11 +321,20 @@ export function deriveScores(state: WatershedState): PlayerScore[] {
         }
       } else if (cell.controller && scores[cell.controller]) {
         scores[cell.controller].controlledCells++;
+        // Strength-weighted score: sum the strength of this controller's
+        // tokens on the cell. (Fortified cells have a strength-3 token
+        // from the controller, so they score 3.)
+        for (const token of cell.tokens) {
+          if (token.playerId === cell.controller) {
+            scores[cell.controller].score += token.strength;
+          }
+        }
       }
     }
   }
 
-  // Score empty adjacent cells (influence)
+  // Score empty adjacent cells (influence) — each influenced empty cell
+  // is worth 1 point (no token strength to weight by).
   for (let y = 0; y < board.height; y++) {
     for (let x = 0; x < board.width; x++) {
       const cell = board.cells[y][x];
@@ -330,6 +355,7 @@ export function deriveScores(state: WatershedState): PlayerScore[] {
         const controller = adjacentPlayers.values().next().value;
         if (controller && scores[controller]) {
           scores[controller].controlledCells++;
+          scores[controller].score += 1; // influence = 1 point per empty cell
         }
       }
     }
@@ -351,12 +377,13 @@ export function deriveResult(state: WatershedState): GameResult {
 
   let winner: string | null = null;
   if (state.phase === "ended") {
+    // Winner is determined by strength-weighted score, not raw cell count.
     let maxScore = -1;
     for (const score of scores) {
-      if (score.controlledCells > maxScore) {
-        maxScore = score.controlledCells;
+      if (score.score > maxScore) {
+        maxScore = score.score;
         winner = score.playerId;
-      } else if (score.controlledCells === maxScore && maxScore > 0) {
+      } else if (score.score === maxScore && maxScore > 0) {
         winner = null; // tie
       }
     }
@@ -384,6 +411,14 @@ export function isValidPlacement(
   if (x < 0 || x >= state.config.width) return false;
   if (y < 0 || y >= state.config.height) return false;
   if (!state.players[playerId]) return false;
+
+  // Fortification: cannot place on a cell containing another player's
+  // strength-3 (fortified) token. Own tokens are fine (player may stack
+  // to merge toward their own fortification).
+  const tokensHere = getTokensAt(state, x, y);
+  for (const t of tokensHere) {
+    if (t.playerId !== playerId && t.strength >= 3) return false;
+  }
   return true;
 }
 

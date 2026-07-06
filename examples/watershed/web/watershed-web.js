@@ -865,14 +865,20 @@ function renderEnergy() {
 
 function handlePlacementRejected(event) {
   const reason = event?.reason || event?.payload?.reason;
-  if (reason !== 'insufficient_energy') return;
-  announce('Not enough energy!');
-  if (elements.energyBar) {
-    elements.energyBar.classList.remove('shake');
-    // Force reflow to restart animation
-    void elements.energyBar.offsetWidth;
-    elements.energyBar.classList.add('shake');
-    setTimeout(() => elements.energyBar.classList.remove('shake'), 500);
+  if (reason === 'insufficient_energy') {
+    announce('Not enough energy!');
+    if (elements.energyBar) {
+      elements.energyBar.classList.remove('shake');
+      // Force reflow to restart animation
+      void elements.energyBar.offsetWidth;
+      elements.energyBar.classList.add('shake');
+      setTimeout(() => elements.energyBar.classList.remove('shake'), 500);
+    }
+    return;
+  }
+  if (reason === 'fortified') {
+    announce('That cell is fortified — cannot be contested!');
+    showError('Fortified cell — cannot place here');
   }
 }
 
@@ -964,6 +970,21 @@ function createTokenElement(token) {
     tokenEl.setAttribute('aria-label', `Opponent token, strength ${token.strength}`);
   }
 
+  // Fortified: strength-3 tokens lock their cell — can't be contested.
+  // Add a shield badge and class so CSS can render the defensive indicator.
+  if (token.strength >= 3) {
+    tokenEl.classList.add('fortified');
+    tokenEl.setAttribute('aria-label',
+      token.playerId === state.peerId
+        ? `Your fortified token, strength ${token.strength} — cannot be contested`
+        : `Opponent fortified token, strength ${token.strength} — cannot be contested or placed on`);
+    const shield = document.createElement('span');
+    shield.className = 'fortified-shield';
+    shield.setAttribute('aria-hidden', 'true');
+    shield.textContent = '🛡';
+    tokenEl.appendChild(shield);
+  }
+
   // Selected state
   if (state.selectedTokenId === token.id) {
     tokenEl.classList.add('selected');
@@ -1014,6 +1035,7 @@ function renderScores(scores) {
 
     const maxTerritory = 100; // 10x10 grid
     const territoryPercent = Math.min(100, (score.controlledCells / maxTerritory) * 100);
+    const scoreValue = score.score ?? 0;
 
     card.innerHTML = `
       <div class="player-score-header">
@@ -1023,6 +1045,10 @@ function renderScores(scores) {
         </span>
       </div>
       <div class="player-stats">
+        <div class="stat stat-score">
+          <div class="stat-value">${scoreValue}</div>
+          <div class="stat-label">Score</div>
+        </div>
         <div class="stat">
           <div class="stat-value">${score.controlledCells}</div>
           <div class="stat-label">Controlled</div>
@@ -1398,8 +1424,8 @@ function showGameOver() {
   // Render final scores
   elements.finalScores.innerHTML = '';
 
-  // Sort by controlled cells
-  const sortedScores = [...scores].sort((a, b) => b.controlledCells - a.controlledCells);
+  // Sort by strength-weighted score
+  const sortedScores = [...scores].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   for (const score of sortedScores) {
     const card = document.createElement('div');
@@ -1412,8 +1438,9 @@ function showGameOver() {
     card.innerHTML = `
       <span class="player-color-dot" style="background: ${score.color}"></span>
       <div class="player-name">${escapeHtml(score.name)}${score.playerId === state.peerId ? ' (You)' : ''}</div>
-      <div class="score-value">${score.controlledCells}</div>
-      <div class="score-label">Territory</div>
+      <div class="score-value">${score.score ?? 0}</div>
+      <div class="score-label">Score</div>
+      <div class="score-sub">(${score.controlledCells} cells)</div>
     `;
 
     elements.finalScores.appendChild(card);
