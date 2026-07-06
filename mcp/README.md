@@ -12,12 +12,12 @@ Model Context Protocol (MCP) is Anthropic's open standard for connecting AI mode
 |   Claude/LLM   |   tools/resources/     |   HyperToken   |
 |                | <--------------------- |   MCP Server   |
 +----------------+        prompts         +----------------+
-                                                 |
-                                                 v
-                                          +----------------+
-                                          |   HyperToken   |
-                                          |  Game Engine   |
-                                          +----------------+
+                                                  |
+                                                  v
+                                           +----------------+
+                                           |   HyperToken   |
+                                           |  Game Engine   |
+                                           +----------------+
 ```
 
 ## Setup
@@ -65,7 +65,7 @@ npm run mcp
 In Claude, you can now:
 
 - "Let's play blackjack!"
-- "Start a tic-tac-toe game"
+- "Start a cuttle game"
 - "What games can we play?"
 
 Claude will use the HyperToken tools to play games with you.
@@ -74,6 +74,14 @@ Claude will use the HyperToken tools to play games with you.
 
 ### Blackjack
 
+Blackjack is backed by the real HyperToken engine — `examples/blackjack/game.js`
+uses `Engine`, `Stack`, `Space`, and `Agent` under the hood. The MCP wrapper
+(`mcp/games/blackjack-mcp.ts`) is a thin adapter that creates a
+`BlackjackGame`, calls its methods, and formats the resulting state for the
+LLM. The wrapper creates its own `BlackjackGame` (which creates its own
+`Engine`); the `Engine` field on the MCP `GameSession` is kept for interface
+symmetry but is not used by the blackjack wrapper.
+
 | Tool | Description |
 |------|-------------|
 | `blackjack_new_game` | Start a new hand |
@@ -81,13 +89,23 @@ Claude will use the HyperToken tools to play games with you.
 | `blackjack_stand` | Keep your hand, dealer plays |
 | `blackjack_state` | See current game state |
 
-### Tic-Tac-Toe
+### Cuttle
+
+Cuttle is exposed via an LLM-friendly index-picking interface: call
+`cuttle_list_actions` to get a numbered menu of legal actions, then call
+`cuttle_pick_action` with the index of the action you want. After you act,
+the AI opponent (a simple random picker, matching `examples/cuttle/cli.js`'s
+`getRandomAction`) plays its turn — including any counter chains and
+resolution phases — before the state is returned.
+
+Only the 2-player `classic` variant is supported in the MCP wrapper.
 
 | Tool | Description |
 |------|-------------|
-| `tictactoe_new_game` | Start a new game |
-| `tictactoe_move` | Make a move (position 0-8) |
-| `tictactoe_state` | See the board |
+| `cuttle_new_game` | Start a new game (optional `variant` arg; only `classic` supported) |
+| `cuttle_list_actions` | List your available actions as a numbered menu |
+| `cuttle_pick_action` | Take an action by index (takes `index`) |
+| `cuttle_state` | See the current game state |
 
 ### General
 
@@ -111,8 +129,8 @@ Pre-built conversation starters:
 | Prompt | Description |
 |--------|-------------|
 | `play_blackjack` | Play with strategic advice |
-| `play_tictactoe` | Play with optimal strategy |
-| `teach_game` | Learn how to play (accepts `game` argument) |
+| `play_cuttle` | Play with strategy tips |
+| `teach_game` | Learn how to play (accepts `game` argument: `blackjack` or `cuttle`) |
 
 ## Game Rules
 
@@ -125,30 +143,39 @@ Pre-built conversation starters:
 - Hit: Take another card
 - Stand: Keep your hand, dealer must draw to 17
 
-### Tic-Tac-Toe
+### Cuttle (classic, 2-player)
 
-- Goal: Get three in a row (horizontal, vertical, or diagonal)
-- You play as X, AI plays as O
-- Board positions:
-  ```
-    0 | 1 | 2
-    ---------
-    3 | 4 | 5
-    ---------
-    6 | 7 | 8
-  ```
+- Goal: Be first to accumulate 21+ points in point cards (A=1, 2-10 face value)
+- On your turn: draw a card, pass (only if deck empty), or play a card
+- Cards can be played as: point card, one-off effect, permanent, or scuttle
+- One-offs: A (wipe points), 2 (destroy permanent / counter), 3 (recur from scrap),
+  4 (opponent discards 2), 5 (draw 2), 6 (wipe permanents), 7 (draw & must play),
+  9 (bounce a permanent)
+- Permanents: 8 (glasses — see opponent's hand), J (steal a point card),
+  Q (protect your other cards), K (reduce your point goal: 21 → 14 → 10 → 7 → 5)
+- Scuttle: use a higher card to destroy an opponent's point card (both go to scrap)
+- 3 consecutive passes (when deck is empty) = draw
 
 ## Architecture
 
 ```
 mcp/
 ├── games/
-│   ├── blackjack-mcp.ts    # Blackjack game wrapper
-│   └── tictactoe-mcp.ts    # Tic-Tac-Toe game wrapper
-└── README.md           # This file
-
-(Server entrypoint lives at cli/commands/mcp.ts, launched via `npm run mcp`.)
+│   ├── blackjack-mcp.ts    # Blackjack adapter (wraps examples/blackjack/game.js)
+│   └── cuttle-mcp.ts        # Cuttle adapter (wraps examples/cuttle/CuttleGame.ts)
+└── README.md                # This file
 ```
+
+The server entrypoint lives at `cli/commands/mcp.ts`, launched via `npm run mcp`.
+
+Each game wrapper accepts an optional `Engine` argument (for interface
+compatibility with the MCP server's `GameSession`) but the underlying game
+implementations create their own engines/state as needed:
+
+- `BlackjackMCPGame` delegates to `examples/blackjack/game.js`'s `BlackjackGame`,
+  which constructs a real HyperToken `Engine` with `Stack`/`Space`/`Agent`.
+- `CuttleMCPGame` delegates to `examples/cuttle/CuttleGame.ts`'s `CuttleGame`,
+  a standalone implementation (documented; does not use the Engine internally).
 
 ## Development
 
@@ -165,16 +192,9 @@ npx @anthropic-ai/mcp-inspector npm run mcp
 1. Create a new game wrapper in `mcp/games/`:
 
 ```typescript
-import { Engine } from '../../engine/Engine.js';
-
 export class MyGame {
-  private engine: Engine;
+  constructor(_engine?: any) {}
 
-  constructor(engine: Engine) {
-    this.engine = engine;
-  }
-
-  // Implement game methods...
   reset(): string { /* ... */ }
   makeMove(/* params */): string { /* ... */ }
   describe(): string { /* ... */ }
@@ -185,6 +205,7 @@ export class MyGame {
    - Add tools in `ListToolsRequestSchema` handler
    - Add tool handling in `CallToolRequestSchema` handler
    - Update `getOrCreateSession()` to support the new game type
+   - Update the `GameSession.game` type union
 
 3. Update this README with the new game's tools and rules
 

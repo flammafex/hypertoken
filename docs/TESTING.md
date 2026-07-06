@@ -40,13 +40,6 @@ npm run test:agent         # Agent system
 npm run test:policy        # Policy evaluation
 ```
 
-#### Action Tests
-```bash
-npm run test:token         # Token operations (transform, attach, merge)
-npm run test:batch         # Batch operations
-npm run test:player-transfers  # Agent resource transfers
-```
-
 #### Network Tests
 ```bash
 npm run test:sync          # CRDT synchronization
@@ -56,8 +49,9 @@ npm run test:network       # All network tests
 
 #### WASM Tests
 ```bash
-npm run test:wasm          # WASM bridge + Chronicle incremental CRDT parity
-npm run test:rust          # Rust unit tests (requires Rust)
+npm run test:wasm                    # WASM bridge
+npm run test:chronicle-incremental   # Chronicle incremental CRDT TS/WASM parity
+npm run test:rust                    # Rust unit tests (requires Rust)
 ```
 
 #### Plugin Tests
@@ -75,7 +69,7 @@ npm run test:integration   # End-to-end tests
 ### Composite Commands
 
 ```bash
-npm run test:unit              # core + engine + exporters + token + batch + transfers
+npm run test:unit              # core + engine + exporters
 npm run test:engine-components # recorder + script + agent + policy
 npm run test:core-components   # crypto + random
 ```

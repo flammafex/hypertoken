@@ -17,13 +17,13 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { Engine } from '../../engine/Engine.js';
-import { BlackjackGame } from '../../mcp/games/blackjack-mcp.js';
-import { TicTacToeGame } from '../../mcp/games/tictactoe-mcp.js';
+import { BlackjackMCPGame } from '../../mcp/games/blackjack-mcp.js';
+import { CuttleMCPGame } from '../../mcp/games/cuttle-mcp.js';
 
 // === Game State ===
 interface GameSession {
   type: string;
-  game: BlackjackGame | TicTacToeGame;
+  game: BlackjackMCPGame | CuttleMCPGame;
   engine: Engine;
   history: string[];
 }
@@ -58,7 +58,7 @@ DESCRIPTION:
 
 AVAILABLE GAMES:
   - Blackjack (blackjack_new_game, blackjack_hit, blackjack_stand)
-  - Tic-Tac-Toe (tictactoe_new_game, tictactoe_move)
+  - Cuttle (cuttle_new_game, cuttle_list_actions, cuttle_pick_action)
 
 CLAUDE DESKTOP CONFIGURATION:
   Add to your Claude Desktop config file:
@@ -89,13 +89,13 @@ function getOrCreateSession(gameType: string): GameSession {
   const sessionId = `session-${Date.now()}`;
   const engine = new Engine();
 
-  let game: BlackjackGame | TicTacToeGame;
+  let game: BlackjackMCPGame | CuttleMCPGame;
   switch (gameType) {
     case 'blackjack':
-      game = new BlackjackGame(engine);
+      game = new BlackjackMCPGame(engine);
       break;
-    case 'tictactoe':
-      game = new TicTacToeGame(engine);
+    case 'cuttle':
+      game = new CuttleMCPGame(engine);
       break;
     default:
       throw new Error(`Unknown game type: ${gameType}`);
@@ -163,26 +163,40 @@ export async function runMcp(args: string[]): Promise<void> {
           description: 'Get the current Blackjack game state.',
           inputSchema: { type: 'object' as const, properties: {}, required: [] },
         },
-        // Tic-Tac-Toe
+        // Cuttle
         {
-          name: 'tictactoe_new_game',
-          description: 'Start a new game of Tic-Tac-Toe.',
-          inputSchema: { type: 'object' as const, properties: {}, required: [] },
-        },
-        {
-          name: 'tictactoe_move',
-          description: 'Make a move in Tic-Tac-Toe (position 0-8).',
+          name: 'cuttle_new_game',
+          description: 'Start a new game of Cuttle (classic 2-player variant).',
           inputSchema: {
             type: 'object' as const,
             properties: {
-              position: { type: 'number', description: 'Board position (0-8)' },
+              variant: {
+                type: 'string',
+                description: 'Cuttle variant. Only "classic" is supported (default).',
+              },
             },
-            required: ['position'],
+            required: [],
           },
         },
         {
-          name: 'tictactoe_state',
-          description: 'Get the current Tic-Tac-Toe board.',
+          name: 'cuttle_list_actions',
+          description: 'List the actions available to you in the current Cuttle game, as a numbered menu.',
+          inputSchema: { type: 'object' as const, properties: {}, required: [] },
+        },
+        {
+          name: 'cuttle_pick_action',
+          description: 'Pick a Cuttle action by its index from the list returned by cuttle_list_actions.',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              index: { type: 'number', description: 'Index of the action to take (from cuttle_list_actions).' },
+            },
+            required: ['index'],
+          },
+        },
+        {
+          name: 'cuttle_state',
+          description: 'Get the current Cuttle game state (your hand, points, opponent info, phase).',
           inputSchema: { type: 'object' as const, properties: {}, required: [] },
         },
         // General
@@ -202,26 +216,26 @@ export async function runMcp(args: string[]): Promise<void> {
       switch (name) {
         case 'blackjack_new_game': {
           const session = getOrCreateSession('blackjack');
-          const bjGame = session.game as BlackjackGame;
-          bjGame.deal();
+          const bjGame = session.game as BlackjackMCPGame;
+          const result = bjGame.deal();
           session.history.push('New game started');
-          return { content: [{ type: 'text', text: formatGameState(session) }] };
+          return { content: [{ type: 'text', text: result }] };
         }
 
         case 'blackjack_hit': {
           const session = getOrCreateSession('blackjack');
-          const bjGame = session.game as BlackjackGame;
+          const bjGame = session.game as BlackjackMCPGame;
           const result = bjGame.hit();
           session.history.push('Player hit');
-          return { content: [{ type: 'text', text: `${result}\n\n${formatGameState(session)}` }] };
+          return { content: [{ type: 'text', text: result }] };
         }
 
         case 'blackjack_stand': {
           const session = getOrCreateSession('blackjack');
-          const bjGame = session.game as BlackjackGame;
+          const bjGame = session.game as BlackjackMCPGame;
           const result = bjGame.stand();
           session.history.push('Player stood');
-          return { content: [{ type: 'text', text: `${result}\n\n${formatGameState(session)}` }] };
+          return { content: [{ type: 'text', text: result }] };
         }
 
         case 'blackjack_state': {
@@ -229,28 +243,35 @@ export async function runMcp(args: string[]): Promise<void> {
           return { content: [{ type: 'text', text: formatGameState(session) }] };
         }
 
-        case 'tictactoe_new_game': {
-          const session = getOrCreateSession('tictactoe');
-          const tttGame = session.game as TicTacToeGame;
-          tttGame.reset();
-          session.history.push('New game started');
-          return { content: [{ type: 'text', text: formatGameState(session) }] };
+        case 'cuttle_new_game': {
+          const session = getOrCreateSession('cuttle');
+          const cuttleGame = session.game as CuttleMCPGame;
+          const variant = (toolArgs as { variant?: string })?.variant;
+          const result = cuttleGame.newGame(variant);
+          session.history.push('New cuttle game started');
+          return { content: [{ type: 'text', text: result }] };
         }
 
-        case 'tictactoe_move': {
-          const session = getOrCreateSession('tictactoe');
-          const tttGame = session.game as TicTacToeGame;
-          const position = (toolArgs as { position?: number })?.position;
-          if (position === undefined) {
-            return { content: [{ type: 'text', text: 'Error: position required' }], isError: true };
+        case 'cuttle_list_actions': {
+          const session = getOrCreateSession('cuttle');
+          const cuttleGame = session.game as CuttleMCPGame;
+          return { content: [{ type: 'text', text: cuttleGame.listActions() }] };
+        }
+
+        case 'cuttle_pick_action': {
+          const session = getOrCreateSession('cuttle');
+          const cuttleGame = session.game as CuttleMCPGame;
+          const index = (toolArgs as { index?: number })?.index;
+          if (index === undefined) {
+            return { content: [{ type: 'text', text: 'Error: index required' }], isError: true };
           }
-          const result = tttGame.makeMove(position);
-          session.history.push(`Player moved to ${position}`);
-          return { content: [{ type: 'text', text: `${result}\n\n${formatGameState(session)}` }] };
+          const result = cuttleGame.pickAction(index);
+          session.history.push(`Player picked action ${index}`);
+          return { content: [{ type: 'text', text: result }] };
         }
 
-        case 'tictactoe_state': {
-          const session = getOrCreateSession('tictactoe');
+        case 'cuttle_state': {
+          const session = getOrCreateSession('cuttle');
           return { content: [{ type: 'text', text: formatGameState(session) }] };
         }
 
@@ -261,11 +282,11 @@ export async function runMcp(args: string[]): Promise<void> {
                 type: 'text',
                 text: `Available games:
 
-1. **Blackjack** - Classic casino card game
+1. **Blackjack** - Classic casino card game (Engine-backed)
    - Tools: blackjack_new_game, blackjack_hit, blackjack_stand, blackjack_state
 
-2. **Tic-Tac-Toe** - Classic strategy game
-   - Tools: tictactoe_new_game, tictactoe_move, tictactoe_state
+2. **Cuttle** - Combat card game, classic 2-player variant
+   - Tools: cuttle_new_game, cuttle_list_actions, cuttle_pick_action, cuttle_state
 
 Start a game by calling the appropriate new_game tool!`,
               },
@@ -327,14 +348,14 @@ Start a game by calling the appropriate new_game tool!`,
     return {
       prompts: [
         { name: 'play_blackjack', description: 'Play a game of Blackjack with strategic advice', arguments: [] },
-        { name: 'play_tictactoe', description: 'Play Tic-Tac-Toe with optimal strategy', arguments: [] },
+        { name: 'play_cuttle', description: 'Play a game of Cuttle with strategy tips', arguments: [] },
         {
           name: 'teach_game',
           description: 'Learn how to play a game',
           arguments: [
             {
               name: 'game',
-              description: 'The game to learn (blackjack, tictactoe)',
+              description: 'The game to learn (blackjack, cuttle)',
               required: true,
             },
           ],
@@ -375,31 +396,49 @@ Let's play!`,
             },
           ],
         };
-      case 'play_tictactoe':
+      case 'play_cuttle':
         return {
           messages: [
             {
               role: 'user',
               content: {
                 type: 'text',
-                text: `Let's play Tic-Tac-Toe! You play as X, and I want you to try to win.
+                text: `Let's play Cuttle! You are Player 0; the AI is Player 1.
 
-Start a new game with tictactoe_new_game, then make moves with tictactoe_move.
+Cuttle is a combat card game played with a standard 52-card deck. Goal: be
+first to 21+ points in point cards (A=1, 2-10 face value). On your turn you
+may draw, pass (only if deck empty), or play a card as a point card, a
+one-off effect, a permanent, or to scuttle an opponent's point card.
 
-The board positions are:
-  0 | 1 | 2
-  ---------
-  3 | 4 | 5
-  ---------
-  6 | 7 | 8
+Quick card-effect reference (classic variant):
+- A: one-off — destroy ALL point cards
+- 2: one-off — destroy a permanent, OR counter an opponent's one-off
+- 3: one-off — retrieve a card from scrap
+- 4: one-off — opponent discards 2 cards
+- 5: one-off — draw 2 cards
+- 6: one-off — destroy ALL permanents
+- 7: one-off — draw a card and must play it immediately
+- 8: permanent — opponent's hand is revealed to you ("glasses")
+- 9: one-off — return a permanent to its owner's hand
+- 10: point card only
+- J: permanent — steal control of an opponent's point card
+- Q: permanent — protect your other cards from targeting
+- K: permanent — reduce your point goal (21 -> 14 -> 10 -> 7 -> 5)
+
+Workflow:
+1. Call cuttle_new_game to start.
+2. Call cuttle_list_actions to see your numbered options.
+3. Call cuttle_pick_action with the index of your chosen action.
+4. The AI will play its turn automatically. Repeat until someone wins.
 
 Strategy tips:
-- Take center (4) if available
-- Take corners (0, 2, 6, 8) over edges
-- Block opponent's winning moves
-- Create forks when possible
+- Build points early, but watch for Aces (wipe all points).
+- Queens protect your board; play one before committing to points.
+- Scuttle aggressively when ahead; it removes opponent points.
+- Save 2s to counter dangerous one-offs (especially A and 6).
+- Kings snowball: each one lowers your goal.
 
-Start the game and play to win!`,
+Let's play!`,
               },
             },
           ],
