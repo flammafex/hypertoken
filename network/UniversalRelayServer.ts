@@ -48,6 +48,10 @@ export interface UniversalRelayServerOptions {
   rateLimit?: Partial<RateLimitConfig> | false;
   /** Message codec (default: JSON for backward compatibility) */
   codec?: MessageCodec | Partial<CodecConfig>;
+  /** Enable room multiplexing (default: true). When enabled, peers can create/join
+   *  rooms and broadcasts are scoped to the room. Non-room peers broadcast to
+   *  other non-room peers only (backward compatible). */
+  rooms?: boolean;
 }
 
 export interface ClientInfo {
@@ -58,6 +62,19 @@ export interface ClientInfo {
   binaryMode: boolean;
 }
 
+/**
+ * Generate a human-readable room code (format: XXXX-XXXX).
+ * Uses unambiguous characters (no 0/O/1/I/L).
+ */
+function generateRoomCode(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  code += "-";
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 export class UniversalRelayServer extends Emitter {
   private httpServer: ReturnType<typeof createServer> | null = null;
   private wss: WebSocketServer | null = null;
@@ -65,6 +82,13 @@ export class UniversalRelayServer extends Emitter {
   private rateLimiter: RateLimiter | null = null;
   private startTime: number = Date.now();
   private codec: MessageCodec;
+
+  /** Room multiplexing: roomCode → set of client WebSockets */
+  private rooms: Map<string, Set<WebSocket>> = new Map();
+  /** Track which room each peer is in: peerId → roomCode */
+  private peerRooms: Map<string, string> = new Map();
+  /** Whether room multiplexing is enabled */
+  private readonly roomsEnabled: boolean;
 
   readonly port: number;
   readonly verbose: boolean;
@@ -74,6 +98,7 @@ export class UniversalRelayServer extends Emitter {
 
     this.port = options.port ?? 3000;
     this.verbose = options.verbose ?? false;
+    this.roomsEnabled = options.rooms ?? true;
 
     // Setup codec (default to JSON for backward compatibility)
     if (options.codec instanceof MessageCodec) {
@@ -166,6 +191,8 @@ export class UniversalRelayServer extends Emitter {
       }
     }
     this.clients.clear();
+    this.rooms.clear();
+    this.peerRooms.clear();
 
     // Close the WebSocket server
     if (this.wss) {
@@ -249,7 +276,15 @@ export class UniversalRelayServer extends Emitter {
     ws.on("close", () => {
       this.clients.delete(ws);
       this.rateLimiter?.remove(peerId);
-      this._broadcast({ type: "peer:left", peerId });
+
+      // Clean up room membership (notifies room peers if applicable)
+      const wasInRoom = this.roomsEnabled && this.peerRooms.has(peerId);
+      if (wasInRoom) {
+        this._leaveCurrentRoom(ws, clientInfo);
+      } else {
+        // Not in a room — broadcast to non-room peers (backward compat)
+        this._broadcast({ type: "peer:left", peerId });
+      }
 
       if (this.verbose) {
         console.log(`[UniversalRelay] Client disconnected: ${peerId} (${this.clients.size} remaining)`);
@@ -296,6 +331,12 @@ export class UniversalRelayServer extends Emitter {
 
       // Decode message using codec
       const msg = this.codec.decode(rawData) as any;
+
+      // Handle room protocol messages (if rooms enabled)
+      if (this.roomsEnabled && this._isRoomMessage(msg)) {
+        this._handleRoomMessage(ws, clientInfo, msg);
+        return;
+      }
 
       // Handle WebRTC signaling
       if (this._isWebRTCSignaling(msg)) {
@@ -365,6 +406,135 @@ export class UniversalRelayServer extends Emitter {
   }
 
   /*───────────────────────────────────────────────
+    Private: Room multiplexing
+  ───────────────────────────────────────────────*/
+
+  private _isRoomMessage(msg: any): boolean {
+    return msg.type === "room:create" || msg.type === "room:join" || msg.type === "room:leave";
+  }
+
+  private _handleRoomMessage(ws: WebSocket, clientInfo: ClientInfo, msg: any): void {
+    switch (msg.type) {
+      case "room:create": {
+        // Generate unique room code
+        let roomCode: string;
+        let attempts = 0;
+        do {
+          roomCode = generateRoomCode();
+          attempts++;
+        } while (this.rooms.has(roomCode) && attempts < 100);
+
+        if (this.rooms.has(roomCode)) {
+          this._send(ws, clientInfo, { type: "room:error", message: "Could not generate unique room code" });
+          return;
+        }
+
+        // Leave current room if in one
+        this._leaveCurrentRoom(ws, clientInfo);
+
+        // Create room and add peer
+        this.rooms.set(roomCode, new Set([ws]));
+        this.peerRooms.set(clientInfo.peerId, roomCode);
+
+        // Respond
+        this._send(ws, clientInfo, { type: "room:created", roomCode });
+
+        if (this.verbose) {
+          console.log(`[UniversalRelay] Room created: ${roomCode} by ${clientInfo.peerId}`);
+        }
+        break;
+      }
+
+      case "room:join": {
+        const roomCode = (msg.payload?.roomCode || msg.roomCode || "").toUpperCase().trim();
+        const room = this.rooms.get(roomCode);
+
+        if (!room) {
+          this._send(ws, clientInfo, { type: "room:error", message: "Room not found" });
+          return;
+        }
+
+        // Leave current room if in one
+        this._leaveCurrentRoom(ws, clientInfo);
+
+        // Join new room
+        room.add(ws);
+        this.peerRooms.set(clientInfo.peerId, roomCode);
+
+        // Send existing peers in room to new joiner
+        for (const [client, info] of this.clients) {
+          if (client !== ws && this.peerRooms.get(info.peerId) === roomCode) {
+            this._send(ws, clientInfo, { type: "peer:joined", peerId: info.peerId });
+          }
+        }
+
+        // Notify room peers of new joiner
+        this._broadcastToRoom(roomCode, { type: "peer:joined", peerId: clientInfo.peerId }, ws);
+
+        // Respond
+        this._send(ws, clientInfo, { type: "room:joined", roomCode });
+
+        if (this.verbose) {
+          console.log(`[UniversalRelay] Peer ${clientInfo.peerId} joined room ${roomCode}`);
+        }
+        break;
+      }
+
+      case "room:leave": {
+        this._leaveCurrentRoom(ws, clientInfo);
+        this._send(ws, clientInfo, { type: "room:left" });
+        break;
+      }
+    }
+  }
+
+  /**
+   * Remove a peer from their current room (if any).
+   * Notifies remaining room peers of the departure.
+   */
+  private _leaveCurrentRoom(ws: WebSocket, clientInfo: ClientInfo): void {
+    const roomCode = this.peerRooms.get(clientInfo.peerId);
+    if (!roomCode) return;
+
+    const room = this.rooms.get(roomCode);
+    if (room) {
+      room.delete(ws);
+      if (room.size === 0) {
+        this.rooms.delete(roomCode);
+        if (this.verbose) {
+          console.log(`[UniversalRelay] Room ${roomCode} deleted (empty)`);
+        }
+      } else {
+        // Notify remaining peers
+        this._broadcastToRoom(roomCode, { type: "peer:left", peerId: clientInfo.peerId });
+      }
+    }
+    this.peerRooms.delete(clientInfo.peerId);
+  }
+
+  /**
+   * Broadcast a message to all peers in a specific room.
+   */
+  private _broadcastToRoom(roomCode: string, msg: any, excludeWs?: WebSocket): void {
+    const room = this.rooms.get(roomCode);
+    if (!room) return;
+
+    const jsonStr = JSON.stringify(msg);
+    for (const client of room) {
+      if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
+        const info = this.clients.get(client);
+        if (info) {
+          if (info.binaryMode) {
+            client.send(this.codec.encode(msg));
+          } else {
+            client.send(jsonStr);
+          }
+        }
+      }
+    }
+  }
+
+  /*───────────────────────────────────────────────
     Private: Message routing
   ───────────────────────────────────────────────*/
 
@@ -396,6 +566,19 @@ export class UniversalRelayServer extends Emitter {
   }
 
   private _broadcast(msg: any, excludeWs?: WebSocket): void {
+    // If rooms are enabled, scope broadcast to sender's room
+    if (this.roomsEnabled && excludeWs) {
+      const senderInfo = this.clients.get(excludeWs);
+      const senderRoom = senderInfo ? this.peerRooms.get(senderInfo.peerId) : undefined;
+
+      if (senderRoom) {
+        // Sender is in a room — broadcast to room peers only
+        this._broadcastToRoom(senderRoom, msg, excludeWs);
+        return;
+      }
+      // Sender is not in a room — broadcast to non-room peers only (backward compat)
+    }
+
     // Pre-encode for efficiency
     const jsonStr = JSON.stringify(msg);
     const binaryData = this.codec.getConfig().format === "msgpack"
@@ -404,6 +587,9 @@ export class UniversalRelayServer extends Emitter {
 
     for (const [client, info] of this.clients) {
       if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
+        // Skip peers in rooms (they only receive room-scoped broadcasts)
+        if (this.roomsEnabled && this.peerRooms.has(info.peerId)) continue;
+
         if (info.binaryMode && binaryData) {
           client.send(binaryData);
         } else {

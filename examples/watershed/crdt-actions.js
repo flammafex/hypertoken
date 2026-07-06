@@ -1,7 +1,7 @@
 /**
- * Confluence CRDT Actions
+ * Watershed CRDT Actions
  *
- * Registers confluence:* actions with the ActionRegistry. Uses field-level
+ * Registers watershed:* actions with the ActionRegistry. Uses field-level
  * Chronicle writes (not full-state replacement) so concurrent writes to
  * different tokens merge cleanly in the CRDT.
  *
@@ -11,7 +11,7 @@
  * Usage:
  *   import "./crdt-actions.js";  // Register actions
  *   const engine = new Engine({ disableWasm: true });
- *   await engine.dispatch("confluence:init", {});
+ *   await engine.dispatch("watershed:init", {});
  *   engine.connect("ws://localhost:3000");
  */
 
@@ -28,53 +28,53 @@ import {
   deriveResult,
   getTimeRemaining,
   isTimeUp,
-} from "./ConfluenceGame.js";
+} from "./WatershedGame.js";
 
 /**
- * Get or create the Confluence state from Chronicle.
- * The state lives in doc.confluence — if it doesn't exist, create it.
+ * Get or create the Watershed state from Chronicle.
+ * The state lives in doc.watershed — if it doesn't exist, create it.
  */
 function getOrCreateState(engine) {
-  if (!engine.session.state?.confluence) {
+  if (!engine.session.state?.watershed) {
     const initialState = createInitialState();
-    engine.session.change("confluence:init", (doc) => {
-      doc.confluence = initialState;
+    engine.session.change("watershed:init", (doc) => {
+      doc.watershed = initialState;
     });
   }
-  return engine.session.state.confluence;
+  return engine.session.state.watershed;
 }
 
 /**
- * Load Confluence state from Chronicle into a local cache.
+ * Load Watershed state from Chronicle into a local cache.
  * Called when remote state arrives via CRDT sync.
  */
 function loadFromChronicle(engine) {
-  const confluenceState = engine.session.state?.confluence;
-  if (!confluenceState) return;
+  const watershedState = engine.session.state?.watershed;
+  if (!watershedState) return;
 
   // State is read directly from Chronicle — no separate local copy needed.
-  // The ConfluenceGame functions operate on the state object in-place.
+  // The WatershedGame functions operate on the state object in-place.
   // We just need to make sure the engine knows the state exists.
-  if (!engine._confluenceReady) {
-    engine._confluenceReady = true;
-    engine.emit("confluence:ready", {});
+  if (!engine._watershedReady) {
+    engine._watershedReady = true;
+    engine.emit("watershed:ready", {});
   }
 }
 
 /**
  * Set up the state sync listener for an engine.
- * When Chronicle receives remote state, emit confluence:updated.
+ * When Chronicle receives remote state, emit watershed:updated.
  */
-export function setupConfluenceSync(engine) {
+export function setupWatershedSync(engine) {
   engine.on("state:updated", (e) => {
     const source = e?.source || e?.payload?.source;
     if (source !== "local" && source !== undefined) {
       loadFromChronicle(engine);
     }
     // Always emit update (local or remote) so UI re-renders
-    if (engine.session.state?.confluence) {
-      engine.emit("confluence:updated", {
-        state: engine.session.state.confluence,
+    if (engine.session.state?.watershed) {
+      engine.emit("watershed:updated", {
+        state: engine.session.state.watershed,
         source,
       });
     }
@@ -88,15 +88,15 @@ function generateOpId(peerId, seq) {
   return `${peerId}-${seq}`;
 }
 
-// Register Confluence actions
+// Register Watershed actions
 Object.assign(ActionRegistry, {
   /**
-   * Initialize a new Confluence game.
+   * Initialize a new Watershed game.
    */
-  "confluence:init": (engine, { width, height, durationMs } = {}) => {
+  "watershed:init": (engine, { width, height, durationMs } = {}) => {
     const config = { width: width ?? 10, height: height ?? 10, durationMs: durationMs ?? 30000 };
-    engine.session.change("confluence:init", (doc) => {
-      doc.confluence = {
+    engine.session.change("watershed:init", (doc) => {
+      doc.watershed = {
         config: { width: config.width, height: config.height, durationMs: config.durationMs },
         players: {},
         tokens: {},
@@ -108,22 +108,22 @@ Object.assign(ActionRegistry, {
       };
     });
 
-    if (!engine._confluenceSyncSetup) {
-      setupConfluenceSync(engine);
-      engine._confluenceSyncSetup = true;
+    if (!engine._watershedSyncSetup) {
+      setupWatershedSync(engine);
+      engine._watershedSyncSetup = true;
     }
 
-    engine.emit("confluence:ready", {});
+    engine.emit("watershed:ready", {});
   },
 
   /**
    * Register a player.
    */
-  "confluence:register": (engine, { peerId, name } = {}) => {
+  "watershed:register": (engine, { peerId, name } = {}) => {
     if (!peerId) throw new Error("peerId required");
 
     // Read current state, modify, write back
-    const state = engine.session.state?.confluence;
+    const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
 
     // Check if already registered
@@ -132,28 +132,28 @@ Object.assign(ActionRegistry, {
     const colors = ["#e94560", "#00d4ff", "#4ade80", "#fbbf24"];
     const colorIndex = Object.keys(state.players).length % colors.length;
 
-    engine.session.change("confluence:register", (doc) => {
-      doc.confluence.players[peerId] = {
+    engine.session.change("watershed:register", (doc) => {
+      doc.watershed.players[peerId] = {
         peerId,
-        name: name || `Player ${Object.keys(doc.confluence.players).length + 1}`,
+        name: name || `Player ${Object.keys(doc.watershed.players).length + 1}`,
         color: colors[colorIndex],
         joinedAt: Date.now(),
       };
     });
 
-    engine.emit("confluence:playerJoined", { peerId });
+    engine.emit("watershed:playerJoined", { peerId });
   },
 
   /**
    * Place a token on the board.
-   * Uses field-level write: only adds to doc.confluence.tokens[tokenId]
-   * and doc.confluence.ops[opId]. Does NOT replace the entire state.
+   * Uses field-level write: only adds to doc.watershed.tokens[tokenId]
+   * and doc.watershed.ops[opId]. Does NOT replace the entire state.
    */
-  "confluence:place": (engine, { x, y, peerId } = {}) => {
+  "watershed:place": (engine, { x, y, peerId } = {}) => {
     if (x === undefined || y === undefined) throw new Error("x and y required");
     if (!peerId) throw new Error("peerId required");
 
-    const state = engine.session.state?.confluence;
+    const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
     if (state.phase !== "playing") throw new Error("Game not in progress");
     if (!state.players[peerId]) throw new Error(`Player ${peerId} not registered`);
@@ -166,8 +166,8 @@ Object.assign(ActionRegistry, {
     const tokenId = `tok-${opId}`;
 
     // Field-level write: only add the new token and op
-    engine.session.change(`confluence:place ${peerId} (${x},${y})`, (doc) => {
-      doc.confluence.tokens[tokenId] = {
+    engine.session.change(`watershed:place ${peerId} (${x},${y})`, (doc) => {
+      doc.watershed.tokens[tokenId] = {
         id: tokenId,
         playerId: peerId,
         strength: 1,
@@ -178,7 +178,7 @@ Object.assign(ActionRegistry, {
         _splitFrom: null,
         placedAt: Date.now(),
       };
-      doc.confluence.ops[opId] = {
+      doc.watershed.ops[opId] = {
         type: "place",
         actor: peerId,
         seq,
@@ -186,18 +186,18 @@ Object.assign(ActionRegistry, {
       };
     });
 
-    engine.emit("confluence:placed", { tokenId, x, y, peerId });
+    engine.emit("watershed:placed", { tokenId, x, y, peerId });
   },
 
   /**
    * Merge two adjacent same-player tokens into a stronger one.
    * Marks parents as consumed, creates new token with _mergedFrom.
    */
-  "confluence:merge": (engine, { tokenIdA, tokenIdB, peerId } = {}) => {
+  "watershed:merge": (engine, { tokenIdA, tokenIdB, peerId } = {}) => {
     if (!tokenIdA || !tokenIdB) throw new Error("tokenIdA and tokenIdB required");
     if (!peerId) throw new Error("peerId required");
 
-    const state = engine.session.state?.confluence;
+    const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
     if (state.phase !== "playing") throw new Error("Game not in progress");
 
@@ -226,15 +226,15 @@ Object.assign(ActionRegistry, {
     const newStrength = Math.min(3, tokenA.strength + tokenB.strength);
 
     // Field-level writes
-    engine.session.change(`confluence:merge ${peerId}`, (doc) => {
+    engine.session.change(`watershed:merge ${peerId}`, (doc) => {
       // Mark parents as consumed
-      if (!doc.confluence.consumed[tokenIdA]) doc.confluence.consumed[tokenIdA] = {};
-      doc.confluence.consumed[tokenIdA][opId] = true;
-      if (!doc.confluence.consumed[tokenIdB]) doc.confluence.consumed[tokenIdB] = {};
-      doc.confluence.consumed[tokenIdB][opId] = true;
+      if (!doc.watershed.consumed[tokenIdA]) doc.watershed.consumed[tokenIdA] = {};
+      doc.watershed.consumed[tokenIdA][opId] = true;
+      if (!doc.watershed.consumed[tokenIdB]) doc.watershed.consumed[tokenIdB] = {};
+      doc.watershed.consumed[tokenIdB][opId] = true;
 
       // Create merged token
-      doc.confluence.tokens[newTokenId] = {
+      doc.watershed.tokens[newTokenId] = {
         id: newTokenId,
         playerId: peerId,
         strength: newStrength,
@@ -246,7 +246,7 @@ Object.assign(ActionRegistry, {
         placedAt: Date.now(),
       };
 
-      doc.confluence.ops[opId] = {
+      doc.watershed.ops[opId] = {
         type: "merge",
         actor: peerId,
         seq,
@@ -254,19 +254,19 @@ Object.assign(ActionRegistry, {
       };
     });
 
-    engine.emit("confluence:merged", { newTokenId, tokenIdA, tokenIdB, peerId });
+    engine.emit("watershed:merged", { newTokenId, tokenIdA, tokenIdB, peerId });
   },
 
   /**
    * Split a strength-2+ token into two strength-1 tokens.
    * Marks parent as consumed, creates two new tokens with _splitFrom.
    */
-  "confluence:split": (engine, { tokenId, targetX, targetY, peerId } = {}) => {
+  "watershed:split": (engine, { tokenId, targetX, targetY, peerId } = {}) => {
     if (!tokenId) throw new Error("tokenId required");
     if (targetX === undefined || targetY === undefined) throw new Error("targetX and targetY required");
     if (!peerId) throw new Error("peerId required");
 
-    const state = engine.session.state?.confluence;
+    const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
     if (state.phase !== "playing") throw new Error("Game not in progress");
 
@@ -291,13 +291,13 @@ Object.assign(ActionRegistry, {
     const newTokenId2 = `tok-${opId}-b`;
 
     // Field-level writes
-    engine.session.change(`confluence:split ${peerId}`, (doc) => {
+    engine.session.change(`watershed:split ${peerId}`, (doc) => {
       // Mark parent as consumed
-      if (!doc.confluence.consumed[tokenId]) doc.confluence.consumed[tokenId] = {};
-      doc.confluence.consumed[tokenId][opId] = true;
+      if (!doc.watershed.consumed[tokenId]) doc.watershed.consumed[tokenId] = {};
+      doc.watershed.consumed[tokenId][opId] = true;
 
       // Create two new tokens
-      doc.confluence.tokens[newTokenId1] = {
+      doc.watershed.tokens[newTokenId1] = {
         id: newTokenId1,
         playerId: peerId,
         strength: 1,
@@ -309,7 +309,7 @@ Object.assign(ActionRegistry, {
         placedAt: Date.now(),
       };
 
-      doc.confluence.tokens[newTokenId2] = {
+      doc.watershed.tokens[newTokenId2] = {
         id: newTokenId2,
         playerId: peerId,
         strength: 1,
@@ -321,7 +321,7 @@ Object.assign(ActionRegistry, {
         placedAt: Date.now(),
       };
 
-      doc.confluence.ops[opId] = {
+      doc.watershed.ops[opId] = {
         type: "split",
         actor: peerId,
         seq,
@@ -329,30 +329,30 @@ Object.assign(ActionRegistry, {
       };
     });
 
-    engine.emit("confluence:split", { newTokenId1, newTokenId2, tokenId, peerId });
+    engine.emit("watershed:split", { newTokenId1, newTokenId2, tokenId, peerId });
   },
 
   /**
    * Start the game (syncs to all peers via CRDT).
    * Sets startTime and phase to "playing" so the timer begins for everyone.
    */
-  "confluence:start": (engine, { peerId } = {}) => {
-    const state = engine.session.state?.confluence;
+  "watershed:start": (engine, { peerId } = {}) => {
+    const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
 
-    engine.session.change("confluence:start", (doc) => {
-      doc.confluence.startTime = Date.now();
-      doc.confluence.phase = "playing";
+    engine.session.change("watershed:start", (doc) => {
+      doc.watershed.startTime = Date.now();
+      doc.watershed.phase = "playing";
     });
 
-    engine.emit("confluence:started", {});
+    engine.emit("watershed:started", {});
   },
 
   /**
    * End the game and compute final scores.
    */
-  "confluence:end": (engine, { peerId } = {}) => {
-    const state = engine.session.state?.confluence;
+  "watershed:end": (engine, { peerId } = {}) => {
+    const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
     if (state.phase === "ended") throw new Error("Game already ended");
 
@@ -362,12 +362,12 @@ Object.assign(ActionRegistry, {
     plainState.phase = "ended"; // deriveResult only computes winner when phase === "ended"
     const result = deriveResult(plainState);
 
-    engine.session.change("confluence:end", (doc) => {
-      doc.confluence.phase = "ended";
-      doc.confluence.winner = result.winner;
+    engine.session.change("watershed:end", (doc) => {
+      doc.watershed.phase = "ended";
+      doc.watershed.winner = result.winner;
     });
 
-    engine.emit("confluence:ended", { winner: result.winner });
+    engine.emit("watershed:ended", { winner: result.winner });
   },
 });
 
@@ -375,7 +375,7 @@ Object.assign(ActionRegistry, {
  * Helper: get the current board (derived from tokens).
  */
 export function getBoard(engine) {
-  const state = engine.session.state?.confluence;
+  const state = engine.session.state?.watershed;
   if (!state) return null;
   // Deep clone to convert Automerge proxy to plain object
   const plainState = JSON.parse(JSON.stringify(state));
@@ -386,7 +386,7 @@ export function getBoard(engine) {
  * Helper: get current scores (derived from tokens).
  */
 export function getScores(engine) {
-  const state = engine.session.state?.confluence;
+  const state = engine.session.state?.watershed;
   if (!state) return [];
   const plainState = JSON.parse(JSON.stringify(state));
   return deriveScores(plainState);
@@ -396,7 +396,7 @@ export function getScores(engine) {
  * Helper: get time remaining in seconds.
  */
 export function getTimeRemainingSec(engine) {
-  const state = engine.session.state?.confluence;
+  const state = engine.session.state?.watershed;
   if (!state) return 0;
   return Math.ceil(getTimeRemaining(state) / 1000);
 }
@@ -405,7 +405,7 @@ export function getTimeRemainingSec(engine) {
  * Helper: check if game is over.
  */
 export function isGameOver(engine) {
-  const state = engine.session.state?.confluence;
+  const state = engine.session.state?.watershed;
   if (!state) return false;
   return state.phase === "ended" || isTimeUp(state);
 }

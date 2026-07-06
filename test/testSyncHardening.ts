@@ -3,7 +3,7 @@
  *
  * Phase B: Sync hardening tests for HyperToken's CRDT sync path.
  *
- * Tests the bugs we found during Cuttle and Confluence development:
+ * Tests the bugs we found during Cuttle and Watershed development:
  * 1. Conflict scenarios (concurrent writes to same/different fields)
  * 2. Reconnect (disconnect mid-game, catch-up)
  * 3. Concurrent-write convergence (both peers write simultaneously)

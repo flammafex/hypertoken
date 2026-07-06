@@ -1205,6 +1205,39 @@ function hideStatsModal() {
 // Result Display
 // ============================================================================
 
+/**
+ * Triggers a screen-shake animation on #app for high-impact moments
+ * (bust, loss, blackjack). intensity: 'normal' | 'hard'
+ */
+function triggerScreenShake(intensity = 'normal') {
+  const app = document.getElementById('app');
+  if (!app) return;
+  const cls = intensity === 'hard' ? 'shake-screen shake-hard' : 'shake-screen';
+  app.classList.remove('shake-screen', 'shake-hard');
+  // Force reflow so the animation can restart on consecutive triggers
+  void app.offsetWidth;
+  app.classList.add(...cls.split(' '));
+  const duration = intensity === 'hard' ? 600 : 500;
+  setTimeout(() => {
+    app.classList.remove('shake-screen', 'shake-hard');
+  }, duration);
+}
+
+/**
+ * Shows a floating popup (e.g. "+$30" or "BLACKJACK!") that rises and fades.
+ * type: 'win' | 'blackjack' | 'lose'
+ */
+function showFloatingPopup(text, type = 'win') {
+  const app = document.getElementById('app');
+  if (!app) return;
+  const popup = document.createElement('div');
+  popup.className = `floating-popup ${type}`;
+  popup.textContent = text;
+  app.appendChild(popup);
+  // Remove after the float-up animation completes
+  setTimeout(() => popup.remove(), 1700);
+}
+
 function showResult(result) {
   state.phase = 'result';
 
@@ -1286,6 +1319,31 @@ function showResult(result) {
   elements.resultBanner.textContent = message;
   elements.resultBanner.className = `result-banner ${bannerClass}`;
   elements.resultBanner.classList.remove('hidden');
+
+  // High-impact animation hooks (Balatro-style screen shake + floating popup)
+  const busted = (() => {
+    const gs = state.isSplit ? state.game.getSplitGameState() : state.game.getGameState();
+    return !state.isSplit && gs.playerHand.busted;
+  })();
+
+  switch (bannerClass) {
+    case 'blackjack':
+      triggerScreenShake('hard');
+      showFloatingPopup('BLACKJACK!', 'blackjack');
+      break;
+    case 'win':
+      triggerScreenShake('normal');
+      // Net win = currentBet (1:1). For split, just show WIN!
+      if (state.isSplit) {
+        showFloatingPopup('WIN!', 'win');
+      } else {
+        showFloatingPopup(`+$${state.currentBet}`, 'win');
+      }
+      break;
+    case 'lose':
+      triggerScreenShake(busted ? 'hard' : 'normal');
+      break;
+  }
 
   // Play result sound
   switch (bannerClass) {

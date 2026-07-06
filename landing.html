@@ -126,7 +126,7 @@
   <ul class="toc">
     <li><a href="#what-this-gets-you">What This Gets You</a></li>
     <li><a href="#comparison">How It Compares</a></li>
-    <li><a href="#confluence">Confluence — The Flagship Demo</a></li>
+    <li><a href="#watershed">Watershed — The Flagship Demo</a></li>
     <li><a href="#try-it">Try It</a></li>
     <li><a href="#how-it-works">How It Works</a></li>
     <li><a href="#whats-inside">What's Inside</a></li>
@@ -147,7 +147,7 @@
   </p>
 
   <p>
-    <a href="#confluence">Play Confluence</a> — our flagship CRDT showcase game.
+    <a href="#watershed">Play Watershed</a> — our flagship CRDT showcase game.
     Or <a href="https://git.carpocratian.org/sibyl/hypertoken">view the source</a>.
   </p>
 </section>
@@ -187,7 +187,7 @@
 <hr>
 
 <section>
-  <h2 id="confluence">Confluence — The Flagship Demo</h2>
+  <h2 id="watershed">Watershed — The Flagship Demo</h2>
 
   <p>
     A real-time territory game that proves the thesis: when all state is a CRDT,
@@ -210,7 +210,7 @@
   </ul>
 
   <p>
-    <a href="./examples/confluence/web/index.html">Play Confluence</a>
+    <a href="./examples/watershed/web/index.html">Play Watershed</a>
   </p>
 </section>
 
@@ -223,9 +223,9 @@
 cd hypertoken
 npm install && npm run build
 
-# Play Confluence in the browser
+# Play Watershed in the browser
 npm run relay              # Terminal 1: start relay
-npm run confluence:web     # Terminal 2: build + serve
+npm run watershed:web     # Terminal 2: build + serve
 # Open http://localhost:8080 in two tabs</code></pre>
 
   <pre><code># Play Blackjack
@@ -305,7 +305,7 @@ const outcomeB = engine.getState();</code></pre>
     <li><strong>Persistence</strong> — IndexedDB (browser) and Filesystem (Node.js) adapters with auto-save</li>
     <li><strong>Browser builds</strong> — one command bundles any game for the browser</li>
     <li><strong>MCP server</strong> — LLM integration via Model Context Protocol</li>
-    <li><strong>10 example games</strong> — Blackjack, Poker, Cuttle, Confluence, Prisoner's Dilemma, Hanabi, Coup, Liars Dice, Accordion, Dungeon Raiders</li>
+    <li><strong>10 example games</strong> — Blackjack, Poker, Cuttle, Watershed, Prisoner's Dilemma, Hanabi, Coup, Liars Dice, Accordion, Dungeon Raiders</li>
     <li><strong>RL interfaces</strong> — Gym and PettingZoo adapters in <code>hypertoken-rl/</code> for engine-backed evaluation environments</li>
   </ul>
 </section>
@@ -322,7 +322,7 @@ const outcomeB = engine.getState();</code></pre>
     <li>P2P sync (ConsensusCore)</li>
     <li>Persistence layer (IndexedDB + Filesystem)</li>
     <li>Browser build support</li>
-    <li>Confluence CRDT showcase game</li>
+    <li>Watershed CRDT showcase game</li>
     <li>Documentation (AGENTS.md, BROWSER.md, PERSISTENCE.md, ARCHITECTURE.md)</li>
   </ul>
 </section>
@@ -339,7 +339,7 @@ const outcomeB = engine.getState();</code></pre>
     <li><a href="./docs/BROWSER.md">Browser Guide</a> — building games for the browser</li>
     <li><a href="./docs/PERSISTENCE.md">Persistence Guide</a> — save and resume game state</li>
     <li><a href="./engine/ACTIONS.md">Actions Reference</a> — all 77 actions</li>
-    <li><a href="./examples/confluence/web/index.html">Play Confluence</a> — the flagship demo</li>
+    <li><a href="./examples/watershed/web/index.html">Play Watershed</a> — the flagship demo</li>
   </ul>
 </section>
 

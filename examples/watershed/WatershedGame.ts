@@ -1,7 +1,7 @@
 /**
- * ConfluenceGame.ts
+ * WatershedGame.ts
  *
- * Pure game rules + CRDT data model for Confluence — a real-time territory game
+ * Pure game rules + CRDT data model for Watershed — a real-time territory game
  * that showcases HyperToken's CRDT thesis: concurrent writes, token provenance,
  * forkable worlds. No hidden information, no encryption, no turns.
  *
@@ -18,19 +18,19 @@
 
 export type Phase = "playing" | "ended";
 
-export interface ConfluenceConfig {
+export interface WatershedConfig {
   width: number;
   height: number;
   durationMs: number;
 }
 
-export const DEFAULT_CONFIG: ConfluenceConfig = {
+export const DEFAULT_CONFIG: WatershedConfig = {
   width: 10,
   height: 10,
   durationMs: 30000, // 30s for demo
 };
 
-export interface ConfluenceToken {
+export interface WatershedToken {
   id: string;
   playerId: string; // peerId
   strength: 1 | 2 | 3;
@@ -42,26 +42,26 @@ export interface ConfluenceToken {
   placedAt: number; // timestamp
 }
 
-export interface ConfluenceOp {
+export interface WatershedOp {
   type: "place" | "merge" | "split" | "end";
   actor: string; // peerId
   seq: number; // per-actor sequence number
   timestamp: number;
 }
 
-export interface ConfluencePlayer {
+export interface WatershedPlayer {
   peerId: string;
   name: string;
   color: string;
   joinedAt: number;
 }
 
-export interface ConfluenceState {
-  config: ConfluenceConfig;
-  players: Record<string, ConfluencePlayer>;
-  tokens: Record<string, ConfluenceToken>;
+export interface WatershedState {
+  config: WatershedConfig;
+  players: Record<string, WatershedPlayer>;
+  tokens: Record<string, WatershedToken>;
   consumed: Record<string, Record<string, boolean>>; // tokenId -> { opId: true }
-  ops: Record<string, ConfluenceOp>;
+  ops: Record<string, WatershedOp>;
   phase: Phase;
   startTime: number;
   winner: string | null;
@@ -74,7 +74,7 @@ export interface ConfluenceState {
 export interface Cell {
   x: number;
   y: number;
-  tokens: ConfluenceToken[]; // active tokens on this cell
+  tokens: WatershedToken[]; // active tokens on this cell
   contested: boolean; // multiple players have tokens here
   controller: string | null; // playerId who controls this cell, or null
 }
@@ -111,7 +111,7 @@ export const PLAYER_COLORS = ["#e94560", "#00d4ff", "#4ade80", "#fbbf24"];
 // State creation
 // ============================================================================
 
-export function createInitialState(config: Partial<ConfluenceConfig> = {}): ConfluenceState {
+export function createInitialState(config: Partial<WatershedConfig> = {}): WatershedState {
   return {
     config: { ...DEFAULT_CONFIG, ...config },
     players: {},
@@ -129,16 +129,16 @@ export function createInitialState(config: Partial<ConfluenceConfig> = {}): Conf
 // ============================================================================
 
 export function registerPlayer(
-  state: ConfluenceState,
+  state: WatershedState,
   peerId: string,
   name: string,
-): ConfluencePlayer {
+): WatershedPlayer {
   if (state.players[peerId]) {
     return state.players[peerId];
   }
 
   const colorIndex = Object.keys(state.players).length % PLAYER_COLORS.length;
-  const player: ConfluencePlayer = {
+  const player: WatershedPlayer = {
     peerId,
     name,
     color: PLAYER_COLORS[colorIndex],
@@ -152,24 +152,24 @@ export function registerPlayer(
 // Token helpers
 // ============================================================================
 
-export function isTokenConsumed(state: ConfluenceState, tokenId: string): boolean {
+export function isTokenConsumed(state: WatershedState, tokenId: string): boolean {
   const consumed = state.consumed[tokenId];
   return consumed !== undefined && Object.keys(consumed).length > 0;
 }
 
-export function getActiveTokens(state: ConfluenceState): ConfluenceToken[] {
+export function getActiveTokens(state: WatershedState): WatershedToken[] {
   return Object.values(state.tokens).filter((t) => !isTokenConsumed(state, t.id));
 }
 
 export function getTokensAt(
-  state: ConfluenceState,
+  state: WatershedState,
   x: number,
   y: number,
-): ConfluenceToken[] {
+): WatershedToken[] {
   return getActiveTokens(state).filter((t) => t.x === x && t.y === y);
 }
 
-export function getPlayerTokens(state: ConfluenceState, playerId: string): ConfluenceToken[] {
+export function getPlayerTokens(state: WatershedState, playerId: string): WatershedToken[] {
   return getActiveTokens(state).filter((t) => t.playerId === playerId);
 }
 
@@ -177,12 +177,12 @@ export function getPlayerTokens(state: ConfluenceState, playerId: string): Confl
 // Board derivation (the core CRDT showcase)
 // ============================================================================
 
-export function deriveBoard(state: ConfluenceState): Board {
+export function deriveBoard(state: WatershedState): Board {
   const { width, height } = state.config;
   const activeTokens = getActiveTokens(state);
 
   // Group tokens by cell
-  const cellMap: Record<string, ConfluenceToken[]> = {};
+  const cellMap: Record<string, WatershedToken[]> = {};
   for (const token of activeTokens) {
     const key = `${token.x},${token.y}`;
     if (!cellMap[key]) cellMap[key] = [];
@@ -211,7 +211,7 @@ export function deriveBoard(state: ConfluenceState): Board {
 // Scoring (derived from board)
 // ============================================================================
 
-export function deriveScores(state: ConfluenceState): PlayerScore[] {
+export function deriveScores(state: WatershedState): PlayerScore[] {
   const board = deriveBoard(state);
   const playerMap = state.players;
   const scores: Record<string, PlayerScore> = {};
@@ -283,7 +283,7 @@ export function deriveScores(state: ConfluenceState): PlayerScore[] {
   return Object.values(scores);
 }
 
-export function deriveResult(state: ConfluenceState): GameResult {
+export function deriveResult(state: WatershedState): GameResult {
   const scores = deriveScores(state);
   const board = deriveBoard(state);
 
@@ -320,7 +320,7 @@ export function deriveResult(state: ConfluenceState): GameResult {
 // ============================================================================
 
 export function isValidPlacement(
-  state: ConfluenceState,
+  state: WatershedState,
   x: number,
   y: number,
   playerId: string,
@@ -333,7 +333,7 @@ export function isValidPlacement(
 }
 
 export function isValidMerge(
-  state: ConfluenceState,
+  state: WatershedState,
   tokenIdA: string,
   tokenIdB: string,
   playerId: string,
@@ -356,7 +356,7 @@ export function isValidMerge(
 }
 
 export function isValidSplit(
-  state: ConfluenceState,
+  state: WatershedState,
   tokenId: string,
   playerId: string,
 ): boolean {
@@ -375,13 +375,13 @@ export function isValidSplit(
 // ============================================================================
 
 export function placeToken(
-  state: ConfluenceState,
+  state: WatershedState,
   x: number,
   y: number,
   playerId: string,
   opId: string,
   seq: number,
-): ConfluenceState {
+): WatershedState {
   if (!isValidPlacement(state, x, y, playerId)) {
     throw new Error(`Invalid placement at (${x},${y}) by ${playerId}`);
   }
@@ -412,13 +412,13 @@ export function placeToken(
 }
 
 export function mergeTokens(
-  state: ConfluenceState,
+  state: WatershedState,
   tokenIdA: string,
   tokenIdB: string,
   playerId: string,
   opId: string,
   seq: number,
-): ConfluenceState {
+): WatershedState {
   if (!isValidMerge(state, tokenIdA, tokenIdB, playerId)) {
     throw new Error(`Invalid merge: ${tokenIdA} + ${tokenIdB} by ${playerId}`);
   }
@@ -460,14 +460,14 @@ export function mergeTokens(
 }
 
 export function splitToken(
-  state: ConfluenceState,
+  state: WatershedState,
   tokenId: string,
   playerId: string,
   targetX: number,
   targetY: number,
   opId: string,
   seq: number,
-): ConfluenceState {
+): WatershedState {
   if (!isValidSplit(state, tokenId, playerId)) {
     throw new Error(`Invalid split: ${tokenId} by ${playerId}`);
   }
@@ -527,7 +527,7 @@ export function splitToken(
   return newState;
 }
 
-export function endGame(state: ConfluenceState, opId: string, seq: number): ConfluenceState {
+export function endGame(state: WatershedState, opId: string, seq: number): WatershedState {
   const newState = cloneState(state);
   newState.phase = "ended";
   newState.ops[opId] = {
@@ -546,13 +546,13 @@ export function endGame(state: ConfluenceState, opId: string, seq: number): Conf
 // ============================================================================
 
 export interface ProvenanceNode {
-  token: ConfluenceToken;
+  token: WatershedToken;
   parents: ProvenanceNode[];
   children: ProvenanceNode[];
 }
 
 export function getProvenanceTree(
-  state: ConfluenceState,
+  state: WatershedState,
   tokenId: string,
   visited: Set<string> = new Set(),
 ): ProvenanceNode | null {
@@ -608,16 +608,16 @@ function getNeighbors(x: number, y: number, width: number, height: number): [num
   return neighbors;
 }
 
-function cloneState(state: ConfluenceState): ConfluenceState {
+function cloneState(state: WatershedState): WatershedState {
   return JSON.parse(JSON.stringify(state));
 }
 
-export function isTimeUp(state: ConfluenceState): boolean {
+export function isTimeUp(state: WatershedState): boolean {
   if (state.phase === "ended") return true;
   return Date.now() - state.startTime >= state.config.durationMs;
 }
 
-export function getTimeRemaining(state: ConfluenceState): number {
+export function getTimeRemaining(state: WatershedState): number {
   if (state.phase === "ended") return 0;
   return Math.max(0, state.config.durationMs - (Date.now() - state.startTime));
 }

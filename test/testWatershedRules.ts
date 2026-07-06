@@ -1,7 +1,7 @@
 /*
- * test/testConfluenceRules.ts
+ * test/testWatershedRules.ts
  *
- * Phase 0+1: Pure game rules tests for ConfluenceGame.
+ * Phase 0+1: Pure game rules tests for WatershedGame.
  *
  * Tests:
  * 1. Token placement
@@ -29,7 +29,7 @@ import {
   isValidPlacement,
   isValidMerge,
   isValidSplit,
-} from "../examples/confluence/ConfluenceGame.js";
+} from "../examples/watershed/WatershedGame.js";
 
 let passed = 0;
 let failed = 0;
@@ -51,7 +51,7 @@ async function runTest(name: string, fn: () => Promise<void> | void): Promise<vo
 }
 
 async function runTests(): Promise<void> {
-  console.log("🎮 Confluence: Pure Game Rules Tests\n");
+  console.log("🎮 Watershed: Pure Game Rules Tests\n");
 
   // --- Test 1: Token placement ---
   await runTest("Token placement creates a token", () => {

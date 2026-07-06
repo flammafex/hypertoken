@@ -1,7 +1,7 @@
 /*
- * test/testConfluenceSync.ts
+ * test/testWatershedSync.ts
  *
- * Phase 3: CRDT sync tests for Confluence.
+ * Phase 3: CRDT sync tests for Watershed.
  *
  * Tests the CRDT thesis:
  * 1. Basic sync: A places, B sees it
@@ -13,7 +13,7 @@
  */
 import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
-import { getBoard, getScores, setupConfluenceSync } from "../examples/confluence/crdt-actions.js";
+import { getBoard, getScores, setupWatershedSync } from "../examples/watershed/crdt-actions.js";
 
 let passed = 0;
 let failed = 0;
@@ -45,14 +45,14 @@ async function setupEngines(port: number) {
   const engineA = new Engine({ disableWasm: true });
   const engineB = new Engine({ disableWasm: true });
 
-  setupConfluenceSync(engineA);
-  setupConfluenceSync(engineB);
+  setupWatershedSync(engineA);
+  setupWatershedSync(engineB);
 
   return { server, engineA, engineB };
 }
 
 async function runTests(): Promise<void> {
-  console.log("🌐 Confluence: CRDT Sync Tests\n");
+  console.log("🌐 Watershed: CRDT Sync Tests\n");
 
   // --- Test 1: Basic sync (A places, B sees it) ---
   await runTest("Basic sync: A places, B sees it", async () => {
@@ -63,16 +63,16 @@ async function runTests(): Promise<void> {
     await sleep(1000);
 
     // A initializes and registers
-    await engineA.dispatch("confluence:init", {});
-    await engineA.dispatch("confluence:register", { peerId: "p1", name: "Alice" });
+    await engineA.dispatch("watershed:init", {});
+    await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
     await sleep(1000);
 
     // B registers
-    await engineB.dispatch("confluence:register", { peerId: "p2", name: "Bob" });
+    await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
     // A places a token
-    await engineA.dispatch("confluence:place", { x: 3, y: 4, peerId: "p1" });
+    await engineA.dispatch("watershed:place", { x: 3, y: 4, peerId: "p1" });
     await sleep(1000);
 
     // B should see the token
@@ -95,16 +95,16 @@ async function runTests(): Promise<void> {
     engineB.connect("ws://localhost:9202");
     await sleep(1000);
 
-    await engineA.dispatch("confluence:init", {});
-    await engineA.dispatch("confluence:register", { peerId: "p1", name: "Alice" });
+    await engineA.dispatch("watershed:init", {});
+    await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
     await sleep(1000);
-    await engineB.dispatch("confluence:register", { peerId: "p2", name: "Bob" });
+    await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
     // Both place simultaneously on different cells
     await Promise.all([
-      engineA.dispatch("confluence:place", { x: 2, y: 2, peerId: "p1" }),
-      engineB.dispatch("confluence:place", { x: 7, y: 7, peerId: "p2" }),
+      engineA.dispatch("watershed:place", { x: 2, y: 2, peerId: "p1" }),
+      engineB.dispatch("watershed:place", { x: 7, y: 7, peerId: "p2" }),
     ]);
 
     await sleep(2500);
@@ -132,16 +132,16 @@ async function runTests(): Promise<void> {
     engineB.connect("ws://localhost:9203");
     await sleep(1000);
 
-    await engineA.dispatch("confluence:init", {});
-    await engineA.dispatch("confluence:register", { peerId: "p1", name: "Alice" });
+    await engineA.dispatch("watershed:init", {});
+    await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
     await sleep(1000);
-    await engineB.dispatch("confluence:register", { peerId: "p2", name: "Bob" });
+    await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
     // Both place on the SAME cell simultaneously
     await Promise.all([
-      engineA.dispatch("confluence:place", { x: 5, y: 5, peerId: "p1" }),
-      engineB.dispatch("confluence:place", { x: 5, y: 5, peerId: "p2" }),
+      engineA.dispatch("watershed:place", { x: 5, y: 5, peerId: "p1" }),
+      engineB.dispatch("watershed:place", { x: 5, y: 5, peerId: "p2" }),
     ]);
 
     await sleep(2500);
@@ -183,9 +183,9 @@ async function runTests(): Promise<void> {
     engineB.connect("ws://localhost:9204");
     await sleep(1000);
 
-    await engineA.dispatch("confluence:init", {});
-    await engineA.dispatch("confluence:register", { peerId: "p1", name: "Alice" });
-    await engineB.dispatch("confluence:register", { peerId: "p2", name: "Bob" });
+    await engineA.dispatch("watershed:init", {});
+    await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+    await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
     // B disconnects
@@ -193,8 +193,8 @@ async function runTests(): Promise<void> {
     await sleep(500);
 
     // A places while B is gone
-    await engineA.dispatch("confluence:place", { x: 1, y: 1, peerId: "p1" });
-    await engineA.dispatch("confluence:place", { x: 2, y: 2, peerId: "p1" });
+    await engineA.dispatch("watershed:place", { x: 1, y: 1, peerId: "p1" });
+    await engineA.dispatch("watershed:place", { x: 2, y: 2, peerId: "p1" });
     await sleep(500);
 
     // B reconnects
@@ -220,23 +220,23 @@ async function runTests(): Promise<void> {
     engineB.connect("ws://localhost:9205");
     await sleep(1000);
 
-    await engineA.dispatch("confluence:init", {});
-    await engineA.dispatch("confluence:register", { peerId: "p1", name: "Alice" });
-    await engineB.dispatch("confluence:register", { peerId: "p2", name: "Bob" });
+    await engineA.dispatch("watershed:init", {});
+    await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+    await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
     // A places two tokens
-    await engineA.dispatch("confluence:place", { x: 3, y: 3, peerId: "p1" });
+    await engineA.dispatch("watershed:place", { x: 3, y: 3, peerId: "p1" });
     await sleep(500);
-    await engineA.dispatch("confluence:place", { x: 4, y: 3, peerId: "p1" });
+    await engineA.dispatch("watershed:place", { x: 4, y: 3, peerId: "p1" });
     await sleep(1000);
 
     // A merges them
-    const stateA = engineA.session.state.confluence as any;
+    const stateA = engineA.session.state.watershed as any;
     const tokenIds = Object.keys(stateA.tokens).filter((id: string) => !stateA.consumed[id] || Object.keys(stateA.consumed[id]).length === 0);
     assert(tokenIds.length === 2, `Should have 2 active tokens, has ${tokenIds.length}`);
 
-    await engineA.dispatch("confluence:merge", {
+    await engineA.dispatch("watershed:merge", {
       tokenIdA: tokenIds[0],
       tokenIdB: tokenIds[1],
       peerId: "p1",
@@ -244,7 +244,7 @@ async function runTests(): Promise<void> {
     await sleep(2500);
 
     // B should see the merged token with provenance
-    const stateB = engineB.session.state.confluence as any;
+    const stateB = engineB.session.state.watershed as any;
     const activeTokensB = Object.values(stateB.tokens).filter((t: any) => {
       const consumed = stateB.consumed[t.id];
       return !consumed || Object.keys(consumed).length === 0;
@@ -272,14 +272,14 @@ async function runTests(): Promise<void> {
     engineB.connect("ws://localhost:9206");
     await sleep(1000);
 
-    await engineA.dispatch("confluence:init", {});
-    await engineA.dispatch("confluence:register", { peerId: "p1", name: "Alice" });
-    await engineB.dispatch("confluence:register", { peerId: "p2", name: "Bob" });
+    await engineA.dispatch("watershed:init", {});
+    await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+    await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
     // Both place tokens
-    await engineA.dispatch("confluence:place", { x: 0, y: 0, peerId: "p1" });
-    await engineB.dispatch("confluence:place", { x: 9, y: 9, peerId: "p2" });
+    await engineA.dispatch("watershed:place", { x: 0, y: 0, peerId: "p1" });
+    await engineB.dispatch("watershed:place", { x: 9, y: 9, peerId: "p2" });
     await sleep(2500);
 
     const scoresA = getScores(engineA);

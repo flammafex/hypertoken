@@ -4,24 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#e94560">
-  <meta name="description" content="Confluence — A real-time CRDT territory game showcasing HyperToken's distributed game engine">
+  <meta name="description" content="Watershed — A real-time CRDT territory game showcasing HyperToken's distributed game engine">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Confluence">
-  <title>Confluence — CRDT Territory Game</title>
+  <meta name="apple-mobile-web-app-title" content="Watershed">
+  <title>Watershed — CRDT Territory Game</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="app" role="application" aria-label="Confluence Territory Game">
+  <div id="app" role="application" aria-label="Watershed Territory Game">
     <!-- Screen reader announcements -->
     <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
     <!-- Start Screen -->
     <div id="start-screen" class="start-screen" role="dialog" aria-labelledby="start-title" aria-modal="true">
-      <h1 id="start-title" class="game-logo" tabindex="0">CONFLUENCE</h1>
+      <h1 id="start-title" class="game-logo" tabindex="0">WATERSHED</h1>
       <p class="game-tagline">Real-Time CRDT Territory Game</p>
 
       <form id="start-form" class="start-form" autocomplete="off">
@@ -65,7 +65,7 @@
       <!-- Header -->
       <header class="game-header">
         <div class="game-title">
-          <h1>Confluence</h1>
+          <h1>Watershed</h1>
           <div class="sync-status" aria-label="Connection status">
             <span class="sync-indicator" id="sync-indicator" aria-hidden="true"></span>
             <span id="sync-text">Connecting...</span>
@@ -122,16 +122,6 @@
         <span id="instruction-text">Click an empty cell to place a token</span>
       </div>
 
-      <!-- Waiting for Players Overlay -->
-      <div class="waiting-overlay" id="waiting-overlay" role="dialog" aria-labelledby="waiting-title">
-        <div class="waiting-content">
-          <h2 id="waiting-title">Waiting for Players</h2>
-          <p id="waiting-text">Share this relay URL with a friend: <code id="waiting-url"></code></p>
-          <p id="waiting-players">Players connected: 1</p>
-          <button type="button" id="btn-start-game" class="btn btn-primary">Start Game</button>
-        </div>
-      </div>
-
       <!-- Offline Demo Banner -->
       <div class="offline-banner" id="offline-banner" role="complementary" aria-label="Offline mode demo">
         <div>
@@ -141,6 +131,101 @@
         <button type="button" id="btn-offline" class="btn btn-secondary" aria-pressed="false">
           Go Offline
         </button>
+      </div>
+    </div>
+
+    <!-- Room Lobby Overlay -->
+    <div id="room-lobby" class="room-lobby hidden" role="dialog" aria-modal="true" aria-labelledby="lobby-title">
+      <div class="lobby-content">
+        <div class="lobby-header">
+          <div class="lobby-logo" aria-hidden="true">W</div>
+          <h2 id="lobby-title">Watershed Lobby</h2>
+          <p class="lobby-subtitle">Real-Time CRDT Territory</p>
+        </div>
+
+        <!-- Connecting state -->
+        <div id="lobby-connecting" class="lobby-state">
+          <div class="lobby-spinner" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <p class="lobby-connecting-text">Connecting to server<span class="lobby-ellipsis">...</span></p>
+        </div>
+
+        <!-- Room select (create or join) -->
+        <div id="lobby-room-select" class="lobby-state hidden">
+          <p class="lobby-intro">Create a new game or join an existing one.</p>
+          <div class="lobby-actions">
+            <button type="button" id="btn-create-room" class="btn btn-primary btn-lobby-cta">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+              <span>Create Room</span>
+            </button>
+          </div>
+          <div class="lobby-divider" role="separator" aria-label="or">
+            <span>OR</span>
+          </div>
+          <div class="lobby-join">
+            <label for="room-code-input">Join with a code</label>
+            <div class="room-code-input-group">
+              <input type="text" id="room-code-input" placeholder="XXXX-XXXX" maxlength="9" autocomplete="off" class="input room-code-field" spellcheck="false">
+              <button type="button" id="btn-join-room" class="btn btn-secondary">Join</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Room code display (shareable) -->
+        <div id="lobby-room-code" class="lobby-state hidden">
+          <p class="lobby-intro">Share this code with your friends</p>
+          <div class="room-code-display">
+            <span id="room-code-text" class="room-code-large">XXXX-XXXX</span>
+            <button type="button" id="btn-copy-code" class="btn-copy-code" title="Copy code" aria-label="Copy room code">
+              <svg class="icon-copy" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <svg class="icon-check" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            </button>
+          </div>
+          <p class="room-link-label">Or share this link</p>
+          <div class="room-link-group">
+            <a id="room-link" href="#" class="room-link" target="_blank">Loading...</a>
+            <button type="button" id="btn-copy-link" class="btn-copy-link" title="Copy link" aria-label="Copy shareable link">
+              <svg class="icon-copy" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <svg class="icon-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Waiting for players -->
+        <div id="lobby-waiting" class="lobby-state hidden">
+          <p id="lobby-status-text" class="lobby-status">Waiting for players...</p>
+          <div id="lobby-players" class="lobby-players"></div>
+          <button type="button" id="btn-start-game" class="btn btn-primary btn-lobby-cta">Start Game</button>
+        </div>
+
+        <!-- Error state -->
+        <div id="lobby-error" class="lobby-state hidden">
+          <div class="lobby-error-icon" aria-hidden="true">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v4M12 16h.01"/>
+            </svg>
+          </div>
+          <p id="lobby-error-text" class="error-text">Connection failed</p>
+          <button type="button" id="btn-lobby-retry" class="btn btn-primary">Retry</button>
+        </div>
+
+        <div class="lobby-footer">
+          <button type="button" id="btn-lobby-cancel" class="btn btn-secondary btn-ghost">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -169,7 +254,7 @@
     <div class="modal-overlay" id="rules-overlay" role="dialog" aria-labelledby="rules-title" aria-modal="true">
       <div class="modal rules-content">
         <h2 id="rules-title">How to Play</h2>
-        <p>Confluence is a real-time territory game where 2-4 players compete to control the most cells on a 10×10 grid.</p>
+        <p>Watershed is a real-time territory game where 2-4 players compete to control the most cells on a 10×10 grid.</p>
 
         <div class="modal-content">
           <h3>Objective</h3>
@@ -217,6 +302,6 @@
     </div>
   </div>
 
-  <script type="module" src="confluence.bundle.js"></script>
+  <script type="module" src="watershed.bundle.js"></script>
 </body>
 </html>

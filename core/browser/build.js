@@ -12,8 +12,8 @@
  *
  * Usage:
  *   node --loader ./test/ts-esm-loader.js core/browser/build.js \
- *     --entry examples/confluence/web/confluence-web.js \
- *     --out examples/confluence/web/confluence.bundle.js
+ *     --entry examples/watershed/web/watershed-web.js \
+ *     --out examples/watershed/web/watershed.bundle.js
  *
  * Or programmatically:
  *   import { buildForBrowser } from './core/browser/build.js';
@@ -104,7 +104,7 @@ if (process.argv[1] && !process.argv[1].endsWith('build.js')) {
 
   if (!entry || !outfile) {
     console.error('Usage: node core/browser/build.js --entry <path> --out <path> [--minify]');
-    console.error('Example: node core/browser/build.js --entry examples/confluence/web/confluence-web.js --out examples/confluence/web/confluence.bundle.js');
+    console.error('Example: node core/browser/build.js --entry examples/watershed/web/watershed-web.js --out examples/watershed/web/watershed.bundle.js');
     process.exit(1);
   }
 

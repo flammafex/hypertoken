@@ -1,5 +1,5 @@
 /**
- * Confluence Web Client
+ * Watershed Web Client
  *
  * Browser UI for the CRDT territory game. Demonstrates:
  * - Real-time multiplayer sync via HyperToken Engine
@@ -12,14 +12,14 @@
 import { Engine } from '../../../engine/Engine';
 import { IndexedDBAdapter } from '../../../core/storage/IndexedDBAdapter';
 import {
-  setupConfluenceSync,
+  setupWatershedSync,
   getBoard,
   getScores,
   getTimeRemainingSec,
   isGameOver,
 } from '../crdt-actions';
 
-console.log('[Confluence] Modules loaded successfully');
+console.log('[Watershed] Modules loaded successfully');
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -67,6 +67,11 @@ const state = {
 
   // UI
   showOfflineBanner: true,
+
+  // Room / Lobby
+  roomCode: null,
+  isHost: false,
+  lobbyVisible: false,
 };
 
 // ============================================================================
@@ -126,6 +131,27 @@ const elements = {
 
   // Accessibility
   srAnnouncements: document.getElementById('sr-announcements'),
+
+  // Room Lobby
+  roomLobby: document.getElementById('room-lobby'),
+  lobbyConnecting: document.getElementById('lobby-connecting'),
+  lobbyRoomSelect: document.getElementById('lobby-room-select'),
+  lobbyRoomCode: document.getElementById('lobby-room-code'),
+  lobbyWaiting: document.getElementById('lobby-waiting'),
+  lobbyError: document.getElementById('lobby-error'),
+  lobbyErrorText: document.getElementById('lobby-error-text'),
+  lobbyStatusText: document.getElementById('lobby-status-text'),
+  lobbyPlayers: document.getElementById('lobby-players'),
+  roomCodeText: document.getElementById('room-code-text'),
+  roomLink: document.getElementById('room-link'),
+  roomCodeInput: document.getElementById('room-code-input'),
+  btnCreateRoom: document.getElementById('btn-create-room'),
+  btnJoinRoom: document.getElementById('btn-join-room'),
+  btnCopyCode: document.getElementById('btn-copy-code'),
+  btnCopyLink: document.getElementById('btn-copy-link'),
+  btnStartGame: document.getElementById('btn-start-game'),
+  btnLobbyRetry: document.getElementById('btn-lobby-retry'),
+  btnLobbyCancel: document.getElementById('btn-lobby-cancel'),
 };
 
 // ============================================================================
@@ -134,8 +160,8 @@ const elements = {
 
 function initApp() {
   // Load saved preferences
-  const savedName = localStorage.getItem('confluence playerName');
-  const savedServer = localStorage.getItem('confluence serverUrl');
+  const savedName = localStorage.getItem('watershed playerName');
+  const savedServer = localStorage.getItem('watershed serverUrl');
 
   if (savedName) elements.playerNameInput.value = savedName;
   if (savedServer) elements.serverUrlInput.value = savedServer;
@@ -146,7 +172,7 @@ function initApp() {
   // Generate peer ID (will be overwritten by network peerId after connection)
   state.peerId = `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  console.log('[Confluence] App initialized, temp peerId:', state.peerId);
+  console.log('[Watershed] App initialized, temp peerId:', state.peerId);
 
   // Check for existing saves and show Resume button
   checkForSavedGames();
@@ -172,14 +198,14 @@ async function checkForSavedGames() {
 async function handleSaveGame() {
   if (!state.engine || !state.storageAdapter) return;
   try {
-    await state.engine.persist('confluence-save', 'Manual save');
+    await state.engine.persist('watershed-save', 'Manual save');
     announce('Game saved!');
     if (elements.btnSave) {
       elements.btnSave.textContent = 'Saved!';
       setTimeout(() => { elements.btnSave.textContent = 'Save'; }, 2000);
     }
   } catch (e) {
-    console.error('[Confluence] Save failed:', e);
+    console.error('[Watershed] Save failed:', e);
     announce('Save failed: ' + e.message);
   }
 }
@@ -189,16 +215,16 @@ async function handleResumeGame() {
     state.engine = new Engine({ disableWasm: true });
     state.storageAdapter = new IndexedDBAdapter();
     state.engine.useStorage(state.storageAdapter);
-    setupConfluenceSync(state.engine);
+    setupWatershedSync(state.engine);
 
-    state.engine.on('confluence:updated', handleStateUpdate);
-    state.engine.on('confluence:ready', handleGameReady);
-    state.engine.on('confluence:started', handleGameStarted);
-    state.engine.on('confluence:ended', handleGameEnded);
+    state.engine.on('watershed:updated', handleStateUpdate);
+    state.engine.on('watershed:ready', handleGameReady);
+    state.engine.on('watershed:started', handleGameStarted);
+    state.engine.on('watershed:ended', handleGameEnded);
 
-    const loaded = await state.engine.resume('confluence-save');
+    const loaded = await state.engine.resume('watershed-save');
     if (loaded) {
-      console.log('[Confluence] Game resumed from save');
+      console.log('[Watershed] Game resumed from save');
       state.gameStarted = true;
       state.playerName = 'Resumed Player';
       state.peerId = state.engine.network?.peerId || state.peerId;
@@ -211,7 +237,7 @@ async function handleResumeGame() {
       announce('No saved game found');
     }
   } catch (e) {
-    console.error('[Confluence] Resume failed:', e);
+    console.error('[Watershed] Resume failed:', e);
     announce('Resume failed: ' + e.message);
   }
 }
@@ -238,9 +264,37 @@ function bindEvents() {
     elements.btnResume.addEventListener('click', handleResumeGame);
   }
 
-  // Start game button
-  const btnStartGame = document.getElementById('btn-start-game');
-  if (btnStartGame) btnStartGame.addEventListener('click', startGame);
+  // Lobby buttons
+  elements.btnCreateRoom?.addEventListener('click', createRoom);
+  elements.btnJoinRoom?.addEventListener('click', () => {
+    joinRoom(elements.roomCodeInput.value);
+  });
+  elements.roomCodeInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      joinRoom(elements.roomCodeInput.value);
+    }
+  });
+  // Auto-uppercase + format room code as the user types (visual only; joinRoom also uppercases)
+  elements.roomCodeInput?.addEventListener('input', () => {
+    const raw = elements.roomCodeInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    elements.roomCodeInput.value = raw;
+  });
+  elements.btnCopyCode?.addEventListener('click', copyRoomCode);
+  elements.btnCopyLink?.addEventListener('click', copyRoomLink);
+  elements.btnStartGame?.addEventListener('click', () => {
+    state.engine.dispatch('watershed:start', { peerId: state.peerId });
+  });
+  elements.btnLobbyCancel?.addEventListener('click', () => {
+    state.engine?.disconnect();
+    hideLobby();
+    elements.startScreen.classList.remove('hidden');
+    elements.btnJoin.disabled = false;
+    elements.btnJoin.textContent = 'Join Game';
+  });
+  elements.btnLobbyRetry?.addEventListener('click', () => {
+    showLobbyState('room-select');
+  });
 
   // Board interactions
   elements.gameBoard.addEventListener('click', handleBoardClick);
@@ -266,8 +320,8 @@ async function handleStart(e) {
   const serverUrl = elements.serverUrlInput.value.trim() || autoDetectWsUrl();
 
   // Save preferences
-  localStorage.setItem('confluence playerName', name);
-  localStorage.setItem('confluence serverUrl', serverUrl);
+  localStorage.setItem('watershed playerName', name);
+  localStorage.setItem('watershed serverUrl', serverUrl);
 
   state.playerName = name;
   state.serverUrl = serverUrl;
@@ -284,112 +338,308 @@ async function handleStart(e) {
     state.storageAdapter = new IndexedDBAdapter();
     state.engine.useStorage(state.storageAdapter);
 
-    // Set up Confluence sync
-    setupConfluenceSync(state.engine);
+    // Set up Watershed sync
+    setupWatershedSync(state.engine);
 
     // Listen for state updates
-    state.engine.on('confluence:updated', handleStateUpdate);
-    state.engine.on('confluence:ready', handleGameReady);
-    state.engine.on('confluence:started', handleGameStarted);
-    state.engine.on('confluence:ended', handleGameEnded);
+    state.engine.on('watershed:updated', handleStateUpdate);
+    state.engine.on('watershed:ready', handleGameReady);
+    state.engine.on('watershed:started', handleGameStarted);
+    state.engine.on('watershed:ended', handleGameEnded);
     state.engine.on('net:ready', handleConnected);
     state.engine.on('net:disconnected', handleDisconnected);
     state.engine.on('net:peer:connected', handlePeerJoined);
     state.engine.on('net:peer:disconnected', handlePeerLeft);
 
-    // Connect to relay first
+    // Show lobby in connecting state, then connect
+    showLobby();
+    showLobbyState('connecting');
+    elements.startScreen.classList.add('hidden');
+
     state.engine.connect(state.serverUrl);
 
-    // Wait a moment for connection, then check if a game already exists
-    await sleep(1000);
-
-    const existingState = state.engine.session.state?.confluence;
-    if (!existingState) {
-      // No game exists yet — we're the first player, initialize the game
-      console.log('[Confluence] No existing game found, initializing...');
-      await state.engine.dispatch('confluence:init', {
-        width: 10,
-        height: 10,
-        durationMs: 30000,
-      });
-    } else {
-      console.log('[Confluence] Found existing game, joining...');
-    }
-
-    // Register player (use relay-assigned peerId if available, otherwise temp)
-    const peerId = state.engine.network?.peerId || state.peerId;
-    state.peerId = peerId;
-    state.engine.dispatch('confluence:register', {
-      peerId,
-      name: state.playerName,
+    // Register room message handler AFTER connect (network object now exists).
+    // Must be registered before net:ready fires (which triggers room join flow).
+    state.engine.network?.on('net:message', (evt) => {
+      const msg = evt.payload;
+      if (!msg || typeof msg.type !== 'string') return;
+      switch (msg.type) {
+        case 'room:created': {
+          state.roomCode = msg.roomCode;
+          state.isHost = true;
+          showRoomCode(msg.roomCode);
+          const createUrl = new URL(window.location);
+          createUrl.searchParams.set('room', msg.roomCode);
+          window.history.replaceState({}, '', createUrl);
+          showLobbyState('waiting');
+          updateLobbyPlayers();
+          // Host initializes the game state
+          initGameState();
+          break;
+        }
+        case 'room:joined': {
+          state.roomCode = msg.roomCode;
+          state.isHost = false;
+          const joinUrl = new URL(window.location);
+          joinUrl.searchParams.set('room', msg.roomCode);
+          window.history.replaceState({}, '', joinUrl);
+          showLobbyState('waiting');
+          // Joiner waits for CRDT sync, then registers
+          initGameState();
+          break;
+        }
+        case 'room:error':
+          showLobbyState('error', msg.message || 'Room error');
+          break;
+        case 'room:left':
+          state.roomCode = null;
+          state.isHost = false;
+          showLobbyState('room-select');
+          break;
+      }
     });
-
-    announce('Connected to game. Place your tokens!');
   } catch (error) {
-    console.error('[Confluence] Start error:', error);
+    console.error('[Watershed] Start error:', error);
     showError(`Failed to connect: ${error.message}`);
     elements.btnJoin.disabled = false;
     elements.btnJoin.textContent = 'Join Game';
   }
 }
 
+// Initialize game state (extracted from handleStart). Called after a room is
+// created or joined. Host creates the game if none exists; joiners wait for
+// the CRDT sync to deliver the existing state.
+async function initGameState() {
+  // Wait a moment for connection / sync to stabilize
+  await sleep(500);
+
+  const existingState = state.engine.session.state?.watershed;
+  if (!existingState) {
+    console.log('[Watershed] No existing game found, initializing...');
+    try {
+      await state.engine.dispatch('watershed:init', {
+        width: 10,
+        height: 10,
+        durationMs: 30000,
+      });
+    } catch (e) {
+      // A peer may have already initialized — ignore concurrent init errors
+      console.warn('[Watershed] init dispatch failed (likely concurrent):', e.message);
+    }
+  } else {
+    console.log('[Watershed] Found existing game, joining...');
+  }
+
+  // Register player (use relay-assigned peerId if available)
+  const peerId = state.engine.network?.peerId || state.peerId;
+  state.peerId = peerId;
+  try {
+    state.engine.dispatch('watershed:register', {
+      peerId,
+      name: state.playerName,
+    });
+  } catch (e) {
+    console.warn('[Watershed] register dispatch failed:', e.message);
+  }
+}
+
 function handleGameReady() {
-  console.log('[Confluence] Game ready');
+  console.log('[Watershed] Game ready');
   state.gameStarted = true;
 
   // Show game screen
   elements.startScreen.classList.add('hidden');
   elements.gameScreen.classList.add('active');
 
-  // Show waiting overlay — don't start timer until players join
-  showWaitingOverlay();
-
   // Initial render
   render();
 }
 
-function showWaitingOverlay() {
-  const overlay = document.getElementById('waiting-overlay');
-  const urlEl = document.getElementById('waiting-url');
-  const playersEl = document.getElementById('waiting-players');
+// ============================================================================
+// Lobby Management
+// ============================================================================
 
-  if (urlEl) urlEl.textContent = state.serverUrl;
-  if (playersEl) playersEl.textContent = `Players connected: ${getPlayerCount()}`;
-
-  overlay.classList.add('visible');
+function showLobby() {
+  elements.roomLobby.classList.remove('hidden');
+  state.lobbyVisible = true;
 }
 
-function hideWaitingOverlay() {
-  const overlay = document.getElementById('waiting-overlay');
-  overlay.classList.remove('visible');
+function hideLobby() {
+  elements.roomLobby.classList.add('hidden');
+  state.lobbyVisible = false;
+}
+
+function showLobbyState(stateName, errorMsg) {
+  // Hide all lobby states
+  elements.lobbyConnecting.classList.add('hidden');
+  elements.lobbyRoomSelect.classList.add('hidden');
+  elements.lobbyRoomCode.classList.add('hidden');
+  elements.lobbyWaiting.classList.add('hidden');
+  elements.lobbyError.classList.add('hidden');
+
+  // Show the requested state
+  switch (stateName) {
+    case 'connecting':
+      elements.lobbyConnecting.classList.remove('hidden');
+      break;
+    case 'room-select':
+      elements.lobbyRoomSelect.classList.remove('hidden');
+      break;
+    case 'room-code':
+      elements.lobbyRoomCode.classList.remove('hidden');
+      break;
+    case 'waiting':
+      elements.lobbyWaiting.classList.remove('hidden');
+      break;
+    case 'error':
+      elements.lobbyError.classList.remove('hidden');
+      if (errorMsg) elements.lobbyErrorText.textContent = errorMsg;
+      break;
+  }
+}
+
+function showRoomCode(roomCode) {
+  elements.roomCodeText.textContent = roomCode;
+  const url = new URL(window.location);
+  url.searchParams.set('room', roomCode);
+  elements.roomLink.href = url.toString();
+  elements.roomLink.textContent = url.toString();
+}
+
+function updateLobbyPlayers() {
+  const watershedState = state.engine?.session?.state?.watershed;
+  const players = watershedState?.players || {};
+  const playerCount = Object.keys(players).length || 1;
+
+  elements.lobbyStatusText.textContent = `Waiting for players... (${playerCount} connected)`;
+
+  // Build player list — preserve insertion order for stable color assignment
+  const parts = [];
+  const peerIds = Object.keys(players);
+  for (const peerId of peerIds) {
+    const p = players[peerId];
+    const name = escapeHtml(p?.name || 'Player');
+    const color = p?.color || 'var(--success)';
+    const isHost = peerId === state.peerId && state.isHost;
+    const isYou = peerId === state.peerId;
+    const youTag = isYou ? ' <span class="you-tag">(You)</span>' : '';
+    const hostBadge = isHost ? '<span class="host-badge">Host</span>' : '';
+    parts.push(
+      `<div class="lobby-player" style="--player-color: ${color}">` +
+      `<span class="dot"></span>` +
+      `<span class="player-label">${name}${youTag}</span>` +
+      `${hostBadge}` +
+      `</div>`
+    );
+  }
+  if (parts.length === 0) {
+    const color = 'var(--success)';
+    parts.push(
+      `<div class="lobby-player" style="--player-color: ${color}">` +
+      `<span class="dot"></span>` +
+      `<span class="player-label">${escapeHtml(state.playerName || 'You')} <span class="you-tag">(You)</span></span>` +
+      `${state.isHost ? '<span class="host-badge">Host</span>' : ''}` +
+      `</div>`
+    );
+  }
+
+  // Pad with empty slots up to 4 players (Watershed supports 2-4)
+  const totalSlots = 4;
+  for (let i = parts.length; i < totalSlots; i++) {
+    parts.push(
+      `<div class="lobby-player empty-slot">` +
+      `<span class="dot"></span>` +
+      `<span class="player-label">Waiting for player...</span>` +
+      `</div>`
+    );
+  }
+
+  elements.lobbyPlayers.innerHTML = parts.join('');
+}
+
+function flashCopied(button) {
+  if (!button) return;
+  button.classList.add('copied');
+  clearTimeout(button._copyTimer);
+  button._copyTimer = setTimeout(() => button.classList.remove('copied'), 1500);
+}
+
+function copyRoomCode() {
+  if (!state.roomCode) return;
+  navigator.clipboard.writeText(state.roomCode).then(() => {
+    announce('Room code copied to clipboard');
+    flashCopied(elements.btnCopyCode);
+  }).catch(() => {
+    announce('Could not copy room code');
+  });
+}
+
+function copyRoomLink() {
+  if (!state.roomCode) return;
+  const url = new URL(window.location);
+  url.searchParams.set('room', state.roomCode);
+  navigator.clipboard.writeText(url.toString()).then(() => {
+    announce('Link copied to clipboard');
+    flashCopied(elements.btnCopyLink);
+  }).catch(() => {
+    announce('Could not copy link');
+  });
+}
+
+// ============================================================================
+// Room Actions
+// ============================================================================
+
+function createRoom() {
+  state.engine.network?.broadcast('room:create', {});
+}
+
+function joinRoom(roomCode) {
+  const code = (roomCode || '').toUpperCase().trim();
+  if (!code) {
+    showLobbyState('error', 'Please enter a room code');
+    return;
+  }
+  state.engine.network?.broadcast('room:join', { roomCode: code });
+}
+
+function leaveRoom() {
+  state.engine.network?.broadcast('room:leave', {});
+  state.roomCode = null;
+  state.isHost = false;
+  const url = new URL(window.location);
+  url.searchParams.delete('room');
+  window.history.replaceState({}, '', url);
 }
 
 function getPlayerCount() {
-  const confluenceState = state.engine?.session?.state?.confluence;
-  if (!confluenceState?.players) return 1;
-  return Object.keys(confluenceState.players).length;
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (!watershedState?.players) return 1;
+  return Object.keys(watershedState.players).length;
 }
 
 function startGame() {
-  // Dispatch confluence:start — syncs to all peers via CRDT
+  // Dispatch watershed:start — syncs to all peers via CRDT
   try {
-    state.engine.dispatch('confluence:start', { peerId: state.peerId });
+    state.engine.dispatch('watershed:start', { peerId: state.peerId });
   } catch (e) {
-    console.warn('[Confluence] Start dispatch failed:', e.message);
+    console.warn('[Watershed] Start dispatch failed:', e.message);
   }
   // handleGameStarted will be called by the event listener
 }
 
 function handleGameStarted() {
-  hideWaitingOverlay();
+  console.log('[Watershed] Game started');
+  state.gameStarted = true;
+  hideLobby();
   startTimer();
   announce('Game started! Place your tokens!');
 }
 
 function handleStateUpdate(event) {
   // Check if game has started via CRDT sync (remote peer clicked Start)
-  const confluenceState = state.engine?.session?.state?.confluence;
-  if (confluenceState && confluenceState.phase === "playing" && !state.gameStarted) {
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (watershedState && watershedState.phase === "playing" && !state.gameStarted) {
     state.gameStarted = true;
     handleGameStarted();
   }
@@ -405,12 +655,21 @@ function handleConnected(event) {
   const networkPeerId = event?.peerId || state.engine?.network?.peerId;
   if (networkPeerId) {
     state.peerId = networkPeerId;
-    console.log('[Confluence] Assigned peerId:', state.peerId);
+    console.log('[Watershed] Assigned peerId:', state.peerId);
   }
 
   updateSyncStatus('connected', 'Connected');
   updatePeerCount();
-  console.log('[Confluence] Connected to relay');
+  console.log('[Watershed] Connected to relay');
+
+  // Check URL for room code — auto-join if present, else show room select
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomCode = urlParams.get('room');
+  if (roomCode) {
+    joinRoom(roomCode);
+  } else {
+    showLobbyState('room-select');
+  }
 }
 
 function handleDisconnected(event) {
@@ -426,30 +685,33 @@ function handleDisconnected(event) {
 
 function handlePeerJoined(event) {
   const peerId = event?.peerId || event?.payload?.peerId;
-  console.log('[Confluence] Peer joined:', peerId);
+  console.log('[Watershed] Peer joined:', peerId);
   updatePeerCount();
 
-  // Update waiting overlay if visible
-  const overlay = document.getElementById('waiting-overlay');
-  if (overlay && overlay.classList.contains('visible')) {
-    const playersEl = document.getElementById('waiting-players');
-    if (playersEl) playersEl.textContent = `Players connected: ${getPlayerCount()}`;
+  // Update lobby player list if lobby is visible
+  if (state.lobbyVisible) {
+    updateLobbyPlayers();
   }
 
-  announce('A player joined the game');
+  announce('A player joined the room');
 }
 
 function handlePeerLeft(event) {
   const peerId = event?.peerId || event?.payload?.peerId;
-  console.log('[Confluence] Peer left:', peerId);
+  console.log('[Watershed] Peer left:', peerId);
   updatePeerCount();
-  announce('A player left the game');
+
+  if (state.lobbyVisible) {
+    updateLobbyPlayers();
+  }
+
+  announce('A player left the room');
 }
 
 function updatePeerCount() {
-  // Count players from the confluence state (registered players)
-  const confluenceState = state.engine?.session?.state?.confluence;
-  const playerCount = confluenceState?.players ? Object.keys(confluenceState.players).length : 1;
+  // Count players from the watershed state (registered players)
+  const watershedState = state.engine?.session?.state?.watershed;
+  const playerCount = watershedState?.players ? Object.keys(watershedState.players).length : 1;
   elements.peerCount.textContent = `${playerCount} player${playerCount !== 1 ? 's' : ''}`;
 }
 
@@ -459,7 +721,7 @@ function handleGameEnded(event) {
 
   // Auto-save the final game state
   if (state.engine && state.storageAdapter) {
-    state.engine.persist('confluence-save', 'Game over save').catch(() => {});
+    state.engine.persist('watershed-save', 'Game over save').catch(() => {});
   }
 
   showGameOver();
@@ -486,9 +748,9 @@ function startTimer() {
 
     // Check for game end
     if (seconds <= 0 && !state.gameEnded) {
-      // Dispatch confluence:end to compute winner and sync to peers
+      // Dispatch watershed:end to compute winner and sync to peers
       try {
-        state.engine.dispatch('confluence:end', { peerId: state.peerId });
+        state.engine.dispatch('watershed:end', { peerId: state.peerId });
       } catch (e) {
         // Game may have already ended via peer sync
       }
@@ -512,7 +774,7 @@ function stopTimer() {
 // ============================================================================
 
 function render() {
-  if (!state.engine?.session?.state?.confluence) return;
+  if (!state.engine?.session?.state?.watershed) return;
 
   const board = getBoard(state.engine);
   const scores = getScores(state.engine);
@@ -582,7 +844,7 @@ function createTokenElement(token) {
   tokenEl.setAttribute('aria-label', `Your token, strength ${token.strength}`);
 
   // Get player color
-  const playerState = state.engine.session.state.confluence.players[token.playerId];
+  const playerState = state.engine.session.state.watershed.players[token.playerId];
   const color = playerState?.color || '#888888';
   tokenEl.style.color = color;
   tokenEl.style.setProperty('--player-color', color);
@@ -760,14 +1022,14 @@ function handlePlace(x, y) {
   if (!state.engine || state.gameEnded) return;
 
   try {
-    state.engine.dispatch('confluence:place', {
+    state.engine.dispatch('watershed:place', {
       x,
       y,
       peerId: state.peerId,
     });
     announce('Token placed');
   } catch (error) {
-    console.warn('[Confluence] Place failed:', error.message);
+    console.warn('[Watershed] Place failed:', error.message);
   }
 }
 
@@ -775,14 +1037,14 @@ function handleMerge(tokenA, tokenB) {
   if (!state.engine || state.gameEnded) return;
 
   try {
-    state.engine.dispatch('confluence:merge', {
+    state.engine.dispatch('watershed:merge', {
       tokenIdA: tokenA.id,
       tokenIdB: tokenB.id,
       peerId: state.peerId,
     });
     announce('Tokens merged');
   } catch (error) {
-    console.warn('[Confluence] Merge failed:', error.message);
+    console.warn('[Watershed] Merge failed:', error.message);
     showError(`Cannot merge: ${error.message}`);
   }
 }
@@ -806,7 +1068,7 @@ function handleSplit(token, targetX, targetY) {
   }
 
   try {
-    state.engine.dispatch('confluence:split', {
+    state.engine.dispatch('watershed:split', {
       tokenId: token.id,
       targetX,
       targetY,
@@ -814,7 +1076,7 @@ function handleSplit(token, targetX, targetY) {
     });
     announce('Token split');
   } catch (error) {
-    console.warn('[Confluence] Split failed:', error.message);
+    console.warn('[Watershed] Split failed:', error.message);
     showError(`Cannot split: ${error.message}`);
   }
 }
@@ -861,12 +1123,12 @@ function handleKeyboard(e) {
 // ============================================================================
 
 function showProvenance(token) {
-  const confluenceState = state.engine?.session?.state?.confluence;
-  if (!confluenceState) return;
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (!watershedState) return;
 
-  // Import getProvenanceTree from ConfluenceGame
+  // Import getProvenanceTree from WatershedGame
   // For now, build simple tree from token data
-  const tree = buildProvenanceTree(confluenceState, token.id);
+  const tree = buildProvenanceTree(watershedState, token.id);
 
   if (!tree || (!tree.parents && !token._mergedFrom && !token._splitFrom)) {
     hideProvenance();
@@ -878,7 +1140,7 @@ function showProvenance(token) {
   // Show current token
   const currentNode = document.createElement('div');
   currentNode.className = 'provenance-node';
-  const player = confluenceState.players[token.playerId];
+  const player = watershedState.players[token.playerId];
   currentNode.innerHTML = `
     <span class="dot" style="background: ${player?.color || '#888'}"></span>
     <span>Strength ${token.strength}</span>
@@ -892,7 +1154,7 @@ function showProvenance(token) {
     for (const parent of tree.parents) {
       const parentNode = document.createElement('div');
       parentNode.className = 'provenance-node';
-      const parentPlayer = confluenceState.players[parent.token.playerId];
+      const parentPlayer = watershedState.players[parent.token.playerId];
       const parentType = parent.token._mergedFrom ? 'Merged' : 'Split';
       parentNode.innerHTML = `
         <span class="dot" style="background: ${parentPlayer?.color || '#888'}"></span>
@@ -914,11 +1176,11 @@ function hideProvenance() {
   elements.provenanceTooltip.setAttribute('aria-hidden', 'true');
 }
 
-function buildProvenanceTree(confluenceState, tokenId, visited = new Set()) {
+function buildProvenanceTree(watershedState, tokenId, visited = new Set()) {
   if (visited.has(tokenId)) return null;
   visited.add(tokenId);
 
-  const token = confluenceState.tokens[tokenId];
+  const token = watershedState.tokens[tokenId];
   if (!token) return null;
 
   const parents = [];
@@ -926,14 +1188,14 @@ function buildProvenanceTree(confluenceState, tokenId, visited = new Set()) {
   // Check mergedFrom
   if (token._mergedFrom) {
     for (const parentId of token._mergedFrom) {
-      const parent = buildProvenanceTree(confluenceState, parentId, visited);
+      const parent = buildProvenanceTree(watershedState, parentId, visited);
       if (parent) parents.push(parent);
     }
   }
 
   // Check splitFrom
   if (token._splitFrom) {
-    const parent = buildProvenanceTree(confluenceState, token._splitFrom, visited);
+    const parent = buildProvenanceTree(watershedState, token._splitFrom, visited);
     if (parent) parents.push(parent);
   }
 
@@ -993,18 +1255,18 @@ function hideOfflineBanner() {
 // ============================================================================
 
 function showGameOver() {
-  const confluenceState = state.engine?.session?.state?.confluence;
-  if (!confluenceState) return;
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (!watershedState) return;
 
   // Hide provenance tooltip
   elements.provenanceTooltip.classList.remove('visible');
   elements.provenanceTooltip.setAttribute('aria-hidden', 'true');
 
   const scores = getScores(state.engine);
-  const winner = confluenceState.winner;
+  const winner = watershedState.winner;
 
   // Determine winner display
-  const winnerPlayer = winner ? confluenceState.players[winner] : null;
+  const winnerPlayer = winner ? watershedState.players[winner] : null;
   const isTie = !winner && scores.length > 0;
   const isWinner = winner === state.peerId;
 
@@ -1058,11 +1320,11 @@ function handleEndGame() {
   if (!state.engine || state.gameEnded) return;
 
   try {
-    state.engine.dispatch('confluence:end', {
+    state.engine.dispatch('watershed:end', {
       peerId: state.peerId,
     });
   } catch (error) {
-    console.warn('[Confluence] End game failed:', error.message);
+    console.warn('[Watershed] End game failed:', error.message);
   }
 }
 
@@ -1077,14 +1339,14 @@ function handlePlayAgain() {
   elements.gameOverScreen.classList.remove('active');
 
   // Reinitialize game
-  state.engine.dispatch('confluence:init', {
+  state.engine.dispatch('watershed:init', {
     width: 10,
     height: 10,
     durationMs: 30000,
   });
 
   // Re-register
-  state.engine.dispatch('confluence:register', {
+  state.engine.dispatch('watershed:register', {
     peerId: state.peerId,
     name: state.playerName,
   });
@@ -1098,6 +1360,8 @@ function handlePlayAgain() {
 function handleNewLobby() {
   // Full reset
   if (state.engine) {
+    // Try to leave the room gracefully
+    try { leaveRoom(); } catch (e) { /* ignore */ }
     state.engine.disconnect();
   }
 
@@ -1106,8 +1370,16 @@ function handleNewLobby() {
   state.connected = false;
   state.selectedTokenId = null;
   state.interactionMode = null;
+  state.roomCode = null;
+  state.isHost = false;
+
+  // Clear room param from URL
+  const url = new URL(window.location);
+  url.searchParams.delete('room');
+  window.history.replaceState({}, '', url);
 
   // Show start screen
+  hideLobby();
   elements.gameOverScreen.classList.remove('active');
   elements.gameScreen.classList.remove('active');
   elements.startScreen.classList.remove('hidden');
@@ -1138,14 +1410,14 @@ function hideRules() {
 // ============================================================================
 
 function getTokenById(tokenId) {
-  const confluenceState = state.engine?.session?.state?.confluence;
-  if (!confluenceState) return null;
+  const watershedState = state.engine?.session?.state?.watershed;
+  if (!watershedState) return null;
 
-  const token = confluenceState.tokens[tokenId];
+  const token = watershedState.tokens[tokenId];
   if (!token) return null;
 
   // Check if consumed
-  const consumed = confluenceState.consumed[tokenId];
+  const consumed = watershedState.consumed[tokenId];
   if (consumed && Object.keys(consumed).length > 0) return null;
 
   return token;
@@ -1180,7 +1452,7 @@ function announce(message) {
 }
 
 function showError(message) {
-  console.error('[Confluence]', message);
+  console.error('[Watershed]', message);
   announce(`Error: ${message}`);
   // Could show a toast notification here
 }
@@ -1238,15 +1510,17 @@ function handleResize() {
 // Exports (for debugging)
 // ============================================================================
 
-window.confluence = {
+window.watershed = {
   getState: () => state,
   getEngine: () => state.engine,
+  getRoomCode: () => state.roomCode,
+  isHost: () => state.isHost,
   render,
   showRules,
   hideRules,
 };
 
-console.log('[Confluence] Client module loaded. Use window.confluence for debugging.');
+console.log('[Watershed] Client module loaded. Use window.watershed for debugging.');
 
 // Initialize after all declarations are in scope
 initApp();

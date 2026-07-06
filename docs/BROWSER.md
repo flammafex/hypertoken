@@ -9,8 +9,8 @@ using the shared build infrastructure in `core/browser/`.
 # Build any game for the browser:
 npm run build:browser -- --entry examples/your-game/web/client.js --out dist/your-game.bundle.js
 
-# Or use the Confluence build:
-npm run confluence:build
+# Or use the Watershed build:
+npm run watershed:build
 ```
 
 ## How it works
@@ -89,7 +89,7 @@ In production behind nginx, this becomes `wss://yourdomain.com/ws`.
 
 ## Production deployment
 
-See `examples/confluence/DEPLOY.md` for a complete nginx deployment guide
+See `examples/watershed/DEPLOY.md` for a complete nginx deployment guide
 with WebSocket proxying, HTTPS, and pm2/systemd for the relay server.
 
 ## The Automerge proxy issue
@@ -115,4 +115,4 @@ but the serialization pattern is still recommended for safety.
 |------|---------|
 | `core/browser/shims.js` | Browser polyfills for Node.js built-ins |
 | `core/browser/build.js` | Shared esbuild configuration + CLI |
-| `examples/confluence/DEPLOY.md` | Complete nginx deployment guide |
+| `examples/watershed/DEPLOY.md` | Complete nginx deployment guide |
