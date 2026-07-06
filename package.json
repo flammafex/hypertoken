@@ -73,6 +73,7 @@
     "test:rooms": "node --loader ./test/ts-esm-loader.js test/testRoomMultiplexing.ts",
     "test:sync:hardening": "node --loader ./test/ts-esm-loader.js test/testSyncHardening.ts",
     "test:persistence": "node --loader ./test/ts-esm-loader.js test/testPersistence.ts",
+    "test:stress": "node --loader ./test/ts-esm-loader.js test/stressTest.ts",
     "watershed:build": "node --loader ./test/ts-esm-loader.js core/browser/build.js --entry examples/watershed/web/watershed-web.js --out examples/watershed/web/watershed.bundle.js",
     "watershed:web": "npm run watershed:build && cd examples/watershed/web && python3 -m http.server 8080",
     "build:browser": "node --loader ./test/ts-esm-loader.js core/browser/build.js"
