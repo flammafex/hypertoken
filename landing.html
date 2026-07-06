@@ -143,7 +143,8 @@
   <p>
     Deterministic replay. Serverless multiplayer. Forkable worlds. Built on
     <a href="https://automerge.org/">Automerge</a> for distributed consensus,
-    with optional Rust→WASM acceleration for hot paths.
+    with optional Rust→WASM acceleration for hot paths. Games, collaborative
+    tools, marketplaces — any multi-user app where state must converge.
   </p>
 
   <p>
@@ -174,13 +175,14 @@
   <h2 id="comparison">How It Compares</h2>
 
   <table>
-    <tr><th></th><th>Traditional Engine</th><th>Blockchain Game</th><th>HyperToken</th></tr>
-    <tr><td>Multiplayer</td><td>Server authoritative</td><td>On-chain consensus</td><td>P2P CRDT sync</td></tr>
-    <tr><td>Cost</td><td>Monthly hosting</td><td>Gas fees per action</td><td>Minimal — just a relay</td></tr>
-    <tr><td>Conflicts</td><td>Last-write-wins</td><td>Consensus delay</td><td>Mathematical merge</td></tr>
-    <tr><td>Offline</td><td>Disconnected</td><td>Cannot act</td><td>Diverge and merge safely</td></tr>
-    <tr><td>History</td><td>Server logs</td><td>On-chain events</td><td>Perfect replay, built-in</td></tr>
-    <tr><td>Forkable</td><td>Manual snapshots</td><td>Impossible</td><td>Fork, diverge, merge back</td></tr>
+    <tr><th></th><th>Traditional Engine</th><th>Blockchain Game</th><th>Raw CRDT (Automerge/Yjs)</th><th>HyperToken</th></tr>
+    <tr><td>Multiplayer</td><td>Server authoritative</td><td>On-chain consensus</td><td>Manual networking</td><td>P2P CRDT sync, built-in</td></tr>
+    <tr><td>Cost</td><td>Monthly hosting</td><td>Gas fees per action</td><td>Relay only</td><td>Minimal — just a relay</td></tr>
+    <tr><td>Conflicts</td><td>Last-write-wins</td><td>Consensus delay</td><td>Mathematical merge</td><td>Mathematical merge</td></tr>
+    <tr><td>Offline</td><td>Disconnected</td><td>Cannot act</td><td>Diverge and merge</td><td>Diverge and merge safely</td></tr>
+    <tr><td>History</td><td>Server logs</td><td>On-chain events</td><td>Change log</td><td>Perfect replay + provenance</td></tr>
+    <tr><td>Forkable</td><td>Manual snapshots</td><td>Impossible</td><td>Manual clone/merge</td><td>Fork, diverge, merge back</td></tr>
+    <tr><td>Abstractions</td><td>Game objects</td><td>Smart contracts</td><td>None — raw documents</td><td>Tokens, agents, stacks, spaces</td></tr>
   </table>
 </section>
 
@@ -299,11 +301,12 @@ const outcomeB = engine.getState();</code></pre>
     <li><strong>Rust/WASM core</strong> — ~20x performance over pure JS, with TypeScript fallback</li>
     <li><strong>P2P networking</strong> — serverless CRDT sync (ConsensusCore) and host-authoritative mode</li>
     <li><strong>Persistence</strong> — IndexedDB (browser) and Filesystem (Node.js) adapters with auto-save</li>
-    <li><strong>Browser builds</strong> — one command bundles any game for the browser</li>
+    <li><strong>Browser builds</strong> — one command bundles any app for the browser</li>
     <li><strong>MCP server</strong> — LLM integration via Model Context Protocol</li>
     <li><strong>3 example games</strong> — Blackjack (fully CRDT-backed card game), Cuttle (snapshot CRDT sync with encrypted hands), Watershed (field-level CRDT real-time showcase)</li>
     <li><strong>Document compaction</strong> — discard CRDT history at phase boundaries to bound document size</li>
     <li><strong>Forkable worlds</strong> — fork engine state, explore divergent timelines, merge back via CRDT conflict resolution</li>
+    <li><strong>Token provenance</strong> — every entity tracks its full merge/split history, useful for games, marketplaces, and collaborative tools</li>
   </ul>
 </section>
 

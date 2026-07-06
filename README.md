@@ -23,13 +23,21 @@ HyperToken:            CRDTs merge → everyone agrees → zero infrastructure
 
 ---
 
-## 🎮 What You Can Build
+## 🚀 What You Can Build
 
 **Card Games** — Blackjack, Cuttle, custom TCGs. Tokens compose with provenance tracking.
 
-**Strategy Games** — Game theory simulations, agent competitions.
+**Real-Time Games** — Watershed-style territory games where concurrent writes merge, not conflict.
 
-**Multiplayer Worlds** — P2P sync, no servers, games that outlive their creators.
+**Collaborative Canvases** — Space's 2D zones map to any spatial surface. Multiple users place and move entities with CRDT-backed sync.
+
+**Virtual Tabletops** — Stack (decks), Space (board), Agent (characters), Token (pieces). Serverless tabletop simulation with perfect replay.
+
+**Marketplaces & Trading** — Token provenance (`_mergedFrom`/`_splitFrom`) tracks the full history of every item. Trade without a central server.
+
+**Branching Narratives** — Forkable worlds let you branch a story, explore alternatives, merge outcomes. Action history provides perfect replay.
+
+**Planning Tools** — Space zones become columns, tokens become tasks, agents become assignees. CRDT sync means no server.
 
 ```bash
 # Play now
@@ -161,7 +169,7 @@ Tokens derive meaning from context:
 - **What it came from** — merge/split provenance
 - **What rules govern it** — constraints, triggers
 
-This applies to cards in blackjack, tokens in watershed, or NPCs in a world. The same engine handles all of them because the abstraction is right.
+This applies to cards in blackjack, tokens in watershed, items in a marketplace, or tasks on a board. The same engine handles all of them because the abstraction is right.
 
 ---
 
@@ -169,9 +177,11 @@ This applies to cards in blackjack, tokens in watershed, or NPCs in a world. The
 
 | System | HyperToken's Difference |
 |--------|------------------------|
-| **Unity/Godot** | Logic-first, no graphics dependency |
-| **Colyseus** | P2P, no server required |
-| **Blockchain games** | Same guarantees, zero gas fees |
+| **Unity/Godot** | Logic-first, no graphics dependency. CRDT-native state. |
+| **Colyseus** | P2P, no server required. Offline-first with mathematical convergence. |
+| **Blockchain games** | Same guarantees (provenance, replay, forkable state), zero gas fees. |
+| **Automerge/Yjs** | Game-aware abstractions (tokens, agents, rules) on top of CRDT sync. |
+| **Roll20/Tabletop Simulator** | Serverless, forkable, programmable. State is a CRDT, not a database. |
 | **Automerge/Yjs** | Game-aware abstractions (tokens, agents, rules) |
 
 ---
