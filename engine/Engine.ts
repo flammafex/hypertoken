@@ -38,6 +38,38 @@ export interface EngineOptions {
   networkOptions?: EngineNetworkOptions;
 }
 
+export type DispatchErrorCode =
+  | "UNKNOWN_ACTION"
+  | "ACTION_HANDLER_ERROR"
+  | "WASM_EXECUTION_ERROR";
+
+export interface DispatchSuccess<T = unknown> {
+  ok: true;
+  result: T;
+}
+
+export interface DispatchFailure {
+  ok: false;
+  error: {
+    code: DispatchErrorCode;
+    message: string;
+  };
+}
+
+export type DispatchOutcome<T = unknown> = DispatchSuccess<T> | DispatchFailure;
+
+export class DispatchError extends Error {
+  readonly code: DispatchErrorCode;
+  readonly actionId: string;
+
+  constructor(code: DispatchErrorCode, message: string, actionId: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = "DispatchError";
+    this.code = code;
+    this.actionId = actionId;
+  }
+}
+
 export class Engine extends Emitter {
   stack: Stack | null;
   space: Space;
@@ -170,6 +202,31 @@ export class Engine extends Emitter {
 
   async dispatch(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<any> {
     const action = new Action(type, payload, opts);
+    return this._dispatchAction(action);
+  }
+
+  async dispatchChecked(type: string, payload: IActionPayload = {}, opts: any = {}): Promise<DispatchOutcome> {
+    const action = new Action(type, payload, opts);
+
+    try {
+      const result = await this._dispatchAction(action);
+      return { ok: true, result };
+    } catch (err) {
+      const dispatchError = err instanceof DispatchError
+        ? err
+        : new DispatchError("ACTION_HANDLER_ERROR", this._errorMessage(err), action.id, err);
+      return {
+        ok: false,
+        error: {
+          code: dispatchError.code,
+          message: dispatchError.message,
+        },
+      };
+    }
+  }
+
+  private _dispatchAction(action: Action): Promise<any> {
+    const { type, payload } = action;
     if (this.debug) console.log("🧩 dispatch:", type, payload);
 
     // Only snapshot at checkpoint intervals (fixes O(n²) memory + CPU)
@@ -177,37 +234,58 @@ export class Engine extends Emitter {
       ? this.session.saveToBase64()
       : null;
 
-    let result: any;
+    const result = this.apply(action);
+    if (this._isPromiseLike(result)) {
+      return Promise.resolve(result).then(resolved => this._recordSuccessfulAction(action, snapshot, resolved));
+    }
 
-    result = this.apply(action);
+    return Promise.resolve(this._recordSuccessfulAction(action, snapshot, result));
+  }
 
-    if (result !== Engine.ACTION_FAILED) {
-      this.historyManager.recordAction(action, snapshot);
+  private _recordSuccessfulAction(action: Action, snapshot: string | null, result: unknown): unknown {
+    this.historyManager.recordAction(action, snapshot);
+    try {
       this.emit("engine:action", { payload: action });
+    } catch (err) {
+      // The handler has completed and history is committed. Listener failures
+      // are post-commit errors and must not change the dispatch outcome.
+      this._reportPostCommitError(action, "engine:action", err);
+    }
 
-      for (const [, policy] of this._policies) {
-        try {
-          policy.evaluate(this);
-        } catch (err) {
-          this.emit("engine:error", { payload: { policy, err } });
-        }
+    for (const [, policy] of this._policies) {
+      try {
+        policy.evaluate(this);
+      } catch (err) {
+        this._reportPostCommitError(action, "policy", err, policy);
       }
     }
 
-    return result === Engine.ACTION_FAILED ? undefined : result;
+    return result;
   }
-
-  private static readonly ACTION_FAILED = Symbol("ACTION_FAILED");
 
   apply(action: Action): any {
     if (this.wasm.dispatcher && WasmManager.WASM_ACTIONS.has(action.type)) {
       try {
         const result = this.wasm.dispatch(action.type, action.payload);
+        if (this._isPromiseLike(result)) {
+          return Promise.resolve(result).then(
+            resolved => {
+              action.result = resolved;
+              this.session.emit("state:changed", { source: "dispatch" });
+              return resolved;
+            },
+            err => {
+              this.emit("engine:error", { payload: { action, err } });
+              throw new DispatchError("WASM_EXECUTION_ERROR", this._errorMessage(err), action.id, err);
+            },
+          );
+        }
         action.result = result;
         this.session.emit("state:changed", { source: "dispatch" });
         return result;
       } catch (err) {
-        if (this.debug) console.log(`⚠️  WASM dispatch failed for ${action.type}, falling back to TypeScript:`, err);
+        this.emit("engine:error", { payload: { action, err } });
+        throw new DispatchError("WASM_EXECUTION_ERROR", this._errorMessage(err), action.id, err);
       }
     }
 
@@ -215,15 +293,49 @@ export class Engine extends Emitter {
     if (fn) {
       try {
         const result = fn(this, action.payload);
+        if (this._isPromiseLike(result)) {
+          return Promise.resolve(result).then(
+            resolved => {
+              action.result = resolved;
+              return resolved;
+            },
+            err => {
+              this.emit("engine:error", { payload: { action, err } });
+              throw new DispatchError("ACTION_HANDLER_ERROR", this._errorMessage(err), action.id, err);
+            },
+          );
+        }
         action.result = result;
         return result;
       } catch (err) {
         this.emit("engine:error", { payload: { action, err } });
-        return Engine.ACTION_FAILED;
+        throw new DispatchError("ACTION_HANDLER_ERROR", this._errorMessage(err), action.id, err);
       }
     } else {
       this.emit("engine:error", { payload: { action, msg: "Unknown action" } });
-      return Engine.ACTION_FAILED;
+      throw new DispatchError("UNKNOWN_ACTION", `Unknown action: ${action.type}`, action.id);
+    }
+  }
+
+  private _isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+    return (
+      (typeof value === "object" && value !== null) || typeof value === "function"
+    ) && typeof (value as PromiseLike<unknown>).then === "function";
+  }
+
+  private _errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+  }
+
+  private _reportPostCommitError(action: Action, phase: string, err: unknown, policy?: unknown): void {
+    try {
+      this.emit("engine:error", {
+        payload: { action, phase, err, ...(policy === undefined ? {} : { policy }), postCommit: true },
+      });
+    } catch (reportingError) {
+      if (this.debug) {
+        console.error(`[Engine] Post-commit ${phase} error:`, err, reportingError);
+      }
     }
   }
 

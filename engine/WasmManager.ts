@@ -9,37 +9,30 @@ export class WasmManager {
   private _dispatcher: WasmActionDispatcher | null = null;
   private _dispatchTable: Record<string, (p: any) => unknown> | null = null;
 
+  /** Actions whose public TypeScript payload schema matches the WASM bridge. */
   static readonly WASM_ACTIONS = new Set([
-    // Stack actions (10)
-    "stack:draw", "stack:peek", "stack:shuffle", "stack:burn", "stack:reset",
+    // Stack actions
+    "stack:peek", "stack:shuffle",
     "stack:cut", "stack:insertAt", "stack:removeAt", "stack:swap",
-    "stack:reverse",
-    // Space actions (14)
-    "space:place", "space:remove", "space:move", "space:flip",
-    "space:createZone", "space:deleteZone", "space:clearZone",
+    // Space actions. space:place intentionally stays on the TypeScript path:
+    // its public payload is { card, opts }, while the WASM bridge expects
+    // { token, x, y }. space:flip and space:createZone also stay in TS because
+    // the bridge omits public faceUp and zone metadata options.
+    "space:remove",
+    "space:deleteZone", "space:clearZone",
     "space:lockZone", "space:shuffleZone",
     "space:transferZone", "space:clear",
-    // Source actions (7)
-    "source:draw", "source:shuffle", "source:burn",
-    "source:addStack", "source:removeStack", "source:reset", "source:inspect",
-    // Agent actions (17)
-    "agent:create", "agent:remove", "agent:setActive", "agent:setMeta",
-    "agent:giveResource", "agent:takeResource",
-    "agent:addToken", "agent:removeToken", "agent:get",
-    "agent:transferResource", "agent:transferToken",
-    "agent:stealResource", "agent:stealToken", "agent:getAll",
-    "agent:trade", "agent:drawCards", "agent:discardCards",
+    // Source actions
+    "source:draw", "source:shuffle",
     // Token operations (5)
     "token:transform", "token:attach", "token:detach",
     "token:merge", "token:split",
-    // GameLoop actions (6)
-    "game:loopInit", "game:loopStart", "game:loopStop",
-    "game:nextTurn", "game:setPhase", "game:setMaxTurns",
-    // GameState actions (8)
-    "game:start", "game:end", "game:pause", "game:resume",
-    "game:nextPhase", "game:setProperty", "game:mergeState", "game:getState",
-    // Rules actions (1)
-    "rule:markFired",
+    // GameLoop actions
+    "game:loopInit",
+    // GameState actions
+    "game:start",
+    // rule:markFired stays on the TypeScript path: rule timestamps are
+    // JavaScript numbers while the WASM binding requires a BigInt.
     // Batch operations (8)
     "tokens:shuffle", "tokens:draw", "tokens:filter", "tokens:map",
     "tokens:find", "tokens:count", "tokens:collect", "tokens:forEach",

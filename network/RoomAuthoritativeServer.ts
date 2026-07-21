@@ -10,7 +10,11 @@
  * - Per-room state broadcasting
  * - Automatic cleanup when rooms empty
  */
-import { AuthoritativeServer, AuthoritativeServerOptions } from "./AuthoritativeServer.js";
+import {
+  AuthoritativeServer,
+  AuthoritativeServerOptions,
+  OutboundPrincipal,
+} from "./AuthoritativeServer.js";
 import { RoomManager, RoomConfig } from "./RoomManager.js";
 import { Engine } from "../engine/Engine.js";
 
@@ -64,6 +68,8 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
 
   protected maxRooms: number;
   protected autoDeleteEmptyRooms: boolean;
+  private checkedDispatchesByRoom: Map<string, number> = new Map();
+  private dispatchQueuesByRoom: Map<string, Promise<void>> = new Map();
 
   /** Factory function to create an Engine for a new room */
   protected createRoomEngine: (roomCode: string, variant?: string) => Engine;
@@ -166,7 +172,9 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
 
     // Wire up engine broadcasts for this room
     engine.on("engine:action", () => {
-      this.broadcastToRoom(roomCode);
+      if ((this.checkedDispatchesByRoom.get(roomCode) ?? 0) === 0) {
+        this.broadcastToRoom(roomCode);
+      }
     });
 
     this.emit("room:created", { roomCode, clientId, variant: options.variant });
@@ -186,6 +194,9 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     roomCode: string,
     options: { password?: string } = {}
   ): { success: boolean; error?: string; playerIndex?: number } {
+    if (typeof roomCode !== "string" || roomCode.length === 0 || roomCode.length > 64) {
+      return { success: false, error: "Room request failed" };
+    }
     // Normalize room code
     roomCode = roomCode.toUpperCase().trim();
 
@@ -262,6 +273,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
    * Get room info by code
    */
   getRoom(roomCode: string): RoomInfo | undefined {
+    if (typeof roomCode !== "string") return undefined;
     return this.rooms.get(roomCode.toUpperCase().trim());
   }
 
@@ -314,7 +326,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
           cmd: "state",
           roomCode,
           state: this.getStateForRoom(roomCode, memberId),
-        });
+        }, "state:broadcast");
       }
     }
   }
@@ -328,7 +340,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     if (!roomInfo) return null;
 
     return {
-      _gameState: roomInfo.engine._gameState,
+      roomCode,
       historyLength: roomInfo.engine.history.length,
     };
   }
@@ -344,18 +356,78 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     return this.getStateForRoom(roomCode, clientId);
   }
 
+  /** Select the current room's raw history; the final policy projects entries. */
+  protected override getHistoryForClient(clientId: string, fromIndex: number): any[] {
+    const roomCode = this.clientRooms.get(clientId);
+    const roomInfo = roomCode ? this.rooms.get(roomCode) : undefined;
+    return roomInfo ? roomInfo.engine.history.slice(fromIndex) : [];
+  }
+
+  /** Add room/player context to the final outbound projection principal. */
+  protected override getOutboundPrincipal(clientId: string): OutboundPrincipal {
+    const roomCode = this.clientRooms.get(clientId);
+    if (!roomCode) return { clientId };
+
+    const state = this.rooms.get(roomCode)?.engine._gameState as any;
+    let playerIndex: number | undefined;
+    if (state?.players) {
+      const index = Array.from({ length: state.numPlayers || 2 }, (_, i) => i)
+        .find((i) => state.players[i] === clientId);
+      if (index !== undefined) playerIndex = index;
+    }
+
+    return { clientId, roomCode, ...(playerIndex !== undefined ? { playerIndex } : {}) };
+  }
+
   /**
    * Override handleDispatch to route actions to the correct room's engine
    */
-  protected override async handleDispatch(clientId: string, type: string, payload: any): Promise<void> {
-    // Find client's room
+  protected override async handleDispatch(
+    clientId: string,
+    type: string,
+    payload: any,
+    requestId?: string | number
+  ): Promise<void> {
     const roomCode = this.clientRooms.get(clientId);
     if (!roomCode) {
       this.sendToClient(clientId, {
         cmd: "error",
-        message: "Not in a room",
+        reason: "not-in-room",
         type,
-      });
+        requestId,
+      }, "dispatch:error");
+      return;
+    }
+
+    const previous = this.dispatchQueuesByRoom.get(roomCode) ?? Promise.resolve();
+    const queued = previous.then(() =>
+      this.handleRoomDispatchSerial(roomCode, clientId, type, payload, requestId)
+    );
+    const continuation = queued.catch(() => undefined);
+    this.dispatchQueuesByRoom.set(roomCode, continuation);
+    try {
+      await queued;
+    } finally {
+      if (this.dispatchQueuesByRoom.get(roomCode) === continuation) {
+        this.dispatchQueuesByRoom.delete(roomCode);
+      }
+    }
+  }
+
+  private async handleRoomDispatchSerial(
+    roomCode: string,
+    clientId: string,
+    type: string,
+    payload: any,
+    requestId?: string | number
+  ): Promise<void> {
+    if (this.clientRooms.get(clientId) !== roomCode) {
+      this.sendToClient(clientId, {
+        cmd: "error",
+        reason: "not-in-room",
+        type,
+        requestId,
+      }, "dispatch:error");
       return;
     }
 
@@ -363,39 +435,111 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     if (!roomInfo) {
       this.sendToClient(clientId, {
         cmd: "error",
-        message: "Room not found",
+        reason: "room-not-found",
         type,
-      });
+        requestId,
+      }, "dispatch:error");
       return;
     }
 
     // Validate via hook
-    if (!this.beforeDispatch(clientId, type, payload)) {
+    let accepted = false;
+    try {
+      accepted = this.beforeDispatch(clientId, type, payload);
+    } catch (error) {
+      this.reportRoomDispatchFailure(clientId, type, payload, requestId, error);
+      return;
+    }
+    if (!accepted) {
       this.sendToClient(clientId, {
         cmd: "error",
-        message: "Action rejected",
+        reason: "rejected",
         type,
-      });
+        requestId,
+      }, "dispatch:error");
+      return;
+    }
+
+    const dispatchChecked = (roomInfo.engine as any).dispatchChecked;
+    if (typeof dispatchChecked !== "function") {
+      this.reportRoomDispatchFailure(
+        clientId,
+        type,
+        payload,
+        requestId,
+        new Error("Strict dispatch is unavailable")
+      );
+      return;
+    }
+
+    let outcome: any;
+    try {
+      this.checkedDispatchesByRoom.set(roomCode, 1);
+      try {
+        outcome = await dispatchChecked.call(roomInfo.engine, type, payload);
+      } finally {
+        this.checkedDispatchesByRoom.delete(roomCode);
+      }
+    } catch (error) {
+      this.reportRoomDispatchFailure(clientId, type, payload, requestId, error);
+      return;
+    }
+
+    if (!outcome || typeof outcome !== "object" || outcome.ok !== true) {
+      this.reportRoomDispatchFailure(clientId, type, payload, requestId, outcome?.error);
       return;
     }
 
     try {
-      // Dispatch to room's engine (not the base dummy engine)
-      const result = await roomInfo.engine.dispatch(type, payload);
-
-      // Notify subclass
-      this.afterDispatch(clientId, type, payload, result);
-
-      // Broadcast to room (engine:action event handles this via listener set up in createRoom)
+      this.afterDispatch(clientId, type, payload, outcome.result);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      this.sendToClient(clientId, {
-        cmd: "error",
-        message: err.message,
-        type,
-      });
-      // Still broadcast to keep clients in sync
+      this.reportRoomPostCommitError("afterDispatch", clientId, type, error);
+    }
+
+    try {
       this.broadcastToRoom(roomCode);
+    } catch (error) {
+      this.reportRoomPostCommitError("broadcast", clientId, type, error);
+    }
+
+    this.sendToClient(clientId, {
+      cmd: "dispatch:result",
+      type,
+      requestId,
+    }, "dispatch:success");
+  }
+
+  private reportRoomDispatchFailure(
+    clientId: string,
+    type: string,
+    payload: any,
+    requestId: string | number | undefined,
+    error: unknown
+  ): void {
+    const err = error instanceof Error
+      ? error
+      : new Error(typeof (error as any)?.message === "string" ? (error as any).message : "Action failed");
+    try {
+      this.onDispatchError(clientId, type, payload, err);
+    } catch (hookError) {
+      if (this.verbose) console.error("[RoomAuthServer] onDispatchError hook failed:", hookError);
+    }
+    this.sendToClient(clientId, {
+      cmd: "error",
+      reason: "failed",
+      type,
+      requestId,
+    }, "dispatch:error");
+  }
+
+  private reportRoomPostCommitError(stage: string, clientId: string, type: string, error: unknown): void {
+    if (this.verbose) {
+      console.error(`[RoomAuthServer] Post-commit ${stage} failed for ${clientId} (${type}):`, error);
+    }
+    try {
+      this.emit("dispatch:postCommitError", { clientId, type, stage, error });
+    } catch (listenerError) {
+      if (this.verbose) console.error("[RoomAuthServer] Post-commit error listener failed:", listenerError);
     }
   }
 
@@ -415,8 +559,21 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     clientId: string,
     msg: any
   ): Promise<{ handled: boolean; response?: any }> {
+    if (!msg || typeof msg !== "object") return { handled: false };
+
     switch (msg.cmd) {
       case "room:create": {
+        const validCreate =
+          this.isOptionalBoundedString(msg.variant, 128) &&
+          this.isOptionalBoundedString(msg.password, 1024) &&
+          (msg.maxMembers === undefined ||
+            (Number.isSafeInteger(msg.maxMembers) && msg.maxMembers > 0 && msg.maxMembers <= 1024)) &&
+          (msg.isPrivate === undefined || typeof msg.isPrivate === "boolean");
+        if (!validCreate) {
+          this.sendMalformedRoomRequest(clientId, msg.requestId);
+          return { handled: true };
+        }
+
         const result = await this.createRoom(clientId, {
           variant: msg.variant,
           password: msg.password,
@@ -428,43 +585,56 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
           this.sendToClient(clientId, {
             cmd: "room:created",
             roomCode: result.roomCode,
-          });
+          }, "room:created");
         } else {
           this.sendToClient(clientId, {
             cmd: "room:error",
             message: result.error,
-          });
+            requestId: msg.requestId,
+          }, "room:error");
         }
         return { handled: true };
       }
 
       case "room:join": {
-        const result = this.joinRoom(clientId, msg.roomCode, {
+        if (
+          typeof msg.roomCode !== "string" ||
+          msg.roomCode.trim().length === 0 ||
+          msg.roomCode.length > 64 ||
+          !this.isOptionalBoundedString(msg.password, 1024)
+        ) {
+          this.sendMalformedRoomRequest(clientId, msg.requestId);
+          return { handled: true };
+        }
+
+        const normalizedRoomCode = msg.roomCode.toUpperCase().trim();
+        const result = this.joinRoom(clientId, normalizedRoomCode, {
           password: msg.password,
         });
 
         if (result.success) {
-          const roomInfo = this.getRoom(msg.roomCode);
+          const roomInfo = this.getRoom(normalizedRoomCode);
           this.sendToClient(clientId, {
             cmd: "room:joined",
-            roomCode: msg.roomCode.toUpperCase().trim(),
+            roomCode: normalizedRoomCode,
             playerIndex: result.playerIndex,
-            state: roomInfo ? this.getStateForRoom(msg.roomCode, clientId) : null,
-          });
+            state: roomInfo ? this.getStateForRoom(normalizedRoomCode, clientId) : null,
+          }, "room:joined");
           // Broadcast to other room members
-          this.broadcastToRoom(msg.roomCode.toUpperCase().trim());
+          this.broadcastToRoom(normalizedRoomCode);
         } else {
           this.sendToClient(clientId, {
             cmd: "room:error",
             message: result.error,
-          });
+            requestId: msg.requestId,
+          }, "room:error");
         }
         return { handled: true };
       }
 
       case "room:leave": {
         this.leaveRoom(clientId);
-        this.sendToClient(clientId, { cmd: "room:left" });
+        this.sendToClient(clientId, { cmd: "room:left" }, "room:left");
         return { handled: true };
       }
 
@@ -473,7 +643,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
         this.sendToClient(clientId, {
           cmd: "room:list",
           rooms,
-        });
+        }, "room:list");
         return { handled: true };
       }
 
@@ -484,6 +654,18 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     }
   }
 
+  private isOptionalBoundedString(value: unknown, maxLength: number): boolean {
+    return value === undefined || (typeof value === "string" && value.length <= maxLength);
+  }
+
+  private sendMalformedRoomRequest(clientId: string, requestId: unknown): void {
+    this.sendToClient(clientId, {
+      cmd: "room:error",
+      message: "Room request failed",
+      requestId,
+    }, "room:error");
+  }
+
   /**
    * Override start to set up room message handling
    */
@@ -491,9 +673,13 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     await super.start();
 
     // Override message handler to include room protocol
-    this.on("message", async (evt) => {
+    this.on("message", (evt) => {
       const { clientId, message } = evt.payload;
-      await this.handleRoomMessage(clientId, message);
+      void this.handleRoomMessage(clientId, message).catch(() => {
+        // Emitter listeners are not awaited. Always contain room-flow
+        // rejections so malformed input cannot become an unhandled rejection.
+        this.sendMalformedRoomRequest(clientId, message?.requestId);
+      });
     });
   }
 

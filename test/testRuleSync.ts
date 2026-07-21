@@ -5,6 +5,7 @@ import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
 import { RuleEngine } from "../engine/RuleEngine.js";
 import { Action } from "../engine/Action.js"; // Import Action for types
+import { registerAction, unregisterAction } from "../engine/actions.js";
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -12,6 +13,7 @@ async function sleep(ms: number) {
 
 async function run() {
   console.log("🔗 Starting Rule Synchronization Test...\n");
+  registerAction("test:action", () => undefined);
 
   // 1. Start Relay Server
   const server = new UniversalRelayServer({ port: 9093, verbose: false });
@@ -42,7 +44,7 @@ async function run() {
 
   // 4. Trigger Rule on Host
   console.log("\n💥 Host: Dispatching trigger action...");
-  host.dispatch("test:action", {});
+  await host.dispatch("test:action", {});
 
   // Wait for sync
   await sleep(500);
@@ -69,7 +71,7 @@ async function run() {
     origLog(msg);
   };
 
-  host.dispatch("test:action", {});
+  await host.dispatch("test:action", {});
   console.log = origLog;
 
   if (reFired) {
@@ -82,6 +84,7 @@ async function run() {
   host.disconnect();
   client.disconnect();
   server.stop();
+  unregisterAction("test:action");
   console.log("\n✨ Phase 5 Verification Complete!");
   process.exit(0);
 }

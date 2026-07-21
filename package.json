@@ -73,6 +73,7 @@
     "test:watershed:rules": "node --loader ./test/ts-esm-loader.js test/testWatershedRules.ts",
     "test:watershed:sync": "node --loader ./test/ts-esm-loader.js test/testWatershedSync.ts",
     "test:rooms": "node --loader ./test/ts-esm-loader.js test/testRoomMultiplexing.ts",
+    "test:safety": "node --loader ./test/ts-esm-loader.js test/testDispatchOutcomes.ts && node --loader ./test/ts-esm-loader.js test/testAuthoritativeProjection.ts",
     "test:sync:hardening": "node --loader ./test/ts-esm-loader.js test/testSyncHardening.ts",
     "test:persistence": "node --loader ./test/ts-esm-loader.js test/testPersistence.ts",
     "test:stress": "node --loader ./test/ts-esm-loader.js test/stressTest.ts",
