@@ -68,7 +68,11 @@ export class WasmManager {
       onSessionReplace(newSession);
       if (debug) console.log('✅ WASM ActionDispatcher initialized');
     } catch (error) {
-      if (debug) console.warn('⚠️  WASM ActionDispatcher initialization failed:', error);
+      // Fail-safe: never leave a half-initialized dispatcher with empty state
+      // (would silently corrupt reads for WASM_ACTIONS actions). Fall back to TS.
+      this._dispatcher = null;
+      this._dispatchTable = null;
+      if (debug) console.warn('⚠️  WASM ActionDispatcher initialization failed, falling back to TypeScript:', error);
     }
   }
 
@@ -88,8 +92,12 @@ export class WasmManager {
       newSession.on("state:changed", onStateChanged);
       onSessionReplace(newSession);
       if (debug) console.log('✅ WASM ActionDispatcher initialized (async)');
-    } catch (_) {
-      // Silently fail — fallback to TypeScript
+    } catch (error) {
+      // Fail-safe: never leave a half-initialized dispatcher with empty state.
+      // Fall back to TypeScript.
+      this._dispatcher = null;
+      this._dispatchTable = null;
+      if (debug) console.warn('⚠️  WASM ActionDispatcher async initialization failed, falling back to TypeScript:', error);
     }
   }
 
@@ -161,7 +169,7 @@ export class WasmManager {
       // Rules
       "rule:markFired": (p) => { d.ruleMarkFired(p.name, p.timestamp ?? Date.now()); },
       // Batch
-      "tokens:shuffle": (p) => JSON.parse(d.batchShuffle(JSON.stringify(p.decks), p.seed ? String(p.seed) : undefined)),
+      "tokens:shuffle": (p) => JSON.parse(d.batchShuffle(JSON.stringify(p.decks), p.seed !== undefined ? String(p.seed) : undefined)),
       "tokens:draw":    (p) => JSON.parse(d.batchDraw(JSON.stringify(p.decks), JSON.stringify(p.counts))),
       "tokens:filter":  (p) => JSON.parse(d.batchFilter(JSON.stringify(p.tokens), p.predicate ?? "reversed")),
       "tokens:map":     (p) => JSON.parse(d.batchMap(JSON.stringify(p.tokens), p.operation ?? "flip")),
