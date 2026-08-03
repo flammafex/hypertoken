@@ -270,6 +270,7 @@ if (!wasmLoaded) {
   skip("parity: agent discardCards valid");
   skip("parity: agent discardCards missing + dedupe");
   skip("parity: agent discardCards missing agent throws on both");
+  skip("parity: agent discardCards empty");
 } else {
   await test("parity: stack:draw produces same state", async () => {
     const { tsState, wasmState } = await parityCheck([
@@ -679,6 +680,26 @@ if (!wasmLoaded) {
     await parityThrows([
       { type: "agent:discardCards", payload: { name: "Nobody", tokenIds: [] } },
     ]);
+  });
+
+  await test("parity: agent discardCards empty", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:drawCards", payload: { name: "Alice", count: 3 } },
+      { type: "agent:discardCards", payload: { name: "Alice", tokenIds: [] } },
+    ]);
+    // No-op: inventory unchanged on both paths.
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.inventory.length, 3, "TS inventory unchanged");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 3, "WASM inventory unchanged");
+    // Discards untouched on both paths.
+    assert.equal(tsState.stack.discards.length, 0, "TS discards unchanged");
+    assert.equal(wasmState.stack.discards.length, 0, "WASM discards unchanged");
+    // Dispatched result is [] on both paths.
+    const tsResult = await tsEngine.dispatch("agent:discardCards", { name: "Alice", tokenIds: [] });
+    const wasmResult = await wasmEngine.dispatch("agent:discardCards", { name: "Alice", tokenIds: [] });
+    assert.deepEqual(tsResult, [], "TS result should be []");
+    assert.deepEqual(wasmResult, [], "WASM result should be []");
   });
 }
 
