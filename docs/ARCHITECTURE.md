@@ -83,24 +83,25 @@ const knight = new Token({
 
 ### Chronicle
 
-**What it is:** The CRDT state container. Wraps [Automerge](https://automerge.org/) to provide automatic conflict resolution when multiple peers modify state simultaneously.
+**What it is:** The CRDT state container. Wraps [Automerge](https://automerge.org/) to provide automatic conflict resolution when multiple peers modify state simultaneously. It backs every `engine.dispatch()` — Stack, Space, Source, and game-specific state all live in the same synchronized document.
 
-**When to use:** You rarely interact with Chronicle directly—Stack, Space, and Source use it internally.
+**When to use:** You rarely interact with Chronicle directly—Stack, Space, and Source use it internally. Game code writes its own state (kept under a top-level doc key) through `engine.dispatch("game:setState", ...)`, and Chronicle stays underneath as the CRDT container that syncs those writes with other peers.
 
 ```javascript
-import { Chronicle } from './core/Chronicle.js';
+import { Engine } from "./engine/Engine.js";
 
-// Create a session (shared state container)
-const session = new Chronicle();
+const engine = new Engine({ disableWasm: true });
 
-// All changes go through session.change()
-session.change("draw a card", (doc) => {
-  doc.hand.push(card);
+// All state mutations go through engine.dispatch()
+await engine.dispatch("game:setState", { key: "game", value: { players: [], turn: 0 } });
+await engine.dispatch("game:setState", {
+  key: "hand",
+  patches: [{ path: ["cards", "c1"], value: card }],
 });
 
 // State auto-syncs with other peers
-session.on('state:changed', ({ doc, source }) => {
-  console.log('State updated from:', source); // 'local', 'merge', or 'load'
+engine.on("state:updated", ({ doc, source }) => {
+  console.log("State updated from:", source); // 'local', 'sync', 'merge', or 'load'
 });
 ```
 

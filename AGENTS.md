@@ -82,7 +82,7 @@ npm run mcp              # LLM MCP server
 - **Event naming** — `type:name` (e.g., `state:updated`, `net:ready`, `state:changed`).
 - **Everything extends `Emitter`** (`core/events.ts`) for event-based comms.
 - **Tokens are immutable** — never modified, only created/destroyed. Provenance via `_mergedFrom` / `_splitFrom`.
-- **State mutations go through `engine.dispatch()`** — not direct `session.change()`. Recent refactor migrated call sites; preserve this pattern.
+- **State mutations go through `engine.dispatch()`** — never direct `session.change()` from caller code. Game-specific state writes use `game:setState` (whole-key `value` or field-level `patches`). The engine's own `ActionRegistry` handlers and game-registered handlers may mutate via `session.change` internally; the examples (watershed/cuttle/blackjack) are fully migrated.
 - **Dual-path dispatch** — WASM `ActionDispatcher` if available + action supported, else TS `ActionRegistry` fallback. `IChronicle` interface abstracts both backends. Any new action needs both paths or an explicit fallback.
 - **disableWasm option** — `new Engine({ disableWasm: true })` forces the TypeScript Chronicle path. Optional — WASM sync is now supported. Useful for browser builds to avoid WASM binary loading.
 - **StorageAdapter pattern** — use `engine.useStorage(adapter)` + `await engine.persist(name)` / `await engine.resume(name)` for persistence (not the old save-state-plugin monkey-patching).
@@ -104,7 +104,7 @@ npm run mcp              # LLM MCP server
 
 ## PR / review expectations
 
-- **Working tree discipline** — recent commits show an active multi-phase engine refactor (migrating state into Chronicle, `session.change()` → `engine.dispatch()`). Check `git log` before touching engine/network code; some areas are mid-evolution.
+- **Working tree discipline** — recent commits completed the engine refactor: `engine.dispatch()` is now the sole state-mutation path (with `game:setState` for game-specific state), and the examples are migrated. Check `git log` before touching engine/network code.
 - **Commit messages** follow conventional-commits style (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`) — match existing style.
 - **Keep diffs clean** — no linter auto-formatting configured; don't reformat untouched code.
 - **Dual-path changes need dual-path review** — if you touch an action handler, check whether a Rust counterpart exists in `core-rs/src/chronicle_actions/` and update both.
@@ -145,3 +145,14 @@ A change is complete when **all** of the following hold:
 4. For action questions: `engine/ACTIONS.md` + per-category docs in `engine/actions/`.
 5. For WASM questions: `WASM_INTEGRATION.md` + `core-rs/README.md`.
 6. For networking questions: `network/` source.
+
+## Repository Map
+
+A full codemap is available at `codemap.md` in the project root.
+
+Before working on any task, read `codemap.md` to understand:
+- Project architecture and entry points
+- Directory responsibilities and design patterns
+- Data flow and integration points between modules
+
+For deep work on a specific folder, also read that folder's `codemap.md`.

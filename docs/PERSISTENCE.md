@@ -17,9 +17,7 @@ const adapter = new FilesystemAdapter({ dir: './saves' });
 engine.useStorage(adapter);
 
 // Write some game state
-engine.session.change('init', (doc) => {
-  doc.game = { players: [], turn: 0 };
-});
+await engine.dispatch("game:setState", { key: "game", value: { players: [], turn: 0 } });
 
 // Save
 await engine.persist('my-game', 'First save');

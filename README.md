@@ -132,7 +132,7 @@ hypertoken/
 ├── core/browser/          # Browser build infrastructure (shims, esbuild config)
 ├── core/storage/          # Storage adapters (IndexedDB, Filesystem, Memory)
 │
-├── core-rs/                # Rust → WASM (67 typed actions)
+├── core-rs/                # Rust → WASM acceleration for action dispatch
 │   └── src/
 │       ├── stack.rs       # 10 stack operations
 │       ├── space.rs       # 14 spatial operations
@@ -188,7 +188,7 @@ This applies to cards in blackjack, tokens in watershed, items in a marketplace,
 
 ## 📖 Documentation
 
-- [Action Reference](./engine/ACTIONS.md) — All 77 actions
+- [Action Reference](./engine/ACTIONS.md) — All 73 actions
 - [Architecture Guide](./docs/ARCHITECTURE.md) — How components connect
 - [Browser Guide](./docs/BROWSER.md) — Building games for the browser
 - [Persistence Guide](./docs/PERSISTENCE.md) — Save/load game state

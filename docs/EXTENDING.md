@@ -40,12 +40,12 @@ console.log(rolls); // [4, 2]
 ### Action with State Mutation
 
 ```javascript
-ActionRegistry['player:addGold'] = (engine, { playerId, amount }) => {
-  // Mutate through Chronicle for CRDT sync
-  engine.session.change(`add ${amount} gold to ${playerId}`, (doc) => {
-    if (!doc.players) doc.players = {};
-    if (!doc.players[playerId]) doc.players[playerId] = { gold: 0 };
-    doc.players[playerId].gold += amount;
+ActionRegistry['player:addGold'] = async (engine, { playerId, amount }) => {
+  // Mutate through game:setState for CRDT sync
+  const currentGold = engine.session.state.players?.[playerId]?.gold ?? 0;
+  await engine.dispatch('game:setState', {
+    key: 'players',
+    patches: [{ path: [playerId, 'gold'], value: currentGold + amount }],
   });
 
   engine.emit('player:goldChanged', { playerId, amount });
@@ -56,7 +56,7 @@ ActionRegistry['player:addGold'] = (engine, { playerId, amount }) => {
 ### Action with Validation
 
 ```javascript
-ActionRegistry['card:play'] = (engine, { playerId, cardId, targetZone }) => {
+ActionRegistry['card:play'] = async (engine, { playerId, cardId, targetZone }) => {
   const player = engine.session.state.players?.[playerId];
   if (!player) {
     throw new Error(`Player ${playerId} not found`);
@@ -69,9 +69,11 @@ ActionRegistry['card:play'] = (engine, { playerId, cardId, targetZone }) => {
 
   const card = player.hand[cardIndex];
 
-  engine.session.change(`play card ${cardId}`, (doc) => {
-    // Remove from hand
-    doc.players[playerId].hand.splice(cardIndex, 1);
+  // Remove from hand via game:setState
+  const newHand = player.hand.filter(c => c.id !== cardId);
+  await engine.dispatch('game:setState', {
+    key: 'players',
+    patches: [{ path: [playerId, 'hand'], value: newHand }],
   });
 
   // Place on board
@@ -386,15 +388,17 @@ import { ActionRegistry } from './engine/actions.js';
 import { RuleEngine } from './engine/RuleEngine.js';
 
 // 1. Custom Actions
-ActionRegistry['game:dealHands'] = (engine, { cardsPerPlayer }) => {
+ActionRegistry['game:dealHands'] = async (engine, { cardsPerPlayer }) => {
   const players = engine.session.state.players || [];
+  const patches = [];
   for (const player of players) {
     const cards = engine.stack.draw(cardsPerPlayer);
-    engine.session.change(`deal to ${player.name}`, (doc) => {
-      const p = doc.players.find(p => p.id === player.id);
-      p.hand = Array.isArray(cards) ? cards : [cards];
+    patches.push({
+      path: [player.id, 'hand'],
+      value: Array.isArray(cards) ? cards : [cards]
     });
   }
+  await engine.dispatch('game:setState', { key: 'players', patches });
 };
 
 // 2. Setup
@@ -404,12 +408,13 @@ const board = new Space(session, 'board');
 
 const engine = new Engine({ stack: deck, space: board });
 
-// Initialize players in CRDT
-session.change('init players', (doc) => {
-  doc.players = [
+// Initialize players through dispatch (top-level await in ESM)
+await engine.dispatch('game:setState', {
+  key: 'players',
+  value: [
     { id: 'p1', name: 'Alice', hand: [], score: 0 },
     { id: 'p2', name: 'Bob', hand: [], score: 0 }
-  ];
+  ]
 });
 
 // 3. Rules
@@ -462,7 +467,7 @@ await engine.dispatch('game:dealHands', { cardsPerPlayer: 5 });
 - Use for constraints and auto-triggers
 
 ### CRDT Considerations
-- All persistent state goes through `session.change()`
+- All persistent state mutations go through `engine.dispatch()` (use `game:setState` for game-specific state)
 - Local-only state can be regular properties
 - Use deterministic operations for sync
 

@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 76+ built-in actions in the HyperToken engine.
+Complete documentation for all 73 built-in actions in the HyperToken engine.
 
 ---
 
@@ -10,25 +10,28 @@ Complete documentation for all 76+ built-in actions in the HyperToken engine.
 
 | Category | Count | Documentation |
 |----------|-------|---------------|
-| **Stack** | 10 | [Stack Actions](./actions/stack.md) |
+| **Stack** | 11 | [Stack Actions](./actions/stack.md) |
 | **Space** | 14 | [Space Actions](./actions/TABLE.md) |
 | **Source** | 7 | [Source Actions](./actions/SHOE.md) |
-| **Agent** | 16 | [Agent Actions](./actions/PLAYER.md) |
-| **Game** | 7 | [Game Actions](./actions/GAME.md) |
+| **Agent** | 17 | [Agent Actions](./actions/PLAYER.md) |
+| **Game** | 9 | [Game Actions](./actions/GAME.md) |
 | **GameLoop** | 7 | Game loop lifecycle (loopInit, loopStart, loopStop, nextTurn, setPhase, setMaxTurns, setActiveAgent) |
 | **Rules** | 2 | Rule engine state (markFired, initRules) |
 | **Token** | 5 | [Token Actions](./actions/TOKEN.md) |
-| **Batch** | 8 | [Batch Actions](./actions/BATCH.md) |
-| **Total** | **76** | **100% Complete** |
+| **Debug** | 1 | Debug helpers (debug:log) |
+| **Batch** | 8 (WASM-only) | [Batch Actions](./actions/BATCH.md) — `tokens:*`, not in the TS ActionRegistry; reachable only when the WASM dispatcher is active |
+| **Total (TS ActionRegistry)** | **73** | **100% Complete** |
+
+> Category counts reflect the TS `ActionRegistry` via `listActions()`. The 8 `tokens:*` Batch actions are WASM-only and are *not* part of the 73.
 
 ---
 
 ## Action Categories
 
-### 🎴 [Stack Actions](./actions/stack.md) (10)
+### 🎴 [Stack Actions](./actions/stack.md) (11)
 Operations on the primary card stack.
 
-**Actions:** shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse
+**Actions:** shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse, discard
 
 **Use cases:** Shuffling at game start, drawing cards, stack manipulation, dealer procedures
 
@@ -52,21 +55,47 @@ Operations on multi-stack containers.
 
 ---
 
-### 👥 [Agent Actions](./actions/PLAYER.md) (16)
+### 👥 [Agent Actions](./actions/PLAYER.md) (17)
 Agent management and agent-to-agent interactions.
 
-**Actions:** create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade
+**Actions:** create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade, setMeta
 
 **Use cases:** Game setup, resource management, trading economies, theft mechanics, agent state
 
 ---
 
-### 🎮 [Game Actions](./actions/GAME.md) (7)
+### 🎮 [Game Actions](./actions/GAME.md) (9)
 High-level game state management and lifecycle.
 
-**Actions:** start, end, pause, resume, nextPhase, setProperty, getState
+**Actions:** start, end, pause, resume, nextPhase, setProperty, mergeState, setState, getState
 
 **Use cases:** Game flow control, phase transitions, win conditions, custom state tracking
+
+**`game:setState`** — generic game-state writer. Lets game code write game-specific top-level state keys (`doc.watershed`, `doc.cuttle`) and nested field-level writes through `engine.dispatch()` instead of raw `session.change()`.
+
+- **Payload:** `key` (top-level doc key to write, required) plus either `value` (whole-key write) or `patches` (batch of nested field writes). `replace` is only valid with `value`: `true` → `doc[key] = value` (overwrite), otherwise the value is merged into the existing key via `Object.assign`.
+- **Patches shape:** `patches: [{ path: string[], value: any }]` — for each entry writes `doc[key].path[0]….path[n] = value`, creating missing objects along the way.
+- **Semantics:** All writes happen in a single `session.change("game:setState", ...)`. Whole-key mode assigns `doc[key] = value` when `replace` is set or the key doesn't exist yet, else `Object.assign(doc[key], value)`. Field-level mode ensures `doc[key]` exists, then walks each patch path using `if (!cur[seg]) cur[seg] = {}`.
+- **JSON sanitization:** Every value (whole-key `value` and each `patch.value`) is passed through `JSON.parse(JSON.stringify(v))` centrally, stripping `undefined` members that Automerge rejects. Non-serializable values throw `"value must be JSON-serializable"`.
+- **Validation:** Throws clear errors: `"key required"`, `"value or patches required"`, `"use either value or patches, not both"`, `"replace is only valid with value"`, `"patches must be a non-empty array"`, `"each patch needs a non-empty string path"`, `"patch value required"`.
+- **TS-only:** `game:setState` has no WASM counterpart and routes through the ActionRegistry fallback (consistent with `game:setProperty`, `game:mergeState`, `agent:setMeta`). Requires the TS Chronicle path (`disableWasm` or the TS fallback).
+
+```javascript
+// Whole-key write
+engine.dispatch("game:setState", { key: "watershed", value: { territories: [], turn: 1 } });
+
+// Replace an existing key outright
+engine.dispatch("game:setState", { key: "cuttle", value: { phase: "recruit" }, replace: true });
+
+// Batch nested field-level writes
+engine.dispatch("game:setState", {
+  key: "watershed",
+  patches: [
+    { path: ["territories", "t1", "owner"], value: "Alice" },
+    { path: ["turn"], value: 2 },
+  ],
+});
+```
 
 ---
 
@@ -79,8 +108,8 @@ Token transformation and relationship management.
 
 ---
 
-### 📊 [Batch Actions](./actions/BATCH.md) (8)
-Collection operations and queries.
+### 📊 [Batch Actions](./actions/BATCH.md) (8) — WASM-only
+Collection operations and queries. **Not part of the TS ActionRegistry:** the `tokens:*` actions live in the WASM dispatcher's dispatch table (`WasmManager`), so they are only reachable when the WASM dispatcher is active.
 
 **Actions:** filter, map, forEach, collect, count, find, shuffle, draw
 
@@ -115,6 +144,19 @@ Rule engine state tracking.
 ```javascript
 engine.dispatch("rule:initRules", {});
 engine.dispatch("rule:markFired", { name: "low-health-warning", timestamp: Date.now() });
+```
+
+---
+
+### 🐞 Debug Actions (1)
+Debug helpers for the legacy JSON dispatch system.
+
+**Actions:** log
+
+**Use cases:** Logging payloads when `engine.debug` is enabled.
+
+```javascript
+engine.dispatch("debug:log", { message: "turn started" });
 ```
 
 ---
@@ -336,6 +378,6 @@ Each category file includes:
 
 ---
 
-**Total: 76 actions - 100% complete and documented**
+**Total: 73 actions in the TS ActionRegistry — 100% complete and documented**
 
-**Note:** An additional debug action (`debug:log`) exists in the legacy JSON dispatch system. The 76 actions listed here include 67 original actions plus 9 new GameLoop/Rules actions added for the incremental Chronicle CRDT integration. Actions route through dual-path dispatch: WASM Chronicle (incremental field-level ops) or TS ActionRegistry fallback.
+**Note:** Counts reflect the TypeScript `ActionRegistry` via `listActions()` (73 actions). The `tokens:*` Batch actions (8) are WASM-only — they live in the WASM dispatcher's dispatch table, not the TS ActionRegistry, and are only reachable when the WASM dispatcher is active. Actions route through dual-path dispatch: WASM Chronicle (incremental field-level ops) or TS ActionRegistry fallback.
