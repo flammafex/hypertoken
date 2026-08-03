@@ -79,7 +79,7 @@ Object.assign(ActionRegistry, {
   /**
    * Register a player
    */
-  "cuttle:register": (engine, { clientId } = {}) => {
+  "cuttle:register": async (engine, { clientId } = {}) => {
     if (!clientId) {
       throw new Error("clientId required");
     }
@@ -100,14 +100,23 @@ Object.assign(ActionRegistry, {
 
     for (const slot of slotOrder) {
       if (state.players[slot] === null) {
-        state.players[slot] = clientId;
+        // Clone before deriving (Automerge proxies don't support spread/derive).
+        const players = JSON.parse(JSON.stringify(state.players));
+        players[slot] = clientId;
+
+        // Check if all players are registered
+        const allFilled = Object.values(players).every((p) => p !== null);
+
+        const patches = [{ path: ["players"], value: players }];
+        if (allFilled) {
+          patches.push({ path: ["gameStarted"], value: true });
+        }
+
+        await engine.dispatch("game:setState", { key: "gameState", patches });
         engine.emit("player:registered", { playerIndex: slot, clientId });
         assigned = true;
 
-        // Check if all players are registered
-        const allFilled = Object.values(state.players).every((p) => p !== null);
         if (allFilled) {
-          state.gameStarted = true;
           engine.emit("game:started", { numPlayers });
         }
         break;
@@ -116,15 +125,30 @@ Object.assign(ActionRegistry, {
 
     // If game is in progress, check for disconnected slots to take over
     if (!assigned && state.gameStarted && state.disconnectedSlots?.length > 0) {
-      const slot = state.disconnectedSlots.shift();
-      state.players[slot] = clientId;
+      const players = JSON.parse(JSON.stringify(state.players));
+      const disconnectedSlots = JSON.parse(JSON.stringify(state.disconnectedSlots));
+      const slot = disconnectedSlots.shift();
+      players[slot] = clientId;
+
+      await engine.dispatch("game:setState", {
+        key: "gameState",
+        patches: [
+          { path: ["players"], value: players },
+          { path: ["disconnectedSlots"], value: disconnectedSlots },
+        ],
+      });
       engine.emit("player:reconnected", { playerIndex: slot, clientId });
       assigned = true;
     }
 
     if (!assigned) {
       // Game full, add as spectator
-      state.spectators.push(clientId);
+      const spectators = JSON.parse(JSON.stringify(state.spectators || []));
+      spectators.push(clientId);
+      await engine.dispatch("game:setState", {
+        key: "gameState",
+        patches: [{ path: ["spectators"], value: spectators }],
+      });
       engine.emit("spectator:joined", { clientId });
     }
   },
@@ -132,7 +156,7 @@ Object.assign(ActionRegistry, {
   /**
    * Execute a game action
    */
-  "cuttle:action": (engine, { action, clientId } = {}) => {
+  "cuttle:action": async (engine, { action, clientId } = {}) => {
     const state = engine._gameState;
     const gameInstance = engine._cuttleGame;
 
@@ -174,15 +198,22 @@ Object.assign(ActionRegistry, {
       throw new Error(result.message);
     }
 
-    // Update state
-    state.game = gameInstance.getState();
-
-    // Add to history for chronicle sync
-    state.history.push({
+    // Commit updated game state + action history via dispatch
+    // (single atomic patches write; gameInstance state advances in memory)
+    const history = JSON.parse(JSON.stringify(state.history || []));
+    history.push({
       playerIndex,
       action,
       message: result.message,
       timestamp: Date.now(),
+    });
+
+    await engine.dispatch("game:setState", {
+      key: "gameState",
+      patches: [
+        { path: ["game"], value: gameInstance.getState() },
+        { path: ["history"], value: history },
+      ],
     });
 
     engine.emit("action:executed", {
@@ -192,9 +223,10 @@ Object.assign(ActionRegistry, {
     });
 
     // Check for game end
-    if (state.game.winner !== null) {
-      engine.emit("game:won", { winner: state.game.winner });
-    } else if (state.game.isDraw) {
+    const game = gameInstance.getState();
+    if (game.winner !== null) {
+      engine.emit("game:won", { winner: game.winner });
+    } else if (game.isDraw) {
       engine.emit("game:draw", {});
     }
   },
@@ -203,7 +235,7 @@ Object.assign(ActionRegistry, {
    * Mark a player as ready for the next game
    * When all players are ready, the game resets and starts
    */
-  "cuttle:ready": (engine, { clientId } = {}) => {
+  "cuttle:ready": async (engine, { clientId } = {}) => {
     if (!clientId) return;
 
     const state = engine._gameState;
@@ -223,21 +255,31 @@ Object.assign(ActionRegistry, {
     if (playerIndex === -1) return; // Not a player
 
     // Mark this player as ready
-    state.readyForNextGame[playerIndex] = true;
+    const readyForNextGame = JSON.parse(JSON.stringify(state.readyForNextGame || {}));
+    readyForNextGame[playerIndex] = true;
+    await engine.dispatch("game:setState", {
+      key: "gameState",
+      patches: [{ path: ["readyForNextGame"], value: readyForNextGame }],
+    });
     engine.emit("player:ready", { playerIndex, clientId });
 
     // Check if all players are ready
     const allReady = Object.values(state.players).every((pid, idx) => {
-      return pid === null || state.readyForNextGame[idx];
+      return pid === null || readyForNextGame[idx];
     });
 
     if (allReady) {
       // Reset the game
       gameInstance.reset();
-      state.game = gameInstance.getState();
-      state.history = [];
-      state.readyForNextGame = {}; // Clear ready state
-      state.gameStarted = true;
+      await engine.dispatch("game:setState", {
+        key: "gameState",
+        patches: [
+          { path: ["game"], value: gameInstance.getState() },
+          { path: ["history"], value: [] },
+          { path: ["readyForNextGame"], value: {} },
+          { path: ["gameStarted"], value: true },
+        ],
+      });
       engine.emit("game:reset", {});
       engine.emit("game:started", { numPlayers: state.numPlayers });
     }
@@ -246,18 +288,25 @@ Object.assign(ActionRegistry, {
   /**
    * Reset the game (internal use or admin)
    */
-  "cuttle:reset": (engine, { seed } = {}) => {
+  "cuttle:reset": async (engine, { seed } = {}) => {
     const gameInstance = engine._cuttleGame;
     if (!gameInstance) return;
 
     gameInstance.reset(seed);
     const state = engine._gameState;
-    state.game = gameInstance.getState();
-    state.history = []; // Clear history for new game
-    state.readyForNextGame = {}; // Clear ready state
+
     // Check if all player slots are filled
     const allFilled = Object.values(state.players).every((p) => p !== null);
-    state.gameStarted = allFilled;
+
+    await engine.dispatch("game:setState", {
+      key: "gameState",
+      patches: [
+        { path: ["game"], value: gameInstance.getState() },
+        { path: ["history"], value: [] }, // Clear history for new game
+        { path: ["readyForNextGame"], value: {} }, // Clear ready state
+        { path: ["gameStarted"], value: allFilled },
+      ],
+    });
 
     engine.emit("game:reset", {});
   },
@@ -266,7 +315,7 @@ Object.assign(ActionRegistry, {
    * Unregister a player (called on disconnect)
    * Only allows leaving before game has started or after game ends
    */
-  "cuttle:unregister": (engine, { clientId } = {}) => {
+  "cuttle:unregister": async (engine, { clientId } = {}) => {
     if (!clientId) return;
 
     const state = engine._gameState;
@@ -277,7 +326,12 @@ Object.assign(ActionRegistry, {
     // Remove from spectators
     const specIndex = state.spectators.indexOf(clientId);
     if (specIndex !== -1) {
-      state.spectators.splice(specIndex, 1);
+      const spectators = JSON.parse(JSON.stringify(state.spectators));
+      spectators.splice(specIndex, 1);
+      await engine.dispatch("game:setState", {
+        key: "gameState",
+        patches: [{ path: ["spectators"], value: spectators }],
+      });
       engine.emit("spectator:left", { clientId });
       return;
     }
@@ -288,21 +342,33 @@ Object.assign(ActionRegistry, {
         // Only allow leaving if game hasn't started or game is over
         const gameOver = state.game?.winner !== null || state.game?.isDraw;
         if (!state.gameStarted || gameOver) {
-          state.players[i] = null;
-          state.gameStarted = false;
-          engine.emit("player:left", { playerIndex: i, clientId });
+          const players = JSON.parse(JSON.stringify(state.players));
+          players[i] = null;
+          const patches = [
+            { path: ["players"], value: players },
+            { path: ["gameStarted"], value: false },
+          ];
 
           // Reset the game if a player leaves before start
           if (!gameOver && gameInstance) {
             gameInstance.reset();
-            state.game = gameInstance.getState();
+            patches.push({ path: ["game"], value: gameInstance.getState() });
           }
+
+          await engine.dispatch("game:setState", { key: "gameState", patches });
+          engine.emit("player:left", { playerIndex: i, clientId });
         } else {
           // Game in progress - mark slot as available for reconnection
-          state.disconnectedSlots = state.disconnectedSlots || [];
-          if (!state.disconnectedSlots.includes(i)) {
-            state.disconnectedSlots.push(i);
+          const disconnectedSlots = JSON.parse(
+            JSON.stringify(state.disconnectedSlots || [])
+          );
+          if (!disconnectedSlots.includes(i)) {
+            disconnectedSlots.push(i);
           }
+          await engine.dispatch("game:setState", {
+            key: "gameState",
+            patches: [{ path: ["disconnectedSlots"], value: disconnectedSlots }],
+          });
           engine.emit("player:disconnected", { playerIndex: i, clientId });
         }
         return;
