@@ -14,6 +14,7 @@
 import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
 import { getBoard, getScores, setupWatershedSync } from "../examples/watershed/crdt-actions.js";
+import { ENERGY_PRESETS } from "../examples/watershed/WatershedGame.js";
 
 let passed = 0;
 let failed = 0;
@@ -24,6 +25,20 @@ function assert(condition: any, message: string): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Wait until the engine has a watershed state. B never dispatches init itself —
+ * it relies on A's init syncing over the relay. Polling (instead of a fixed
+ * sleep) removes the race where B's register fires before that sync lands.
+ */
+async function waitForWatershed(engine: Engine, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (engine.session.state?.watershed) return;
+    await sleep(50);
+  }
+  throw new Error(`Timed out after ${timeoutMs}ms waiting for watershed state to sync`);
 }
 
 async function runTest(name: string, fn: () => Promise<void>): Promise<void> {
@@ -185,6 +200,10 @@ async function runTests(): Promise<void> {
 
     await engineA.dispatch("watershed:init", {});
     await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+
+    // Wait for A's init to sync to B before B registers — tests 1-3 use a
+    // fixed sleep here, but polling removes the race entirely.
+    await waitForWatershed(engineB);
     await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
@@ -222,6 +241,10 @@ async function runTests(): Promise<void> {
 
     await engineA.dispatch("watershed:init", {});
     await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+
+    // Wait for A's init to sync to B before B registers — tests 1-3 use a
+    // fixed sleep here, but polling removes the race entirely.
+    await waitForWatershed(engineB);
     await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
@@ -274,6 +297,10 @@ async function runTests(): Promise<void> {
 
     await engineA.dispatch("watershed:init", {});
     await engineA.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+
+    // Wait for A's init to sync to B before B registers — tests 1-3 use a
+    // fixed sleep here, but polling removes the race entirely.
+    await waitForWatershed(engineB);
     await engineB.dispatch("watershed:register", { peerId: "p2", name: "Bob" });
     await sleep(1000);
 
@@ -301,6 +328,47 @@ async function runTests(): Promise<void> {
     engineB.disconnect();
     server.stop();
     await sleep(200);
+  });
+
+  // --- Test 7: game:setState writes all four fields for a place ---
+  // After the session.change → game:setState migration, watershed:place must
+  // write ALL FOUR fields (energy, lastEnergyTime, token, op) in one dispatch.
+  await runTest("game:setState: watershed:place writes energy/lastEnergyTime/token/op", async () => {
+    const engine = new Engine({ disableWasm: true });
+
+    await engine.dispatch("watershed:init", {});
+    await engine.dispatch("watershed:register", { peerId: "p1", name: "Alice" });
+
+    // Capture the placed token id from the event payload (Emitter wraps
+    // emissions in { id, type, payload, ts }).
+    let placedTokenId: string | null = null;
+    engine.on("watershed:placed", (e: any) => {
+      placedTokenId = e?.payload?.tokenId ?? e?.tokenId ?? null;
+    });
+
+    await engine.dispatch("watershed:place", { x: 2, y: 3, peerId: "p1" });
+
+    const ws = engine.session.state.watershed as any;
+    assert(placedTokenId !== null, "watershed:placed should have fired with a tokenId");
+
+    const tokenId = placedTokenId!;
+    const opId = tokenId.slice(4); // "tok-p1-0" -> "p1-0"
+
+    const maxEnergy = ENERGY_PRESETS.standard.max;
+    const placeCost = ENERGY_PRESETS.standard.placeCost;
+
+    assert(
+      ws.players["p1"].energy === maxEnergy - placeCost,
+      `player energy should be ${maxEnergy - placeCost}, got ${ws.players["p1"].energy}`,
+    );
+    assert(
+      typeof ws.players["p1"].lastEnergyTime === "number" && ws.players["p1"].lastEnergyTime > 0,
+      `lastEnergyTime should be a positive number, got ${ws.players["p1"].lastEnergyTime}`,
+    );
+    assert(ws.tokens[tokenId] !== undefined, `token ${tokenId} should exist`);
+    assert(ws.tokens[tokenId].createdByOp === opId, `token createdByOp should be ${opId}`);
+    assert(ws.ops[opId] !== undefined, `op ${opId} should exist`);
+    assert(ws.ops[opId].type === "place", `op type should be "place", got ${ws.ops[opId].type}`);
   });
 
   // Summary
