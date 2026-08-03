@@ -381,12 +381,16 @@ async function runTests(): Promise<void> {
     engineB.connect("ws://localhost:9309");
     await sleep(1000);
 
-    // Write and verify sync works with WASM
-    engineA.session.change("wasm-sync-test", (doc: any) => { doc.wasmSync = true; });
+    // Write and verify sync works with WASM. Use a WASM-routed dispatch
+    // (agent:create) instead of a direct session.change() — the
+    // WasmChronicleAdapter rejects direct change().
+    await engineA.dispatch("agent:create", { name: "p1" });
     await sleep(1500);
 
+    const stateA = engineA.session.state as any;
     const stateB = engineB.session.state as any;
-    assert(stateB.wasmSync === true, `B should see wasmSync=true via WASM sync, sees ${stateB.wasmSync}`);
+    assert(stateA.agents?.["p1"], `A should see agent p1 via WASM dispatch, sees ${JSON.stringify(stateA.agents)}`);
+    assert(stateB.agents?.["p1"], `B should see agent p1 via WASM sync, sees ${JSON.stringify(stateB.agents)}`);
 
     console.log("    WASM sync works — disableWasm: true is no longer required");
 

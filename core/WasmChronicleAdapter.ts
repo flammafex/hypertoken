@@ -142,7 +142,7 @@ export class WasmChronicleAdapter extends Emitter implements IChronicle<HyperTok
         };
     }
 
-    receiveSyncMessage(syncState: any, message: Uint8Array, source?: string): { nextSyncState: any } {
+    receiveSyncMessage(syncState: any, message: Uint8Array, source?: string): { nextSyncState: any; message?: Uint8Array | null } {
         // Decode sync state (base64 string → Uint8Array) if present
         let syncStateBytes: Uint8Array | undefined;
         if (syncState) {
@@ -162,8 +162,14 @@ export class WasmChronicleAdapter extends Emitter implements IChronicle<HyperTok
         // Emit state:changed so ConsensusCore updates other peers
         this.emit("state:changed", { doc: this.state, source: source || "sync" });
 
+        // The Rust receive path calls generate_sync_message internally, which sets
+        // in_flight=true on the sync state. That means the follow-up
+        // generateSyncMessage from ConsensusCore.updatePeer() will be suppressed
+        // (in_flight guard) — so the responseMessage returned here is the ONLY
+        // chance to deliver the changes back to the sender. It must not be dropped.
         return {
             nextSyncState: result.syncState,  // base64 string
+            message: result.responseMessage ? base64ToUint8Array(result.responseMessage) : null,
         };
     }
 }

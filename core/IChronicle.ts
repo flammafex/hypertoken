@@ -23,7 +23,7 @@ export interface IChronicle<T = HyperTokenState> {
     // Sync protocol (used by ConsensusCore)
     initSyncState(): any;
     generateSyncMessage(syncState: any): { nextSyncState: any; message: Uint8Array | null };
-    receiveSyncMessage(syncState: any, message: Uint8Array, source?: string): { nextSyncState: any };
+    receiveSyncMessage(syncState: any, message: Uint8Array, source?: string): { nextSyncState: any; message?: Uint8Array | null };
     // Emitter methods
     on(type: string, fn: Function): any;
     off(type: string, fn: Function): any;

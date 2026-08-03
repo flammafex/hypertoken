@@ -73,7 +73,11 @@ export class ConsensusCore extends Emitter {
 
   private updatePeer(peerId: string) {
     const syncState = this._syncStates.get(peerId);
-    if (!syncState) return;
+    // Bail only when the peer has no sync entry. A null syncState is valid: the
+    // WASM adapter's initSyncState() returns null by design ("create new sync
+    // state" on first generateSyncMessage call). A truthy guard here silently
+    // broke WASM-enabled sync handshakes.
+    if (syncState === undefined) return;
 
     const { nextSyncState, message } = this.session.generateSyncMessage(syncState);
 
@@ -107,9 +111,20 @@ export class ConsensusCore extends Emitter {
 
     try {
       // Delegate sync to session — it applies the message internally and emits state:changed
-      const { nextSyncState } = this.session.receiveSyncMessage(syncState, message, peerId);
+      const { nextSyncState, message: responseMessage } = this.session.receiveSyncMessage(syncState, message, peerId);
 
       this._syncStates.set(peerId, nextSyncState);
+
+      // The session may return an immediate response message (e.g. the WASM
+      // backend generates one inside receive_sync_message and flips in_flight,
+      // which suppresses the follow-up generateSyncMessage below). Send it
+      // straight back to the sender or the changes are lost.
+      if (responseMessage) {
+        this.network.sendToPeer(peerId, {
+          type: "sync",
+          data: this.arrayBufferToBase64(responseMessage)
+        });
+      }
 
       // Reply to sender to acknowledge/converge
       this.updatePeer(peerId);
