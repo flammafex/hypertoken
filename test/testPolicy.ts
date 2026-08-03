@@ -98,7 +98,7 @@ await test('Policy initializes with options', () => {
 
 console.log('\n✅ Policy Evaluation Tests\n');
 
-await test('Policy evaluates condition and executes effect', () => {
+await test('Policy evaluates condition and executes effect', async () => {
   const engine = new Engine();
   let effectExecuted = false;
 
@@ -114,8 +114,10 @@ await test('Policy evaluates condition and executes effect', () => {
   policy.evaluate(engine);
   assert(!effectExecuted, 'Effect should not execute when condition false');
 
-  // Add agent - condition true
-  engine._agents.push({ name: 'Alice', id: '1', resources: {} } as any);
+  // Add agent - condition true. engine._agents is a getter that returns a
+  // fresh Object.values array, so pushing into it is a no-op; register the
+  // agent through dispatch instead.
+  await engine.dispatch("agent:create", { name: "Alice" });
   policy.evaluate(engine);
 
   assert(effectExecuted, 'Effect should execute when condition true');

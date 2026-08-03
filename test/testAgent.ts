@@ -26,6 +26,15 @@ import { Token } from '../core/Token.js';
 import { Stack } from '../core/Stack.js';
 import { Space } from '../core/Space.js';
 import { Chronicle } from '../core/Chronicle.js';
+import { ActionRegistry } from '../engine/actions.js';
+
+// Dispatch is strict (unknown actions throw DispatchError), so the AI-agent
+// tests register their fixture actions here. Note: `new Engine()` records an
+// internal game:loopInit action in history — history assertions use deltas
+// from the initial length, not absolute counts.
+for (const type of ['test:action', 'test', 'action1', 'action2']) {
+  (ActionRegistry as any)[type] = () => undefined;
+}
 
 // Test helpers
 let testCount = 0;
@@ -339,20 +348,22 @@ await test('Agent think() executes AI agent logic', async () => {
 
   const agent = new Agent('Alice', { agent: aiAgent });
 
+  const initialHistoryLength = engine.history.length;
   await agent.think(engine);
 
   assert(thinkCalled, 'AI think should be called');
-  assertEquals(engine.history.length, 1, 'Should dispatch action');
-  assertEquals(engine.history[0].type, 'test:action', 'Action type should match');
+  assertEquals(engine.history.length, initialHistoryLength + 1, 'Should dispatch action');
+  assertEquals(engine.history[engine.history.length - 1].type, 'test:action', 'Action type should match');
 });
 
 await test('Agent think() with no AI agent does nothing', async () => {
   const engine = new Engine();
   const agent = new Agent('Alice');
 
+  const initialHistoryLength = engine.history.length;
   await agent.think(engine);
 
-  assertEquals(engine.history.length, 0, 'Should not dispatch any actions');
+  assertEquals(engine.history.length, initialHistoryLength, 'Should not dispatch any actions');
 });
 
 await test('Agent think() handles Script return value', async () => {
@@ -371,9 +382,10 @@ await test('Agent think() handles Script return value', async () => {
 
   const agent = new Agent('Alice', { agent: aiAgent });
 
+  const initialHistoryLength = engine.history.length;
   await agent.think(engine);
 
-  assertEquals(engine.history.length, 2, 'Should execute script');
+  assertEquals(engine.history.length, initialHistoryLength + 2, 'Should execute script');
 });
 
 await test('Agent think() emits decision event', async () => {

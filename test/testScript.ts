@@ -22,6 +22,15 @@
 
 import { Engine } from '../engine/Engine.js';
 import { Script } from '../engine/Script.js';
+import { ActionRegistry } from '../engine/actions.js';
+
+// Dispatch is strict (unknown actions throw DispatchError), so the script-run
+// tests register their fixture actions here. Note: `new Engine()` records an
+// internal game:loopInit action in history — history assertions below use
+// deltas from the initial length, not absolute counts.
+for (const type of ['test:action', 'step1', 'step2', 'step3', 'action1', 'action2']) {
+  (ActionRegistry as any)[type] = () => undefined;
+}
 
 // Test helpers
 let testCount = 0;
@@ -165,6 +174,7 @@ await test('Script does not run if already running', async () => {
 
   script.add({ type: 'test:action', payload: { id: 1 }, delay: 100 });
 
+  const initialHistoryLength = engine.history.length;
   const run1 = script.run(engine);
   const run2 = script.run(engine); // Should return immediately
 
@@ -173,7 +183,7 @@ await test('Script does not run if already running', async () => {
 
   // If both ran, we'd have 2 actions dispatched
   // But since second call returns early, we should only have 1
-  assertEquals(engine.history.length, 1, 'Should only execute once');
+  assertEquals(engine.history.length, initialHistoryLength + 1, 'Should only execute once');
 });
 
 // ============================================================================
@@ -190,6 +200,7 @@ await test('Script respects AbortSignal', async () => {
   script.add({ type: 'test:action', payload: { id: 2 }, delay: 50 });
   script.add({ type: 'test:action', payload: { id: 3 } });
 
+  const initialHistoryLength = engine.history.length;
   const controller = new AbortController();
 
   // Abort after first action
@@ -198,7 +209,7 @@ await test('Script respects AbortSignal', async () => {
   await script.run(engine, { signal: controller.signal });
 
   // Should have executed first action, but aborted before third
-  assert(engine.history.length < 3, 'Should not execute all actions');
+  assert(engine.history.length - initialHistoryLength < 3, 'Should not execute all actions');
 });
 
 await test('Script aborts between steps', async () => {
@@ -209,6 +220,7 @@ await test('Script aborts between steps', async () => {
   script.add({ type: 'step2', payload: {}, delay: 100 });
   script.add({ type: 'step3', payload: {} });
 
+  const initialHistoryLength = engine.history.length;
   const controller = new AbortController();
 
   setTimeout(() => controller.abort(), 50);
@@ -216,7 +228,8 @@ await test('Script aborts between steps', async () => {
   await script.run(engine, { signal: controller.signal });
 
   // Should execute step1, step2 (aborted during delay), but not step3
-  assert(engine.history.length >= 1 && engine.history.length <= 2, 'Should execute 1-2 steps before abort');
+  const delta = engine.history.length - initialHistoryLength;
+  assert(delta >= 1 && delta <= 2, 'Should execute 1-2 steps before abort');
 });
 
 // ============================================================================
@@ -360,7 +373,10 @@ await test('Script complete event shows incomplete on abort', async () => {
 console.log('\n🎯 Integration Tests\n');
 
 await test('Script executes complex game scenario', async () => {
-  const engine = new Engine();
+  // disableWasm: this scenario dispatches agent:giveResource, a TS-only action
+  // whose handler calls session.change() (throws on the WASM adapter). The
+  // test targets Script orchestration, not WASM dispatch routing.
+  const engine = new Engine({ disableWasm: true });
   const script = new Script('game-setup');
 
   script
