@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 73 built-in actions in the HyperToken engine.
+Complete documentation for all 81 built-in actions in the HyperToken engine.
 
 ---
 
@@ -19,10 +19,10 @@ Complete documentation for all 73 built-in actions in the HyperToken engine.
 | **Rules** | 2 | Rule engine state (markFired, initRules) |
 | **Token** | 5 | [Token Actions](./actions/TOKEN.md) |
 | **Debug** | 1 | Debug helpers (debug:log) |
-| **Batch** | 8 (WASM-only) | [Batch Actions](./actions/BATCH.md) — `tokens:*`, not in the TS ActionRegistry; reachable only when the WASM dispatcher is active |
-| **Total (TS ActionRegistry)** | **73** | **100% Complete** |
+| **Batch** | 8 | [Batch Actions](./actions/BATCH.md) — `tokens:*`, TS ActionRegistry parity; WASM-accelerated when the WASM dispatcher is active |
+| **Total (TS ActionRegistry)** | **81** | **100% Complete** |
 
-> Category counts reflect the TS `ActionRegistry` via `listActions()`. The 8 `tokens:*` Batch actions are WASM-only and are *not* part of the 73.
+> Category counts reflect the TS `ActionRegistry` via `listActions()` (81 actions). The 8 `tokens:*` Batch actions are included; they route through the WASM dispatcher when available and fall back to the TS registry otherwise.
 
 ---
 
@@ -108,8 +108,8 @@ Token transformation and relationship management.
 
 ---
 
-### 📊 [Batch Actions](./actions/BATCH.md) (8) — WASM-only
-Collection operations and queries. **Not part of the TS ActionRegistry:** the `tokens:*` actions live in the WASM dispatcher's dispatch table (`WasmManager`), so they are only reachable when the WASM dispatcher is active.
+### 📊 [Batch Actions](./actions/BATCH.md) (8)
+Collection operations and queries. The `tokens:*` actions are implemented in both the WASM dispatcher (`WasmManager`) and the TS `ActionRegistry` — the WASM path is used when active, otherwise the TS handlers provide parity.
 
 **Actions:** filter, map, forEach, collect, count, find, shuffle, draw
 
@@ -378,6 +378,6 @@ Each category file includes:
 
 ---
 
-**Total: 73 actions in the TS ActionRegistry — 100% complete and documented**
+**Total: 81 actions in the TS ActionRegistry — 100% complete and documented**
 
-**Note:** Counts reflect the TypeScript `ActionRegistry` via `listActions()` (73 actions). The `tokens:*` Batch actions (8) are WASM-only — they live in the WASM dispatcher's dispatch table, not the TS ActionRegistry, and are only reachable when the WASM dispatcher is active. Actions route through dual-path dispatch: WASM Chronicle (incremental field-level ops) or TS ActionRegistry fallback.
+**Note:** Counts reflect the TypeScript `ActionRegistry` via `listActions()` (81 actions), including the 8 `tokens:*` Batch actions. Batch actions are dual-path: they route through the WASM dispatcher when it is active, and fall back to the TS ActionRegistry handlers otherwise. Actions route through dual-path dispatch: WASM Chronicle (incremental field-level ops) or TS ActionRegistry fallback.

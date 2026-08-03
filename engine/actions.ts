@@ -20,6 +20,7 @@
 
 import { Engine } from "./Engine.js";
 import { IToken } from "../core/types.js";
+import { shuffleArray } from "../core/random.js";
 import type { IEngineAgent } from "./types.js";
 import type {
   StackInsertAtPayload, StackSwapPayload, StackDiscardPayload,
@@ -689,6 +690,143 @@ const TokenActions: ActionRegistryType = {
 };
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BATCH ACTIONS (tokens:*)
+  Stateless/pure or read-only — these never call session.change.
+  TS parity for the WASM-only batch ops (see WasmManager dispatch table).
+  Field names (rev/merged/split/kind/group) match the Rust Token serde schema.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
+
+type BatchPredicate = (token: any) => boolean;
+
+/** Predicates accepted by parallel_filter (flag-only; kind:/group: are find/count-only). */
+const BATCH_FLAG_PREDICATES = new Set(["reversed", "normal", "merged", "split"]);
+
+/** Resolve a string predicate; returns null for unknown predicates. */
+function batchPredicate(predicate: string): BatchPredicate | null {
+  switch (predicate) {
+    case "reversed": return (t: any) => !!t.rev;
+    case "normal": return (t: any) => !t.rev;
+    case "merged": return (t: any) => !!t.merged;
+    case "split": return (t: any) => !!t.split;
+  }
+  if (predicate.startsWith("kind:")) {
+    const k = predicate.slice(5);
+    return (t: any) => t.kind === k;
+  }
+  if (predicate.startsWith("group:")) {
+    const g = predicate.slice(6);
+    return (t: any) => t.group === g;
+  }
+  return null;
+}
+
+/** Resolve a string operation; throws for unknown operations. */
+function batchOperation(operation: string): (token: any) => any {
+  switch (operation) {
+    case "flip": return (t: any) => ({ ...t, rev: !t.rev });
+    case "merge": return (t: any) => ({ ...t, merged: true });
+    case "unmerge": return (t: any) => ({ ...t, merged: false });
+    default: throw new Error(`Unknown operation: ${operation}`);
+  }
+}
+
+/** Deterministic numeric hash for per-deck shuffle seeds ("{seed}-{idx}"). */
+function batchSeed(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
+  }
+  return h >>> 0;
+}
+
+const BatchActions: ActionRegistryType = {
+  "tokens:shuffle": (engine, { decks, seed } = {}) => {
+    if (!Array.isArray(decks)) throw new Error("decks required");
+    return decks.map((deck, idx) => {
+      const copy = [...deck];
+      shuffleArray(copy, seed != null ? batchSeed(`${seed}-${idx}`) : null);
+      return copy;
+    });
+  },
+  "tokens:draw": (engine, { decks, counts } = {}) => {
+    if (!Array.isArray(decks) || !Array.isArray(counts)) throw new Error("decks and counts required");
+    if (decks.length !== counts.length) throw new Error("Deck and count arrays must match");
+    const drawn: any[][] = [];
+    const remaining: any[][] = [];
+    for (let i = 0; i < decks.length; i++) {
+      const deck = decks[i];
+      const toDraw = Math.min(counts[i], deck.length);
+      drawn.push(deck.slice(deck.length - toDraw).reverse());
+      remaining.push(deck.slice(0, deck.length - toDraw));
+    }
+    return { drawn, decks: remaining };
+  },
+  "tokens:filter": (engine, { tokens, predicate = "reversed" } = {}) => {
+    if (!Array.isArray(tokens)) throw new Error("tokens required");
+    // Rust parallel_filter only accepts the four flag predicates and errors
+    // on anything else (kind:/group: are find/count-only) — keep that parity.
+    if (!BATCH_FLAG_PREDICATES.has(predicate)) throw new Error(`Unknown predicate: ${predicate}`);
+    return tokens.filter(batchPredicate(predicate)!);
+  },
+  "tokens:map": (engine, { tokens, operation = "flip" } = {}) => {
+    if (!Array.isArray(tokens)) throw new Error("tokens required");
+    const op = batchOperation(operation);
+    return tokens.map(op);
+  },
+  "tokens:find": (engine, { tokens, predicate = "reversed" } = {}) => {
+    if (!Array.isArray(tokens)) throw new Error("tokens required");
+    const match = batchPredicate(predicate);
+    if (!match) return null;
+    return tokens.find(match) ?? null;
+  },
+  "tokens:count": (engine, { tokens, predicate = "reversed" } = {}) => {
+    if (!Array.isArray(tokens)) throw new Error("tokens required");
+    const match = batchPredicate(predicate);
+    if (!match) return 0;
+    return tokens.filter(match).length;
+  },
+  "tokens:forEach": (engine, { tokens, operation = "flip" } = {}) => {
+    if (!Array.isArray(tokens)) throw new Error("tokens required");
+    const op = batchOperation(operation);
+    return tokens.map(op);
+  },
+  "tokens:collect": (engine, { sources } = {}) => {
+    if (!Array.isArray(sources)) throw new Error("sources required");
+    // Read once off the Automerge proxy (never Object.values on it).
+    const state = JSON.parse(JSON.stringify(engine.session.state)) as any;
+    const collected: any[] = [];
+    for (const source of sources) {
+      switch (source) {
+        case "stack":
+          if (state.stack?.stack) collected.push(...state.stack.stack);
+          break;
+        case "discard":
+        case "discards":
+          if (state.stack?.discards) collected.push(...state.stack.discards);
+          break;
+        case "drawn":
+          if (state.stack?.drawn) collected.push(...state.stack.drawn);
+          break;
+        case "source":
+          if (state.source?.tokens) collected.push(...state.source.tokens);
+          break;
+        default: {
+          const zone = state.zones?.[source];
+          if (Array.isArray(zone)) {
+            for (const placement of zone) {
+              if (placement?.tokenSnapshot) collected.push(placement.tokenSnapshot);
+            }
+          }
+          break;
+        }
+      }
+    }
+    return collected;
+  },
+};
+
+/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   DEBUG
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
@@ -712,6 +850,7 @@ export const ActionRegistry: ActionRegistryType = {
   ...GameLoopActions,
   ...RuleActions,
   ...TokenActions,
+  ...BatchActions,
   ...DebugActions,
 };
 

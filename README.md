@@ -188,7 +188,7 @@ This applies to cards in blackjack, tokens in watershed, items in a marketplace,
 
 ## 📖 Documentation
 
-- [Action Reference](./engine/ACTIONS.md) — All 73 actions
+- [Action Reference](./engine/ACTIONS.md) — All 81 actions
 - [Architecture Guide](./docs/ARCHITECTURE.md) — How components connect
 - [Browser Guide](./docs/BROWSER.md) — Building games for the browser
 - [Persistence Guide](./docs/PERSISTENCE.md) — Save/load game state

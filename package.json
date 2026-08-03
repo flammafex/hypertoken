@@ -65,6 +65,7 @@
     "test:rust": "cd core-rs && cargo test --lib --target $(rustc -vV | sed -n 's/host: //p')",
     "test:wasm": "node --loader ./test/ts-esm-loader.js test/testWasmBridge.ts",
     "test:chronicle-incremental": "node --loader ./test/ts-esm-loader.js test/testChronicleIncremental.ts",
+    "test:batch": "node --loader ./test/ts-esm-loader.js test/testBatchActions.ts",
     "clean:rust": "cd core-rs && cargo clean && rm -rf pkg",
     "test:sync:spike": "node --loader ./test/ts-esm-loader.js test/testSyncSpike.ts",
     "test:cuttle:sync": "node --loader ./test/ts-esm-loader.js test/testCuttleSync.ts",
