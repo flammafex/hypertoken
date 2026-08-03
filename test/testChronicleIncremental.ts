@@ -261,6 +261,15 @@ if (!wasmLoaded) {
   skip("parity: agent setActive(false)");
   skip("parity: agent remove");
   skip("parity: agent drawCards seeded stack");
+  skip("parity: agent trade valid");
+  skip("parity: agent trade token-only");
+  skip("parity: agent trade resource-only");
+  skip("parity: agent trade insufficient resource throws on both");
+  skip("parity: agent trade missing token throws on both");
+  skip("parity: agent trade same resource nets out");
+  skip("parity: agent discardCards valid");
+  skip("parity: agent discardCards missing + dedupe");
+  skip("parity: agent discardCards missing agent throws on both");
 } else {
   await test("parity: stack:draw produces same state", async () => {
     const { tsState, wasmState } = await parityCheck([
@@ -495,6 +504,181 @@ if (!wasmLoaded) {
     assert.equal(wasmState.agents["Alice"].inventory.length, 2, "WASM inventory count");
     // Do NOT assert stack.drawn equality: the WASM path does not update it
     // (documented divergence — the TS Stack.draw does).
+  });
+
+  await test("parity: agent trade valid", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 100 } },
+      { type: "agent:giveResource", payload: { name: "Bob", resource: "gems", amount: 50 } },
+      { type: "agent:addToken", payload: { name: "Alice", token: { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} } } },
+      { type: "agent:addToken", payload: { name: "Bob", token: { id: "t2", text: "Shield", char: "H", kind: "item", index: 0, meta: {} } } },
+      { type: "agent:trade", payload: {
+        agent1: "Alice", agent2: "Bob",
+        offer1: { token: { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} }, resource: "gold", amount: 30 },
+        offer2: { token: { id: "t2", text: "Shield", char: "H", kind: "item", index: 0, meta: {} }, resource: "gems", amount: 20 },
+      } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    // TS: Alice 70 gold / +20 gems / has t2; Bob 30 gold / 30 gems / has t1
+    assert.equal(tsAlice.resources.gold, 70, "TS Alice gold");
+    assert.equal(tsAlice.resources.gems, 20, "TS Alice gems");
+    assert.equal(tsAlice.inventory.length, 1, "TS Alice inventory");
+    assert.equal(tsAlice.inventory[0].id, "t2", "TS Alice has t2");
+    assert.equal(tsBob.resources.gold, 30, "TS Bob gold");
+    assert.equal(tsBob.resources.gems, 30, "TS Bob gems");
+    assert.equal(tsBob.inventory.length, 1, "TS Bob inventory");
+    assert.equal(tsBob.inventory[0].id, "t1", "TS Bob has t1");
+    // WASM: same expectations
+    const wAlice = wasmState.agents["Alice"];
+    const wBob = wasmState.agents["Bob"];
+    assert.equal(wAlice.resources.gold, 70, "WASM Alice gold");
+    assert.equal(wAlice.resources.gems, 20, "WASM Alice gems");
+    assert.equal(wAlice.inventory.length, 1, "WASM Alice inventory");
+    assert.equal(wAlice.inventory[0].id, "t2", "WASM Alice has t2");
+    assert.equal(wBob.resources.gold, 30, "WASM Bob gold");
+    assert.equal(wBob.resources.gems, 30, "WASM Bob gems");
+    assert.equal(wBob.inventory.length, 1, "WASM Bob inventory");
+    assert.equal(wBob.inventory[0].id, "t1", "WASM Bob has t1");
+  });
+
+  await test("parity: agent trade token-only", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:addToken", payload: { name: "Alice", token: { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} } } },
+      { type: "agent:addToken", payload: { name: "Bob", token: { id: "t2", text: "Shield", char: "H", kind: "item", index: 0, meta: {} } } },
+      { type: "agent:trade", payload: {
+        agent1: "Alice", agent2: "Bob",
+        offer1: { token: { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} } },
+        offer2: { token: { id: "t2", text: "Shield", char: "H", kind: "item", index: 0, meta: {} } },
+      } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsAlice.inventory.length, 1, "TS Alice inventory");
+    assert.equal(tsAlice.inventory[0].id, "t2", "TS Alice has t2");
+    assert.equal(tsBob.inventory.length, 1, "TS Bob inventory");
+    assert.equal(tsBob.inventory[0].id, "t1", "TS Bob has t1");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 1, "WASM Alice inventory");
+    assert.equal(wasmState.agents["Alice"].inventory[0].id, "t2", "WASM Alice has t2");
+    assert.equal(wasmState.agents["Bob"].inventory.length, 1, "WASM Bob inventory");
+    assert.equal(wasmState.agents["Bob"].inventory[0].id, "t1", "WASM Bob has t1");
+  });
+
+  await test("parity: agent trade resource-only", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 100 } },
+      { type: "agent:giveResource", payload: { name: "Bob", resource: "gems", amount: 50 } },
+      { type: "agent:trade", payload: {
+        agent1: "Alice", agent2: "Bob",
+        offer1: { resource: "gold", amount: 30 },
+        offer2: { resource: "gems", amount: 20 },
+      } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsAlice.resources.gold, 70, "TS Alice gold");
+    assert.equal(tsAlice.resources.gems, 20, "TS Alice gems");
+    assert.equal(tsBob.resources.gold, 30, "TS Bob gold");
+    assert.equal(tsBob.resources.gems, 30, "TS Bob gems");
+    assert.equal(wasmState.agents["Alice"].resources.gold, 70, "WASM Alice gold");
+    assert.equal(wasmState.agents["Alice"].resources.gems, 20, "WASM Alice gems");
+    assert.equal(wasmState.agents["Bob"].resources.gold, 30, "WASM Bob gold");
+    assert.equal(wasmState.agents["Bob"].resources.gems, 30, "WASM Bob gems");
+  });
+
+  await test("parity: agent trade insufficient resource throws on both", async () => {
+    await parityThrows([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 10 } },
+      { type: "agent:giveResource", payload: { name: "Bob", resource: "gems", amount: 50 } },
+      { type: "agent:trade", payload: {
+        agent1: "Alice", agent2: "Bob",
+        offer1: { resource: "gold", amount: 30 },
+        offer2: { resource: "gems", amount: 20 },
+      } },
+    ]);
+  });
+
+  await test("parity: agent trade missing token throws on both", async () => {
+    await parityThrows([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 100 } },
+      { type: "agent:giveResource", payload: { name: "Bob", resource: "gems", amount: 50 } },
+      { type: "agent:trade", payload: {
+        agent1: "Alice", agent2: "Bob",
+        offer1: { token: { id: "t9", text: "X", char: "X", kind: "item", index: 0, meta: {} }, resource: "gold", amount: 30 },
+        offer2: { resource: "gems", amount: 20 },
+      } },
+    ]);
+  });
+
+  await test("parity: agent trade same resource nets out", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 100 } },
+      { type: "agent:giveResource", payload: { name: "Bob", resource: "gold", amount: 50 } },
+      { type: "agent:trade", payload: {
+        agent1: "Alice", agent2: "Bob",
+        offer1: { resource: "gold", amount: 30 },
+        offer2: { resource: "gold", amount: 20 },
+      } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsAlice.resources.gold, 90, "TS Alice gold (net -10)");
+    assert.equal(tsBob.resources.gold, 60, "TS Bob gold (net +10)");
+    assert.equal(wasmState.agents["Alice"].resources.gold, 90, "WASM Alice gold (net -10)");
+    assert.equal(wasmState.agents["Bob"].resources.gold, 60, "WASM Bob gold (net +10)");
+  });
+
+  await test("parity: agent discardCards valid", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:drawCards", payload: { name: "Alice", count: 3 } },
+      { type: "agent:discardCards", payload: { name: "Alice", tokenIds: ["t2", "t1"] } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.inventory.length, 1, "TS inventory count");
+    assert.equal(tsAlice.inventory[0].id, "t3", "TS remaining card");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 1, "WASM inventory count");
+    assert.equal(wasmState.agents["Alice"].inventory[0].id, "t3", "WASM remaining card");
+    // Discards appended in tokenIds order on both paths
+    assert.equal(tsState.stack.discards.length, 2, "TS discards count");
+    assert.equal(tsState.stack.discards[0].id, "t2", "TS discards order");
+    assert.equal(tsState.stack.discards[1].id, "t1", "TS discards order");
+    assert.equal(wasmState.stack.discards.length, 2, "WASM discards count");
+    assert.equal(wasmState.stack.discards[0].id, "t2", "WASM discards order");
+    assert.equal(wasmState.stack.discards[1].id, "t1", "WASM discards order");
+  });
+
+  await test("parity: agent discardCards missing + dedupe", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:drawCards", payload: { name: "Alice", count: 3 } },
+      { type: "agent:discardCards", payload: { name: "Alice", tokenIds: ["t9", "t1", "t1"] } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.inventory.length, 2, "TS inventory count");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 2, "WASM inventory count");
+    assert.equal(tsState.stack.discards.length, 1, "TS discards count");
+    assert.equal(tsState.stack.discards[0].id, "t1", "TS discards id");
+    assert.equal(wasmState.stack.discards.length, 1, "WASM discards count");
+    assert.equal(wasmState.stack.discards[0].id, "t1", "WASM discards id");
+  });
+
+  await test("parity: agent discardCards missing agent throws on both", async () => {
+    await parityThrows([
+      { type: "agent:discardCards", payload: { name: "Nobody", tokenIds: [] } },
+    ]);
   });
 }
 

@@ -367,31 +367,66 @@ const AgentActions: ActionRegistryType = {
   "agent:trade": (engine, { agent1, agent2, offer1, offer2 } = {} as AgentTradePayload) => {
     findAgent(engine, agent1);
     findAgent(engine, agent2);
+    // Snapshot JSON state for validation (Automerge proxy-safe).
+    const state = JSON.parse(JSON.stringify(engine.session.state)) as any;
+    const a1 = state.agents?.[agent1];
+    const a2 = state.agents?.[agent2];
+    const a1Inv: IToken[] = a1?.inventory ?? [];
+    const a2Inv: IToken[] = a2?.inventory ?? [];
+    const a1Res: Record<string, number> = a1?.resources ?? {};
+    const a2Res: Record<string, number> = a2?.resources ?? {};
+    // Validate offer1 (agent1 gives): token presence + resource sufficiency.
+    if (offer1?.token && !a1Inv.some((t: IToken) => t.id === offer1.token.id)) {
+      throw new Error(`Token "${offer1.token.id}" not in ${agent1}'s inventory`);
+    }
+    if (typeof offer1?.amount === "number" && offer1.resource) {
+      const bal = a1Res[offer1.resource] ?? 0;
+      if (bal < offer1.amount) throw new Error(`Agent "${agent1}" has ${bal} ${offer1.resource} but ${offer1.amount} requested`);
+    }
+    // Validate offer2 (agent2 gives).
+    if (offer2?.token && !a2Inv.some((t: IToken) => t.id === offer2.token.id)) {
+      throw new Error(`Token "${offer2.token.id}" not in ${agent2}'s inventory`);
+    }
+    if (typeof offer2?.amount === "number" && offer2.resource) {
+      const bal = a2Res[offer2.resource] ?? 0;
+      if (bal < offer2.amount) throw new Error(`Agent "${agent2}" has ${bal} ${offer2.resource} but ${offer2.amount} requested`);
+    }
+    // Deduped set of exchanged resource keys.
+    const keys = new Set<string>();
+    if (offer1?.resource) keys.add(offer1.resource);
+    if (offer2?.resource) keys.add(offer2.resource);
     engine.session.change("agent:trade", (doc: any) => {
       if (!doc.agents) return;
-      const a1 = doc.agents[agent1];
-      const a2 = doc.agents[agent2];
-      if (!a1.inventory) a1.inventory = [];
-      if (!a2.inventory) a2.inventory = [];
-      if (!a1.resources) a1.resources = {};
-      if (!a2.resources) a2.resources = {};
-      // Execute offer1: agent1 gives to agent2
+      const d1 = doc.agents[agent1];
+      const d2 = doc.agents[agent2];
+      if (!d1.inventory) d1.inventory = [];
+      if (!d2.inventory) d2.inventory = [];
+      if (!d1.resources) d1.resources = {};
+      if (!d2.resources) d2.resources = {};
+      // Absolute resource writes from snapshot values, so both offers on the
+      // SAME key net out (order-independent, mirrors the Rust handler).
+      for (const key of keys) {
+        const a1Amt = offer1?.resource === key && typeof offer1?.amount === "number" ? offer1.amount : 0;
+        const a2Amt = offer2?.resource === key && typeof offer2?.amount === "number" ? offer2.amount : 0;
+        const a1Cur = a1Res[key] ?? 0;
+        const a2Cur = a2Res[key] ?? 0;
+        d1.resources[key] = a1Cur - a1Amt + a2Amt;
+        d2.resources[key] = a2Cur + a1Amt - a2Amt;
+      }
+      // Token exchange (materialize moved tokens to avoid Automerge proxy issues).
       if (offer1?.token) {
-        const idx = a1.inventory.findIndex((t: IToken) => t.id === offer1.token.id);
-        if (idx !== -1) a2.inventory.push(...a1.inventory.splice(idx, 1));
+        const idx = d1.inventory.findIndex((t: IToken) => t.id === offer1.token.id);
+        if (idx !== -1) {
+          const [moved] = d1.inventory.splice(idx, 1);
+          d2.inventory.push(JSON.parse(JSON.stringify(moved)));
+        }
       }
-      if (offer1?.resource && offer1?.amount) {
-        a1.resources[offer1.resource] = (a1.resources[offer1.resource] ?? 0) - offer1.amount;
-        a2.resources[offer1.resource] = (a2.resources[offer1.resource] ?? 0) + offer1.amount;
-      }
-      // Execute offer2: agent2 gives to agent1
       if (offer2?.token) {
-        const idx = a2.inventory.findIndex((t: IToken) => t.id === offer2.token.id);
-        if (idx !== -1) a1.inventory.push(...a2.inventory.splice(idx, 1));
-      }
-      if (offer2?.resource && offer2?.amount) {
-        a2.resources[offer2.resource] = (a2.resources[offer2.resource] ?? 0) - offer2.amount;
-        a1.resources[offer2.resource] = (a1.resources[offer2.resource] ?? 0) + offer2.amount;
+        const idx = d2.inventory.findIndex((t: IToken) => t.id === offer2.token.id);
+        if (idx !== -1) {
+          const [moved] = d2.inventory.splice(idx, 1);
+          d1.inventory.push(JSON.parse(JSON.stringify(moved)));
+        }
       }
       if (!doc.transactions) doc.transactions = [];
       doc.transactions.push({ type: "trade", from: agent1, to: agent2, agent1, agent2, offer1, offer2, timestamp: Date.now() });
@@ -419,20 +454,35 @@ const AgentActions: ActionRegistryType = {
     });
   },
   "agent:discardCards": (engine, { name, tokenIds } = {} as AgentDiscardCardsPayload) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
-    const agent = findAgent(engine, name);
+    // Check stack presence via session.state (mirrors the Rust handler).
+    const snapshot = JSON.parse(JSON.stringify(engine.session.state)) as any;
+    if (!snapshot.stack) throw new Error("No stack attached to engine");
+    findAgent(engine, name);
+    // Collect discarded tokens in tokenIds order from the materialized snapshot
+    // (avoids Automerge proxy references), deduping repeated ids.
+    const inv: IToken[] = snapshot.agents?.[name]?.inventory ?? [];
     const discarded: IToken[] = [];
+    const seen = new Set<string>();
     for (const tokenId of (tokenIds || [])) {
-      const idx = (agent.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
-      if (idx !== -1) discarded.push(agent.inventory[idx]);
+      if (seen.has(tokenId)) continue;
+      seen.add(tokenId);
+      const idx = inv.findIndex((t: IToken) => t.id === tokenId);
+      if (idx !== -1) discarded.push(inv[idx]);
     }
     if (discarded.length > 0) {
       const discardedIds = new Set(discarded.map((t: IToken) => t.id));
       engine.session.change("agent:discardCards", (doc: any) => {
         if (!doc.agents?.[name]?.inventory) return;
-        doc.agents[name].inventory = doc.agents[name].inventory.filter((t: IToken) => !discardedIds.has(t.id));
+        // Materialize before reassigning: a filtered array of Automerge proxies
+        // would fail ("Cannot create a reference to an existing document object").
+        doc.agents[name].inventory = JSON.parse(JSON.stringify(
+          doc.agents[name].inventory.filter((t: IToken) => !discardedIds.has(t.id))
+        ));
+        // Directly append to stack discards (single change, mirrors Rust).
+        if (!doc.stack) return;
+        if (!doc.stack.discards) doc.stack.discards = [];
+        doc.stack.discards.push(...discarded.map((t: IToken) => JSON.parse(JSON.stringify(t))));
       });
-      for (const card of discarded) engine.stack.discard(card);
     }
     return discarded;
   },

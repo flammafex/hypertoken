@@ -2,7 +2,7 @@
 
 Agent management and agent-to-agent interactions. Includes creation, resource management, and economic transfers.
 
-**WASM routing:** all mutating `agent:*` actions route through the WASM dispatcher when active; `agent:trade`, `agent:discardCards`, `agent:get`, `agent:getAll` remain on the TypeScript path.
+**WASM routing:** all mutating `agent:*` actions route through the WASM dispatcher when active; `agent:get`, `agent:getAll` remain on the TypeScript path (read-only; getAll return shape diverges).
 
 [← Back to Action Reference](../ACTIONS.md)
 
@@ -317,20 +317,20 @@ engine.dispatch("agent:drawCards", {
 
 ### `agent:discardCards`
 
-Agent discards specific cards.
+Agent discards specific cards (by token id) to the stack's discards.
 
 ```javascript
 engine.dispatch("agent:discardCards", {
   name: "Alice",
-  cards: [card1, card2]
+  tokenIds: ["card-1", "card-2"]
 });
 ```
 
 **Parameters:**
 - `name` (string, required): Agent name
-- `cards` (Array<Token> or Token, required): Cards to discard
+- `tokenIds` (string[], required): Token ids to discard. Missing ids are silently skipped and duplicates are deduped. Discarded tokens are appended to `stack.discards` in `tokenIds` order.
 
-**Returns:** void
+**Returns:** `Token[]` — the discarded tokens (in `tokenIds` order, deduped).
 
 **Events:** `agent:discarded`
 
@@ -343,16 +343,10 @@ engine.dispatch("agent:discardCards", {
 ```javascript
 const agent = engine.dispatch("agent:get", { name: "Alice" });
 
-// Discard single card
+// Discard specific cards by id
 engine.dispatch("agent:discardCards", {
   name: "Alice",
-  cards: agent.hand[0]
-});
-
-// Discard multiple
-engine.dispatch("agent:discardCards", {
-  name: "Alice",
-  cards: agent.hand.slice(0, 2)
+  tokenIds: agent.hand.slice(0, 2).map((t) => t.id)
 });
 ```
 
@@ -446,69 +440,45 @@ Bidirectional exchange between two agents (atomic).
 ```javascript
 // Resource for resource
 engine.dispatch("agent:trade", {
-  agent1: { 
-    name: "Alice", 
-    offer: { resource: "gold", amount: 100 }
-  },
-  agent2: { 
-    name: "Bob", 
-    offer: { resource: "wood", amount: 200 }
-  }
+  agent1: "Alice",
+  agent2: "Bob",
+  offer1: { resource: "gold", amount: 100 },
+  offer2: { resource: "wood", amount: 200 }
 });
 
 // Token for resource
 engine.dispatch("agent:trade", {
-  agent1: { 
-    name: "Alice", 
-    offer: { token: magicRing }
-  },
-  agent2: { 
-    name: "Bob", 
-    offer: { resource: "gold", amount: 500 }
-  }
+  agent1: "Alice",
+  agent2: "Bob",
+  offer1: { token: magicRing },
+  offer2: { resource: "gold", amount: 500 }
 });
 
 // Token for token
 engine.dispatch("agent:trade", {
-  agent1: { 
-    name: "Alice", 
-    offer: { token: sword }
-  },
-  agent2: { 
-    name: "Bob", 
-    offer: { token: shield }
-  }
+  agent1: "Alice",
+  agent2: "Bob",
+  offer1: { token: sword },
+  offer2: { token: shield }
 });
 ```
 
 **Parameters:**
-- `agent1` (object, required):
-  - `name` (string): Agent name
-  - `offer` (object): What they're offering
-    - `resource` (string) + `amount` (number), OR
-    - `token` (Token)
-- `agent2` (object, required): Same structure as agent1
+- `agent1` (string, required): First agent name
+- `agent2` (string, required): Second agent name
+- `offer1` (object, required): What agent1 gives
+  - `token` (Token): a token to give (optional)
+  - `resource` (string) + `amount` (number): a resource amount to give (optional)
+  - A single offer may carry both a token and a resource.
+- `offer2` (object, required): What agent2 gives (same structure as offer1)
 
-**Returns:**
-```javascript
-{
-  success: true,
-  transaction: {
-    type: 'trade',
-    agent1: "Alice",
-    agent2: "Bob",
-    offer1: { ... },
-    offer2: { ... },
-    timestamp: 1234567890
-  }
-}
-```
+**Returns:** void
 
 **Events:** `agent:trade`
 
 **Validation:**
 - Both agents must exist
-- Both agents must have what they're offering
+- Both agents must have what they're offering (token present in inventory; resource balance sufficient)
 - Trade is atomic - both transfers succeed or both fail
 - Transaction is recorded
 

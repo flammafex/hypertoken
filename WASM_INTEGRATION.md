@@ -228,7 +228,7 @@ The Rust Chronicle uses incremental field-level Automerge operations (54 action 
 
 ### Q: How does the dual-path dispatch work?
 
-**A:** `Engine.dispatch()` checks if the action is in the WASM-supported set. If so, it routes to the Rust `ActionDispatcher` which calls incremental Chronicle methods. Otherwise, it falls back to the TS `ActionRegistry` which uses `session.change()`. The `IChronicle` interface lets both paths work transparently. The mutating `agent:*` actions (create, remove, setActive, setMeta, giveResource, takeResource, addToken, removeToken, transferResource, transferToken, stealResource, stealToken, drawCards) are WASM-routed; `agent:trade`, `agent:discardCards`, `agent:get`, and `agent:getAll` stay on the TS fallback (payload/return-shape divergence).
+**A:** `Engine.dispatch()` checks if the action is in the WASM-supported set. If so, it routes to the Rust `ActionDispatcher` which calls incremental Chronicle methods. Otherwise, it falls back to the TS `ActionRegistry` which uses `session.change()`. The `IChronicle` interface lets both paths work transparently. All mutating `agent:*` actions (create, remove, setActive, setMeta, giveResource, takeResource, addToken, removeToken, transferResource, transferToken, stealResource, stealToken, drawCards, trade, discardCards) are WASM-routed; `agent:get` and `agent:getAll` stay on the TS fallback (read-only; getAll return shape diverges).
 
 ### Q: How do I know if WASM is being used?
 

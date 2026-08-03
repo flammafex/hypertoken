@@ -393,13 +393,14 @@ impl ActionDispatcher {
         self.chronicle.agent_draw_cards(agent_name, count)
     }
 
-    /// Agent discards cards (N cards from end of inventory to stack discards)
+    /// Agent discards specific tokens (JSON array of token ids) to stack discards
     #[wasm_bindgen(js_name = agentDiscardCards)]
-    pub fn agent_discard_cards(&mut self, agent_name: &str, count: usize) -> Result<String> {
-        self.chronicle.agent_discard_cards(agent_name, count)
+    pub fn agent_discard_cards(&mut self, agent_name: &str, token_ids_json: &str) -> Result<String> {
+        self.chronicle.agent_discard_cards(agent_name, token_ids_json)
     }
 
-    /// Agent Trade
+    /// Agent Trade. Offer format: { "token": {...}, "resource": "gold", "amount": 10.0 }
+    /// token/resource/amount are all optional; a single offer may carry both.
     #[wasm_bindgen(js_name = agentTrade)]
     pub fn agent_trade(
         &mut self,

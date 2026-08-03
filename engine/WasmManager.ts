@@ -38,12 +38,7 @@ export class WasmManager {
     "agent:transferResource", "agent:transferToken",
     "agent:stealResource", "agent:stealToken",
     "agent:drawCards",
-    // agent:trade and agent:discardCards intentionally stay on the TypeScript
-    // path: schema divergence. TS trade offers are { token?, resource?, amount? }
-    // while the WASM binding expects { resources: {}, tokens: [] }; TS
-    // discardCards takes explicit tokenIds + per-card stack.discard() while the
-    // WASM binding discards N cards from the end of inventory (same class of
-    // divergence as space:place).
+    "agent:trade", "agent:discardCards",
     // agent:get / agent:getAll stay on the TS path: read-only, already work on
     // WASM engines via the TS fallback; getAll return shape diverges (Rust
     // exports a MAP, TS returns an ARRAY).
@@ -171,6 +166,8 @@ export class WasmManager {
       "agent:addToken":         (p) => { d.agentAddToken(p.name, JSON.stringify(p.token)); },
       "agent:removeToken":      (p) => JSON.parse(d.agentRemoveToken(p.name, p.tokenId)),
       "agent:drawCards":        (p) => JSON.parse(d.agentDrawCards(p.name, p.count ?? 1)),
+      "agent:trade":            (p) => { d.agentTrade(p.agent1, p.agent2, JSON.stringify(p.offer1 ?? {}), JSON.stringify(p.offer2 ?? {})); },
+      "agent:discardCards":     (p) => JSON.parse(d.agentDiscardCards(p.name, JSON.stringify(p.tokenIds ?? []))),
       "agent:get":              (p) => { const r = d.agentGet(p.name) as any; return r ? JSON.parse(r) : null; },
       "agent:transferResource": (p) => { d.agentTransferResource(p.from, p.to, p.resource, p.amount ?? 1); },
       "agent:transferToken":    (p) => { d.agentTransferToken(p.from, p.to, p.tokenId); },

@@ -481,13 +481,19 @@ impl Chronicle {
             .map_err(|e| HyperTokenError::SerializationError(e.to_string()))
     }
 
-    /// Remove N tokens from agent's inventory and add to stack's discards.
+    /// Remove specific tokens from agent's inventory and add to stack's discards.
+    /// token_ids_json is a JSON array of token ids; missing tokens are silently
+    /// skipped and duplicates are deduped (matching the TS handler). Discarded
+    /// tokens are appended to discards in token_ids order.
     /// Sets both dirty.stack and dirty.agents.
-    pub fn agent_discard_cards(&mut self, agent_name: &str, count: usize) -> Result<String> {
+    pub fn agent_discard_cards(&mut self, agent_name: &str, token_ids_json: &str) -> Result<String> {
         let agents_id = self.agents_id.clone()
             .ok_or_else(|| HyperTokenError::InvalidOperation("No agents section".into()))?;
         let stack_id = self.stack_id.clone()
             .ok_or_else(|| HyperTokenError::InvalidOperation("No stack section".into()))?;
+
+        let token_ids: Vec<String> = serde_json::from_str(token_ids_json)
+            .map_err(|e| HyperTokenError::SerializationError(format!("Invalid token IDs JSON: {}", e)))?;
 
         // Get agent inventory
         let agent_obj_id = self.doc.get(&agents_id, agent_name)
@@ -500,16 +506,24 @@ impl Chronicle {
             .1;
 
         let inv_tokens = read_token_list_rd(&self.doc, &inventory_obj_id);
-        let inv_len = inv_tokens.len();
 
-        if count > inv_len {
-            return Err(HyperTokenError::InvalidOperation(
-                format!("Cannot discard {} from inventory of {}", count, inv_len),
-            ));
+        // Collect discarded tokens in token_ids order, deduped, skipping ids not in inventory.
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut discarded: Vec<IToken> = Vec::new();
+        let mut delete_indices: Vec<usize> = Vec::new();
+        for tid in &token_ids {
+            if !seen.insert(tid.clone()) {
+                continue;
+            }
+            if let Some(idx) = inv_tokens.iter().position(|t| t.id == *tid) {
+                discarded.push(inv_tokens[idx].clone());
+                delete_indices.push(idx);
+            }
         }
 
-        // Take from end of inventory
-        let discarded: Vec<IToken> = inv_tokens[inv_len - count..].to_vec();
+        if discarded.is_empty() {
+            return Ok("[]".to_string());
+        }
 
         // Get discards list
         let discards_list_id = self.doc.get(&stack_id, "discards")
@@ -518,12 +532,15 @@ impl Chronicle {
             .ok_or_else(|| HyperTokenError::InvalidOperation("No discards list".into()))?;
         let discards_len = self.doc.length(&discards_list_id);
 
+        // Delete indices descending so earlier deletions don't shift later ones.
+        delete_indices.sort_unstable();
+        delete_indices.reverse();
+
         self.doc.transact::<_, _, AutomergeError>(|tx| {
-            // Remove from inventory (reverse order)
-            for i in (inv_len - count..inv_len).rev() {
-                tx.delete(&inventory_obj_id, i)?;
+            for i in &delete_indices {
+                tx.delete(&inventory_obj_id, *i)?;
             }
-            // Add to discards
+            // Append to discards in token_ids order.
             for (i, token) in discarded.iter().enumerate() {
                 let token_obj = tx.insert_object(&discards_list_id, discards_len + i, ObjType::Map)?;
                 write_token_tx(tx, &token_obj, token)?;
@@ -541,7 +558,10 @@ impl Chronicle {
     /// Trade between two agents: exchange resources and tokens atomically.
     ///
     /// Trade offer format (JSON):
-    /// { "resources": { "gold": 10.0, ... }, "tokens": ["token_id_1", ...] }
+    /// { "token": { ...IToken }, "resource": "gold", "amount": 10.0 }
+    /// token, resource, and amount are all optional; a single offer may carry
+    /// both a token and a resource. Validation mirrors transferResource
+    /// (insufficient balance throws) and transferToken (missing token throws).
     pub fn agent_trade(&mut self, a: &str, b: &str, a_gives_json: &str, b_gives_json: &str) -> Result<()> {
         let agents_id = self.agents_id.clone()
             .ok_or_else(|| HyperTokenError::InvalidOperation("No agents section".into()))?;
@@ -549,9 +569,11 @@ impl Chronicle {
         #[derive(serde::Deserialize, Default)]
         struct TradeOffer {
             #[serde(default)]
-            resources: std::collections::HashMap<String, f64>,
+            token: Option<IToken>,
             #[serde(default)]
-            tokens: Vec<String>,
+            resource: Option<String>,
+            #[serde(default)]
+            amount: Option<f64>,
         }
 
         let a_gives: TradeOffer = serde_json::from_str(a_gives_json)
@@ -587,87 +609,102 @@ impl Chronicle {
             .ok_or_else(|| HyperTokenError::InvalidOperation("Agent B has no inventory".into()))?
             .1;
 
-        // Pre-read resource values for all exchanged resources
-        let mut a_resource_vals: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-        let mut b_resource_vals: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-
-        for key in a_gives.resources.keys().chain(b_gives.resources.keys()) {
-            if !a_resource_vals.contains_key(key) {
-                a_resource_vals.insert(key.clone(), read_f64_rd(&self.doc, &a_res_id, key).unwrap_or(0.0));
-            }
-            if !b_resource_vals.contains_key(key) {
-                b_resource_vals.insert(key.clone(), read_f64_rd(&self.doc, &b_res_id, key).unwrap_or(0.0));
-            }
-        }
-
         // Pre-read inventories for token transfers
         let a_tokens = read_token_list_rd(&self.doc, &a_inv_id);
         let b_tokens = read_token_list_rd(&self.doc, &b_inv_id);
 
-        // Find tokens A gives to B (indices in A's inventory)
-        let mut a_give_indices: Vec<(usize, IToken)> = Vec::new();
-        for tid in &a_gives.tokens {
-            let idx = a_tokens.iter().position(|t| t.id == *tid)
-                .ok_or_else(|| HyperTokenError::TokenNotFound(format!("Token '{}' not in {}'s inventory", tid, a)))?;
-            a_give_indices.push((idx, a_tokens[idx].clone()));
+        // Pre-read resource balances for the exchanged keys
+        let mut exchange_keys: Vec<String> = Vec::new();
+        if let Some(r) = &a_gives.resource {
+            if !exchange_keys.contains(r) {
+                exchange_keys.push(r.clone());
+            }
+        }
+        if let Some(r) = &b_gives.resource {
+            if !exchange_keys.contains(r) {
+                exchange_keys.push(r.clone());
+            }
+        }
+        let mut a_pre: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+        let mut b_pre: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+        for key in &exchange_keys {
+            a_pre.insert(key.clone(), read_f64_rd(&self.doc, &a_res_id, key).unwrap_or(0.0));
+            b_pre.insert(key.clone(), read_f64_rd(&self.doc, &b_res_id, key).unwrap_or(0.0));
         }
 
-        // Find tokens B gives to A (indices in B's inventory)
-        let mut b_give_indices: Vec<(usize, IToken)> = Vec::new();
-        for tid in &b_gives.tokens {
-            let idx = b_tokens.iter().position(|t| t.id == *tid)
-                .ok_or_else(|| HyperTokenError::TokenNotFound(format!("Token '{}' not in {}'s inventory", tid, b)))?;
-            b_give_indices.push((idx, b_tokens[idx].clone()));
+        // Validate offer A (token presence + resource sufficiency)
+        if let Some(token) = &a_gives.token {
+            if !a_tokens.iter().any(|t| t.id == token.id) {
+                return Err(HyperTokenError::TokenNotFound(format!("Token '{}' not in {}'s inventory", token.id, a)));
+            }
+        }
+        if let (Some(r), Some(amount)) = (&a_gives.resource, a_gives.amount) {
+            let bal = a_pre.get(r).copied().unwrap_or(0.0);
+            if bal < amount {
+                return Err(HyperTokenError::InvalidOperation(
+                    format!("Agent '{}' has {} {} but {} requested", a, bal, r, amount),
+                ));
+            }
         }
 
-        // Sort indices in descending order so deletion indices stay valid
-        a_give_indices.sort_by(|x, y| y.0.cmp(&x.0));
-        b_give_indices.sort_by(|x, y| y.0.cmp(&x.0));
+        // Validate offer B
+        if let Some(token) = &b_gives.token {
+            if !b_tokens.iter().any(|t| t.id == token.id) {
+                return Err(HyperTokenError::TokenNotFound(format!("Token '{}' not in {}'s inventory", token.id, b)));
+            }
+        }
+        if let (Some(r), Some(amount)) = (&b_gives.resource, b_gives.amount) {
+            let bal = b_pre.get(r).copied().unwrap_or(0.0);
+            if bal < amount {
+                return Err(HyperTokenError::InvalidOperation(
+                    format!("Agent '{}' has {} {} but {} requested", b, bal, r, amount),
+                ));
+            }
+        }
+
+        // Find token indices for the exchange (each offer carries at most one token)
+        let a_token_idx = a_gives.token.as_ref().and_then(|t| a_tokens.iter().position(|x| x.id == t.id));
+        let b_token_idx = b_gives.token.as_ref().and_then(|t| b_tokens.iter().position(|x| x.id == t.id));
 
         let a_inv_len = self.doc.length(&a_inv_id);
         let b_inv_len = self.doc.length(&b_inv_id);
 
         self.doc.transact::<_, _, AutomergeError>(|tx| {
-            // Exchange resources
-            for (key, amount) in &a_gives.resources {
-                let a_cur = a_resource_vals.get(key).copied().unwrap_or(0.0);
-                let b_cur = b_resource_vals.get(key).copied().unwrap_or(0.0);
-                tx.put(&a_res_id, key.as_str(), a_cur - amount)?;
-                tx.put(&b_res_id, key.as_str(), b_cur + amount)?;
-            }
-            for (key, amount) in &b_gives.resources {
-                // Values may already be adjusted by a_gives, so re-read from our map and apply delta
-                let a_cur = a_resource_vals.get(key).copied().unwrap_or(0.0);
-                let b_cur = b_resource_vals.get(key).copied().unwrap_or(0.0);
-                // Account for any change already applied by a_gives
-                let a_already_delta = a_gives.resources.get(key).copied().unwrap_or(0.0);
-                let b_already_delta = a_gives.resources.get(key).copied().unwrap_or(0.0);
-                tx.put(&b_res_id, key.as_str(), b_cur + b_already_delta - amount)?;
-                tx.put(&a_res_id, key.as_str(), a_cur - a_already_delta + amount)?;
+            // Exchange resources: absolute writes from pre-read values, so the two
+            // offers are order-independent (both offers on the SAME key net out).
+            for key in &exchange_keys {
+                let a_amt = if a_gives.resource.as_deref() == Some(key.as_str()) { a_gives.amount.unwrap_or(0.0) } else { 0.0 };
+                let b_amt = if b_gives.resource.as_deref() == Some(key.as_str()) { b_gives.amount.unwrap_or(0.0) } else { 0.0 };
+                let a_cur = a_pre.get(key).copied().unwrap_or(0.0);
+                let b_cur = b_pre.get(key).copied().unwrap_or(0.0);
+                tx.put(&a_res_id, key.as_str(), a_cur - a_amt + b_amt)?;
+                tx.put(&b_res_id, key.as_str(), b_cur + a_amt - b_amt)?;
             }
 
-            // Remove tokens A gives (descending order)
-            for (idx, _) in &a_give_indices {
-                tx.delete(&a_inv_id, *idx)?;
+            // Remove A's given token (if any)
+            if let Some(idx) = a_token_idx {
+                tx.delete(&a_inv_id, idx)?;
             }
-            // Remove tokens B gives (descending order)
-            for (idx, _) in &b_give_indices {
-                tx.delete(&b_inv_id, *idx)?;
-            }
-
-            // Add A's given tokens to B's inventory
-            // Compute B's new length after deletions
-            let b_new_len = b_inv_len - b_give_indices.len();
-            for (i, (_, token)) in a_give_indices.iter().rev().enumerate() {
-                let obj = tx.insert_object(&b_inv_id, b_new_len + i, ObjType::Map)?;
-                write_token_tx(tx, &obj, token)?;
+            // Remove B's given token (if any)
+            if let Some(idx) = b_token_idx {
+                tx.delete(&b_inv_id, idx)?;
             }
 
-            // Add B's given tokens to A's inventory
-            let a_new_len = a_inv_len - a_give_indices.len();
-            for (i, (_, token)) in b_give_indices.iter().rev().enumerate() {
-                let obj = tx.insert_object(&a_inv_id, a_new_len + i, ObjType::Map)?;
-                write_token_tx(tx, &obj, token)?;
+            // Add A's token to B's inventory at B's post-delete length
+            if let Some(token) = &a_gives.token {
+                if a_token_idx.is_some() {
+                    let b_new_len = b_inv_len - if b_token_idx.is_some() { 1 } else { 0 };
+                    let obj = tx.insert_object(&b_inv_id, b_new_len, ObjType::Map)?;
+                    write_token_tx(tx, &obj, token)?;
+                }
+            }
+            // Add B's token to A's inventory at A's post-delete length
+            if let Some(token) = &b_gives.token {
+                if b_token_idx.is_some() {
+                    let a_new_len = a_inv_len - if a_token_idx.is_some() { 1 } else { 0 };
+                    let obj = tx.insert_object(&a_inv_id, a_new_len, ObjType::Map)?;
+                    write_token_tx(tx, &obj, token)?;
+                }
             }
 
             Ok(())
@@ -912,9 +949,12 @@ mod tests {
         c.agent_draw_cards("Alice", 3).unwrap();
         c.dirty.clear();
 
-        let discarded_json = c.agent_discard_cards("Alice", 2).unwrap();
+        let discarded_json = c.agent_discard_cards("Alice", r#"["c2","c1"]"#).unwrap();
         let discarded: Vec<serde_json::Value> = serde_json::from_str(&discarded_json).unwrap();
+        // Discarded tokens come back in token_ids order
         assert_eq!(discarded.len(), 2);
+        assert_eq!(discarded[0]["id"], "c2");
+        assert_eq!(discarded[1]["id"], "c1");
 
         assert!(c.dirty.stack);
         assert!(c.dirty.agents);
@@ -922,14 +962,46 @@ mod tests {
         let state_json = c.get_state().unwrap();
         let state: HyperTokenState = serde_json::from_str(&state_json).unwrap();
 
-        // Agent should have 1 remaining
+        // Agent should have 1 remaining (c3)
         let agents = state.agents.unwrap();
         let inv = agents["Alice"]["inventory"].as_array().unwrap();
         assert_eq!(inv.len(), 1);
+        assert_eq!(inv[0]["id"], "c3");
 
-        // Discards should have 2
+        // Discards should have c2, c1 appended in token_ids order
         let stack = state.stack.unwrap();
         assert_eq!(stack.discards.len(), 2);
+        assert_eq!(stack.discards[0].id, "c2");
+        assert_eq!(stack.discards[1].id, "c1");
+    }
+
+    #[test]
+    fn test_agent_discard_cards_skips_missing_and_dedupes() {
+        let mut c = setup_with_agents();
+        c.agent_create("a1", "Alice", None).unwrap();
+        c.agent_draw_cards("Alice", 3).unwrap();
+        c.dirty.clear();
+
+        // "c9" is not in inventory; "c1" repeated twice -> dedupe
+        let discarded_json = c.agent_discard_cards("Alice", r#"["c9","c1","c1"]"#).unwrap();
+        let discarded: Vec<serde_json::Value> = serde_json::from_str(&discarded_json).unwrap();
+        assert_eq!(discarded.len(), 1);
+        assert_eq!(discarded[0]["id"], "c1");
+
+        let state_json = c.get_state().unwrap();
+        let state: HyperTokenState = serde_json::from_str(&state_json).unwrap();
+        let agents = state.agents.unwrap();
+        let inv = agents["Alice"]["inventory"].as_array().unwrap();
+        assert_eq!(inv.len(), 2);
+        let stack = state.stack.unwrap();
+        assert_eq!(stack.discards.len(), 1);
+    }
+
+    #[test]
+    fn test_agent_discard_cards_missing_agent() {
+        let mut c = setup_with_agents();
+        let result = c.agent_discard_cards("Nobody", "[]");
+        assert!(result.is_err());
     }
 
     #[test]
@@ -992,8 +1064,8 @@ mod tests {
 
         c.agent_trade(
             "Alice", "Bob",
-            r#"{"resources":{"gold":30},"tokens":["t1"]}"#,
-            r#"{"resources":{"gems":20},"tokens":["t2"]}"#,
+            r#"{"token":{"id":"t1","text":"Sword","char":"S","kind":"item","index":0,"meta":{}},"resource":"gold","amount":30}"#,
+            r#"{"token":{"id":"t2","text":"Shield","char":"H","kind":"item","index":0,"meta":{}},"resource":"gems","amount":20}"#,
         ).unwrap();
 
         let state_json = c.get_state().unwrap();
@@ -1013,5 +1085,67 @@ mod tests {
         let b_inv = agents["Bob"]["inventory"].as_array().unwrap();
         assert_eq!(b_inv.len(), 1);
         assert_eq!(b_inv[0]["id"], "t1");
+    }
+
+    #[test]
+    fn test_agent_trade_insufficient_resource() {
+        let mut c = setup_with_agents();
+        c.agent_create("a1", "Alice", None).unwrap();
+        c.agent_create("a2", "Bob", None).unwrap();
+        c.agent_give_resource("Alice", "gold", 10.0).unwrap();
+        c.agent_give_resource("Bob", "gems", 50.0).unwrap();
+
+        // Alice only has 10 gold but offers 30 -> must fail, nothing changes
+        let result = c.agent_trade(
+            "Alice", "Bob",
+            r#"{"resource":"gold","amount":30}"#,
+            r#"{"resource":"gems","amount":20}"#,
+        );
+        assert!(result.is_err());
+
+        let state_json = c.get_state().unwrap();
+        let state: HyperTokenState = serde_json::from_str(&state_json).unwrap();
+        let agents = state.agents.unwrap();
+        assert_eq!(agents["Alice"]["resources"]["gold"], 10.0);
+        assert_eq!(agents["Bob"]["resources"]["gems"], 50.0);
+    }
+
+    #[test]
+    fn test_agent_trade_missing_token() {
+        let mut c = setup_with_agents();
+        c.agent_create("a1", "Alice", None).unwrap();
+        c.agent_create("a2", "Bob", None).unwrap();
+        c.agent_give_resource("Alice", "gold", 100.0).unwrap();
+        c.agent_give_resource("Bob", "gems", 50.0).unwrap();
+
+        // Alice offers token t9 which she does not own -> must fail
+        let result = c.agent_trade(
+            "Alice", "Bob",
+            r#"{"token":{"id":"t9","text":"X","char":"X","kind":"item","index":0,"meta":{}},"resource":"gold","amount":30}"#,
+            r#"{"resource":"gems","amount":20}"#,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_agent_trade_same_resource() {
+        let mut c = setup_with_agents();
+        c.agent_create("a1", "Alice", None).unwrap();
+        c.agent_create("a2", "Bob", None).unwrap();
+        c.agent_give_resource("Alice", "gold", 100.0).unwrap();
+        c.agent_give_resource("Bob", "gold", 50.0).unwrap();
+
+        // Both offers on the SAME key: Alice gives 30, Bob gives 20 -> net Alice -10, Bob +10
+        c.agent_trade(
+            "Alice", "Bob",
+            r#"{"resource":"gold","amount":30}"#,
+            r#"{"resource":"gold","amount":20}"#,
+        ).unwrap();
+
+        let state_json = c.get_state().unwrap();
+        let state: HyperTokenState = serde_json::from_str(&state_json).unwrap();
+        let agents = state.agents.unwrap();
+        assert_eq!(agents["Alice"]["resources"]["gold"], 90.0);
+        assert_eq!(agents["Bob"]["resources"]["gold"], 60.0);
     }
 }

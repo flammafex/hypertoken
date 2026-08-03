@@ -62,7 +62,7 @@ Agent management and agent-to-agent interactions.
 
 **Use cases:** Game setup, resource management, trading economies, theft mechanics, agent state
 
-**WASM routing:** the mutating agent actions (create, remove, setActive, setMeta, giveResource, takeResource, addToken, removeToken, transferResource, transferToken, stealResource, stealToken, drawCards) route through the WASM dispatcher when active; `agent:trade`, `agent:discardCards`, `agent:get`, `agent:getAll` stay on the TS ActionRegistry fallback.
+**WASM routing:** the mutating agent actions (create, remove, setActive, setMeta, giveResource, takeResource, addToken, removeToken, transferResource, transferToken, stealResource, stealToken, drawCards, trade, discardCards) route through the WASM dispatcher when active; `agent:get`, `agent:getAll` stay on the TS ActionRegistry fallback (read-only; getAll return shape diverges).
 
 ---
 
@@ -192,8 +192,10 @@ engine.dispatch("agent:transfer", {
 
 // Atomic trade
 engine.dispatch("agent:trade", {
-  agent1: { name: "Alice", offer: { resource: "gold", amount: 100 } },
-  agent2: { name: "Bob", offer: { resource: "wood", amount: 200 } }
+  agent1: "Alice",
+  agent2: "Bob",
+  offer1: { resource: "gold", amount: 100 },
+  offer2: { resource: "wood", amount: 200 }
 });
 ```
 
