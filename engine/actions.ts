@@ -265,7 +265,7 @@ const AgentActions: ActionRegistryType = {
     engine.session.change("agent:takeResource", (doc: any) => {
       if (!doc.agents?.[name]) return;
       if (!doc.agents[name].resources) doc.agents[name].resources = {};
-      doc.agents[name].resources[resource] = (doc.agents[name].resources[resource] ?? 0) - amount;
+      doc.agents[name].resources[resource] = Math.max(0, (doc.agents[name].resources[resource] ?? 0) - amount);
     });
   },
   "agent:addToken": (engine, { name, token } = {} as AgentAddTokenPayload) => {
@@ -295,8 +295,12 @@ const AgentActions: ActionRegistryType = {
     return engine._agents;
   },
   "agent:transferResource": (engine, { from, to, resource, amount = 1 } = {} as AgentTransferResourcePayload) => {
-    findAgent(engine, from);
+    const fromAgent = findAgent(engine, from);
     findAgent(engine, to);
+    const fromVal = fromAgent.resources?.[resource] ?? 0;
+    if (fromVal < amount) {
+      throw new Error(`Agent '${from}' has ${fromVal} ${resource} but ${amount} requested`);
+    }
     engine.session.change("agent:transferResource", (doc: any) => {
       if (!doc.agents) return;
       if (!doc.agents[from].resources) doc.agents[from].resources = {};
@@ -306,30 +310,25 @@ const AgentActions: ActionRegistryType = {
       if (!doc.transactions) doc.transactions = [];
       doc.transactions.push({ type: "resource_transfer", from, to, resource, amount, timestamp: Date.now() });
     });
-    const state = (engine.session.state as any);
-    return {
-      from: state.agents?.[from]?.resources?.[resource] ?? 0,
-      to: state.agents?.[to]?.resources?.[resource] ?? 0,
-    };
   },
   "agent:transferToken": (engine, { from, to, tokenId } = {} as AgentTransferTokenPayload) => {
     const src = findAgent(engine, from);
     findAgent(engine, to);
     const idx = (src.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
     if (idx === -1) throw new Error(`Token "${tokenId}" not found in agent "${from}"`);
-    const token = src.inventory[idx];
     engine.session.change("agent:transferToken", (doc: any) => {
       if (!doc.agents) return;
       const i = doc.agents[from].inventory.findIndex((t: IToken) => t.id === tokenId);
       if (i !== -1) {
         const [moved] = doc.agents[from].inventory.splice(i, 1);
         if (!doc.agents[to].inventory) doc.agents[to].inventory = [];
-        doc.agents[to].inventory.push(moved);
+        // Automerge rejects pushing a proxy that still belongs to the document;
+        // materialize a plain copy (Rust re-creates the token in the target).
+        doc.agents[to].inventory.push(JSON.parse(JSON.stringify(moved)));
       }
       if (!doc.transactions) doc.transactions = [];
       doc.transactions.push({ type: "token_transfer", from, to, token: tokenId, timestamp: Date.now() });
     });
-    return token;
   },
   "agent:stealResource": (engine, { from, to, resource, amount = 1 } = {} as AgentStealResourcePayload) => {
     const src = findAgent(engine, from);
@@ -345,31 +344,25 @@ const AgentActions: ActionRegistryType = {
       if (!doc.transactions) doc.transactions = [];
       doc.transactions.push({ type: "steal_resource", from, to, resource, amount: stolen, timestamp: Date.now() });
     });
-    const state = (engine.session.state as any);
-    return {
-      stolen,
-      from: state.agents?.[from]?.resources?.[resource] ?? 0,
-      to: state.agents?.[to]?.resources?.[resource] ?? 0,
-    };
   },
   "agent:stealToken": (engine, { from, to, tokenId } = {} as AgentStealTokenPayload) => {
     const src = findAgent(engine, from);
     findAgent(engine, to);
     const idx = (src.inventory ?? []).findIndex((t: IToken) => t.id === tokenId);
     if (idx === -1) throw new Error(`Token "${tokenId}" not found in agent "${from}"`);
-    const token = src.inventory[idx];
     engine.session.change("agent:stealToken", (doc: any) => {
       if (!doc.agents) return;
       const i = doc.agents[from].inventory.findIndex((t: IToken) => t.id === tokenId);
       if (i !== -1) {
         const [moved] = doc.agents[from].inventory.splice(i, 1);
         if (!doc.agents[to].inventory) doc.agents[to].inventory = [];
-        doc.agents[to].inventory.push(moved);
+        // Automerge rejects pushing a proxy that still belongs to the document;
+        // materialize a plain copy (Rust re-creates the token in the target).
+        doc.agents[to].inventory.push(JSON.parse(JSON.stringify(moved)));
       }
       if (!doc.transactions) doc.transactions = [];
       doc.transactions.push({ type: "steal_token", from, to, token: tokenId, timestamp: Date.now() });
     });
-    return token;
   },
   "agent:trade": (engine, { agent1, agent2, offer1, offer2 } = {} as AgentTradePayload) => {
     findAgent(engine, agent1);

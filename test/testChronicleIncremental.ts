@@ -150,6 +150,35 @@ async function parityCheck(actions: Array<{type: string, payload: any}>) {
   return { tsState, wasmState, tsEngine, wasmEngine };
 }
 
+/**
+ * Run the same action sequence through both paths, asserting that both paths
+ * agree on whether each dispatch throws (used for error-parity cases).
+ */
+async function parityThrows(actions: Array<{type: string, payload: any}>) {
+  const tsEngine = createTsEngine();
+  const wasmEngine = createWasmEngine();
+
+  for (const action of actions) {
+    let tsThrew = false;
+    let wasmThrew = false;
+    try { await tsEngine.dispatch(action.type, action.payload); } catch { tsThrew = true; }
+    try { await wasmEngine.dispatch(action.type, action.payload); } catch { wasmThrew = true; }
+    assert.equal(tsThrew, wasmThrew, `TS and WASM should agree on throw for ${action.type}`);
+  }
+
+  return { tsEngine, wasmEngine };
+}
+
+/**
+ * Find an agent on the TS engine by name, throwing if absent. Returns `any`
+ * so tests can read resources/inventory/meta without TS undefined-narrowing.
+ */
+function findTsAgent(engine: Engine, name: string): any {
+  const agent = engine._agents.find((a: any) => a.name === name);
+  if (!agent) throw new Error(`Agent "${name}" not found on TS engine`);
+  return agent;
+}
+
 // ── Load WASM ───────────────────────────────────────────────────────────────
 
 console.log('='.repeat(72));
@@ -220,6 +249,18 @@ if (!wasmLoaded) {
   skip("parity: multiple action sequence produces equivalent state");
   skip("parity: save/load round-trip through WASM");
   skip("parity: WASM documents can merge cleanly");
+  skip("parity: agent create+give+take overdraw floors at zero");
+  skip("parity: agent transferResource valid");
+  skip("parity: agent transferResource insufficient throws on both");
+  skip("parity: agent addToken + removeToken returns removed token");
+  skip("parity: agent transferToken missing throws on both");
+  skip("parity: agent transferToken valid");
+  skip("parity: agent stealResource over-amount");
+  skip("parity: agent stealToken");
+  skip("parity: agent setMeta scalar");
+  skip("parity: agent setActive(false)");
+  skip("parity: agent remove");
+  skip("parity: agent drawCards seeded stack");
 } else {
   await test("parity: stack:draw produces same state", async () => {
     const { tsState, wasmState } = await parityCheck([
@@ -302,6 +343,158 @@ if (!wasmLoaded) {
     const state = engine1.session.state;
     assert.ok(state.agents?.["Player 1"], "Should have agent from engine1");
     assert.equal(state.stack!.drawn.length, 1, "Should have drawn card from engine2");
+  });
+
+  await test("parity: agent create+give+take overdraw floors at zero", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 10 } },
+      { type: "agent:takeResource", payload: { name: "Alice", resource: "gold", amount: 100 } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.resources.gold, 0, "TS take should floor at 0");
+    assert.equal(wasmState.agents["Alice"].resources.gold, 0, "WASM take should floor at 0");
+  });
+
+  await test("parity: agent transferResource valid", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 100 } },
+      { type: "agent:transferResource", payload: { from: "Alice", to: "Bob", resource: "gold", amount: 40 } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsAlice.resources.gold, 60, "TS Alice should have 60");
+    assert.equal(tsBob.resources.gold, 40, "TS Bob should have 40");
+    assert.equal(wasmState.agents["Alice"].resources.gold, 60, "WASM Alice should have 60");
+    assert.equal(wasmState.agents["Bob"].resources.gold, 40, "WASM Bob should have 40");
+  });
+
+  await test("parity: agent transferResource insufficient throws on both", async () => {
+    await parityThrows([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 10 } },
+      { type: "agent:transferResource", payload: { from: "Alice", to: "Bob", resource: "gold", amount: 50 } },
+    ]);
+  });
+
+  await test("parity: agent addToken + removeToken returns removed token", async () => {
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const token = { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} };
+    await tsEngine.dispatch("agent:create", { id: "a1", name: "Alice" });
+    await wasmEngine.dispatch("agent:create", { id: "a1", name: "Alice" });
+    await tsEngine.dispatch("agent:addToken", { name: "Alice", token });
+    await wasmEngine.dispatch("agent:addToken", { name: "Alice", token });
+    const tsRemoved = await tsEngine.dispatch("agent:removeToken", { name: "Alice", tokenId: "t1" });
+    const wasmRemoved = await wasmEngine.dispatch("agent:removeToken", { name: "Alice", tokenId: "t1" });
+    assert.equal(tsRemoved.id, "t1", "TS removed token id");
+    assert.equal(wasmRemoved.id, "t1", "WASM removed token id");
+    const tsState = JSON.parse(JSON.stringify(tsEngine.session.state));
+    const wasmState = JSON.parse(JSON.stringify(wasmEngine.session.state));
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.inventory.length, 0, "TS inventory should be empty");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 0, "WASM inventory should be empty");
+  });
+
+  await test("parity: agent transferToken missing throws on both", async () => {
+    await parityThrows([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:transferToken", payload: { from: "Alice", to: "Bob", tokenId: "nope" } },
+    ]);
+  });
+
+  await test("parity: agent transferToken valid", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:addToken", payload: { name: "Alice", token: { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} } } },
+      { type: "agent:transferToken", payload: { from: "Alice", to: "Bob", tokenId: "t1" } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsAlice.inventory.length, 0, "TS Alice inventory empty");
+    assert.equal(tsBob.inventory.length, 1, "TS Bob inventory has 1");
+    assert.equal(tsBob.inventory[0].id, "t1", "TS Bob has t1");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 0, "WASM Alice inventory empty");
+    assert.equal(wasmState.agents["Bob"].inventory.length, 1, "WASM Bob inventory has 1");
+    assert.equal(wasmState.agents["Bob"].inventory[0].id, "t1", "WASM Bob has t1");
+  });
+
+  await test("parity: agent stealResource over-amount", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:giveResource", payload: { name: "Alice", resource: "gold", amount: 10 } },
+      { type: "agent:stealResource", payload: { from: "Alice", to: "Bob", resource: "gold", amount: 100 } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsAlice.resources.gold, 0, "TS Alice should have 0");
+    assert.equal(tsBob.resources.gold, 10, "TS Bob should have 10");
+    assert.equal(wasmState.agents["Alice"].resources.gold, 0, "WASM Alice should have 0");
+    assert.equal(wasmState.agents["Bob"].resources.gold, 10, "WASM Bob should have 10");
+  });
+
+  await test("parity: agent stealToken", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:addToken", payload: { name: "Alice", token: { id: "t1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} } } },
+      { type: "agent:stealToken", payload: { from: "Alice", to: "Bob", tokenId: "t1" } },
+    ]);
+    const tsBob = findTsAgent(tsEngine, "Bob");
+    assert.equal(tsBob.inventory.length, 1, "TS Bob has 1");
+    assert.equal(tsBob.inventory[0].id, "t1", "TS Bob has t1");
+    assert.equal(wasmState.agents["Bob"].inventory.length, 1, "WASM Bob has 1");
+    assert.equal(wasmState.agents["Bob"].inventory[0].id, "t1", "WASM Bob has t1");
+  });
+
+  await test("parity: agent setMeta scalar", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:setMeta", payload: { name: "Alice", key: "score", value: 42 } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.meta.score, 42, "TS meta score");
+    assert.equal(wasmState.agents["Alice"].meta.score, 42, "WASM meta score");
+  });
+
+  await test("parity: agent setActive(false)", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:setActive", payload: { name: "Alice", active: false } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.active, false, "TS active should be false");
+    assert.equal(wasmState.agents["Alice"].active, false, "WASM active should be false");
+  });
+
+  await test("parity: agent remove", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:create", payload: { id: "a2", name: "Bob" } },
+      { type: "agent:remove", payload: { name: "Alice" } },
+    ]);
+    const tsAlice = tsEngine._agents.find((a: any) => a.name === "Alice");
+    assert.ok(!tsAlice, "TS Alice should be removed");
+    assert.ok(!wasmState.agents["Alice"], "WASM Alice should be removed");
+    assert.ok(wasmState.agents["Bob"], "WASM Bob should remain");
+  });
+
+  await test("parity: agent drawCards seeded stack", async () => {
+    const { tsState, wasmState, tsEngine, wasmEngine } = await parityCheck([
+      { type: "agent:create", payload: { id: "a1", name: "Alice" } },
+      { type: "agent:drawCards", payload: { name: "Alice", count: 2 } },
+    ]);
+    const tsAlice = findTsAgent(tsEngine, "Alice");
+    assert.equal(tsAlice.inventory.length, 2, "TS inventory count");
+    assert.equal(wasmState.agents["Alice"].inventory.length, 2, "WASM inventory count");
+    // Do NOT assert stack.drawn equality: the WASM path does not update it
+    // (documented divergence — the TS Stack.draw does).
   });
 }
 

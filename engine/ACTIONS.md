@@ -62,6 +62,8 @@ Agent management and agent-to-agent interactions.
 
 **Use cases:** Game setup, resource management, trading economies, theft mechanics, agent state
 
+**WASM routing:** the mutating agent actions (create, remove, setActive, setMeta, giveResource, takeResource, addToken, removeToken, transferResource, transferToken, stealResource, stealToken, drawCards) route through the WASM dispatcher when active; `agent:trade`, `agent:discardCards`, `agent:get`, `agent:getAll` stay on the TS ActionRegistry fallback.
+
 ---
 
 ### 🎮 [Game Actions](./actions/GAME.md) (9)
@@ -78,7 +80,7 @@ High-level game state management and lifecycle.
 - **Semantics:** All writes happen in a single `session.change("game:setState", ...)`. Whole-key mode assigns `doc[key] = value` when `replace` is set or the key doesn't exist yet, else `Object.assign(doc[key], value)`. Field-level mode ensures `doc[key]` exists, then walks each patch path using `if (!cur[seg]) cur[seg] = {}`.
 - **JSON sanitization:** Every value (whole-key `value` and each `patch.value`) is passed through `JSON.parse(JSON.stringify(v))` centrally, stripping `undefined` members that Automerge rejects. Non-serializable values throw `"value must be JSON-serializable"`.
 - **Validation:** Throws clear errors: `"key required"`, `"value or patches required"`, `"use either value or patches, not both"`, `"replace is only valid with value"`, `"patches must be a non-empty array"`, `"each patch needs a non-empty string path"`, `"patch value required"`.
-- **TS-only:** `game:setState` has no WASM counterpart and routes through the ActionRegistry fallback (consistent with `game:setProperty`, `game:mergeState`, `agent:setMeta`). Requires the TS Chronicle path (`disableWasm` or the TS fallback).
+- **TS-only:** `game:setState` has no WASM counterpart and routes through the ActionRegistry fallback (consistent with `game:setProperty`, `game:mergeState`). Requires the TS Chronicle path (`disableWasm` or the TS fallback).
 
 ```javascript
 // Whole-key write

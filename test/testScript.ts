@@ -373,10 +373,7 @@ await test('Script complete event shows incomplete on abort', async () => {
 console.log('\n🎯 Integration Tests\n');
 
 await test('Script executes complex game scenario', async () => {
-  // disableWasm: this scenario dispatches agent:giveResource, a TS-only action
-  // whose handler calls session.change() (throws on the WASM adapter). The
-  // test targets Script orchestration, not WASM dispatch routing.
-  const engine = new Engine({ disableWasm: true });
+  const engine = new Engine();
   const script = new Script('game-setup');
 
   script

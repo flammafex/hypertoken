@@ -32,6 +32,28 @@ export class WasmManager {
     "token:merge", "token:split",
     // Agent actions
     "agent:create",
+    "agent:remove", "agent:setActive", "agent:setMeta",
+    "agent:giveResource", "agent:takeResource",
+    "agent:addToken", "agent:removeToken",
+    "agent:transferResource", "agent:transferToken",
+    "agent:stealResource", "agent:stealToken",
+    "agent:drawCards",
+    // agent:trade and agent:discardCards intentionally stay on the TypeScript
+    // path: schema divergence. TS trade offers are { token?, resource?, amount? }
+    // while the WASM binding expects { resources: {}, tokens: [] }; TS
+    // discardCards takes explicit tokenIds + per-card stack.discard() while the
+    // WASM binding discards N cards from the end of inventory (same class of
+    // divergence as space:place).
+    // agent:get / agent:getAll stay on the TS path: read-only, already work on
+    // WASM engines via the TS fallback; getAll return shape diverges (Rust
+    // exports a MAP, TS returns an ARRAY).
+    // Transaction records (doc.transactions) are NOT written on the WASM path
+    // for transfer/steal/trade — accepted divergence: only engine.getTransactions()
+    // reads them and it has zero consumers.
+    // agent:drawCards on the WASM path does not update stack.drawn (the TS
+    // Stack.draw does) — accepted divergence, no example consumer reads stack.drawn.
+    // agent:takeResource / agent:transferResource semantics are aligned TS-to-Rust
+    // in engine/actions.ts.
     // GameLoop actions
     "game:loopInit", "game:loopStart",
     // GameState actions
@@ -148,11 +170,12 @@ export class WasmManager {
       "agent:takeResource":     (p) => { d.agentTakeResource(p.name, p.resource, p.amount ?? 1); },
       "agent:addToken":         (p) => { d.agentAddToken(p.name, JSON.stringify(p.token)); },
       "agent:removeToken":      (p) => JSON.parse(d.agentRemoveToken(p.name, p.tokenId)),
+      "agent:drawCards":        (p) => JSON.parse(d.agentDrawCards(p.name, p.count ?? 1)),
       "agent:get":              (p) => { const r = d.agentGet(p.name) as any; return r ? JSON.parse(r) : null; },
-      "agent:transferResource": (p) => { d.agentTransferResource(p.from, p.to, p.resource, p.amount ?? 1); return {}; },
-      "agent:transferToken":    (p) => { d.agentTransferToken(p.from, p.to, p.tokenId); return {}; },
-      "agent:stealResource":    (p) => { d.agentStealResource(p.from, p.to, p.resource, p.amount ?? 1); return {}; },
-      "agent:stealToken":       (p) => { d.agentStealToken(p.from, p.to, p.tokenId); return {}; },
+      "agent:transferResource": (p) => { d.agentTransferResource(p.from, p.to, p.resource, p.amount ?? 1); },
+      "agent:transferToken":    (p) => { d.agentTransferToken(p.from, p.to, p.tokenId); },
+      "agent:stealResource":    (p) => { d.agentStealResource(p.from, p.to, p.resource, p.amount ?? 1); },
+      "agent:stealToken":       (p) => { d.agentStealToken(p.from, p.to, p.tokenId); },
       "agent:getAll":           (_) => JSON.parse(d.agentGetAll()),
       // Token
       "token:transform": (p) => JSON.parse(d.tokenTransform(JSON.stringify(p.token), JSON.stringify(p.properties ?? {}))),
