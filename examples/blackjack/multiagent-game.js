@@ -126,31 +126,32 @@ export class MultiagentBlackjackGame {
    * Card movements (deal/hit/split/etc.) are already CRDT-backed via
    * Stack/Space; this method covers the remaining plain-JS state:
    * agent.resources (bankroll, currentBet, insuranceBet, stood, busted,
-   * hasSplit, splitHandZone, splitHandBet, playingSplitHand).
+   * hasSplit, splitHandZone, splitHandBet, playingSplitHand). Writes flow
+   * through engine.dispatch("game:setState", ...) — synchronous, and the
+   * handler JSON-sanitizes centrally (strips undefined).
    */
   syncToChronicle() {
     if (!this.engine._agents || this.engine._agents.length === 0) return;
 
-    this.engine.session.change("sync multiagent blackjack state", (doc) => {
-      // Avoid reassigning existing Automerge proxies to themselves — that
-      // throws "Cannot create a reference to an existing document object".
-      // Use conditional initialization instead of `doc.x = doc.x || {}`.
-      if (!doc.agents) doc.agents = {};
-      for (const agent of this.engine._agents) {
-        if (!doc.agents[agent.name]) doc.agents[agent.name] = {};
-        doc.agents[agent.name].resources = {
-          bankroll: agent.resources?.bankroll,
-          currentBet: agent.resources?.currentBet,
-          insuranceBet: agent.resources?.insuranceBet,
-          stood: agent.resources?.stood,
-          busted: agent.resources?.busted,
-          hasSplit: agent.resources?.hasSplit,
-          splitHandZone: agent.resources?.splitHandZone,
-          splitHandBet: agent.resources?.splitHandBet,
-          playingSplitHand: agent.resources?.playingSplitHand,
-        };
-      }
-    });
+    for (const agent of this.engine._agents) {
+      this.engine.dispatch("game:setState", {
+        key: "agents",
+        patches: [{
+          path: [agent.name, "resources"],
+          value: {
+            bankroll: agent.resources?.bankroll,
+            currentBet: agent.resources?.currentBet,
+            insuranceBet: agent.resources?.insuranceBet,
+            stood: agent.resources?.stood,
+            busted: agent.resources?.busted,
+            hasSplit: agent.resources?.hasSplit,
+            splitHandZone: agent.resources?.splitHandZone,
+            splitHandBet: agent.resources?.splitHandBet,
+            playingSplitHand: agent.resources?.playingSplitHand,
+          },
+        }],
+      });
+    }
   }
 
   /**

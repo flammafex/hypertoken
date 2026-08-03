@@ -1,9 +1,11 @@
 /**
  * Watershed CRDT Actions
  *
- * Registers watershed:* actions with the ActionRegistry. Uses field-level
- * Chronicle writes (not full-state replacement) so concurrent writes to
- * different tokens merge cleanly in the CRDT.
+ * Registers watershed:* actions with the ActionRegistry. Game-specific state
+ * writes go through engine.dispatch("game:setState", ...) — whole-key
+ * replacement for init, field-level patch batches for players/tokens/ops/
+ * consumed. Each handler performs ONE dispatch per game action, so concurrent
+ * writes to different tokens merge cleanly in the CRDT.
  *
  * No encryption, no host/client distinction — all peers are equal.
  * Any peer can place/merge/split, and the CRDT merges everything.
@@ -17,7 +19,6 @@
 
 import { ActionRegistry } from "../../engine/actions.js";
 import {
-  createInitialState,
   registerPlayer,
   placeToken,
   mergeTokens,
@@ -32,20 +33,6 @@ import {
   ENERGY_PRESETS,
   DURATION_PRESETS,
 } from "./WatershedGame.js";
-
-/**
- * Get or create the Watershed state from Chronicle.
- * The state lives in doc.watershed — if it doesn't exist, create it.
- */
-function getOrCreateState(engine) {
-  if (!engine.session.state?.watershed) {
-    const initialState = createInitialState();
-    engine.session.change("watershed:init", (doc) => {
-      doc.watershed = initialState;
-    });
-  }
-  return engine.session.state.watershed;
-}
 
 /**
  * Load Watershed state from Chronicle into a local cache.
@@ -122,15 +109,16 @@ Object.assign(ActionRegistry, {
   /**
    * Initialize a new Watershed game.
    */
-  "watershed:init": (engine, { width, height, durationMs, energyConfig } = {}) => {
+  "watershed:init": async (engine, { width, height, durationMs, energyConfig } = {}) => {
     const config = {
       width: width ?? 10,
       height: height ?? 10,
       durationMs: durationMs ?? DURATION_PRESETS.sprint,
     };
     const energy = energyConfig || ENERGY_PRESETS.standard;
-    engine.session.change("watershed:init", (doc) => {
-      doc.watershed = {
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      value: {
         config: {
           width: config.width,
           height: config.height,
@@ -144,7 +132,8 @@ Object.assign(ActionRegistry, {
         phase: "playing",
         startTime: Date.now(),
         winner: null,
-      };
+      },
+      replace: true,
     });
 
     if (!engine._watershedSyncSetup) {
@@ -158,7 +147,7 @@ Object.assign(ActionRegistry, {
   /**
    * Register a player.
    */
-  "watershed:register": (engine, { peerId, name } = {}) => {
+  "watershed:register": async (engine, { peerId, name } = {}) => {
     if (!peerId) throw new Error("peerId required");
 
     // Read current state, modify, write back
@@ -172,15 +161,21 @@ Object.assign(ActionRegistry, {
     const colorIndex = Object.keys(state.players).length % colors.length;
     const energyMax = state.config?.energy?.max ?? 15;
 
-    engine.session.change("watershed:register", (doc) => {
-      doc.watershed.players[peerId] = {
-        peerId,
-        name: name || `Player ${Object.keys(doc.watershed.players).length + 1}`,
-        color: colors[colorIndex],
-        joinedAt: Date.now(),
-        energy: energyMax, // start with full energy
-        lastEnergyTime: Date.now(),
-      };
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      patches: [
+        {
+          path: ["players", peerId],
+          value: {
+            peerId,
+            name: name || `Player ${Object.keys(state.players).length + 1}`,
+            color: colors[colorIndex],
+            joinedAt: Date.now(),
+            energy: energyMax, // start with full energy
+            lastEnergyTime: Date.now(),
+          },
+        },
+      ],
     });
 
     engine.emit("watershed:playerJoined", { peerId });
@@ -191,7 +186,7 @@ Object.assign(ActionRegistry, {
    * Uses field-level write: only adds to doc.watershed.tokens[tokenId]
    * and doc.watershed.ops[opId]. Does NOT replace the entire state.
    */
-  "watershed:place": (engine, { x, y, peerId } = {}) => {
+  "watershed:place": async (engine, { x, y, peerId } = {}) => {
     if (x === undefined || y === undefined) throw new Error("x and y required");
     if (!peerId) throw new Error("peerId required");
 
@@ -231,29 +226,43 @@ Object.assign(ActionRegistry, {
     const opId = generateOpId(peerId, seq);
     const tokenId = `tok-${opId}`;
 
-    // Field-level write: only add the new token and op
-    engine.session.change(`watershed:place ${peerId} (${x},${y})`, (doc) => {
-      // Deduct energy and update timestamp
-      doc.watershed.players[peerId].energy = currentEnergy - energyConfig.placeCost;
-      doc.watershed.players[peerId].lastEnergyTime = Date.now();
-
-      doc.watershed.tokens[tokenId] = {
-        id: tokenId,
-        playerId: peerId,
-        strength: 1,
-        x,
-        y,
-        createdByOp: opId,
-        _mergedFrom: null,
-        _splitFrom: null,
-        placedAt: Date.now(),
-      };
-      doc.watershed.ops[opId] = {
-        type: "place",
-        actor: peerId,
-        seq,
-        timestamp: Date.now(),
-      };
+    // Field-level writes: all four fields land in ONE atomic game:setState
+    // dispatch (energy, lastEnergyTime, token, op).
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      patches: [
+        {
+          path: ["players", peerId, "energy"],
+          value: currentEnergy - energyConfig.placeCost,
+        },
+        {
+          path: ["players", peerId, "lastEnergyTime"],
+          value: Date.now(),
+        },
+        {
+          path: ["tokens", tokenId],
+          value: {
+            id: tokenId,
+            playerId: peerId,
+            strength: 1,
+            x,
+            y,
+            createdByOp: opId,
+            _mergedFrom: null,
+            _splitFrom: null,
+            placedAt: Date.now(),
+          },
+        },
+        {
+          path: ["ops", opId],
+          value: {
+            type: "place",
+            actor: peerId,
+            seq,
+            timestamp: Date.now(),
+          },
+        },
+      ],
     });
 
     engine.emit("watershed:placed", { tokenId, x, y, peerId });
@@ -263,7 +272,7 @@ Object.assign(ActionRegistry, {
    * Merge two adjacent same-player tokens into a stronger one.
    * Marks parents as consumed, creates new token with _mergedFrom.
    */
-  "watershed:merge": (engine, { tokenIdA, tokenIdB, peerId } = {}) => {
+  "watershed:merge": async (engine, { tokenIdA, tokenIdB, peerId } = {}) => {
     if (!tokenIdA || !tokenIdB) throw new Error("tokenIdA and tokenIdB required");
     if (!peerId) throw new Error("peerId required");
 
@@ -295,33 +304,37 @@ Object.assign(ActionRegistry, {
     const newTokenId = `tok-${opId}`;
     const newStrength = Math.min(3, tokenA.strength + tokenB.strength);
 
-    // Field-level writes
-    engine.session.change(`watershed:merge ${peerId}`, (doc) => {
-      // Mark parents as consumed
-      if (!doc.watershed.consumed[tokenIdA]) doc.watershed.consumed[tokenIdA] = {};
-      doc.watershed.consumed[tokenIdA][opId] = true;
-      if (!doc.watershed.consumed[tokenIdB]) doc.watershed.consumed[tokenIdB] = {};
-      doc.watershed.consumed[tokenIdB][opId] = true;
-
-      // Create merged token
-      doc.watershed.tokens[newTokenId] = {
-        id: newTokenId,
-        playerId: peerId,
-        strength: newStrength,
-        x: tokenA.x,
-        y: tokenA.y,
-        createdByOp: opId,
-        _mergedFrom: [tokenIdA, tokenIdB],
-        _splitFrom: null,
-        placedAt: Date.now(),
-      };
-
-      doc.watershed.ops[opId] = {
-        type: "merge",
-        actor: peerId,
-        seq,
-        timestamp: Date.now(),
-      };
+    // Field-level writes: consumed entries are created by the path-walk in
+    // game:setState. All four patches land in ONE atomic dispatch.
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      patches: [
+        { path: ["consumed", tokenIdA, opId], value: true },
+        { path: ["consumed", tokenIdB, opId], value: true },
+        {
+          path: ["tokens", newTokenId],
+          value: {
+            id: newTokenId,
+            playerId: peerId,
+            strength: newStrength,
+            x: tokenA.x,
+            y: tokenA.y,
+            createdByOp: opId,
+            _mergedFrom: [tokenIdA, tokenIdB],
+            _splitFrom: null,
+            placedAt: Date.now(),
+          },
+        },
+        {
+          path: ["ops", opId],
+          value: {
+            type: "merge",
+            actor: peerId,
+            seq,
+            timestamp: Date.now(),
+          },
+        },
+      ],
     });
 
     engine.emit("watershed:merged", { newTokenId, tokenIdA, tokenIdB, peerId });
@@ -331,7 +344,7 @@ Object.assign(ActionRegistry, {
    * Split a strength-2+ token into two strength-1 tokens.
    * Marks parent as consumed, creates two new tokens with _splitFrom.
    */
-  "watershed:split": (engine, { tokenId, targetX, targetY, peerId } = {}) => {
+  "watershed:split": async (engine, { tokenId, targetX, targetY, peerId } = {}) => {
     if (!tokenId) throw new Error("tokenId required");
     if (targetX === undefined || targetY === undefined) throw new Error("targetX and targetY required");
     if (!peerId) throw new Error("peerId required");
@@ -360,43 +373,50 @@ Object.assign(ActionRegistry, {
     const newTokenId1 = `tok-${opId}-a`;
     const newTokenId2 = `tok-${opId}-b`;
 
-    // Field-level writes
-    engine.session.change(`watershed:split ${peerId}`, (doc) => {
-      // Mark parent as consumed
-      if (!doc.watershed.consumed[tokenId]) doc.watershed.consumed[tokenId] = {};
-      doc.watershed.consumed[tokenId][opId] = true;
-
-      // Create two new tokens
-      doc.watershed.tokens[newTokenId1] = {
-        id: newTokenId1,
-        playerId: peerId,
-        strength: 1,
-        x: token.x,
-        y: token.y,
-        createdByOp: opId,
-        _mergedFrom: null,
-        _splitFrom: tokenId,
-        placedAt: Date.now(),
-      };
-
-      doc.watershed.tokens[newTokenId2] = {
-        id: newTokenId2,
-        playerId: peerId,
-        strength: 1,
-        x: targetX,
-        y: targetY,
-        createdByOp: opId,
-        _mergedFrom: null,
-        _splitFrom: tokenId,
-        placedAt: Date.now(),
-      };
-
-      doc.watershed.ops[opId] = {
-        type: "split",
-        actor: peerId,
-        seq,
-        timestamp: Date.now(),
-      };
+    // Field-level writes: consumed entry created by the path-walk in
+    // game:setState. All four patches land in ONE atomic dispatch.
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      patches: [
+        { path: ["consumed", tokenId, opId], value: true },
+        {
+          path: ["tokens", newTokenId1],
+          value: {
+            id: newTokenId1,
+            playerId: peerId,
+            strength: 1,
+            x: token.x,
+            y: token.y,
+            createdByOp: opId,
+            _mergedFrom: null,
+            _splitFrom: tokenId,
+            placedAt: Date.now(),
+          },
+        },
+        {
+          path: ["tokens", newTokenId2],
+          value: {
+            id: newTokenId2,
+            playerId: peerId,
+            strength: 1,
+            x: targetX,
+            y: targetY,
+            createdByOp: opId,
+            _mergedFrom: null,
+            _splitFrom: tokenId,
+            placedAt: Date.now(),
+          },
+        },
+        {
+          path: ["ops", opId],
+          value: {
+            type: "split",
+            actor: peerId,
+            seq,
+            timestamp: Date.now(),
+          },
+        },
+      ],
     });
 
     engine.emit("watershed:split", { newTokenId1, newTokenId2, tokenId, peerId });
@@ -406,13 +426,16 @@ Object.assign(ActionRegistry, {
    * Start the game (syncs to all peers via CRDT).
    * Sets startTime and phase to "playing" so the timer begins for everyone.
    */
-  "watershed:start": (engine, { peerId } = {}) => {
+  "watershed:start": async (engine, { peerId } = {}) => {
     const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
 
-    engine.session.change("watershed:start", (doc) => {
-      doc.watershed.startTime = Date.now();
-      doc.watershed.phase = "playing";
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      patches: [
+        { path: ["startTime"], value: Date.now() },
+        { path: ["phase"], value: "playing" },
+      ],
     });
 
     engine.emit("watershed:started", {});
@@ -421,7 +444,7 @@ Object.assign(ActionRegistry, {
   /**
    * End the game and compute final scores.
    */
-  "watershed:end": (engine, { peerId } = {}) => {
+  "watershed:end": async (engine, { peerId } = {}) => {
     const state = engine.session.state?.watershed;
     if (!state) throw new Error("Game not initialized");
     if (state.phase === "ended") throw new Error("Game already ended");
@@ -432,9 +455,12 @@ Object.assign(ActionRegistry, {
     plainState.phase = "ended"; // deriveResult only computes winner when phase === "ended"
     const result = deriveResult(plainState);
 
-    engine.session.change("watershed:end", (doc) => {
-      doc.watershed.phase = "ended";
-      doc.watershed.winner = result.winner;
+    await engine.dispatch("game:setState", {
+      key: "watershed",
+      patches: [
+        { path: ["phase"], value: "ended" },
+        { path: ["winner"], value: result.winner },
+      ],
     });
 
     engine.emit("watershed:ended", { winner: result.winner });

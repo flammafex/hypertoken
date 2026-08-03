@@ -150,33 +150,33 @@ export class BlackjackGame {
    * Called after each state mutation so peers receive updates via CRDT sync.
    *
    * This mirrors the snapshot-sync pattern used by examples/cuttle/crdt-actions.js:
-   * full-state replacement via session.change(). Card movements (deal/hit/etc.)
-   * are already CRDT-backed via Stack/Space; this method covers the remaining
-   * plain-JS state: this.gameState and agent.resources.
+   * writes flow through engine.dispatch("game:setState", ...). Card movements
+   * (deal/hit/etc.) are already CRDT-backed via Stack/Space; this method covers
+   * the remaining plain-JS state: this.gameState and agent.resources.
    */
   syncToChronicle() {
-    // Deep clone to strip undefined values (Automerge rejects undefined).
-    const bjState = JSON.parse(JSON.stringify(this.gameState));
-
-    this.engine.session.change("sync blackjack state", (doc) => {
-      // Avoid reassigning existing Automerge proxies to themselves — that
-      // throws "Cannot create a reference to an existing document object".
-      // Use conditional initialization instead of `doc.x = doc.x || {}`.
-      if (!doc.gameState) doc.gameState = {};
-      doc.gameState.blackjack = bjState;
-
-      if (this.engine._agents && this.engine._agents.length > 0) {
-        if (!doc.agents) doc.agents = {};
-        for (const agent of this.engine._agents) {
-          if (!doc.agents[agent.name]) doc.agents[agent.name] = {};
-          doc.agents[agent.name].resources = {
-            bankroll: agent.resources?.bankroll,
-            currentBet: agent.resources?.currentBet,
-            insuranceBet: agent.resources?.insuranceBet,
-          };
-        }
-      }
+    // The game:setState handler runs synchronously (dispatch resolves the
+    // handler synchronously) and JSON-sanitizes centrally (strips undefined),
+    // so no async/await or deep clone is needed here.
+    this.engine.dispatch("game:setState", {
+      key: "gameState",
+      patches: [{ path: ["blackjack"], value: this.gameState }],
     });
+    if (this.engine._agents && this.engine._agents.length > 0) {
+      for (const agent of this.engine._agents) {
+        this.engine.dispatch("game:setState", {
+          key: "agents",
+          patches: [{
+            path: [agent.name, "resources"],
+            value: {
+              bankroll: agent.resources?.bankroll,
+              currentBet: agent.resources?.currentBet,
+              insuranceBet: agent.resources?.insuranceBet,
+            },
+          }],
+        });
+      }
+    }
   }
 
   /**

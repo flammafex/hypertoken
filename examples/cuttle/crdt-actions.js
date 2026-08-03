@@ -3,7 +3,8 @@
  *
  * CRDT-aware version of game-actions.js. Instead of storing game state on
  * engine._gameState (mutable JS object), writes sanitized snapshots to Chronicle
- * via session.change() after each action. ConsensusCore then syncs state to peers.
+ * via engine.dispatch("game:setState", ...) after each action. ConsensusCore
+ * then syncs state to peers.
  *
  * On receiving remote state (via CRDT sync), loads the snapshot into the local
  * CuttleGame instance.
@@ -43,7 +44,7 @@ export function getGameInstance(engine) {
  * encrypts hands before writing so opponents can't read them.
  * This is what triggers CRDT sync to peers.
  */
-async function syncToChronicle(engine, message) {
+async function syncToChronicle(engine, _message) {
   const game = engine._cuttleGame;
   if (!game) return;
 
@@ -55,11 +56,12 @@ async function syncToChronicle(engine, message) {
     stateToSync = await sanitizeForSync(snapshot, engine._e2e, engine._peerIds);
   }
 
-  // Deep clone to strip undefined values (Automerge rejects undefined)
-  const cleanState = JSON.parse(JSON.stringify(stateToSync));
-
-  engine.session.change(message, (doc) => {
-    doc.cuttle = cleanState;
+  // The game:setState handler JSON-sanitizes centrally (strips undefined),
+  // so no explicit deep clone is needed here.
+  await engine.dispatch("game:setState", {
+    key: "cuttle",
+    value: stateToSync,
+    replace: true,
   });
 }
 
