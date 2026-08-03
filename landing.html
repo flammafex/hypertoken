@@ -6,7 +6,7 @@
 <meta name="description" content="A distributed game engine where the entire state is a CRDT. Serverless multiplayer, perfect replay, forkable worlds. Built on Automerge.">
 <meta name="author" content="The Carpocratian Church of Commonality and Equality, Inc.">
 <link rel="license" href="https://www.apache.org/licenses/LICENSE-2.0">
-<link rel="canonical" href="https://hypertoken.carpocratian.org/">
+<link rel="canonical" href="https://hypertoken.ai/">
 <style>
   :root {
     --bg: #0d1117;
@@ -116,28 +116,9 @@
 <body>
 
 <header>
-  <h1>HyperToken</h1>
-  <p>A game engine where the entire state is a CRDT.</p>
+  <h1>🧩 HyperToken</h1>
+  <p>A game engine where the entire state is a conflict-free replicated data type (<a href="https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type">CRDT</a>).</p>
 </header>
-
-<hr>
-
-<nav aria-label="Table of Contents">
-  <ul class="toc">
-    <li><a href="#what-this-gets-you">What This Gets You</a></li>
-    <li><a href="#comparison">How It Compares</a></li>
-    <li><a href="#watershed">Watershed — The Flagship Demo</a></li>
-    <li><a href="#try-it">Try It</a></li>
-    <li><a href="#how-it-works">How It Works</a></li>
-    <li><a href="#whats-inside">What's Inside</a></li>
-    <li><a href="#status">Status</a></li>
-    <li><a href="#get-involved">Get Involved</a></li>
-  </ul>
-</nav>
-
-<hr>
-
-<main>
 
 <section>
   <p>
@@ -147,13 +128,28 @@
     tools, marketplaces — any multi-user app where state must converge.
   </p>
 
+  <h2 id="showcase">Showcase</h2>
   <p>
-    <a href="#watershed">Play Watershed</a> — our flagship CRDT showcase game.
-    Or <a href="https://git.carpocratian.org/sibyl/hypertoken">view the source</a>.
+    <a href="https://watershed.hypertoken.ai">Play Watershed</a> — a real-time territory game.<br>
+    <a href="https://cuttle.hypertoken.ai">Play Cuttle</a> — a card-combat game.<br>
+    <a href="https://carpocratian.org/en/church/blackjack">Play Blackjack</a> — a card-counting game.
   </p>
 </section>
 
-<hr>
+<h2>Table of Contents</h2>
+<nav aria-label="Table of Contents">
+  <ul class="toc">
+    <li><a href="#what-this-gets-you">What This Gets You</a></li>
+    <li><a href="#showcase">Showcase</a></li>
+    <li><a href="#comparison">How It Compares</a></li>
+    <li><a href="#try-it">Try It</a></li>
+    <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#whats-inside">What's Inside</a></li>
+  </ul>
+</nav>
+
+<main>
+
 
 <section>
   <h2 id="what-this-gets-you">What This Gets You</h2>
@@ -168,8 +164,6 @@
     <tr><td>Browser-ready</td><td>One command bundles any game for the browser</td></tr>
   </table>
 </section>
-
-<hr>
 
 <section>
   <h2 id="comparison">How It Compares</h2>
@@ -186,37 +180,6 @@
   </table>
 </section>
 
-<hr>
-
-<section>
-  <h2 id="watershed">Watershed — The Flagship Demo</h2>
-
-  <p>
-    A real-time territory game that proves the thesis: when all state is a CRDT,
-    simultaneous play creates emergent collaboration, not conflict.
-  </p>
-
-  <p>
-    Players place tokens on a shared grid. Contested cells don't use
-    last-write-wins — they preserve <em>both</em> players' tokens, merged by the
-    CRDT. The result is a living board state that reflects every player's
-    contribution.
-  </p>
-
-  <ul>
-    <li>Real-time simultaneous placement — no turns</li>
-    <li>Contested cells merge tokens, not overwrite</li>
-    <li>Every move is recorded with provenance</li>
-    <li>Play in your browser, no installation</li>
-    <li>Save and resume games with IndexedDB persistence</li>
-  </ul>
-
-  <p>
-    <a href="./examples/watershed/web/index.html">Play Watershed</a>
-  </p>
-</section>
-
-<hr>
 
 <section>
   <h2 id="try-it">Try It</h2>
@@ -237,7 +200,6 @@ npm run blackjack
 npm run cuttle</code></pre>
 </section>
 
-<hr>
 
 <section>
   <h2 id="how-it-works">How It Works</h2>
@@ -245,7 +207,7 @@ npm run cuttle</code></pre>
   <h3>Tokens Compose With Provenance</h3>
   <pre><code>const enchantedSword = engine.dispatch("token:merge", {
   tokens: [sword, fireEnchantment],
-  resultProperties: { label: "Flaming Sword" }
+  properties: { label: "Flaming Sword" }
 });
 // enchantedSword._mergedFrom = [sword.id, fireEnchantment.id]
 
@@ -291,13 +253,11 @@ engine.mergeFrom(fork);
 const outcomeB = engine.getState();</code></pre>
 </section>
 
-<hr>
-
 <section>
   <h2 id="whats-inside">What's Inside</h2>
 
   <ul>
-    <li><strong>77 built-in actions</strong> — draw, shuffle, place, move, flip, merge, split, and more across 7 categories</li>
+    <li><strong>81 built-in actions</strong> — draw, shuffle, place, move, flip, merge, split, and more across 7 categories</li>
     <li><strong>Rust/WASM core</strong> — ~20x performance over pure JS, with TypeScript fallback</li>
     <li><strong>P2P networking</strong> — serverless CRDT sync (ConsensusCore) and host-authoritative mode</li>
     <li><strong>Persistence</strong> — IndexedDB (browser) and Filesystem (Node.js) adapters with auto-save</li>
@@ -310,51 +270,16 @@ const outcomeB = engine.getState();</code></pre>
   </ul>
 </section>
 
-<hr>
-
-<section>
-  <h2 id="status">Status</h2>
-
-  <ul class="status-list">
-    <li>CRDT core (Automerge)</li>
-    <li>77 action handlers with full TS/WASM parity</li>
-    <li>WASM acceleration</li>
-    <li>P2P sync (ConsensusCore)</li>
-    <li>Persistence layer (IndexedDB + Filesystem)</li>
-    <li>Document compaction (epoch-based history pruning)</li>
-    <li>Forkable worlds (fork / mergeFrom)</li>
-    <li>Browser build support</li>
-    <li>3 example games (Blackjack, Cuttle, Watershed)</li>
-    <li>Documentation (AGENTS.md, BROWSER.md, PERSISTENCE.md, ARCHITECTURE.md)</li>
-  </ul>
-</section>
-
-<hr>
-
-<section>
-  <h2 id="get-involved">Get Involved</h2>
-
-  <ul>
-    <li><a href="https://git.carpocratian.org/sibyl/hypertoken">Repository</a> — source, issues, PRs</li>
-    <li><a href="./docs/GETTING_STARTED.md">Getting Started</a> — installation and quick start</li>
-    <li><a href="./docs/ARCHITECTURE.md">Architecture</a> — how components connect</li>
-    <li><a href="./docs/BROWSER.md">Browser Guide</a> — building games for the browser</li>
-    <li><a href="./docs/PERSISTENCE.md">Persistence Guide</a> — save and resume game state</li>
-    <li><a href="./engine/ACTIONS.md">Actions Reference</a> — all 77 actions</li>
-    <li><a href="./examples/watershed/web/index.html">Play Watershed</a> — the flagship demo</li>
-  </ul>
-</section>
-
 </main>
-
-<hr>
 
 <footer>
   <p>
-    Apache 2.0 — Copyright © 2025 The Carpocratian Church of Commonality and Equality, Inc.
+    <a href="https://git.carpocratian.org/sibyl/hypertoken">Source</a> ·
+    <a href="./docs/GETTING_STARTED.md">Getting Started</a> ·
+    <a href="./engine/ACTIONS.md">Actions Reference</a>
   </p>
-  <p class="tagline">
-    "A token isn't valuable because of what it IS — it's valuable because of its relationships."
+  <p>
+    Apache 2.0 — Copyright © 2026 The Carpocratian Church of Commonality and Equality, Inc.
   </p>
 </footer>
 
