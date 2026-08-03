@@ -34,7 +34,7 @@ import type {
   AgentTransferResourcePayload, AgentTransferTokenPayload,
   AgentStealResourcePayload, AgentStealTokenPayload,
   AgentTradePayload, AgentDrawCardsPayload, AgentDiscardCardsPayload, AgentSetMetaPayload,
-  GameNextPhasePayload, GameSetPropertyPayload, GameMergeStatePayload,
+  GameNextPhasePayload, GameSetPropertyPayload, GameMergeStatePayload, GameSetStatePayload,
   GameLoopInitPayload, GameLoopStopPayload, GameNextTurnPayload,
   GameSetPhasePayload, GameSetMaxTurnsPayload, GameSetActiveAgentPayload,
   RuleMarkFiredPayload,
@@ -517,6 +517,53 @@ const GameActions: ActionRegistryType = {
       Object.assign(doc.gameState, state);
     });
     return engine._gameState;
+  },
+  /**
+   * game:setState — generic game-state writer. Lets game code write game-specific
+   * top-level state keys (e.g. doc.watershed, doc.cuttle) and nested field-level
+   * writes through engine.dispatch() instead of raw session.change(). TS-only:
+   * no WASM counterpart; routes through the ActionRegistry fallback.
+   */
+  "game:setState": (engine, { key, value, replace, patches } = {} as GameSetStatePayload) => {
+    if (typeof key !== "string" || !key) throw new Error("key required");
+    if (value === undefined && !patches) throw new Error("value or patches required");
+    if (value !== undefined && patches) throw new Error("use either value or patches, not both");
+    if (replace && patches) throw new Error("replace is only valid with value");
+    if (patches && (!Array.isArray(patches) || patches.length === 0)) throw new Error("patches must be a non-empty array");
+    if (patches) {
+      for (const p of patches) {
+        if (!Array.isArray(p.path) || p.path.length === 0 || !p.path.every((seg: string) => typeof seg === "string")) {
+          throw new Error("each patch needs a non-empty string path");
+        }
+        if (p.value === undefined) throw new Error("patch value required");
+      }
+    }
+    // JSON.sanitize centrally: strips undefined members Automerge rejects.
+    const sanitize = (v: any): any => {
+      if (JSON.stringify(v) === undefined) throw new Error("value must be JSON-serializable");
+      return JSON.parse(JSON.stringify(v));
+    };
+    const sValue = value !== undefined ? sanitize(value) : undefined;
+    const sPatches = patches ? patches.map((p: { path: string[]; value: any }) => ({ path: p.path, value: sanitize(p.value) })) : undefined;
+    engine.session.change("game:setState", (doc: any) => {
+      if (sPatches) {
+        if (!doc[key]) doc[key] = {};
+        const root = doc[key];
+        for (const p of sPatches) {
+          let cur = root;
+          for (const seg of p.path.slice(0, -1)) {
+            if (!cur[seg]) cur[seg] = {};
+            cur = cur[seg];
+          }
+          cur[p.path[p.path.length - 1]] = p.value;
+        }
+      } else if (replace || !doc[key]) {
+        doc[key] = sValue;
+      } else {
+        Object.assign(doc[key], sValue);
+      }
+    });
+    return (engine.session.state as any)?.[key];
   },
   "game:getState": (engine) => {
     return engine._gameState;

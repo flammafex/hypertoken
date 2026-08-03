@@ -62,6 +62,12 @@ export interface GameEndPayload         { winner?: string; reason?: string }
 export interface GameNextPhasePayload   { phase: string }
 export interface GameSetPropertyPayload { key: string; value: unknown }
 export interface GameMergeStatePayload  { state: Record<string, unknown> }
+export interface GameSetStatePayload {
+  key: string;                       // top-level doc key to write (required)
+  value?: any;                       // whole-key write (one of value | patches required)
+  replace?: boolean;                 // only valid with value: true → doc[key] = value
+  patches?: { path: string[]; value: any }[];  // batch of nested field writes
+}
 
 // ─── GameLoop ────────────────────────────────────────────────────────────────
 export interface GameLoopInitPayload       { maxTurns?: number }
