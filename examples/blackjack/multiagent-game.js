@@ -7,7 +7,6 @@ import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { Stack } from '../../core/Stack.js';
 import { Space } from '../../core/Space.js';
 import { Engine } from '../../engine/Engine.js';
-import { Agent } from '../../engine/Agent.js';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -86,17 +85,12 @@ export class MultiagentBlackjackGame {
       const name = agentNames && agentNames[i] ? agentNames[i] : `Agent ${i + 1}`;
       let agent = this.engine._agents.find(p => p.name === name);
       if (!agent) {
-        agent = new Agent(name);
-        agent.resources.bankroll = initialBankroll;
-        agent.resources.currentBet = 0;
-        agent.resources.stood = 0;
-        agent.resources.busted = 0;
-        agent.resources.insuranceBet = 0;
-        agent.resources.hasSplit = 0;
-        agent.resources.splitHandZone = null;
-        agent.resources.splitHandBet = 0;
-        agent.resources.playingSplitHand = 0;
-        this.engine._agents.push(agent);
+        this.engine.dispatch("agent:create", { name });
+        this.engine.dispatch("game:setState", {
+          key: "agents",
+          patches: [{ path: [name, "resources"], value: { bankroll: initialBankroll, currentBet: 0, stood: 0, busted: 0, insuranceBet: 0, hasSplit: 0, splitHandZone: null, splitHandBet: 0, playingSplitHand: 0 } }],
+        });
+        agent = this.engine._agents.find(p => p.name === name);
       }
       const handZone = `agent-${i}-hand`;
       if (!this.engine.space.zones.includes(handZone)) {

@@ -87,7 +87,9 @@ function getOrCreateSession(gameType: string): GameSession {
   }
 
   const sessionId = `session-${Date.now()}`;
-  const engine = new Engine();
+  // MCP games dispatch TS-only actions (game:setState, space ops); force the
+  // TS ActionRegistry path so WASM-initialized engines don't hit the adapter.
+  const engine = new Engine({ disableWasm: true });
 
   let game: BlackjackMCPGame | CuttleMCPGame;
   switch (gameType) {

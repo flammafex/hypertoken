@@ -78,8 +78,10 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
   protected initializeRoom?: (engine: Engine, roomCode: string, variant?: string) => Promise<void> | void;
 
   constructor(options: RoomAuthoritativeServerOptions = {}) {
-    // Create a dummy engine for the base class - we'll use per-room engines
-    const dummyEngine = new Engine();
+    // Create a dummy engine for the base class - we'll use per-room engines.
+    // disableWasm: room engines only dispatch TS-only game actions
+    // (game:setState, cuttle:*, etc.) which have no WASM counterpart.
+    const dummyEngine = new Engine({ disableWasm: true });
     super(dummyEngine, options);
 
     this.maxRooms = options.maxRooms ?? 100;
@@ -91,8 +93,10 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
       autoDeleteEmpty: this.autoDeleteEmptyRooms,
     });
 
-    // Default engine factory - subclasses should override
-    this.createRoomEngine = () => new Engine();
+    // Default engine factory - subclasses should override.
+    // disableWasm: room engines dispatch TS-only game actions (game:setState,
+    // space ops, cuttle:*, etc.) which have no WASM counterpart.
+    this.createRoomEngine = () => new Engine({ disableWasm: true });
 
     // Wire up room manager events
     this.roomManager.on("rooms:deleted", (evt) => {
@@ -228,7 +232,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     this.clientRooms.set(clientId, roomCode);
 
     // Get player index from room state
-    const state = roomInfo.engine._gameState as any;
+    const state = this.getRoomGameState(roomInfo.engine);
     let playerIndex = -1;
     if (state?.players) {
       for (let i = 0; i < (state.numPlayers || 2); i++) {
@@ -283,6 +287,26 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
   getClientRoom(clientId: string): RoomInfo | undefined {
     const roomCode = this.clientRooms.get(clientId);
     return roomCode ? this.rooms.get(roomCode) : undefined;
+  }
+
+  /**
+   * Resolve the game state used for player/playerIndex derivation.
+   *
+   * Games store their state under different CRDT keys:
+   * - cuttle room flow writes the room state (players clientIds, numPlayers)
+   *   under the "cuttle" key (crdt-actions.js syncToChronicle), while the
+   *   game-actions.js flow writes it under the compat "gameState" key.
+   * - blackjack writes gameState-keyed state (doc.gameState.blackjack) plus
+   *   doc.agents; the compat getter covers those.
+   *
+   * Prefer the game's actual key first, then fall back to the compat
+   * `_gameState` getter (session.state.gameState) for gameState-keyed games.
+   */
+  protected getRoomGameState(engine: Engine | undefined): any {
+    if (!engine) return undefined;
+    const sessionState = (engine.session.state as any) ?? {};
+    if (sessionState.cuttle) return sessionState.cuttle;
+    return engine._gameState;
   }
 
   /**
@@ -368,7 +392,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     const roomCode = this.clientRooms.get(clientId);
     if (!roomCode) return { clientId };
 
-    const state = this.rooms.get(roomCode)?.engine._gameState as any;
+    const state = this.getRoomGameState(this.rooms.get(roomCode)?.engine);
     let playerIndex: number | undefined;
     if (state?.players) {
       const index = Array.from({ length: state.numPlayers || 2 }, (_, i) => i)

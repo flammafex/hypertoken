@@ -20,7 +20,7 @@ async function run() {
 
   // 2. Setup Engine A (Host)
   // Host initializes the game state with cards
-  const engineA = new Engine();
+  const engineA = new Engine({ disableWasm: true });
   const cardsA = [
     new Token({ id: "c1", label: "Card 1" }), 
     new Token({ id: "c2", label: "Card 2" })
@@ -30,7 +30,7 @@ async function run() {
 
   // 3. Setup Engine B (Client)
   // Client starts WITHOUT a stack initially. It will adopt the host's state.
-  const engineB = new Engine();
+  const engineB = new Engine({ disableWasm: true });
   
   engineA.on("engine:error", (e) => console.error("🔥 Engine A Error:", e));
   engineB.on("engine:error", (e) => console.error("🔥 Engine B Error:", e));

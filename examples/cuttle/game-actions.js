@@ -35,7 +35,7 @@ Object.assign(ActionRegistry, {
   /**
    * Initialize a new Cuttle game
    */
-  "cuttle:init": (engine, { seed, variant } = {}) => {
+  "cuttle:init": async (engine, { seed, variant } = {}) => {
     // Use passed value, or fall back to default setting
     const v = variant || defaultVariant;
     const gameInstance = new CuttleGame({ seed, variant: v });
@@ -51,17 +51,27 @@ Object.assign(ActionRegistry, {
       players[i] = null;
     }
 
-    engine._gameState = {
-      game: gameInstance.getState(),
-      variant: v,
-      numPlayers,
-      players,
-      spectators: [],
-      disconnectedSlots: [], // Track slots where players disconnected mid-game
-      gameStarted: false,
-      history: [], // Track action history for chronicle sync
-      readyForNextGame: {}, // Track which players are ready for next game
-    };
+    // Write the room state into the CRDT doc under key "gameState". The
+    // engine._gameState getter returns session.state.gameState, and every
+    // other cuttle handler in this file reads engine._gameState, so this key
+    // keeps the file self-consistent. (Previously this assigned
+    // engine._gameState directly, which throws because _gameState is a
+    // read-only getter.)
+    await engine.dispatch("game:setState", {
+      key: "gameState",
+      value: {
+        game: gameInstance.getState(),
+        variant: v,
+        numPlayers,
+        players,
+        spectators: [],
+        disconnectedSlots: [], // Track slots where players disconnected mid-game
+        gameStarted: false,
+        history: [], // Track action history for chronicle sync
+        readyForNextGame: {}, // Track which players are ready for next game
+      },
+      replace: true,
+    });
 
     engine.emit("game:initialized", { variant: v, numPlayers });
   },

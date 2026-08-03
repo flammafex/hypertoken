@@ -18,7 +18,6 @@ import { parseTokenSetObject } from '../../core/loaders/tokenSetLoader.js';
 import { Stack } from '../../core/Stack.js';
 import { Space } from '../../core/Space.js';
 import { Engine } from '../../engine/Engine.js';
-import { Agent } from '../../engine/Agent.js';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -99,11 +98,11 @@ export class BlackjackGame {
     });
 
     // Create a simple agent for single-player
-    const agent = new Agent("Player");
-    agent.resources.bankroll = initialBankroll || 1000;
-    agent.resources.currentBet = 0;
-    agent.handZone = "agent-hand";
-    this.engine._agents.push(agent);
+    this.engine.dispatch("agent:create", { name: "Player" });
+    this.engine.dispatch("game:setState", {
+      key: "agents",
+      patches: [{ path: ["Player", "resources"], value: { bankroll: initialBankroll || 1000, currentBet: 0 } }],
+    });
 
     // Add game state tracking
     this.gameState = {

@@ -104,8 +104,10 @@ class CuttleRoomServer extends RoomAuthoritativeServer {
     this.connectionToPlayer = new Map();
 
     // Set up room engine factory
+    // disableWasm: room engines only run TS actions (cuttle:*, game:setState),
+    // which have no WASM counterpart.
     this.createRoomEngine = (roomCode, variant) => {
-      const engine = new Engine();
+      const engine = new Engine({ disableWasm: true });
       setupEngineListeners(engine, roomCode);
       return engine;
     };
@@ -124,7 +126,9 @@ class CuttleRoomServer extends RoomAuthoritativeServer {
 
     const engine = roomInfo.engine;
     const gameInstance = getGameInstance(engine);
-    const state = engine._gameState;
+    // cuttle:init writes room state to session.state.gameState (read by the
+    // engine._gameState getter). Read it from the CRDT doc directly.
+    const state = engine.session.state?.gameState;
 
     const validActions = {};
     if (gameInstance && state) {
@@ -235,7 +239,7 @@ class CuttleRoomServer extends RoomAuthoritativeServer {
         // Get player index AFTER registration (look for playerId, not connectionId)
         let playerIndex = -1;
         if (roomInfo) {
-          const state = roomInfo.engine._gameState;
+          const state = roomInfo.engine.session.state?.gameState;
           if (state?.players) {
             for (let i = 0; i < (state.numPlayers || 2); i++) {
               if (state.players[i] === playerId) {
