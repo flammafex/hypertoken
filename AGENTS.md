@@ -44,7 +44,7 @@ npm run clean            # rm -rf dist
 
 # Tests (custom runner, no Jest/Vitest)
 npm run test:quick       # ~10s: core + engine
-npm run test:unit        # ~30s: core + engine + exporters + token + batch + transfers
+npm run test:unit        # ~30s: core + engine + exporters
 npm run test            # ~2min: full suite incl. integration & network
 npm run test:rust       # cargo test (native target, requires Rust)
 npm run test:wasm       # WASM bridge tests
