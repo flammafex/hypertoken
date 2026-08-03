@@ -215,30 +215,26 @@ const absentWasmSectionCases: Array<{
   verify: (engine: Engine, outcome: any) => void;
 }> = [
   {
-    name: "stack:draw",
-    type: "stack:draw",
-    payload: { count: 1 },
-    wasmMethod: "stackDraw",
+    name: "stack:reset",
+    type: "stack:reset",
+    payload: {},
+    wasmMethod: "stackReset",
     setup: (engine) => {
-      engine.stack = new Stack(engine.session as any, [new Token({ id: "ts-draw-card" })]);
+      engine.stack = new Stack(engine.session as any, [new Token({ id: "ts-reset-card" })]);
     },
     verify: (engine, outcome) => {
-      assert(outcome.ok, "stack:draw should succeed through TypeScript");
-      assert(Array.isArray(outcome.result), "counted TypeScript stack draw should return an array");
-      assertEquals(outcome.result[0]?.id, "ts-draw-card", "TypeScript stack draw result should be preserved");
-      assertEquals(engine.stack?.size, 0, "TypeScript stack should be mutated");
+      assert(outcome.ok, "stack:reset should succeed through TypeScript");
+      assertEquals(engine.stack?.size, 1, "TypeScript stack should be preserved by reset");
     },
   },
   {
-    name: "agent:create with optional id",
-    type: "agent:create",
-    payload: { name: "TS Agent" },
-    wasmMethod: "agentCreate",
+    name: "game:setMaxTurns",
+    type: "game:setMaxTurns",
+    payload: { maxTurns: 50 },
+    wasmMethod: "gameSetMaxTurns",
     verify: (engine, outcome) => {
-      assert(outcome.ok, "agent:create should succeed through TypeScript");
-      assert(typeof outcome.result.id === "string", "TypeScript should generate the optional agent id");
-      assertEquals(outcome.result.name, "TS Agent", "TypeScript agent result should be preserved");
-      assertEquals((engine.session.state as any).agents["TS Agent"].id, outcome.result.id, "agent should be committed");
+      assert(outcome.ok, "game:setMaxTurns should succeed through TypeScript");
+      assertEquals((engine.session.state as any).gameLoop.maxTurns, 50, "TypeScript maxTurns should be committed");
     },
   },
   {

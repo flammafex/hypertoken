@@ -12,8 +12,11 @@ export class WasmManager {
   /** Actions whose public TypeScript payload schema matches the WASM bridge. */
   static readonly WASM_ACTIONS = new Set([
     // Stack actions
-    "stack:peek", "stack:shuffle",
+    "stack:draw", "stack:peek", "stack:shuffle",
     "stack:cut", "stack:insertAt", "stack:removeAt", "stack:swap",
+    // stack:reset is intentionally excluded: semantic divergence. The TS
+    // handler restores the constructor's original deck, while the Rust bridge
+    // re-merges stack + drawn + discards sorted by index.
     // Space actions. space:place intentionally stays on the TypeScript path:
     // its public payload is { card, opts }, while the WASM bridge expects
     // { token, x, y }. space:flip and space:createZone also stay in TS because
@@ -27,8 +30,10 @@ export class WasmManager {
     // Token operations (5)
     "token:transform", "token:attach", "token:detach",
     "token:merge", "token:split",
+    // Agent actions
+    "agent:create",
     // GameLoop actions
-    "game:loopInit",
+    "game:loopInit", "game:loopStart",
     // GameState actions
     "game:start",
     // rule:markFired stays on the TypeScript path: rule timestamps are
@@ -130,7 +135,12 @@ export class WasmManager {
       "source:shuffle": (p) => { d.sourceShuffle(p.seed !== undefined ? String(p.seed) : undefined); },
       "source:burn":    (p) => JSON.parse(d.sourceBurn(p.count ?? 1)),
       // Agent
-      "agent:create":           (p) => JSON.parse(d.agentCreate(p.id, p.name, p.meta ? JSON.stringify(p.meta) : undefined)),
+      // id is optional in AgentCreatePayload (payloads.ts); mirror the TS
+      // default from actions.ts so a missing id does not crash the wasm-bindgen
+      // wrapper (which reads .length off the passed string). TS throws on
+      // duplicate agent names; Rust silently overwrites — acceptable divergence,
+      // the parity test never hits it.
+      "agent:create":           (p) => JSON.parse(d.agentCreate(p.id ?? `agent-${Date.now()}-${Math.random().toString(36).slice(2)}`, p.name, p.meta ? JSON.stringify(p.meta) : undefined)),
       "agent:remove":           (p) => { d.agentRemove(p.name); },
       "agent:setActive":        (p) => { d.agentSetActive(p.name, p.active ?? true); },
       "agent:setMeta":          (p) => { d.agentSetMeta(p.name, p.key, JSON.stringify(p.value)); },

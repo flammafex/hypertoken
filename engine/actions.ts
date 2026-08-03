@@ -577,10 +577,15 @@ const GameActions: ActionRegistryType = {
 
 const GameLoopActions: ActionRegistryType = {
   "game:loopInit": (engine, { maxTurns = 100 } = {} as GameLoopInitPayload) => {
+    // Guard: Infinity cannot be serialized (JSON.stringify → null), and the
+    // WASM backend rejects null for the i32 maxTurns field. Coerce non-finite
+    // values to the handler default so an explicit Infinity payload cannot
+    // break WASM init.
+    const safeMaxTurns = Number.isFinite(maxTurns) ? maxTurns : 100;
     engine.session.change("init loop", (doc: any) => {
       doc.gameLoop = {
         turn: 0, running: false, activeAgentIndex: -1,
-        phase: "setup", maxTurns,
+        phase: "setup", maxTurns: safeMaxTurns,
       };
     });
   },

@@ -19,7 +19,7 @@ export class GameLoop extends Emitter {
     phase: "setup",
   };
 
-  constructor(engine: Engine, { maxTurns = Infinity, delay = 0 } = {}) {
+  constructor(engine: Engine, { maxTurns = 100, delay = 0 } = {}) {
     super();
     this.engine = engine;
     this.delay = delay;
