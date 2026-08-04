@@ -11,13 +11,6 @@ available via `git log`.
 ## [Unreleased]
 
 ### Planned
-- Close the chronicle-incremental parity gap: 30 of 47 WASM-routed actions
-  (stack:cut/insertAt/peek/removeAt/shuffle/swap, space:clear/clearZone/
-  deleteZone/lockZone/remove/shuffleZone/transferZone, source:draw/shuffle,
-  game:loopInit/start, token:attach/detach/merge/split/transform, tokens:*
-  batch actions) lack TS/WASM behavioral-parity coverage. This is the single
-  remaining `test/audit-parity.js` FAIL and keeps `npm run verify` red until
-  closed.
 - Game module contract (`GameDefinition`) formalizing the per-game action
   surface, state schema, phases, and win/loss hooks.
 - Hidden-information generalization: player-owned `secret:` slices with reveal
@@ -58,11 +51,23 @@ available via `git log`.
     command.
   - Gitea Actions workflow (`.gitea/workflows/ci.yml`) running `npm run
     verify` on push and pull requests.
+- **Chronicle-incremental parity coverage for all 47 allowlisted actions.**
+  `test/testChronicleIncremental.ts` now covers the remaining 30 WASM-routed
+  actions (stack:cut/insertAt/peek/removeAt/shuffle/swap, space:clear/
+  clearZone/deleteZone/lockZone/remove/shuffleZone/transferZone,
+  source:draw/shuffle, game:loopInit/start, token:attach/detach/merge/split/
+  transform, and the tokens:* batch actions) with TS/WASM behavioral-parity
+  tests. The parity audit (`test/audit-parity.js` check [4]) is green and
+  `npm run verify` passes.
 
 ### Fixed
 - Landing page: live showcase links, canonical URL, action count (77 → 81),
   `token:merge` example payload key, invalid HTML in the showcase block, and
   restored footer links.
+- `Source.draw`/`Source.burn` passed a negative `splice` index to the
+  Automerge proxy, which rejects negative indices — every source draw/burn
+  threw on the TypeScript path. Now computes a non-negative start index
+  (mirrors `Stack._drawMany`).
 
 ### Changed
 - Version bumped 0.2.0 → 0.3.0.

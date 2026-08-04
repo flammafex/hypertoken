@@ -126,7 +126,10 @@ export class Source extends Emitter {
     this.session.change(`burn ${n} cards from source`, (doc) => {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
-      const burnedProxy = doc.source.tokens.splice(-count, count);
+      // Automerge proxies reject negative splice indices; compute a
+      // non-negative start (mirrors Stack._drawMany).
+      const startIdx = doc.source.tokens.length - count;
+      const burnedProxy = doc.source.tokens.splice(startIdx, count);
       burned = clone(burnedProxy);
       doc.source.burned.push(...burned);
     });
@@ -188,7 +191,10 @@ export class Source extends Emitter {
     this.session.change(`draw ${n} from source`, (doc) => {
       if (!doc.source) return;
       const count = Math.min(n, doc.source.tokens.length);
-      const drawnProxy = doc.source.tokens.splice(-count, count);
+      // Automerge proxies reject negative splice indices; compute a
+      // non-negative start (mirrors Stack._drawMany).
+      const startIdx = doc.source.tokens.length - count;
+      const drawnProxy = doc.source.tokens.splice(startIdx, count);
       drawn = clone(drawnProxy);
 
       // Check reshuffle policy

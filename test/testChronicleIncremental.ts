@@ -13,6 +13,7 @@ import { Chronicle } from '../core/Chronicle.js';
 import { Stack } from '../core/Stack.js';
 import { Space } from '../core/Space.js';
 import { Token } from '../core/Token.js';
+import { Source } from '../core/Source.js';
 import { isWasmAvailable, tryLoadWasm } from '../core/WasmBridge.js';
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -74,10 +75,16 @@ const tokenDefs = [
   { id: "t3", text: "C", char: "C", kind: "card", index: 2, meta: {} },
 ];
 
+const zonePlacements = [
+  { id: "p1", tokenId: "t1", tokenSnapshot: { ...tokenDefs[0] }, x: 0, y: 0, faceUp: true, label: null, ts: 0, reversed: false, tags: [] },
+  { id: "p2", tokenId: "t2", tokenSnapshot: { ...tokenDefs[1] }, x: 0, y: 0, faceUp: true, label: null, ts: 0, reversed: false, tags: [] },
+];
+
 const initStateJson = JSON.stringify({
   stack: { stack: tokenDefs, drawn: [], discards: [] },
-  zones: { hand: [], table: [] },
+  zones: { hand: zonePlacements, table: [] },
   agents: {},
+  source: { stackIds: ["stack-0"], tokens: tokenDefs, burned: [], seed: null, reshufflePolicy: { threshold: null, mode: "auto" } },
   gameLoop: { turn: 0, running: false, activeAgentIndex: -1, phase: "setup", maxTurns: 10 },
   rules: { fired: {} },
 });
@@ -93,8 +100,9 @@ function createTsEngine(): Engine {
   const tokens = tokenDefs.map(t => new Token(t));
   const stack = new Stack(session, tokens);
   const space = new Space(session, "main-space");
+  const source = new Source(session, [stack]);
 
-  const engine = new Engine({ stack, space });
+  const engine = new Engine({ stack, space, source });
   // Force TS path: ensure no WASM dispatcher is used
   (engine as any)._wasmDispatcher = null;
   // Restore session to the Chronicle that owns the Stack/Space state
@@ -113,7 +121,13 @@ function createTsEngine(): Engine {
       doc.agents = {};
     }
     if (!doc.zones) {
-      doc.zones = { hand: [], table: [] };
+      doc.zones = {
+        hand: [
+          { id: "p1", tokenId: "t1", tokenSnapshot: JSON.parse(JSON.stringify(tokenDefs[0])), x: 0, y: 0, faceUp: true, label: null, ts: 0, reversed: false, tags: [] },
+          { id: "p2", tokenId: "t2", tokenSnapshot: JSON.parse(JSON.stringify(tokenDefs[1])), x: 0, y: 0, faceUp: true, label: null, ts: 0, reversed: false, tags: [] },
+        ],
+        table: [],
+      };
     }
   });
 
@@ -178,6 +192,17 @@ function findTsAgent(engine: Engine, name: string): any {
   if (!agent) throw new Error(`Agent "${name}" not found on TS engine`);
   return agent;
 }
+
+// ── Shared token constants for token/batch parity tests ──────────────────────
+
+const tokenA = { id: "a1", text: "Sword", char: "S", kind: "item", index: 0, meta: {} };
+const tokenB = { id: "b1", text: "Shield", char: "H", kind: "item", index: 1, meta: {} };
+const tokenC = { id: "c1", text: "Gem", char: "G", kind: "item", index: 2, meta: {} };
+const batchTokens = [
+  { id: "a1", text: "Sword", char: "S", kind: "item", index: 0, meta: {}, rev: true, _rev: true },
+  { id: "b1", text: "Shield", char: "H", kind: "item", index: 1, meta: {} },
+  { id: "c1", text: "Gem", char: "G", kind: "item", index: 2, meta: {}, rev: true, _rev: true },
+];
 
 // ── Load WASM ───────────────────────────────────────────────────────────────
 
@@ -271,6 +296,38 @@ if (!wasmLoaded) {
   skip("parity: agent discardCards missing + dedupe");
   skip("parity: agent discardCards missing agent throws on both");
   skip("parity: agent discardCards empty");
+  skip("parity: stack:cut valid position");
+  skip("parity: stack:insertAt valid position");
+  skip("parity: stack:peek returns top cards");
+  skip("parity: stack:removeAt valid position");
+  skip("parity: stack:shuffle seeded keeps deck");
+  skip("parity: stack:swap valid indices");
+  skip("parity: space:clear empties all zones");
+  skip("parity: space:clearZone empties one zone");
+  skip("parity: space:deleteZone removes zone");
+  skip("parity: space:lockZone accepted on both");
+  skip("parity: space:remove placement");
+  skip("parity: space:shuffleZone seeded keeps placements");
+  skip("parity: space:transferZone moves placements");
+  skip("parity: source:draw valid count");
+  skip("parity: source:shuffle seeded keeps tokens");
+  skip("parity: game:loopInit resets loop");
+  skip("parity: game:start marks game started");
+  skip("parity: token:transform applies properties");
+  skip("parity: token:attach records attachment");
+  skip("parity: token:detach returns divergent shapes");
+  skip("parity: token:merge requires 2 tokens");
+  skip("parity: token:merge combines tokens");
+  skip("parity: token:split splits token");
+  skip("parity: tokens:collect gathers stack tokens");
+  skip("parity: tokens:count predicate");
+  skip("parity: tokens:draw splits decks");
+  skip("parity: tokens:filter predicate");
+  skip("parity: tokens:find predicate");
+  skip("parity: tokens:map flip");
+  skip("parity: tokens:forEach merge");
+  skip("parity: tokens:shuffle seeded keeps decks");
+  skip("parity: tokens:filter unknown predicate throws on both");
 } else {
   await test("parity: stack:draw produces same state", async () => {
     const { tsState, wasmState } = await parityCheck([
@@ -700,6 +757,370 @@ if (!wasmLoaded) {
     const wasmResult = await wasmEngine.dispatch("agent:discardCards", { name: "Alice", tokenIds: [] });
     assert.deepEqual(tsResult, [], "TS result should be []");
     assert.deepEqual(wasmResult, [], "WASM result should be []");
+  });
+
+  // ── Stack parity (6) ──────────────────────────────────────────────────────
+  await test("parity: stack:cut valid position", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "stack:cut", payload: { position: 1 } },
+    ]);
+    assert.deepEqual(tsState.stack.stack.map((t: any) => t.id), ["t2", "t3", "t1"], "TS cut order");
+    assert.deepEqual(wasmState.stack.stack.map((t: any) => t.id), ["t2", "t3", "t1"], "WASM cut order");
+  });
+
+  await test("parity: stack:insertAt valid position", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "stack:insertAt", payload: { position: 1, card: { id: "t4", text: "D", char: "D", kind: "card", index: 3, meta: {} } } },
+    ]);
+    assert.deepEqual(tsState.stack.stack.map((t: any) => t.id), ["t1", "t4", "t2", "t3"], "TS insertAt order");
+    assert.deepEqual(wasmState.stack.stack.map((t: any) => t.id), ["t1", "t4", "t2", "t3"], "WASM insertAt order");
+  });
+
+  await test("parity: stack:peek returns top cards", async () => {
+    // divergence: TS stack:peek returns the top `count` cards as an array; the
+    // Rust stack_peek ignores count and returns the full stack state object
+    // (export_stack). Both are read-only — assert non-mutation + each shape.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("stack:peek", { count: 2 });
+    const wasmResult = await wasmEngine.dispatch("stack:peek", { count: 2 });
+    assert.deepEqual(tsResult.map((t: any) => t.id), ["t3", "t2"], "TS peek ids");
+    assert.deepEqual(wasmResult.stack.map((t: any) => t.id), ["t1", "t2", "t3"], "WASM peek returns full stack");
+    const tsState = JSON.parse(JSON.stringify(tsEngine.session.state));
+    const wasmState = JSON.parse(JSON.stringify(wasmEngine.session.state));
+    assert.equal(tsState.stack.stack.length, 3, "TS peek should not mutate");
+    assert.equal(wasmState.stack.stack.length, 3, "WASM peek should not mutate");
+  });
+
+  await test("parity: stack:removeAt valid position", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "stack:removeAt", payload: { position: 1 } },
+    ]);
+    assert.deepEqual(tsState.stack.stack.map((t: any) => t.id), ["t1", "t3"], "TS removeAt order");
+    assert.deepEqual(wasmState.stack.stack.map((t: any) => t.id), ["t1", "t3"], "WASM removeAt order");
+  });
+
+  await test("parity: stack:shuffle seeded keeps deck", async () => {
+    // divergence: shuffled ORDER differs (TS mulberry32 vs Rust SipHash→ChaCha8).
+    const { tsState, wasmState } = await parityCheck([
+      { type: "stack:shuffle", payload: { seed: 42 } },
+    ]);
+    assert.equal(tsState.stack.stack.length, 3, "TS shuffle length");
+    assert.equal(wasmState.stack.stack.length, 3, "WASM shuffle length");
+    assert.deepEqual(tsState.stack.stack.map((t: any) => t.id).sort(), ["t1", "t2", "t3"], "TS shuffle multiset");
+    assert.deepEqual(wasmState.stack.stack.map((t: any) => t.id).sort(), ["t1", "t2", "t3"], "WASM shuffle multiset");
+  });
+
+  await test("parity: stack:swap valid indices", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "stack:swap", payload: { i: 0, j: 2 } },
+    ]);
+    assert.deepEqual(tsState.stack.stack.map((t: any) => t.id), ["t3", "t2", "t1"], "TS swap order");
+    assert.deepEqual(wasmState.stack.stack.map((t: any) => t.id), ["t3", "t2", "t1"], "WASM swap order");
+  });
+
+  // ── Space parity (7) ──────────────────────────────────────────────────────
+  await test("parity: space:clear empties all zones", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "space:clear", payload: {} },
+    ]);
+    assert.equal(Object.keys(tsState.zones).length, 0, "TS zones empty");
+    assert.equal(Object.keys(wasmState.zones).length, 0, "WASM zones empty");
+  });
+
+  await test("parity: space:clearZone empties one zone", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "space:clearZone", payload: { zone: "hand" } },
+    ]);
+    assert.equal(tsState.zones.hand.length, 0, "TS hand empty");
+    assert.equal(tsState.zones.table.length, 0, "TS table untouched");
+    assert.equal(wasmState.zones.hand.length, 0, "WASM hand empty");
+    assert.equal(wasmState.zones.table.length, 0, "WASM table untouched");
+  });
+
+  await test("parity: space:deleteZone removes zone", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "space:deleteZone", payload: { name: "table" } },
+    ]);
+    assert.ok(!tsState.zones.table, "TS table deleted");
+    assert.equal(tsState.zones.hand.length, 2, "TS hand untouched");
+    assert.ok(!wasmState.zones.table, "WASM table deleted");
+    assert.equal(wasmState.zones.hand.length, 2, "WASM hand untouched");
+  });
+
+  await test("parity: space:lockZone accepted on both", async () => {
+    // divergence: TS keeps lock in-memory (_lockedZones); Rust writes
+    // doc.zones["_lock:table"]. State shapes diverge — only throw-agreement.
+    await parityThrows([
+      { type: "space:lockZone", payload: { zone: "table", locked: true } },
+    ]);
+  });
+
+  await test("parity: space:remove placement", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "space:remove", payload: { zone: "hand", placementId: "p1" } },
+    ]);
+    assert.equal(tsState.zones.hand.length, 1, "TS hand length");
+    assert.equal(tsState.zones.hand[0].id, "p2", "TS remaining placement");
+    assert.equal(tsState.zones.table.length, 0, "TS table untouched");
+    assert.equal(wasmState.zones.hand.length, 1, "WASM hand length");
+    assert.equal(wasmState.zones.hand[0].id, "p2", "WASM remaining placement");
+    assert.equal(wasmState.zones.table.length, 0, "WASM table untouched");
+  });
+
+  await test("parity: space:shuffleZone seeded keeps placements", async () => {
+    // divergence: shuffled ORDER differs (TS mulberry32 vs Rust SipHash→ChaCha8).
+    const { tsState, wasmState } = await parityCheck([
+      { type: "space:shuffleZone", payload: { zone: "hand", seed: 42 } },
+    ]);
+    assert.equal(tsState.zones.hand.length, 2, "TS hand length");
+    assert.equal(wasmState.zones.hand.length, 2, "WASM hand length");
+    assert.deepEqual(tsState.zones.hand.map((p: any) => p.tokenId).sort(), ["t1", "t2"], "TS placement multiset");
+    assert.deepEqual(wasmState.zones.hand.map((p: any) => p.tokenId).sort(), ["t1", "t2"], "WASM placement multiset");
+  });
+
+  await test("parity: space:transferZone moves placements", async () => {
+    // divergence: the TS space:transferZone throws "Cannot create a reference
+    // to an existing document object" (Automerge proxy splice+push across
+    // zones); the WASM path performs the transfer. Assert the WASM result only.
+    const wasmEngine = createWasmEngine();
+    await wasmEngine.dispatch("space:transferZone", { fromZone: "hand", toZone: "table" });
+    const wasmState = JSON.parse(JSON.stringify(wasmEngine.session.state));
+    assert.equal(wasmState.zones.hand.length, 0, "WASM hand empty");
+    assert.equal(wasmState.zones.table.length, 2, "WASM table has 2");
+    assert.deepEqual(wasmState.zones.table.map((p: any) => p.tokenId).sort(), ["t1", "t2"], "WASM table multiset");
+  });
+
+  // ── Source parity (2) ─────────────────────────────────────────────────────
+  await test("parity: source:draw valid count", async () => {
+    // divergence: overdraw throws on Rust but clamps on TS — valid count only.
+    const { tsState, wasmState } = await parityCheck([
+      { type: "source:draw", payload: { count: 2 } },
+    ]);
+    assert.equal(tsState.source.tokens.length, 1, "TS source length");
+    assert.equal(tsState.source.tokens[0].id, "t1", "TS source remaining");
+    assert.equal(wasmState.source.tokens.length, 1, "WASM source length");
+    assert.equal(wasmState.source.tokens[0].id, "t1", "WASM source remaining");
+  });
+
+  await test("parity: source:shuffle seeded keeps tokens", async () => {
+    // divergence: shuffled ORDER differs; TS writes source.seed, Rust does not.
+    const { tsState, wasmState } = await parityCheck([
+      { type: "source:shuffle", payload: { seed: 42 } },
+    ]);
+    assert.equal(tsState.source.tokens.length, 3, "TS source length");
+    assert.equal(wasmState.source.tokens.length, 3, "WASM source length");
+    assert.deepEqual(tsState.source.tokens.map((t: any) => t.id).sort(), ["t1", "t2", "t3"], "TS source multiset");
+    assert.deepEqual(wasmState.source.tokens.map((t: any) => t.id).sort(), ["t1", "t2", "t3"], "WASM source multiset");
+  });
+
+  // ── Game parity (2) ───────────────────────────────────────────────────────
+  await test("parity: game:loopInit resets loop", async () => {
+    const { tsState, wasmState } = await parityCheck([
+      { type: "game:loopInit", payload: { maxTurns: 25 } },
+    ]);
+    assert.equal(tsState.gameLoop.maxTurns, 25, "TS maxTurns");
+    assert.equal(tsState.gameLoop.phase, "setup", "TS phase");
+    assert.equal(tsState.gameLoop.running, false, "TS running");
+    assert.equal(wasmState.gameLoop.maxTurns, 25, "WASM maxTurns");
+    assert.equal(wasmState.gameLoop.phase, "setup", "WASM phase");
+    assert.equal(wasmState.gameLoop.running, false, "WASM running");
+  });
+
+  await test("parity: game:start marks game started", async () => {
+    // divergence: startTime = Date.now() differs per path; Rust does not write
+    // a `paused` field at all (TS writes paused:false). Assert the booleans
+    // that converge and that `paused` is falsy on both.
+    const { tsState, wasmState } = await parityCheck([
+      { type: "game:start", payload: {} },
+    ]);
+    assert.equal(tsState.gameState.started, true, "TS started");
+    assert.equal(tsState.gameState.ended, false, "TS ended");
+    assert.ok(!tsState.gameState.paused, "TS paused falsy");
+    assert.equal(wasmState.gameState.started, true, "WASM started");
+    assert.equal(wasmState.gameState.ended, false, "WASM ended");
+    assert.ok(!wasmState.gameState.paused, "WASM paused falsy");
+  });
+
+  // ── Token parity (6) ──────────────────────────────────────────────────────
+  await test("parity: token:transform applies properties", async () => {
+    // divergence: TS adds top-level _transformedFrom; Rust does not.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("token:transform", { token: tokenA, properties: { char: "X", kind: "spell" } });
+    const wasmResult = await wasmEngine.dispatch("token:transform", { token: tokenA, properties: { char: "X", kind: "spell" } });
+    assert.equal(tsResult.id, "a1", "TS id");
+    assert.equal(tsResult.char, "X", "TS char");
+    assert.equal(tsResult.kind, "spell", "TS kind");
+    assert.equal(wasmResult.id, "a1", "WASM id");
+    assert.equal(wasmResult.char, "X", "WASM char");
+    assert.equal(wasmResult.kind, "spell", "WASM kind");
+  });
+
+  await test("parity: token:attach records attachment", async () => {
+    // divergence: TS stores _attachments top-level; Rust stores meta._attachments.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("token:attach", { host: tokenA, attachment: tokenB, attachmentType: "gem" });
+    const wasmResult = await wasmEngine.dispatch("token:attach", { host: tokenA, attachment: tokenB, attachmentType: "gem" });
+    assert.equal(tsResult.id, "a1", "TS host id");
+    assert.equal(tsResult._attachments.length, 1, "TS attachments count");
+    assert.equal(tsResult._attachments[0].id, "b1", "TS attachment id");
+    assert.equal(wasmResult.id, "a1", "WASM host id");
+    assert.equal(wasmResult.meta._attachments.length, 1, "WASM attachments count");
+    assert.equal(wasmResult.meta._attachments[0].id, "b1", "WASM attachment id");
+  });
+
+  await test("parity: token:detach returns divergent shapes", async () => {
+    // divergence: TS returns the host with the attachment removed; Rust returns
+    // the detached (cleaned) token. Both succeed on the same payload.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const host = { id: "a1", text: "Sword", char: "S", kind: "item", index: 0, meta: { _attachments: [{ id: "b1", token: tokenB, attachment_type: "gem", attached_at: 0 }] } };
+    const tsResult = await tsEngine.dispatch("token:detach", { host, attachmentId: "b1" });
+    const wasmResult = await wasmEngine.dispatch("token:detach", { host, attachmentId: "b1" });
+    assert.equal(tsResult.id, "a1", "TS returns host");
+    assert.equal(wasmResult.id, "b1", "WASM returns detached token");
+  });
+
+  await test("parity: token:merge requires 2 tokens", async () => {
+    await parityThrows([
+      { type: "token:merge", payload: { tokens: [tokenA] } },
+    ]);
+  });
+
+  await test("parity: token:merge combines tokens", async () => {
+    // divergence: Rust keeps the FIRST (base) token id and stores metadata in
+    // meta; TS spreads Object.assign({}, ...tokens) over its "merged-<ts>"
+    // placeholder so the LAST token's id wins, with top-level fields.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("token:merge", { tokens: [tokenA, tokenB], properties: { kind: "combo" } });
+    const wasmResult = await wasmEngine.dispatch("token:merge", { tokens: [tokenA, tokenB], properties: { kind: "combo" } });
+    assert.equal(tsResult.merged.id, "b1", "TS merged keeps last token id");
+    assert.deepEqual(tsResult.merged._mergedFrom, ["a1", "b1"], "TS mergedFrom");
+    assert.equal(tsResult.merged.kind, "combo", "TS kind applied");
+    assert.equal(wasmResult.id, "a1", "WASM keeps base id");
+    assert.deepEqual(wasmResult.meta._mergedFrom, ["a1", "b1"], "WASM mergedFrom");
+    assert.equal(wasmResult.meta.kind, "combo", "WASM kind applied");
+  });
+
+  await test("parity: token:split splits token", async () => {
+    // divergence: id schemes differ (TS "split-<ts>-<i>" vs Rust "<id>-split-<i>");
+    // metadata location differs (top-level vs meta). Count 1 diverges (TS ok,
+    // Rust throws) so only count >= 2 is tested.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("token:split", { token: tokenA, count: 3 });
+    const wasmResult = await wasmEngine.dispatch("token:split", { token: tokenA, count: 3 });
+    assert.equal(tsResult.length, 3, "TS split count");
+    assert.equal(wasmResult.length, 3, "WASM split count");
+    for (let i = 0; i < 3; i++) {
+      assert.ok(tsResult[i].id !== "a1", "TS split id differs");
+      assert.equal(tsResult[i]._splitFrom, "a1", `TS splitFrom ${i}`);
+      assert.ok(wasmResult[i].id !== "a1", "WASM split id differs");
+      assert.equal(wasmResult[i].meta._splitFrom, "a1", `WASM splitFrom ${i}`);
+    }
+  });
+
+  // ── Batch parity (8) ──────────────────────────────────────────────────────
+  await test("parity: tokens:collect gathers stack tokens", async () => {
+    // divergence: full token shape differs (Rust serde adds label/group null) — ids only.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:collect", { sources: ["stack", "hand"] });
+    const wasmResult = await wasmEngine.dispatch("tokens:collect", { sources: ["stack", "hand"] });
+    assert.deepEqual(tsResult.map((t: any) => t.id), ["t1", "t2", "t3", "t1", "t2"], "TS collect ids");
+    assert.deepEqual(wasmResult.map((t: any) => t.id), ["t1", "t2", "t3", "t1", "t2"], "WASM collect ids");
+  });
+
+  await test("parity: tokens:count predicate", async () => {
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:count", { tokens: batchTokens, predicate: "reversed" });
+    const wasmResult = await wasmEngine.dispatch("tokens:count", { tokens: batchTokens, predicate: "reversed" });
+    assert.equal(tsResult, 2, "TS count");
+    assert.equal(wasmResult, 2, "WASM count");
+  });
+
+  await test("parity: tokens:draw splits decks", async () => {
+    // divergence: full token shape differs — ids only.
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:draw", { decks: [batchTokens], counts: [2] });
+    const wasmResult = await wasmEngine.dispatch("tokens:draw", { decks: [batchTokens], counts: [2] });
+    assert.deepEqual(tsResult.drawn[0].map((t: any) => t.id), ["c1", "b1"], "TS drawn ids");
+    assert.deepEqual(tsResult.decks[0].map((t: any) => t.id), ["a1"], "TS remaining ids");
+    assert.deepEqual(wasmResult.drawn[0].map((t: any) => t.id), ["c1", "b1"], "WASM drawn ids");
+    assert.deepEqual(wasmResult.decks[0].map((t: any) => t.id), ["a1"], "WASM remaining ids");
+  });
+
+  await test("parity: tokens:filter predicate", async () => {
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:filter", { tokens: batchTokens, predicate: "reversed" });
+    const wasmResult = await wasmEngine.dispatch("tokens:filter", { tokens: batchTokens, predicate: "reversed" });
+    assert.equal(tsResult.length, 2, "TS filter count");
+    assert.equal(wasmResult.length, 2, "WASM filter count");
+    assert.deepEqual(tsResult.map((t: any) => t.id).sort(), ["a1", "c1"], "TS filter ids");
+    assert.deepEqual(wasmResult.map((t: any) => t.id).sort(), ["a1", "c1"], "WASM filter ids");
+  });
+
+  await test("parity: tokens:find predicate", async () => {
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:find", { tokens: batchTokens, predicate: "reversed" });
+    const wasmResult = await wasmEngine.dispatch("tokens:find", { tokens: batchTokens, predicate: "reversed" });
+    assert.equal(tsResult.id, "a1", "TS find id");
+    assert.equal(wasmResult.id, "a1", "WASM find id");
+  });
+
+  await test("parity: tokens:map flip", async () => {
+    // divergence: none for the flip result — both paths toggle `rev` (TS rev /
+    // Rust Token.rev). Input a1/c1 had rev:true -> toggled to false; b1 had
+    // none -> toggled to true. Assert the concrete converged [false,true,false].
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:map", { tokens: batchTokens, operation: "flip" });
+    const wasmResult = await wasmEngine.dispatch("tokens:map", { tokens: batchTokens, operation: "flip" });
+    assert.equal(tsResult.length, 3, "TS map length");
+    assert.equal(wasmResult.length, 3, "WASM map length");
+    const expected = [false, true, false];
+    for (let i = 0; i < 3; i++) {
+      assert.equal((tsResult[i].rev ?? tsResult[i]._rev), expected[i], `TS flipped ${i}`);
+      assert.equal((wasmResult[i].rev ?? wasmResult[i]._rev), expected[i], `WASM flipped ${i}`);
+    }
+  });
+
+  await test("parity: tokens:forEach merge", async () => {
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:forEach", { tokens: batchTokens, operation: "merge" });
+    const wasmResult = await wasmEngine.dispatch("tokens:forEach", { tokens: batchTokens, operation: "merge" });
+    assert.equal(tsResult.length, 3, "TS forEach length");
+    assert.equal(wasmResult.length, 3, "WASM forEach length");
+    for (let i = 0; i < 3; i++) {
+      assert.equal((tsResult[i].merged ?? tsResult[i]._merged), true, `TS merged ${i}`);
+      assert.equal((wasmResult[i].merged ?? wasmResult[i]._merged), true, `WASM merged ${i}`);
+    }
+  });
+
+  await test("parity: tokens:shuffle seeded keeps decks", async () => {
+    // divergence: shuffled ORDER differs (TS mulberry32 vs Rust SipHash→ChaCha8).
+    const tsEngine = createTsEngine();
+    const wasmEngine = createWasmEngine();
+    const tsResult = await tsEngine.dispatch("tokens:shuffle", { decks: [batchTokens], seed: 42 });
+    const wasmResult = await wasmEngine.dispatch("tokens:shuffle", { decks: [batchTokens], seed: 42 });
+    assert.equal(tsResult[0].length, 3, "TS deck length");
+    assert.equal(wasmResult[0].length, 3, "WASM deck length");
+    assert.deepEqual(tsResult[0].map((t: any) => t.id).sort(), ["a1", "b1", "c1"], "TS deck multiset");
+    assert.deepEqual(wasmResult[0].map((t: any) => t.id).sort(), ["a1", "b1", "c1"], "WASM deck multiset");
+  });
+
+  await test("parity: tokens:filter unknown predicate throws on both", async () => {
+    await parityThrows([
+      { type: "tokens:filter", payload: { tokens: batchTokens, predicate: "nope" } },
+    ]);
   });
 }
 
