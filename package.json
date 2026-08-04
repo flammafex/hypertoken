@@ -1,6 +1,6 @@
 {
   "name": "hypertoken-monorepo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "bin": {
     "hypertoken": "./dist/cli/index.js"
@@ -54,7 +54,9 @@
     "test:engine-components": "npm run test:script && npm run test:agent && npm run test:policy",
     "test:core-components": "npm run test:crypto && npm run test:random",
     "test:network": "npm run test:sync && npm run test:rule-sync",
-    "test": "npm run test:unit && npm run test:engine-components && npm run test:core-components && npm run test:integration && npm run test:network",
+    "test": "node test/run-all.js",
+    "test:parity": "node --loader ./test/ts-esm-loader.js test/audit-parity.js",
+    "verify": "tsc --noEmit && npm run test && npm run test:parity",
     "benchmark": "node --loader ./test/ts-esm-loader.js test/benchmarks.ts",
     "benchmark:memory": "node --expose-gc --loader ./test/ts-esm-loader.js test/benchmarks-memory.ts",
     "benchmark:chronicle": "node --loader ./test/ts-esm-loader.js test/benchmarkChronicle.ts",

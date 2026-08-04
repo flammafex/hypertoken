@@ -8,13 +8,13 @@ This document describes the integration of Rust/WASM performance optimizations i
 
 ## 🎯 Overview
 
-HyperToken's performance-critical operations are implemented in Rust and compiled to WebAssembly for **significant performance improvements** (~20x for Stack/Space operations). The Rust Chronicle now provides **incremental field-level Automerge operations** via 54 action methods, with dirty-section tracking to minimize WASM↔JS boundary crossings.
+HyperToken's performance-critical operations are implemented in Rust and compiled to WebAssembly for **significant performance improvements** (~20x for Stack/Space operations). The Rust Chronicle now provides **incremental field-level Automerge operations** via 56 action methods, with dirty-section tracking to minimize WASM↔JS boundary crossings.
 
 ### Current Status
 
 | Component | Rust Implementation | TypeScript Integration | Status |
 |-----------|---------------------|----------------------|--------|
-| **Chronicle** | ✅ Complete (54 incremental actions) | ✅ `WasmChronicleAdapter` + `IChronicle` | **READY** - Field-level CRDT ops with dirty-section caching |
+| **Chronicle** | ✅ Complete (56 incremental actions) | ✅ `WasmChronicleAdapter` + `IChronicle` | **READY** - Field-level CRDT ops with dirty-section caching |
 | **Actions** | ✅ Complete | ✅ Dual-path dispatch in Engine | **READY** - WASM or TS fallback per action |
 | **WasmBridge** | ✅ Complete | ✅ Complete | Module loader working |
 
@@ -44,7 +44,7 @@ npm run test:wasm        # WASM module loading + Chronicle incremental CRDT pari
 This runs integration tests that verify:
 - WASM module loads successfully
 - `WasmChronicleAdapter` correctly proxies Chronicle operations
-- TS/WASM behavioral parity for all 54 incremental action methods
+- TS/WASM behavioral parity for all 56 incremental action methods
 - Dirty-section caching minimizes WASM↔JS boundary crossings
 
 ### 3. Run Rust Unit Tests
@@ -73,7 +73,7 @@ hypertoken/
 │   │   ├── token.rs          # ✅ Token implementation
 │   │   ├── stack.rs          # ✅ Stack operations
 │   │   ├── space.rs          # ✅ Space operations
-│   │   ├── chronicle.rs      # ✅ Incremental CRDT (DirtySections, section exports, 54 action methods)
+│   │   ├── chronicle.rs      # ✅ Incremental CRDT (DirtySections, section exports, 56 action methods)
 │   │   ├── chronicle_actions/ # ✅ Action method modules
 │   │   │   ├── helpers.rs    #    Transaction helpers (resolve/ensure)
 │   │   │   ├── stack.rs      #    10 stack actions
@@ -154,7 +154,7 @@ chronicle.applyAction('stack:draw', { count: 5 });
 
 ## 📊 Performance Targets
 
-The Rust Chronicle uses incremental field-level Automerge operations (54 action methods) with dirty-section caching. This avoids full-state replacement on every action.
+The Rust Chronicle uses incremental field-level Automerge operations (56 action methods) with dirty-section caching. This avoids full-state replacement on every action.
 
 > **Note on Chronicle Performance:** Performance benchmarks are pending. Run `npm run benchmark:chronicle` to measure incremental action performance (field-level ops vs full-state replacement), dirty-section caching impact on WASM↔JS boundary overhead, and Chronicle CRDT merge performance (Rust vs TS).
 
@@ -193,7 +193,7 @@ The Rust Chronicle uses incremental field-level Automerge operations (54 action 
 ### Phase 2B: Chronicle Incremental CRDT (✅ COMPLETE)
 
 - ✅ Implement full HyperTokenState in Rust Chronicle (types.rs)
-- ✅ **54 incremental action methods** — field-level Automerge operations (no full-state replacement)
+- ✅ **56 incremental action methods** — field-level Automerge operations (no full-state replacement)
 - ✅ **DirtySections tracking** — per-section dirty flags minimize WASM↔JS re-exports
 - ✅ **`chronicle_actions/`** — 8 submodules (helpers, stack, space, source, agent, game_loop, game_state, rules)
 - ✅ **`IChronicle` interface** — abstracts over Chronicle (Automerge) and WasmChronicleAdapter

@@ -1,6 +1,6 @@
 # HyperToken Action Reference
 
-Complete documentation for all 77 built-in actions in the HyperToken engine.
+Complete documentation for all 81 built-in actions in the HyperToken engine.
 
 ---
 
@@ -10,30 +10,30 @@ Complete documentation for all 77 built-in actions in the HyperToken engine.
 
 | Category | Count | Actions |
 |----------|-------|---------|
-| **Stack** | 10 | shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse |
+| **Stack** | 11 | shuffle, draw, reset, burn, peek, cut, insertAt, removeAt, swap, reverse, discard |
 | **Space** | 14 | place, clear, move, flip, remove, createZone, deleteZone, clearZone, shuffleZone, transferZone, fanZone, stackZone, spreadZone, lockZone |
 | **Source** | 7 | draw, shuffle, burn, reset, addStack, removeStack, inspect |
-| **Agent** | 16 | create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade |
-| **Game** | 7 | start, end, pause, resume, nextPhase, setProperty, getState |
+| **Agent** | 17 | create, remove, setActive, giveResource, takeResource, addToken, removeToken, drawCards, discardCards, get, getAll, transferResource, transferToken, stealResource, stealToken, trade, setMeta |
+| **Game** | 9 | start, end, pause, resume, nextPhase, setProperty, mergeState, setState, getState |
 | **GameLoop** | 7 | loopInit, loopStart, loopStop, nextTurn, setPhase, setMaxTurns, setActiveAgent |
 | **Rules** | 2 | markFired, initRules |
 | **Token** | 5 | transform, attach, detach, merge, split |
 | **Batch** | 8 | filter, map, forEach, collect, count, find, shuffle, draw |
-| **Total** | **76** | **100% Complete** |
+| **Total** | **81** | **100% Complete** |
 
 ---
 
 ## Space of Contents
 
-1. [Stack Actions](#stack-actions) (10)
+1. [Stack Actions](#stack-actions) (11)
 2. [Space Actions](#space-actions) (14)
 3. [Source Actions](#source-actions) (7)
-4. [Agent Actions](#agent-actions) (16)
-5. [Game Actions](#game-actions) (7)
+4. [Agent Actions](#agent-actions) (17)
+5. [Game Actions](#game-actions) (9)
 6. [GameLoop Actions](#gameloop-actions) (7)
 7. [Rules Actions](#rules-actions) (2)
-6. [Token Actions](#token-actions) (5)
-7. [Batch Actions](#batch-actions) (5)
+8. [Token Actions](#token-actions) (5)
+9. [Batch Actions](#batch-actions) (8)
 
 ---
 
@@ -1889,7 +1889,7 @@ const legendary = engine.dispatch("tokens:find", {
 
 ---
 
-## `tokens:map` / `batch:map`
+## `tokens:map`
 
 Map tokens with a predefined operation (typed, zero-overhead).
 
@@ -1922,7 +1922,7 @@ const modified = engine.dispatch("tokens:map", {
 
 ---
 
-## `batch:shuffle`
+## `tokens:shuffle`
 
 Shuffle multiple decks in parallel (typed, zero-overhead).
 
@@ -1947,7 +1947,7 @@ const shuffled = JSON.parse(shuffledJson);
 
 ---
 
-## `batch:draw`
+## `tokens:draw`
 
 Draw from multiple decks in parallel (typed, zero-overhead).
 
@@ -1981,7 +1981,7 @@ const result = JSON.parse(resultJson);
 
 ## Action Index
 
-**Stack (10)**
+**Stack (11)**
 - stack:shuffle
 - stack:draw
 - stack:reset
@@ -1992,8 +1992,9 @@ const result = JSON.parse(resultJson);
 - stack:removeAt
 - stack:swap
 - stack:reverse
+- stack:discard
 
-**Space (13)**
+**Space (14)**
 - space:place
 - space:clear
 - space:move
@@ -2018,7 +2019,7 @@ const result = JSON.parse(resultJson);
 - source:removeStack
 - source:inspect
 
-**Agent (16)**
+**Agent (17)**
 - agent:create
 - agent:remove
 - agent:setActive
@@ -2035,14 +2036,17 @@ const result = JSON.parse(resultJson);
 - agent:stealResource
 - agent:stealToken
 - agent:trade
+- agent:setMeta
 
-**Game (7)**
+**Game (9)**
 - game:start
 - game:end
 - game:pause
 - game:resume
 - game:nextPhase
 - game:setProperty
+- game:mergeState
+- game:setState
 - game:getState
 
 **Token (5)**
@@ -2059,8 +2063,8 @@ const result = JSON.parse(resultJson);
 - tokens:collect
 - tokens:count
 - tokens:find
-- batch:shuffle
-- batch:draw
+- tokens:shuffle
+- tokens:draw
 
 ---
 
@@ -2075,6 +2079,6 @@ const result = JSON.parse(resultJson);
 
 ---
 
-**Total: 67 actions - 100% complete and documented**
+**Total: 81 actions - 100% complete and documented**
 
-**Note:** An additional debug action (`debug:log`) exists in the legacy JSON dispatch system, bringing the total to 68 actions. The 67 actions listed here are all available as zero-overhead typed methods in the Rust/WASM core.
+**Note:** All 81 actions live in the TS `ActionRegistry`. 47 of them route through the Rust/WASM core (`WASM_ACTIONS`), with a TypeScript fallback for the rest; `debug:log` is the single Debug-category action. The parity audit (`test/audit-parity.js`) enforces code/docs/WASM agreement.
