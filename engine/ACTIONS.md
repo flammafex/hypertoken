@@ -182,8 +182,8 @@ engine.dispatch("agent:drawCards", { name: "Bob", count: 5 });
 
 **Agent Trading**
 ```javascript
-// Direct transfer
-engine.dispatch("agent:transfer", {
+// Direct resource transfer
+engine.dispatch("agent:transferResource", {
   from: "Alice",
   to: "Bob",
   resource: "gold",
@@ -234,32 +234,34 @@ const goldCount = engine.dispatch("tokens:count", {
 
 ## Event System
 
-All actions emit events through the EventBus. Listen for them:
+Every successful dispatch emits `engine:action` on the engine, and every state mutation emits `state:updated`. Listen with `engine.on(...)` and filter on the action type:
 
 ```javascript
-// Listen to specific action
-engine.eventBus.on("agent:transfer", (data) => {
-  console.log(`${data.from} transferred to ${data.to}`);
+// Listen to all actions
+engine.on("engine:action", (e) => {
+  console.log(`Action: ${e.payload.type}`);
 });
 
-// Listen to all actions
-engine.eventBus.on("action:dispatched", (action) => {
-  console.log(`Action: ${action.type}`);
+// Listen to a specific action
+engine.on("engine:action", (e) => {
+  const action = e.payload;
+  if (action.type === "agent:transferResource") {
+    const { from, to, resource, amount } = action.payload;
+    console.log(`${from} transferred ${amount} ${resource} to ${to}`);
+  }
 });
 ```
 
 **Common events:**
-- `stack:shuffled`
-- `agent:transfer`
-- `agent:trade`
-- `agent:steal`
-- `token:transformed`
-- `token:attached`
-- `token:merged`
-- `token:split`
-- `tokens:filtered`
-- `action:dispatched`
-- `action:error`
+- `engine:action` — every successful dispatch (payload = the `Action`)
+- `engine:error` — dispatch failures and unknown actions
+- `state:updated` — session state changed (after each mutation)
+- `game:started`, `game:ended`, `game:paused`, `game:resumed`, `game:phaseChanged`
+- `turn:changed`, `loop:start`, `loop:stop`
+- `rule:triggered`, `rule:error`, `rule:cleared`
+- `policy:triggered`, `policy:error`
+- `agent:beginTurn`
+- `engine:undo`, `engine:restored`, `engine:compacted`, `engine:merged`, `engine:saved`
 
 ---
 
@@ -269,7 +271,7 @@ Actions throw descriptive errors:
 
 ```javascript
 try {
-  engine.dispatch("agent:transfer", {
+  engine.dispatch("agent:transferResource", {
     from: "Alice",
     to: "Bob",
     resource: "gold",
@@ -277,7 +279,7 @@ try {
   });
 } catch (error) {
   console.error(error.message);
-  // "Agent Alice only has 100 gold, cannot transfer 1000"
+  // "Agent 'Alice' has 100 gold but 1000 requested"
 }
 ```
 
@@ -326,7 +328,7 @@ npm test
 **Resource Management**
 - Give: `agent:giveResource`
 - Take: `agent:takeResource`
-- Transfer: `agent:transfer`
+- Transfer: `agent:transferResource` (resources) / `agent:transferToken` (tokens)
 - Trade: `agent:trade`
 
 **Token Lifecycle**

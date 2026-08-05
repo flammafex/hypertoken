@@ -19,6 +19,7 @@ Complete documentation for all 81 built-in actions in the HyperToken engine.
 | **Rules** | 2 | markFired, initRules |
 | **Token** | 5 | transform, attach, detach, merge, split |
 | **Batch** | 8 | filter, map, forEach, collect, count, find, shuffle, draw |
+| **Debug** | 1 | log |
 | **Total** | **81** | **100% Complete** |
 
 ---
@@ -237,6 +238,23 @@ engine.dispatch("stack:reverse");
 **Returns:** void
 
 **Use cases:** Stack manipulation, special effects
+
+---
+
+## `stack:discard`
+
+Remove a specific card from the stack's discard collection.
+
+```javascript
+engine.dispatch("stack:discard", { card: myCard });
+```
+
+**Parameters:**
+- `card` (object, required): The card to discard (a `Token`; throws if missing)
+
+**Returns:** The discarded token, or `null` (delegates to `Stack.discard`)
+
+**Use cases:** Discard mechanics, removal from play, hand management
 
 ---
 
@@ -948,6 +966,29 @@ const agents = engine.dispatch("agent:getAll");
 
 ---
 
+## `agent:setMeta`
+
+Set a metadata field on an agent.
+
+```javascript
+engine.dispatch("agent:setMeta", {
+  name: "Alice",
+  key: "color",
+  value: "blue"
+});
+```
+
+**Parameters:**
+- `name` (string, required): Agent name (must exist)
+- `key` (string, required): Metadata key (throws if missing)
+- `value` (any): Value to store on `agent.meta[key]`
+
+**Returns:** void
+
+**Use cases:** Custom agent state, cosmetics, ability flags, per-game metadata
+
+---
+
 ## `agent:transferResource`
 
 Transfer resources between agents (typed, zero-overhead).
@@ -975,7 +1016,7 @@ engine.dispatch("agent:transferResource", {
 
 **Use cases:** Gifting resources, tribute, payment, lending
 
-**Events:** Emits `agent:transferResource`
+**Events:** none — dispatch emits `engine:action`; mutations emit `state:updated`
 
 ---
 
@@ -1004,7 +1045,7 @@ engine.dispatch("agent:transferToken", {
 
 **Use cases:** Gifting items, trading equipment, passing tokens
 
-**Events:** Emits `agent:transferToken`
+**Events:** none — dispatch emits `engine:action`; mutations emit `state:updated`
 
 ---
 
@@ -1035,7 +1076,7 @@ engine.dispatch("agent:stealResource", {
 
 **Use cases:** Theft mechanics, raiding, piracy, combat loot
 
-**Events:** Emits `agent:stealResource`
+**Events:** none — dispatch emits `engine:action`; mutations emit `state:updated`
 
 **Notes:** Steals as much as possible (up to requested amount)
 
@@ -1066,43 +1107,13 @@ engine.dispatch("agent:stealToken", {
 
 **Use cases:** Pickpocketing, disarming, stealing equipment
 
-**Events:** Emits `agent:stealToken`
+**Events:** none — dispatch emits `engine:action`; mutations emit `state:updated`
 
 ---
 
-## `agent:transfer`
-
-Transfer resources/tokens between agents.
-
-```javascript
-// Transfer resources
-engine.dispatch("agent:transfer", {
-  from: "Alice",
-  to: "Bob",
-  resource: "gold",
-  amount: 50
-});
-
-// Transfer a token
-engine.dispatch("agent:transfer", {
-  from: "Alice",
-  to: "Bob",
-  token: magicSword
-});
-```
-
-**Parameters:**
-- `from` (string, required): Source agent
-- `to` (string, required): Target agent
-- `resource` (string): Resource type (if transferring resources)
-- `amount` (number, default: 1): Amount to transfer
-- `token` (Token): Specific token to transfer
-
-**Returns:** Transfer result object
-
-**Use cases:** Gifting, tribute, payment, lending
-
-**Events:** Emits `agent:transfer`
+> **No composite `agent:transfer` action exists in the registry.** Transfers are dispatched as two separate actions:
+> - [`agent:transferResource`](#agenttransferresource) — move a resource amount
+> - [`agent:transferToken`](#agenttransfertoken) — move a specific token
 
 ---
 
@@ -1147,52 +1158,16 @@ engine.dispatch("agent:trade", {
 
 **Use cases:** Marketplace, bartering, agreements
 
-**Events:** Emits `agent:trade`
+**Events:** none — dispatch emits `engine:action`; mutations emit `state:updated`
 
 **Notes:** Atomic operation - both transfers succeed or both fail
 
 ---
 
-## `agent:steal`
-
-Forcibly take resources/tokens (with optional validation).
-
-```javascript
-// Basic steal
-engine.dispatch("agent:steal", {
-  from: "Victim",
-  to: "Thief",
-  resource: "gold",
-  amount: 50
-});
-
-// Steal with validation
-engine.dispatch("agent:steal", {
-  from: "Victim",
-  to: "Thief",
-  resource: "gold",
-  amount: 50,
-  validate: (thief, victim, engine) => {
-    return thief.meta.hasThiefAbility === true;
-  }
-});
-```
-
-**Parameters:**
-- `from` (string, required): Victim agent
-- `to` (string, required): Thief agent
-- `resource` (string): Resource type
-- `amount` (number, default: 1): Amount to steal
-- `token` (Token): Specific token to steal
-- `validate` (function, optional): Validation function
-
-**Returns:** Steal result object
-
-**Use cases:** Theft mechanics, raiding, piracy, combat loot
-
-**Events:** Emits `agent:steal`
-
-**Notes:** Steals as much as possible (up to requested amount)
+> **No composite `agent:steal` action exists in the registry.** Steals are dispatched as two separate actions:
+> - [`agent:stealResource`](#agentstealresource) — forcibly take a resource amount
+> - [`agent:stealToken`](#agentstealtoken) — forcibly take a specific token
+> Neither accepts a `validate` callback.
 
 ---
 
@@ -1350,6 +1325,64 @@ const state = engine.dispatch("game:getState");
 - Custom properties set via `game:setProperty`
 
 **Use cases:** State inspection, UI updates, saving game state, debugging
+
+---
+
+## `game:mergeState`
+
+Merge a plain object into the game state (`doc.gameState`).
+
+```javascript
+engine.dispatch("game:mergeState", {
+  state: { phase: "bidding", pot: 100 }
+});
+```
+
+**Parameters:**
+- `state` (object, required): Plain object merged via `Object.assign` into `doc.gameState` (throws if not an object)
+
+**Returns:** The updated game state object
+
+**Use cases:** Incremental game-state updates, phase data, custom state
+
+**TS-only:** No WASM counterpart — routes through the ActionRegistry fallback.
+
+---
+
+## `game:setState`
+
+Generic game-state writer. Lets game code write game-specific top-level state keys (e.g. `doc.watershed`, `doc.cuttle`) and nested field-level writes through `engine.dispatch()` instead of raw `session.change()`.
+
+```javascript
+// Whole-key write (merges into the existing key)
+engine.dispatch("game:setState", { key: "watershed", value: { territories: [], turn: 1 } });
+
+// Replace an existing key outright
+engine.dispatch("game:setState", { key: "cuttle", value: { phase: "recruit" }, replace: true });
+
+// Batch nested field-level writes
+engine.dispatch("game:setState", {
+  key: "watershed",
+  patches: [
+    { path: ["territories", "t1", "owner"], value: "Alice" },
+    { path: ["turn"], value: 2 },
+  ],
+});
+```
+
+**Parameters:**
+- `key` (string, required): Top-level document key to write (throws if missing)
+- `value` (any): Whole-key value — with `replace: true` assigns `doc[key] = value`; otherwise `Object.assign` merges into the existing key
+- `replace` (boolean): Only valid with `value`; overwrite instead of merge
+- `patches` (array): Batch of `{ path: string[], value }` field-level writes; mutually exclusive with `value`
+
+**Validation:** Throws `"value or patches required"`, `"use either value or patches, not both"`, `"replace is only valid with value"`, `"patches must be a non-empty array"`, `"each patch needs a non-empty string path"`, `"patch value required"`. Every value is JSON-sanitized centrally (`JSON.parse(JSON.stringify(v))`); non-serializable values throw `"value must be JSON-serializable"`.
+
+**Returns:** The written top-level value (`session.state[key]`)
+
+**TS-only:** No WASM counterpart — routes through the ActionRegistry fallback (consistent with `game:setProperty` and `game:mergeState`).
+
+**Use cases:** Game-specific state (`watershed`, `cuttle`), whole-key or nested field-level writes via `engine.dispatch()`
 
 ---
 
@@ -1989,6 +2022,28 @@ const result = JSON.parse(resultJson);
 
 ---
 
+# Debug Actions
+
+Diagnostic helpers.
+
+---
+
+## `debug:log`
+
+Log a value through the engine's debug channel.
+
+```javascript
+engine.dispatch("debug:log", { message: "turn 1 complete" });
+```
+
+**Parameters:** arbitrary payload
+
+**Returns:** The payload (pass-through)
+
+**Behavior:** Logs `[debug:log] <payload>` via `console.log` only when `engine.debug` is enabled. Not routed through WASM.
+
+---
+
 ## Action Index
 
 **Stack (11)**
@@ -2075,6 +2130,22 @@ const result = JSON.parse(resultJson);
 - tokens:find
 - tokens:shuffle
 - tokens:draw
+
+**GameLoop (7)**
+- game:loopInit
+- game:loopStart
+- game:loopStop
+- game:nextTurn
+- game:setPhase
+- game:setMaxTurns
+- game:setActiveAgent
+
+**Rules (2)**
+- rule:initRules
+- rule:markFired
+
+**Debug (1)**
+- debug:log
 
 ---
 

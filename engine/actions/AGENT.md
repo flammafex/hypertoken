@@ -8,7 +8,7 @@ Agent management and agent-to-agent interactions. Includes creation, resource ma
 
 ---
 
-## Actions (12)
+## Actions (13)
 
 **Management (4)**
 1. [agent:create](#agentcreate) - Create a new agent
@@ -22,10 +22,12 @@ Agent management and agent-to-agent interactions. Includes creation, resource ma
 7. [agent:drawCards](#agentdrawcards) - Agent draws cards
 8. [agent:discardCards](#agentdiscardcards) - Agent discards cards
 
-**Transfers (3)** ⭐ New
-9. [agent:transfer](#agenttransfer) - Direct resource/token transfer
-10. [agent:trade](#agenttrade) - Bidirectional exchange (atomic)
-11. [agent:steal](#agentsteal) - Forcible taking (with validation)
+**Transfers (5)**
+9. [agent:transferResource](#agenttransferresource) - Transfer a resource amount
+10. [agent:transferToken](#agenttransfertoken) - Transfer a specific token
+11. [agent:trade](#agenttrade) - Bidirectional exchange (atomic)
+12. [agent:stealResource](#agentstealresource) - Forcibly take a resource amount
+13. [agent:stealToken](#agentstealtoken) - Forcibly take a specific token
 
 ---
 
@@ -354,55 +356,31 @@ engine.dispatch("agent:discardCards", {
 
 ## Agent-to-Agent Transfers
 
-### `agent:transfer`
+### `agent:transferResource`
 
-Transfer resources or tokens from one agent to another (one-way).
+Transfer a resource amount from one agent to another (one-way).
 
 ```javascript
-// Transfer resources
-engine.dispatch("agent:transfer", {
+engine.dispatch("agent:transferResource", {
   from: "Alice",
   to: "Bob",
   resource: "gold",
   amount: 50
-});
-
-// Transfer a specific token
-engine.dispatch("agent:transfer", {
-  from: "Alice",
-  to: "Bob",
-  token: magicSwordToken
 });
 ```
 
 **Parameters:**
 - `from` (string, required): Source agent name
 - `to` (string, required): Target agent name
-- `resource` (string): Resource type (if transferring resources)
+- `resource` (string, required): Resource type
 - `amount` (number, default: 1): Amount to transfer
-- `token` (Token): Specific token to transfer (alternative to resource)
 
-**Returns:**
-```javascript
-{
-  success: true,
-  from: { agent: "Alice", remaining: 50 },
-  to: { agent: "Bob", total: 100 }
-}
-// OR for token transfers:
-{
-  success: true,
-  token: { id: "sword-1", ... }
-}
-```
-
-**Events:** `agent:transfer`
+**Returns:** void
 
 **Validation:**
-- Source agent must exist
-- Target agent must exist
-- Source must have sufficient resources/token
-- Transaction is recorded in `engine._transactions`
+- Both agents must exist
+- Source must have at least `amount` of `resource` — otherwise throws `Agent '<from>' has <n> <resource> but <amount> requested`
+- Records a `resource_transfer` entry in `doc.transactions` (exposed via `engine._transactions`)
 
 **Use cases:**
 - Gifting
@@ -410,26 +388,36 @@ engine.dispatch("agent:transfer", {
 - Payment for services
 - Lending
 
-**Example:**
+---
+
+### `agent:transferToken`
+
+Transfer a specific token from one agent's inventory to another (one-way).
+
 ```javascript
-// Pay another agent
-engine.dispatch("agent:transfer", {
+engine.dispatch("agent:transferToken", {
   from: "Alice",
   to: "Bob",
-  resource: "gold",
-  amount: 100
+  tokenId: "sword-123"
 });
-
-// Give item to teammate
-engine.dispatch("agent:transfer", {
-  from: "Alice",
-  to: "Bob",
-  token: healingPotion
-});
-
-// Check transaction history
-console.log(engine._transactions);
 ```
+
+**Parameters:**
+- `from` (string, required): Source agent name
+- `to` (string, required): Target agent name
+- `tokenId` (string, required): ID of the token to transfer
+
+**Returns:** void
+
+**Validation:**
+- Both agents must exist
+- The token must be in the source agent's inventory — otherwise throws `Token "<id>" not found in agent "<from>"`
+- Records a `token_transfer` entry in `doc.transactions`
+
+**Use cases:**
+- Gifting items
+- Trading equipment
+- Passing tokens between players
 
 ---
 
@@ -509,101 +497,67 @@ if (tradeResult.success) {
 
 ---
 
-### `agent:steal`
+### `agent:stealResource`
 
-Forcibly take resources/tokens from another agent (with optional validation).
+Forcibly take a resource amount from another agent.
 
 ```javascript
-// Basic steal
-engine.dispatch("agent:steal", {
+engine.dispatch("agent:stealResource", {
   from: "Victim",
   to: "Thief",
   resource: "gold",
   amount: 50
-});
-
-// Steal with validation (ability check)
-engine.dispatch("agent:steal", {
-  from: "Victim",
-  to: "Thief",
-  resource: "gold",
-  amount: 50,
-  validate: (thief, victim, engine) => {
-    return thief.meta.hasThiefAbility === true;
-  }
-});
-
-// Steal a token
-engine.dispatch("agent:steal", {
-  from: "Victim",
-  to: "Thief",
-  token: treasureChest
 });
 ```
 
 **Parameters:**
 - `from` (string, required): Victim agent name
 - `to` (string, required): Thief agent name
-- `resource` (string): Resource type to steal
+- `resource` (string, required): Resource type to steal
 - `amount` (number, default: 1): Amount to steal
-- `token` (Token): Specific token to steal
-- `validate` (function, optional): `(thief, victim, engine) => boolean`
 
-**Returns:**
-```javascript
-{
-  success: true,
-  stolen: 30,  // Actual amount stolen (may be less than requested)
-  from: { agent: "Victim", remaining: 20 },
-  to: { agent: "Thief", total: 30 }
-}
-```
-
-**Events:** `agent:steal`
+**Returns:** void
 
 **Behavior:**
-- Steals as much as possible (up to requested amount)
-- If victim has less than requested, steals all available
-- Throws error if victim has nothing to steal
-- Optional validation function can prevent steal
-- Transaction is recorded
+- Steals as much as possible: `stolen = min(amount, available)` — no error on shortfall
+- Records a `steal_resource` entry in `doc.transactions` with the actual stolen amount
+- No `validate` callback parameter (unlike earlier drafts of this action)
 
 **Use cases:**
-- Theft abilities
+- Theft mechanics
 - Raiding/piracy
 - Combat looting
 - Bandit mechanics
 
-**Example:**
-```javascript
-// Simple theft
-try {
-  const result = engine.dispatch("agent:steal", {
-    from: "Merchant",
-    to: "Bandit",
-    resource: "gold",
-    amount: 100
-  });
-  
-  console.log(`Stole ${result.stolen} gold!`);
-} catch (error) {
-  console.log("Theft failed:", error.message);
-}
+---
 
-// Theft with skill check
-const stealResult = engine.dispatch("agent:steal", {
-  from: "Merchant",
-  to: "Rogue",
-  resource: "gold",
-  amount: 50,
-  validate: (rogue, merchant, engine) => {
-    // Success based on stats
-    const skill = Math.random() * rogue.meta.stealth;
-    const awareness = Math.random() * merchant.meta.awareness;
-    return skill > awareness;
-  }
+### `agent:stealToken`
+
+Forcibly take a specific token from another agent's inventory.
+
+```javascript
+engine.dispatch("agent:stealToken", {
+  from: "Victim",
+  to: "Thief",
+  tokenId: "sword-123"
 });
 ```
+
+**Parameters:**
+- `from` (string, required): Victim agent name
+- `to` (string, required): Thief agent name
+- `tokenId` (string, required): ID of the token to steal
+
+**Returns:** void
+
+**Behavior:**
+- The token must be in the victim's inventory — otherwise throws `Token "<id>" not found in agent "<from>"`
+- Records a `steal_token` entry in `doc.transactions`
+
+**Use cases:**
+- Pickpocketing
+- Disarming
+- Stealing equipment
 
 ---
 
@@ -699,7 +653,7 @@ class Marketplace {
 // Vassals pay lords
 function collectTribute(engine, vassals, lord, amount) {
   vassals.forEach(vassal => {
-    engine.dispatch("agent:transfer", {
+    engine.dispatch("agent:transferResource", {
       from: vassal,
       to: lord,
       resource: "gold",
@@ -717,7 +671,7 @@ function combatLoot(engine, winner, loser) {
   const goldAmount = Math.floor((loserAgent.resources.gold || 0) / 2);
   
   if (goldAmount > 0) {
-    engine.dispatch("agent:steal", {
+    engine.dispatch("agent:stealResource", {
       from: loser,
       to: winner,
       resource: "gold",
@@ -731,10 +685,10 @@ function combatLoot(engine, winner, loser) {
       Math.floor(Math.random() * loserAgent.hand.length)
     ];
     
-    engine.dispatch("agent:steal", {
+    engine.dispatch("agent:stealToken", {
       from: loser,
       to: winner,
-      token: randomItem
+      tokenId: randomItem.id
     });
   }
 }
