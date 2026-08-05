@@ -38,7 +38,12 @@ available via `git log`.
     only on `place`/`move`/`remove`/`flip` (`clearZone`/`shuffleZone`/
     `transferZone` ignore them); non-integer stack positions coerce to `usize`
     on WASM while TS throws; TS writes `source.seed` but Rust does not; Rust
-    `read_zones` exports `_lock:*` keys as zero-length lists.
+    `read_zones` exports `_lock:*` keys as zero-length lists; the WASM
+    `Source.shuffle` mirror parses seed strings via `parse::<i32>()`
+    (extreme/non-numeric seeds silently store `null` while TS stores the raw
+    number); batch token-op tests assert ids/counts only — full token shapes
+    diverge (Rust serde adds label/group nulls) and function predicates are
+    TS-only.
 
 ### Planned
 - Game module contract (`GameDefinition`) formalizing the per-game action

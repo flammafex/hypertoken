@@ -143,6 +143,9 @@ impl Source {
         // Update seed if provided
         if let Some(seed_str) = seed.as_ref() {
             if !seed_str.is_empty() {
+                // parse::<i32>() silently fails on extreme/non-numeric seeds,
+                // leaving seed None while TS stores the raw number (accepted
+                // divergence, documented in CHANGELOG + parity tests).
                 if let Ok(seed_int) = seed_str.parse::<i32>() {
                     self.state.seed = Some(seed_int);
                 }

@@ -956,6 +956,9 @@ if (!wasmLoaded) {
   await test("parity: source:shuffle seeded exact order", async () => {
     // RNG unified (both paths use mulberry32(seed)) — orders must match exactly.
     // Remaining divergence: TS writes source.seed (42); Rust leaves it null.
+    // Residual: the WASM Source.shuffle mirror parses seeds via parse::<i32>()
+    // (core-rs/src/source.rs:146) — extreme/non-numeric seeds silently fall
+    // back to null there while TS stores the raw number. Not exercised here.
     const { tsState, wasmState } = await parityCheck([
       { type: "source:shuffle", payload: { seed: 42 } },
     ]);
@@ -1081,6 +1084,9 @@ if (!wasmLoaded) {
     assert.deepEqual(wasmResult.map((t: any) => t.id), ["t1", "t2", "t3", "t1", "t2"], "WASM collect ids");
   });
 
+  // Predicate parity exercises "reversed" — the string predicate both paths
+  // accept. Function predicates are TS-only and other spellings are not
+  // guaranteed to align (documented divergence; see CHANGELOG).
   await test("parity: tokens:count predicate", async () => {
     const tsEngine = createTsEngine();
     const wasmEngine = createWasmEngine();
