@@ -14,7 +14,7 @@ type DispatchOutcome<T> =
 ```
 
 Narrow on `outcome.ok` before reading `result` or `error`. Error codes are
-`UNKNOWN_ACTION`, `ACTION_HANDLER_ERROR`, and `WASM_EXECUTION_ERROR`.
+`UNKNOWN_ACTION` and `ACTION_HANDLER_ERROR`.
 
 The legacy `dispatch()` API still returns the handler result, but now rejects
 with `DispatchError` on failure. A successful handler that returns no value

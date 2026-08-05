@@ -6,7 +6,6 @@ Get up and running in 5 minutes.
 
 - **Node.js 18+** - [Download](https://nodejs.org/)
 - **Git** - [Download](https://git-scm.com/)
-- **Rust** (optional) - Only needed if building WASM from source
 
 Verify your setup:
 ```bash
@@ -146,16 +145,6 @@ npm run blackjack:client
 npm run clean    # Reset build artifacts
 npm install      # Reinstall dependencies
 npm run build    # Try again
-```
-
-### WASM Errors
-
-If you see WASM-related errors, the pre-built WASM binaries should work. If not:
-
-```bash
-# Requires Rust toolchain
-npm run build:rust
-npm run build
 ```
 
 ### Tests Fail

@@ -11,7 +11,7 @@
  *
  * Usage:
  *   import "./crdt-actions.js";  // Register CRDT-aware actions
- *   const engine = new Engine({ disableWasm: true });
+ *   const engine = new Engine();
  *   await engine.dispatch("cuttle:init", { seed: 12345 });
  *   engine.connect("ws://localhost:9091");
  */

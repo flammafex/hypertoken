@@ -8,7 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Prior to 0.3.0 the project did not maintain a changelog; earlier history is
 available via `git log`.
 
-## [Unreleased]
+## [0.4.0] - 2026-08-05
+
+### Removed
+- **Rust→WASM core removed; engine is now TypeScript-only.** Deleted `core-rs/`
+  (Rust source, `Cargo.toml`, `build.sh`, `pkg/`), `core/WasmBridge.ts`,
+  `core/WasmChronicleAdapter.ts`, `engine/WasmManager.ts`, and the WASM test
+  files (`test/testWasmBridge.ts`, `test/testChronicleIncremental.ts`,
+  `test/audit-parity.js`). The `disableWasm` option was removed from the
+  `Engine`. All actions now route through the single TypeScript `ActionRegistry`
+  path, which mutates the Automerge Chronicle via `session.change()`. The
+  `ActionProfiler` is wired into `Engine.dispatch` via `globalProfiler` (from
+  `benchmark/ActionProfiler.js`). The pre-removal state is preserved at the git
+  tag `pre-rust-removal`.
 
 ### Changed
 - **Chronicle-incremental parity coverage.** `test/testChronicleIncremental.ts`
@@ -99,4 +111,5 @@ available via `git log`.
 ### Changed
 - Version bumped 0.2.0 → 0.3.0.
 
+[0.4.0]: https://git.carpocratian.org/sibyl/hypertoken
 [0.3.0]: https://git.carpocratian.org/sibyl/hypertoken

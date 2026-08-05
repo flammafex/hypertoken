@@ -19,7 +19,7 @@
 import { runRelay } from './commands/relay.js';
 import { runMcp } from './commands/mcp.js';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 function showHelp(): void {
   console.log(`

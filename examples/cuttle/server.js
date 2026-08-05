@@ -104,10 +104,8 @@ class CuttleRoomServer extends RoomAuthoritativeServer {
     this.connectionToPlayer = new Map();
 
     // Set up room engine factory
-    // disableWasm: room engines only run TS actions (cuttle:*, game:setState),
-    // which have no WASM counterpart.
     this.createRoomEngine = (roomCode, variant) => {
-      const engine = new Engine({ disableWasm: true });
+      const engine = new Engine();
       setupEngineListeners(engine, roomCode);
       return engine;
     };

@@ -62,8 +62,7 @@ npm run build
 npm run blackjack
 ```
 
-Pre-built WASM binaries included. See [Getting Started Guide](./docs/GETTING_STARTED.md) for the full walkthrough.
-
+See [Getting Started Guide](./docs/GETTING_STARTED.md) for the full walkthrough.
 ---
 
 ## 🏗️ How It Works
@@ -132,16 +131,8 @@ hypertoken/
 ├── core/browser/          # Browser build infrastructure (shims, esbuild config)
 ├── core/storage/          # Storage adapters (IndexedDB, Filesystem, Memory)
 │
-├── core-rs/                # Rust → WASM acceleration for action dispatch
-│   └── src/
-│       ├── stack.rs       # 10 stack operations
-│       ├── space.rs       # 14 spatial operations
-│       ├── agent.rs       # 16 agent operations
-│       ├── token_ops.rs   # 7 token transformations
-│       └── batch.rs       # 8 batch operations
-│
 ├── engine/                 # Game coordination
-│   ├── Engine.ts          # Action dispatch, WASM integration
+│   ├── Engine.ts          # Action dispatch
 │   ├── GameLoop.ts        # Turn management
 │   └── RuleEngine.ts      # Condition-triggered actions
 │

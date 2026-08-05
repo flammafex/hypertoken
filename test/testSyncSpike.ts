@@ -8,8 +8,6 @@
  * 2. Bidirectional sync (B dispatches, A sees it)
  * 3. Disconnect and reconnect (state catches up)
  * 4. Concurrent edits (both dispatch simultaneously, CRDT merges)
- *
- * Uses disableWasm: true to force TS Chronicle path (optional — WASM sync also works).
  */
 import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
@@ -54,8 +52,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 1: Basic state convergence ---
   await runTest("Basic state convergence (A → B)", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     const cardsA = [
       new Token({ id: "c1", label: "Card 1" }),
@@ -87,8 +85,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 2: Bidirectional sync (B → A) ---
   await runTest("Bidirectional sync (B → A)", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     const cardsA = [
       new Token({ id: "b1", label: "Card B1" }),
@@ -120,8 +118,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 3: Disconnect and reconnect ---
   await runTest("Disconnect and reconnect (state catches up)", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     const cardsA = [
       new Token({ id: "d1", label: "Card D1" }),
@@ -162,8 +160,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 4: Concurrent edits (CRDT merge) ---
   await runTest("Concurrent edits (both dispatch simultaneously)", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     // Use space:place for concurrent edits (different zones, no conflict)
     const cardsA = [
@@ -210,8 +208,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 5: Multiple sequential actions ---
   await runTest("Multiple sequential actions (5 draws)", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     const cardsA: Token[] = [];
     for (let i = 0; i < 10; i++) {

@@ -118,7 +118,7 @@ class ProjectionRoomServer extends RoomAuthoritativeServer {
 
   constructor() {
     super({ port: 0, verbose: false });
-    this.createRoomEngine = () => new Engine({ disableWasm: true });
+    this.createRoomEngine = () => new Engine();
     this.initializeRoom = async (engine) => {
       await engine.dispatch("game:setProperty", { key: "privateRoomValue", value: SECRET });
     };
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
   console.log("Authoritative outbound projection tests");
 
   await test("projects welcome, describe, live state, history, and dispatch outcomes", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     await engine.dispatch("game:setProperty", { key: "privateValue", value: SECRET });
     const server = new ProjectionServer(engine, { port: 0, verbose: false });
     await server.start();

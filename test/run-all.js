@@ -50,8 +50,6 @@ const CATEGORIES = {
 
 // Extended suites — only run with --all.
 const EXTENDED = {
-  wasm: [{ file: 'testWasmBridge.ts' }],
-  'chronicle-incremental': [{ file: 'testChronicleIncremental.ts' }],
   batch: [{ file: 'testBatchActions.ts' }],
   'sync:spike': [{ file: 'testSyncSpike.ts' }],
   'sync:hardening': [{ file: 'testSyncHardening.ts' }],

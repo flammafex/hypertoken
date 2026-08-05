@@ -1,8 +1,8 @@
 /*
  * core/IChronicle.ts
  *
- * Abstraction over Chronicle (Automerge) and WasmChronicleAdapter (dirty-section caching).
- * Allows Engine and ConsensusCore to work with either backend transparently.
+ * Abstraction over Chronicle (Automerge). Allows Engine and ConsensusCore to
+ * work with the backend transparently.
  */
 
 import type { HyperTokenState } from "./types.js";

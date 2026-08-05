@@ -18,8 +18,8 @@ multiplayer with CRDT state convergence, no central server deciding state.
   key (E2EEncryption ECDH + AES-GCM). Only the recipient can decrypt.
 - **Reveal verification.** When a card is played, peers verify it matches its
   prior commitment.
-- **TS-only path.** No WASM dispatcher. WasmChronicleAdapter doesn't implement
-  sync methods. Engine must be forced to TS path deterministically.
+- **TS-only path.** The engine is TypeScript-only; all actions route through the
+  TS `ActionRegistry` and the Automerge `Chronicle` sync methods.
 - **Snapshot-in-CRDT.** CuttleGame stays as a mutable rules engine. After each
   accepted action, a sanitized snapshot is written to Chronicle via
   `session.change()`. Full-state replacement, not field-level CRDT ops.
@@ -36,7 +36,6 @@ multiplayer with CRDT state convergence, no central server deciding state.
   2-player turn-based game where concurrent writes are rare.
 - **Chronicle-native CuttleGame migration.** CuttleGame stays mutable; we write
   snapshots to Chronicle, not field-level ops.
-- **WASM acceleration.** TS-only path for sync correctness.
 - **Teams / cutthroat variant.** Classic 2-player only.
 - **Spectators.** Two players only, no observer mode.
 - **Persistence across sessions.** In-memory CRDT sync only. Save/resume is a

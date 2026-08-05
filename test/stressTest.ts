@@ -122,7 +122,7 @@ async function main() {
   console.log(`Measuring at: ${MEASURE_AT.join(", ")} actions\n`);
 
   // Create engine with WASM disabled (pure TS path — the common case)
-  const engine = new Engine({ disableWasm: true });
+  const engine = new Engine();
   const deck = makeDeck(DECK_SIZE);
   engine.stack = new Stack(engine.session as any, deck, { seed: 42 });
   engine.space = new Space(engine.session as any, "board");

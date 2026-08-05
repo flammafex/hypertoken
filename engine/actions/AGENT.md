@@ -2,8 +2,6 @@
 
 Agent management and agent-to-agent interactions. Includes creation, resource management, and economic transfers.
 
-**WASM routing:** all mutating `agent:*` actions route through the WASM dispatcher when active; `agent:get`, `agent:getAll` remain on the TypeScript path (read-only; getAll return shape diverges).
-
 [← Back to Action Reference](../ACTIONS.md)
 
 ---

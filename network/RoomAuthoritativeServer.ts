@@ -79,9 +79,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
 
   constructor(options: RoomAuthoritativeServerOptions = {}) {
     // Create a dummy engine for the base class - we'll use per-room engines.
-    // disableWasm: room engines only dispatch TS-only game actions
-    // (game:setState, cuttle:*, etc.) which have no WASM counterpart.
-    const dummyEngine = new Engine({ disableWasm: true });
+    const dummyEngine = new Engine();
     super(dummyEngine, options);
 
     this.maxRooms = options.maxRooms ?? 100;
@@ -94,9 +92,7 @@ export class RoomAuthoritativeServer extends AuthoritativeServer {
     });
 
     // Default engine factory - subclasses should override.
-    // disableWasm: room engines dispatch TS-only game actions (game:setState,
-    // space ops, cuttle:*, etc.) which have no WASM counterpart.
-    this.createRoomEngine = () => new Engine({ disableWasm: true });
+    this.createRoomEngine = () => new Engine();
 
     // Wire up room manager events
     this.roomManager.on("rooms:deleted", (evt) => {

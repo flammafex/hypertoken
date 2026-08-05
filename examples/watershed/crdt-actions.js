@@ -12,7 +12,7 @@
  *
  * Usage:
  *   import "./crdt-actions.js";  // Register actions
- *   const engine = new Engine({ disableWasm: true });
+ *   const engine = new Engine();
  *   await engine.dispatch("watershed:init", {});
  *   engine.connect("ws://localhost:3000");
  */

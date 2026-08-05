@@ -18,8 +18,8 @@ import type { ConsensusCore } from "../core/ConsensusCore.js";
 import type { MessageCodec, CodecConfig } from "../network/MessageCodec.js";
 import type { ReconnectConfig } from "../network/PeerConnection.js";
 import { HistoryManager } from "./HistoryManager.js";
-import { WasmManager } from "./WasmManager.js";
 import { NetworkManager } from "./NetworkManager.js";
+import { globalProfiler } from "../benchmark/ActionProfiler.js";
 
 export interface EngineNetworkOptions {
   codec?: MessageCodec | Partial<CodecConfig>;
@@ -33,15 +33,12 @@ export interface EngineOptions {
   source?: Source | null;
   autoConnect?: string;
   useWebRTC?: boolean;
-  /** Disable WASM dispatcher and force TypeScript Chronicle path (needed for network sync). */
-  disableWasm?: boolean;
   networkOptions?: EngineNetworkOptions;
 }
 
 export type DispatchErrorCode =
   | "UNKNOWN_ACTION"
-  | "ACTION_HANDLER_ERROR"
-  | "WASM_EXECUTION_ERROR";
+  | "ACTION_HANDLER_ERROR";
 
 export interface DispatchSuccess<T = unknown> {
   ok: true;
@@ -83,13 +80,12 @@ export class Engine extends Emitter {
   debug: boolean;
 
   readonly historyManager: HistoryManager;
-  readonly wasm: WasmManager;
   readonly net: NetworkManager;
 
   private _useWebRTC: boolean;
   private _networkOptions: EngineNetworkOptions;
 
-  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, disableWasm = false, networkOptions = {} }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, networkOptions = {} }: EngineOptions = {}) {
     super();
 
     this.session = new Chronicle();
@@ -103,32 +99,14 @@ export class Engine extends Emitter {
     this.debug = false;
 
     this.historyManager = new HistoryManager();
-    this.wasm = new WasmManager();
     this.net = new NetworkManager();
 
     this.loop = new GameLoop(this);
     this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
 
-    if (!disableWasm) {
-      this._initWasm();
-    }
-
     if (autoConnect) {
       this.connect(autoConnect);
     }
-  }
-
-  private _initWasm(): void {
-    this.wasm.initDispatcher(
-      () => JSON.stringify(this.session.state),
-      this.debug,
-      (newSession) => {
-        this.session = newSession;
-        // Re-wire state:changed → state:updated relay
-        this.session.on("state:changed", (e: any) => this.emit("state:updated", e));
-      },
-      (e: any) => this.emit("state:updated", e),
-    );
   }
 
   // ── Public API compat getters ──────────────────────────────────────────────
@@ -140,10 +118,6 @@ export class Engine extends Emitter {
 
   get network(): INetworkConnection | undefined { return this.net.network; }
   get sync(): ConsensusCore | undefined { return this.net.sync; }
-
-  /** Test compatibility: get/set _wasmDispatcher via WasmManager. */
-  get _wasmDispatcher() { return this.wasm.dispatcher; }
-  set _wasmDispatcher(v: any) { this.wasm.setDispatcher(v); }
 
   // ── State getters ──────────────────────────────────────────────────────────
 
@@ -184,7 +158,6 @@ export class Engine extends Emitter {
 
   async shutdown(): Promise<void> {
     this.net.disconnect();
-    await this.wasm.terminate();
     this._policies.clear();
     this.historyManager.clear();
     this.emit('engine:shutdown');
@@ -264,35 +237,10 @@ export class Engine extends Emitter {
   }
 
   apply(action: Action): any {
-    if (this.wasm.dispatcher && WasmManager.WASM_ACTIONS.has(action.type)) {
-      try {
-        const result = this.wasm.dispatch(action.type, action.payload);
-        if (this._isPromiseLike(result)) {
-          return Promise.resolve(result).then(
-            resolved => {
-              action.result = resolved;
-              this.session.emit("state:changed", { source: "dispatch" });
-              return resolved;
-            },
-            err => {
-              this.emit("engine:error", { payload: { action, err } });
-              throw new DispatchError("WASM_EXECUTION_ERROR", this._errorMessage(err), action.id, err);
-            },
-          );
-        }
-        action.result = result;
-        this.session.emit("state:changed", { source: "dispatch" });
-        return result;
-      } catch (err) {
-        this.emit("engine:error", { payload: { action, err } });
-        throw new DispatchError("WASM_EXECUTION_ERROR", this._errorMessage(err), action.id, err);
-      }
-    }
-
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {
-        const result = fn(this, action.payload);
+        const result = globalProfiler.record(action.type, () => fn(this, action.payload));
         if (this._isPromiseLike(result)) {
           return Promise.resolve(result).then(
             resolved => {
@@ -403,7 +351,7 @@ export class Engine extends Emitter {
    */
   fork(): Engine {
     const forkedSession = this.session.fork();
-    const forkedEngine = new Engine({ disableWasm: true }); // fork uses TS path
+    const forkedEngine = new Engine(); // fork uses TS path
     forkedEngine.session = forkedSession as any;
     forkedEngine.space = new Space(forkedSession as any, "main-space");
     // Copy current state references — Stack/Source are stateless views over the session

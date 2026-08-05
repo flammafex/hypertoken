@@ -46,13 +46,6 @@ npm run test:rule-sync     # Rule engine sync
 npm run test:network       # All network tests
 ```
 
-#### WASM Tests
-```bash
-npm run test:wasm                    # WASM bridge
-npm run test:chronicle-incremental   # Chronicle incremental CRDT TS/WASM parity
-npm run test:rust                    # Rust unit tests (requires Rust)
-```
-
 #### Stress Tests
 ```bash
 npm run test:stress        # CRDT document growth & HistoryManager memory
@@ -224,7 +217,6 @@ test/
 ├── testAgent.ts          # Agent system
 ├── testPolicy.ts         # Policies
 ├── testSync.ts           # Network sync
-├── testWasmBridge.ts     # WASM integration
 ├── benchmarks.ts         # Performance tests
 └── ts-esm-loader.js      # TypeScript ESM loader
 ```
@@ -260,11 +252,4 @@ npm run build
 Use the ESM loader:
 ```bash
 node --loader ./test/ts-esm-loader.js test/myTest.ts
-```
-
-### WASM Tests Fail
-WASM tests require built binaries:
-```bash
-npm run build:rust
-npm run test:wasm
 ```

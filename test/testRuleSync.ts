@@ -20,7 +20,7 @@ async function run() {
   await server.start();
 
   // 2. Setup Host with RuleEngine
-  const host = new Engine({ disableWasm: true });
+  const host = new Engine();
   const hostRules = new RuleEngine(host);
   host.useRuleEngine(hostRules);
 
@@ -34,7 +34,7 @@ async function run() {
   );
 
   // 3. Setup Client (No local rules needed, just observing state)
-  const client = new Engine({ disableWasm: true });
+  const client = new Engine();
 
   console.log("Connecting peers...");
   host.connect("ws://localhost:9093");

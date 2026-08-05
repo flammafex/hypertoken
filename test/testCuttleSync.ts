@@ -9,8 +9,7 @@
  * 3. Player 0 (on A) draws → state syncs to B
  * 4. State converges — both engines see the same game state
  *
- * Uses disableWasm: true (optional — WASM sync also works) and crdt-actions.js
- * (CRDT-aware action handlers that write snapshots to Chronicle).
+ * Uses crdt-actions.js (CRDT-aware action handlers that write snapshots to Chronicle).
  */
 import { Engine } from "../engine/Engine.js";
 import { UniversalRelayServer } from "../network/UniversalRelayServer.js";
@@ -48,8 +47,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 1: Initial state syncs from A to B ---
   await runTest("Initial game state syncs A → B", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     // Set up sync listeners on BOTH engines (B needs it to receive remote state)
     setupCuttleSync(engineA);
@@ -88,8 +87,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 2: Action on B syncs back to A ---
   await runTest("Player 1 draws on B → syncs to A", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     setupCuttleSync(engineA);
     setupCuttleSync(engineB);
@@ -134,8 +133,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 3: Alternating turns (B then A) ---
   await runTest("Alternating turns: P1 draws (B), P0 draws (A)", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     setupCuttleSync(engineA);
     setupCuttleSync(engineB);
@@ -184,8 +183,8 @@ async function runTests(): Promise<void> {
 
   // --- Test 4: State convergence after multiple turns ---
   await runTest("State convergence after 4 turns", async () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     setupCuttleSync(engineA);
     setupCuttleSync(engineB);

@@ -44,8 +44,8 @@ async function setupEngines(port: number): Promise<{ server: UniversalRelayServe
   const server = new UniversalRelayServer({ port, verbose: false });
   await server.start();
 
-  const engineA = new Engine({ disableWasm: true });
-  const engineB = new Engine({ disableWasm: true });
+  const engineA = new Engine();
+  const engineB = new Engine();
 
   setupCuttleSync(engineA);
   setupCuttleSync(engineB);

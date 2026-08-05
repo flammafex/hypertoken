@@ -90,7 +90,7 @@ const knight = new Token({
 ```javascript
 import { Engine } from "./engine/Engine.js";
 
-const engine = new Engine({ disableWasm: true });
+const engine = new Engine();
 
 // All state mutations go through engine.dispatch()
 await engine.dispatch("game:setState", { key: "game", value: { players: [], turn: 0 } });
@@ -279,7 +279,7 @@ const deck = new Stack(session, cards);
 // Create engine
 const engine = new Engine({ stack: deck });
 
-// Dispatch actions (async, supports WASM acceleration)
+// Dispatch actions (async)
 await engine.dispatch('stack:shuffle');
 const card = await engine.dispatch('stack:draw');
 const hand = await engine.dispatch('stack:draw', { count: 5 });
@@ -294,7 +294,6 @@ engine.on('net:ready', () => console.log('Connected to server'));
 
 **Key features:**
 - **Action dispatch**: Unified interface for all game operations
-- **WASM acceleration**: Optional Rust-powered performance
 - **Networking**: Built-in P2P and WebSocket support
 - **Policies**: Register game rules that evaluate after each action
 - **History**: Undo/redo support
@@ -440,22 +439,12 @@ HyperToken can be customized with custom actions, rules, policies, and agents. S
 
 ## Performance
 
-### WASM Acceleration
+### Action Profiling
 
-HyperToken includes optional Rust-compiled WASM for performance-critical operations:
-
-```javascript
-const engine = new Engine({
-  stack: deck,
-  useWorker: true  // Enable multi-threaded WASM
-});
-```
-
-### When to Use WASM
-
-- Large token collections (1000+ cards)
-- High-frequency operations (AI training)
-- Complex batch operations
+HyperToken wires the `ActionProfiler` into `Engine.dispatch` via `globalProfiler`
+(from `benchmark/ActionProfiler.js`). When profiling is enabled, every action
+handler is timed and per-action-type statistics are collected, so bottlenecks can
+be identified and optimized.
 
 For typical games, TypeScript is fast enough.
 

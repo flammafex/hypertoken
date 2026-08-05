@@ -444,7 +444,7 @@ async function main(): Promise<void> {
   console.log('  • Type "quit" to exit\n');
 
   // Create engine with TS-only path (required for CRDT sync)
-  engine = new Engine({ disableWasm: true });
+  engine = new Engine();
 
   // Set up sync listener
   setupCuttleSync(engine);

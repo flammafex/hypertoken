@@ -16,8 +16,6 @@ docker build -t hypertoken:latest .
 ```
 
 The build process:
-- Installs Rust toolchain and wasm-pack
-- Compiles Rust/WASM core for optimal performance
 - Installs Node.js dependencies
 - Compiles TypeScript to JavaScript
 - Creates an optimized runtime image (~400MB)
@@ -81,13 +79,12 @@ node dist/examples/blackjack/server.js
 ```bash
 docker run -it \
   -v $(pwd)/dist:/app/dist \
-  -v $(pwd)/core-rs/pkg:/app/core-rs/pkg \
   -p 3000:3000 \
   hypertoken:latest \
   node dist/cli/index.js relay
 ```
 
-This mounts your local `dist/` and `core-rs/pkg/` directories so you can rebuild code outside Docker and see changes immediately.
+This mounts your local `dist/` directory so you can rebuild code outside Docker and see changes immediately.
 
 ### Rebuild After Code Changes
 
@@ -106,10 +103,7 @@ docker compose build --no-cache
 The Dockerfile uses a multi-stage build for efficiency:
 
 1. **Builder Stage** (`node:20-bookworm`):
-   - Installs Rust toolchain (rustup, cargo)
-   - Adds wasm32-unknown-unknown target
-   - Installs wasm-pack
-   - Builds Rust/WASM core modules
+   - Installs Node.js dependencies
    - Compiles TypeScript
 
 2. **Runtime Stage** (`node:20-bookworm-slim`):
@@ -148,16 +142,10 @@ const blackjackUrl = 'http://localhost:9090';
 
 ### Build Failures
 
-**Issue**: Rust compilation fails
+**Issue**: TypeScript compilation fails
 ```bash
 # Solution: Ensure you have enough memory allocated to Docker
 # Docker Desktop: Settings → Resources → Memory (minimum 4GB recommended)
-```
-
-**Issue**: wasm-pack installation fails
-```bash
-# Solution: Build with no cache to get fresh downloads
-docker build --no-cache -t hypertoken:latest .
 ```
 
 ### Runtime Issues
@@ -180,11 +168,11 @@ docker run -p 3001:3000 hypertoken:latest node dist/cli/index.js relay
 
 ### Performance Issues
 
-**Issue**: Slow WASM execution
+**Issue**: Slow execution
 ```bash
 # Ensure you're using the release build
 # Modify Dockerfile to use:
-RUN cd core-rs && wasm-pack build --release --target nodejs --out-dir pkg/nodejs
+RUN npm run build
 ```
 
 ## Advanced Usage

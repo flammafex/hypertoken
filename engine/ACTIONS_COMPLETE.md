@@ -578,13 +578,10 @@ engine.dispatch("space:lockZone", {
 
 **Notes:**
 - The lock persists in the CRDT doc as a `_lock:{zone}` boolean key inside
-  `zones` (TS and Rust paths agree), so it survives persist/resume and syncs
-  between peers via CRDT merge.
+  `zones`, so it survives persist/resume and syncs between peers via CRDT merge.
 - TS `Space` enforces locks by early-returning on place/move/flip/remove/
-  clearZone/shuffleZone/transferZone; Rust enforces them only on
-  place/move/remove/flip (accepted divergence).
-- The TS `Space.zones` getter filters `_lock:*` keys from zone lists; Rust's
-  exported raw state surfaces them as zero-length lists.
+  clearZone/shuffleZone/transferZone.
+- The TS `Space.zones` getter filters `_lock:*` keys from zone lists.
 
 **Use cases:** Freezing game state, preventing cheating
 
@@ -1345,7 +1342,7 @@ engine.dispatch("game:mergeState", {
 
 **Use cases:** Incremental game-state updates, phase data, custom state
 
-**TS-only:** No WASM counterpart — routes through the ActionRegistry fallback.
+**TS-only:** Routes through the TS `ActionRegistry`.
 
 ---
 
@@ -1380,7 +1377,7 @@ engine.dispatch("game:setState", {
 
 **Returns:** The written top-level value (`session.state[key]`)
 
-**TS-only:** No WASM counterpart — routes through the ActionRegistry fallback (consistent with `game:setProperty` and `game:mergeState`).
+**TS-only:** Routes through the TS `ActionRegistry` (consistent with `game:setProperty` and `game:mergeState`).
 
 **Use cases:** Game-specific state (`watershed`, `cuttle`), whole-key or nested field-level writes via `engine.dispatch()`
 
@@ -2040,7 +2037,7 @@ engine.dispatch("debug:log", { message: "turn 1 complete" });
 
 **Returns:** The payload (pass-through)
 
-**Behavior:** Logs `[debug:log] <payload>` via `console.log` only when `engine.debug` is enabled. Not routed through WASM.
+**Behavior:** Logs `[debug:log] <payload>` via `console.log` only when `engine.debug` is enabled.
 
 ---
 
@@ -2162,4 +2159,4 @@ engine.dispatch("debug:log", { message: "turn 1 complete" });
 
 **Total: 81 actions - 100% complete and documented**
 
-**Note:** All 81 actions live in the TS `ActionRegistry`. 42 of them route through the Rust/WASM core (`WASM_ACTIONS`), with a TypeScript fallback for the rest; `debug:log` is the single Debug-category action. The five `token:*` operations were de-listed from `WASM_ACTIONS` because their return shapes/metadata conventions diverge between the two paths. The parity audit (`test/audit-parity.js`) enforces code/docs/WASM agreement.
+**Note:** All 81 actions live in the TS `ActionRegistry`. All actions route through the single-path TS `ActionRegistry`, which mutates the Automerge Chronicle via `session.change()`.

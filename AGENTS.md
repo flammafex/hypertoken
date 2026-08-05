@@ -4,23 +4,22 @@ Guidance for Codex / AI agents working in this repository. Read this before maki
 
 ## Repository at a glance
 
-HyperToken is a distributed game engine where **all state is a CRDT** (Automerge). One architectural decision yields serverless multiplayer, perfect replay, and forkable worlds. Optional Rust→WASM acceleration for hot paths. Ships with card/strategy game examples.
+HyperToken is a distributed game engine where **all state is a CRDT** (Automerge). One architectural decision yields serverless multiplayer, perfect replay, and forkable worlds. Ships with card/strategy game examples.
 
-- **Runtime:** Node.js 18+ (server/CLI), browser (WASM + examples)
-- **Language:** TypeScript (ESM, strict) + Rust (optional WASM)
+- **Runtime:** Node.js 18+ (server/CLI), browser (examples)
+- **Language:** TypeScript (ESM, strict)
 - **License:** Apache 2.0
 - **Branch:** `main` (clean working tree as of last review)
 
 ## Repo layout
 
 ```
-core/          CRDT state primitives (Token, Stack, Space, Source, Chronicle, IChronicle, WasmChronicleAdapter)
+core/          CRDT state primitives (Token, Stack, Space, Source, Chronicle, IChronicle)
 core/browser/  Browser build infrastructure (shims.js, build.js)
 core/storage/  Storage adapters (MemoryAdapter, FilesystemAdapter, IndexedDBAdapter)
 core/StorageAdapter.ts  Storage adapter interface
 engine/        Game coordination (Engine, actions.ts, Action, GameLoop, RuleEngine, Agent, Policy, Script)
 network/       P2P & server (PeerConnection, AuthoritativeServer, HybridPeerManager, MessageCodec, E2EEncryption)
-core-rs/       Rust → WASM source (src/lib.rs, src/chronicle_actions/, Cargo.toml, build.sh)
 cli/           CLI entrypoint (index.ts → commands/{relay,mcp}.ts)
 examples/      3 games (blackjack, cuttle, watershed)
 examples/watershed/  Watershed CRDT showcase game (real-time territory game)
@@ -37,17 +36,14 @@ test/          Custom test runner (no Jest/Vitest)
 
 ```bash
 npm install              # install deps
-npm run build            # tsc + copy examples/WASM to dist/
+npm run build            # tsc + copy examples to dist/
 npm run build:browser    # Build any game for browser (shared esbuild config)
-npm run build:rust       # optional: compile Rust → WASM (prebuilt binaries included)
 npm run clean            # rm -rf dist
 
 # Tests (custom runner, no Jest/Vitest)
 npm run test:quick       # ~10s: core + engine
 npm run test:unit        # ~30s: core + engine + exporters
 npm run test            # ~2min: full suite incl. integration & network
-npm run test:rust       # cargo test (native target, requires Rust)
-npm run test:wasm       # WASM bridge tests
 npm run test:sync:spike  # Phase 1 CRDT sync spike tests
 npm run test:sync:hardening  # Phase B sync hardening tests
 npm run test:persistence  # Phase C persistence tests
@@ -83,12 +79,12 @@ npm run mcp              # LLM MCP server
 - **Everything extends `Emitter`** (`core/events.ts`) for event-based comms.
 - **Tokens are immutable** — never modified, only created/destroyed. Provenance via `_mergedFrom` / `_splitFrom`.
 - **State mutations go through `engine.dispatch()`** — never direct `session.change()` from caller code. Game-specific state writes use `game:setState` (whole-key `value` or field-level `patches`). The engine's own `ActionRegistry` handlers and game-registered handlers may mutate via `session.change` internally; the examples (watershed/cuttle/blackjack) are fully migrated.
-- **Dual-path dispatch** — WASM `ActionDispatcher` if available + action supported, else TS `ActionRegistry` fallback. `IChronicle` interface abstracts both backends. Any new action needs both paths or an explicit fallback.
-- **disableWasm option** — `new Engine({ disableWasm: true })` forces the TypeScript Chronicle path. Optional — WASM sync is now supported. Useful for browser builds to avoid WASM binary loading.
+- **Single-path dispatch** — all actions (`category:verb`) route through `engine.dispatch()` to the TypeScript `ActionRegistry`, which mutates the Automerge Chronicle via `session.change()`. There is no WASM backend; the TS Chronicle path is the only path.
+- **ActionProfiler wired into dispatch** — `Engine.dispatch` wraps each action handler with `globalProfiler` (from `benchmark/ActionProfiler.js`), so per-action timing is collected whenever profiling is enabled.
 - **StorageAdapter pattern** — use `engine.useStorage(adapter)` + `await engine.persist(name)` / `await engine.resume(name)` for persistence (not the old save-state-plugin monkey-patching).
 - **HistoryManager uses periodic checkpoints** — not per-action snapshots. Checkpoints are taken every 50 actions, capped at 5. This bounds memory to O(checkpoints × docSize) instead of O(actions × docSize). Undo restores to the nearest checkpoint.
 - **Document compaction** — `engine.compact()` discards CRDT history via `A.from(A.toJS(doc))`, keeping only current state. Use at game-phase boundaries to bound document size. All peers must compact at the same epoch boundary.
-- **Forkable worlds** — `engine.fork()` creates a divergent CRDT branch with a new actor ID. `engine.mergeFrom(fork)` merges changes back via CRDT conflict resolution. Forked engines use the TS path (disableWasm).
+- **Forkable worlds** — `engine.fork()` creates a divergent CRDT branch with a new actor ID. `engine.mergeFrom(fork)` merges changes back via CRDT conflict resolution. Forked engines use the TS path.
 - **Automerge proxy issue** — `Object.values()` may not work on Automerge proxies; use `JSON.parse(JSON.stringify(state))` before derivation logic. Also, `doc.x = doc.x || {}` throws on existing objects — use `if (!doc.x) doc.x = {};`.
 - **Seeded randomness** — `mulberry32` + `shuffleArray` (`core/random.js`). Tests use fixed seeds for reproducibility.
 - **Apache 2.0 license header** on source files (see `core/index.js:1-15`).
@@ -98,8 +94,7 @@ npm run mcp              # LLM MCP server
 - **Custom test runner** — no Jest/Vitest. Tests use hand-rolled `test()` / `assert()` helpers with pass/fail summary and `process.exit(1)` on failure (pattern documented in `docs/TESTING.md:103-153`).
 - **ESM loader required** for `.ts` test files: `node --loader ./test/ts-esm-loader.js test/<file>`.
 - **Use fixed seeds** for any randomness in tests (e.g., `stack.shuffle(123)`).
-- **WASM parity** — changes to action handlers that exist in both TS and Rust must keep `test/testChronicleIncremental.ts` passing (TS/WASM behavioral parity).
-- **Test categories:** core, engine, exporters, script, agent, policy, crypto, random, integration, sync, rule-sync, wasm, chronicle-incremental, stress.
+- **Test categories:** core, engine, exporters, script, agent, policy, crypto, random, integration, sync, rule-sync, stress.
 - ⚠️ `test/testCore.js` is a bare `console.log` script without assertions — it does **not** follow the documented `test()`/`assert()` pattern and always exits 0. Do not use it as a template for new tests; follow `docs/TESTING.md` instead.
 
 ## PR / review expectations
@@ -107,20 +102,18 @@ npm run mcp              # LLM MCP server
 - **Working tree discipline** — recent commits completed the engine refactor: `engine.dispatch()` is now the sole state-mutation path (with `game:setState` for game-specific state), and the examples are migrated. Check `git log` before touching engine/network code.
 - **Commit messages** follow conventional-commits style (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`) — match existing style.
 - **Keep diffs clean** — no linter auto-formatting configured; don't reformat untouched code.
-- **Dual-path changes need dual-path review** — if you touch an action handler, check whether a Rust counterpart exists in `core-rs/src/chronicle_actions/` and update both.
 - **Docs and code must agree** — several docs are out of sync with code (see "Known inconsistencies" below). If your change affects documented behavior, update the doc in the same PR.
 - **No secrets** — `.env` and `.env.local` are gitignored; never commit credentials.
 
 ## Constraints — do not touch without asking
 
 1. **`network/E2EEncryption.ts`** — security-critical (ECDH/HKDF/AES-GCM). No visible security audit or constant-time guarantees. Treat as high-risk; ask before changing.
-2. **`core-rs/src/chronicle.rs` + `chronicle_actions/`** — the incremental CRDT (54 field-level action methods) is the performance-critical core. Changes here affect WASM/TS parity for the whole engine.
-3. **`IChronicle` interface / `WasmChronicleAdapter`** — abstracts the TS/WASM backend split. Breaking this interface breaks both dispatch paths.
-4. **`engine/actions.ts`** — the large `ActionRegistry`. Adding actions is fine; renaming/removing actions is a breaking API change across all examples.
-5. **`package.json` scripts** — many test scripts are referenced by CI and docs; renaming breaks tooling.
-6. **`tsconfig.json` strict mode** — do not relax `strict: true` to silence errors; fix the errors.
-7. **License headers** — preserve Apache 2.0 headers on source files.
-8. **`core/StorageAdapter.ts` interface** — breaking this interface breaks all storage adapters. Add new methods with defaults.
+2. **`IChronicle` interface** — abstracts the Chronicle backend. Breaking this interface breaks the dispatch path.
+3. **`engine/actions.ts`** — the large `ActionRegistry`. Adding actions is fine; renaming/removing actions is a breaking API change across all examples.
+4. **`package.json` scripts** — many test scripts are referenced by CI and docs; renaming breaks tooling.
+5. **`tsconfig.json` strict mode** — do not relax `strict: true` to silence errors; fix the errors.
+6. **License headers** — preserve Apache 2.0 headers on source files.
+7. **`core/StorageAdapter.ts` interface** — breaking this interface breaks all storage adapters. Add new methods with defaults.
 
 ## Definition of done
 
@@ -128,11 +121,9 @@ A change is complete when **all** of the following hold:
 
 - [ ] `npx tsc --noEmit` passes (strict mode, no new errors)
 - [ ] Relevant test category passes: `npm run test:quick` minimum; `npm run test:unit` for engine/core changes; `npm run test` for network/integration changes
-- [ ] If you touched an action with a Rust counterpart: `npm run test:wasm` passes (TS/WASM parity)
-- [ ] If you touched Rust: `npm run test:rust` passes
 - [ ] If you touched storage/persistence code: `npm run test:persistence` passes
 - [ ] No new `console.log` left in production code (use `Emitter` events or `engine.debug = true`)
-- [ ] Docs updated if behavior changed (README, `docs/`, `engine/ACTIONS.md`, `WASM_INTEGRATION.md` as relevant)
+- [ ] Docs updated if behavior changed (README, `docs/`, `engine/ACTIONS.md` as relevant)
 - [ ] No secrets, no `.env` files, no large binary artifacts committed
 - [ ] Commit message follows conventional-commits style
 - [ ] Working tree clean (or only intended files staged)
@@ -143,8 +134,7 @@ A change is complete when **all** of the following hold:
 2. Run `npm run test:quick` to confirm the environment works.
 3. Run `npm run blackjack` to see an end-to-end game.
 4. For action questions: `engine/ACTIONS.md` + per-category docs in `engine/actions/`.
-5. For WASM questions: `WASM_INTEGRATION.md` + `core-rs/README.md`.
-6. For networking questions: `network/` source.
+5. For networking questions: `network/` source.
 
 ## Repository Map
 

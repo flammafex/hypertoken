@@ -57,8 +57,8 @@ async function setupEngines(port: number) {
   const server = new UniversalRelayServer({ port, verbose: false });
   await server.start();
 
-  const engineA = new Engine({ disableWasm: true });
-  const engineB = new Engine({ disableWasm: true });
+  const engineA = new Engine();
+  const engineB = new Engine();
 
   setupWatershedSync(engineA);
   setupWatershedSync(engineB);
@@ -334,7 +334,7 @@ async function runTests(): Promise<void> {
   // After the session.change → game:setState migration, watershed:place must
   // write ALL FOUR fields (energy, lastEnergyTime, token, op) in one dispatch.
   await runTest("game:setState: watershed:place writes energy/lastEnergyTime/token/op", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
 
     await engine.dispatch("watershed:init", {});
     await engine.dispatch("watershed:register", { peerId: "p1", name: "Alice" });

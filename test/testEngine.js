@@ -47,7 +47,7 @@ async function runTests() {
   });
 
   await runTest("space:lockZone persists into CRDT doc", () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     engine.dispatch("space:createZone", { name: "table" });
     engine.dispatch("space:lockZone", { zone: "table", locked: true });
 
@@ -66,7 +66,7 @@ async function runTests() {
   });
 
   await runTest("space:lockZone survives persist/resume round-trip", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const adapter = new MemoryAdapter();
     engine.useStorage(adapter);
 
@@ -76,7 +76,7 @@ async function runTests() {
 
     await engine.persist("lock-save", "lock persistence test");
 
-    const engine2 = new Engine({ disableWasm: true });
+    const engine2 = new Engine();
     engine2.useStorage(adapter);
     const loaded = await engine2.resume("lock-save");
     assert(loaded === true, "resume should return true");
@@ -88,8 +88,8 @@ async function runTests() {
   });
 
   await runTest("space:lockZone syncs between peers via merge", () => {
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     engineA.dispatch("space:createZone", { name: "table" });
     engineA.dispatch("space:lockZone", { zone: "table", locked: true });

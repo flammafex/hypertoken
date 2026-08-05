@@ -22,8 +22,8 @@ The Engine uses several Node.js built-ins that don't exist in browsers:
 | `node:buffer` | `buffer` npm package | Base64 encoding |
 | `node:crypto` | Web Crypto API | `randomBytes`, `createHash`, `randomUUID` |
 | `node:events` | `events` npm package | `EventEmitter` |
-| `node:worker_threads` | Empty stub | Only used by WASM worker mode (not needed for sync) |
-| `node:url` / `node:path` | Empty stub | Only used by WASM |
+| `node:worker_threads` | Empty stub | Not used by the engine |
+| `node:url` / `node:path` | Empty stub | Not used by the engine |
 | `ws` | Native `WebSocket` | Browser has built-in WebSocket |
 
 The shims live in `core/browser/shims.js` and are applied automatically by the
@@ -46,15 +46,8 @@ Create a JS file that imports from the Engine:
 import { Engine } from '../../../engine/Engine';
 import { setupMyGameSync } from '../crdt-actions';
 
-// disableWasm: true is optional — forces TS path for simpler bundling.
-// WASM sync is now supported, but the TS path avoids the 2.7MB WASM binary.
-const engine = new Engine({ disableWasm: true });
+const engine = new Engine();
 ```
-
-**Note:** `disableWasm: true` is optional. WASM sync is now supported, but
-using the TS path in browser builds avoids the ~2.7MB WASM binary and
-simplifies bundling. Use WASM mode if you need the ~20x performance
-for compute-heavy operations.
 
 ### 2. Build the bundle
 

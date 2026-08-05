@@ -72,21 +72,43 @@ export class Source extends Emitter {
    * @throws Error if stack is null/undefined
    */
   addStack(stack: Stack): this {
-    if (!stack) {
-      throw new Error("Cannot add null/undefined stack to Source");
+    return this.addStacks([stack]);
+  }
+
+  /**
+   * Add multiple stacks to the source in a single transaction.
+   *
+   * All stackIds and tokens are written in ONE session.change() to avoid the
+   * per-stack Automerge transaction overhead. The tokens list is assigned as a
+   * whole (materialized via clone) rather than incrementally push(...)ed, which
+   * avoids Automerge list amplification when adding a large deck.
+   * @throws Error if any stack is null/undefined
+   */
+  addStacks(stacks: Stack[]): this {
+    if (!stacks || stacks.length === 0) {
+      return this;
+    }
+    for (const stack of stacks) {
+      if (!stack) {
+        throw new Error("Cannot add null/undefined stack to Source");
+      }
     }
 
-    this._stacks.push(stack);
-    const newTokens = stack.tokens ?? [];
+    const startIndex = this._stacks.length;
+    this._stacks.push(...stacks);
+    const allTokens = stacks.flatMap(d => d.tokens ?? []);
 
-    this.session.change("add stack to source", (doc) => {
+    this.session.change("add stacks to source", (doc) => {
       if (!doc.source) return;
-      const stackId = `stack-${this._stacks.length - 1}`;
-      doc.source.stackIds.push(stackId);
-      doc.source.tokens.push(...newTokens.map(t => sanitizeToken(t)));
+      for (let i = 0; i < stacks.length; i++) {
+        doc.source.stackIds.push(`stack-${startIndex + i}`);
+      }
+      doc.source.tokens = [...clone(doc.source.tokens), ...allTokens.map(t => sanitizeToken(t))];
     });
 
-    this.emit("source:addStack", { payload: { stackId: `stack-${this._stacks.length - 1}` } });
+    for (let i = 0; i < stacks.length; i++) {
+      this.emit("source:addStack", { payload: { stackId: `stack-${startIndex + i}` } });
+    }
     return this;
   }
 

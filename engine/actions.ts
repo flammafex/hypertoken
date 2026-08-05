@@ -740,10 +740,9 @@ const TokenActions: ActionRegistryType = {
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   BATCH ACTIONS (tokens:*)
   Stateless/pure or read-only — these never call session.change.
-  TS parity for the WASM-only batch ops (see WasmManager dispatch table).
-  Field names (rev/merged/split/kind/group) match the Rust Token serde schema.
-  NOTE: tokens:shuffle is byte-identical across paths — Rust uses the same
-  mulberry32 RNG as TS, seeded via the shared batchSeed("{seed}-{idx}") hash.
+  Field names (rev/merged/split/kind/group) match the token schema.
+  NOTE: tokens:shuffle uses the mulberry32 RNG, seeded via the shared
+  batchSeed("{seed}-{idx}") hash.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
 type BatchPredicate = (token: any) => boolean;

@@ -10,7 +10,7 @@ that survive page refreshes or server restarts.
 import { Engine } from './engine/Engine.js';
 import { FilesystemAdapter } from './core/storage/FilesystemAdapter.js';
 
-const engine = new Engine({ disableWasm: true });
+const engine = new Engine();
 
 // Attach a storage adapter
 const adapter = new FilesystemAdapter({ dir: './saves' });
@@ -23,7 +23,7 @@ await engine.dispatch("game:setState", { key: "game", value: { players: [], turn
 await engine.persist('my-game', 'First save');
 
 // Later: load in a new engine
-const engine2 = new Engine({ disableWasm: true });
+const engine2 = new Engine();
 engine2.useStorage(new FilesystemAdapter({ dir: './saves' }));
 await engine2.resume('my-game');
 

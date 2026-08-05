@@ -42,7 +42,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 1: tokens:shuffle ---
   await runTest("tokens:shuffle: deterministic seeded shuffle, sizes preserved", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const decks = [
       [token("a1"), token("a2"), token("a3")],
       [token("b1"), token("b2")],
@@ -59,7 +59,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 2: tokens:draw ---
   await runTest("tokens:draw: bottom-draw with per-deck counts", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const decks = [
       [token("1"), token("2"), token("3"), token("4"), token("5")],
       [token("a"), token("b"), token("c")],
@@ -75,7 +75,7 @@ async function runTests(): Promise<void> {
   });
 
   await runTest("tokens:draw: clamps count and rejects mismatched lengths", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
 
     const clamped = await engine.dispatch("tokens:draw", { decks: [[token("1"), token("2")]], counts: [9] });
     assert(clamped.drawn[0].length === 2, "draw all when count exceeds deck");
@@ -92,7 +92,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 3: tokens:filter ---
   await runTest("tokens:filter: flag predicates; rejects kind:/group:", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const tokens = [
       token("r1", { rev: true }),
       token("n1"),
@@ -120,7 +120,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 4: tokens:map ---
   await runTest("tokens:map: flip/merge/unmerge; inputs not mutated", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const tokens = [token("a"), token("b", { rev: true })];
 
     const flipped = await engine.dispatch("tokens:map", { tokens, operation: "flip" });
@@ -144,7 +144,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 5: tokens:find ---
   await runTest("tokens:find: first match incl. kind:/group:; null when absent", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const tokens = [
       token("r1", { rev: true, group: "g1" }),
       token("r2", { rev: true }),
@@ -165,7 +165,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 6: tokens:count ---
   await runTest("tokens:count: number result incl. kind:/group:; unknown -> 0", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const tokens = [token("r1", { rev: true }), token("n1"), token("special", { kind: "special" })];
 
     const count = await engine.dispatch("tokens:count", { tokens, predicate: "reversed" });
@@ -178,7 +178,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 7: tokens:forEach ---
   await runTest("tokens:forEach: same operations as map", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const tokens = [token("a"), token("b")];
 
     const flipped = await engine.dispatch("tokens:forEach", { tokens, operation: "flip" });
@@ -195,7 +195,7 @@ async function runTests(): Promise<void> {
 
   // --- Test 8: tokens:collect ---
   await runTest("tokens:collect: gathers from stack/discards/drawn/source/zones in order", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
 
     // Seed the CRDT doc with stack/source/zones state via game:setState.
     await engine.dispatch("game:setState", {

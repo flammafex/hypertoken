@@ -127,8 +127,8 @@ async function runTests(): Promise<void> {
     const server = new UniversalRelayServer({ port: 9093, verbose: false });
     await server.start();
 
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
 
     // Set up encryption
     const e2eA = new E2EEncryption();

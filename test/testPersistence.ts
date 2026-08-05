@@ -136,7 +136,7 @@ async function runTests(): Promise<void> {
   console.log("\n── Engine Persistence ──\n");
 
   await runTest("Engine: persist and resume with MemoryAdapter", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const adapter = new MemoryAdapter();
     engine.useStorage(adapter);
 
@@ -150,7 +150,7 @@ async function runTests(): Promise<void> {
     await engine.persist("test-save", "test description");
 
     // Create a new engine and resume
-    const engine2 = new Engine({ disableWasm: true });
+    const engine2 = new Engine();
     engine2.useStorage(new MemoryAdapter());
 
     // The new adapter is empty — need to use the same adapter
@@ -165,7 +165,7 @@ async function runTests(): Promise<void> {
   });
 
   await runTest("Engine: resume returns false when no save exists", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     engine.useStorage(new MemoryAdapter());
 
     const loaded = await engine.resume("nonexistent");
@@ -173,7 +173,7 @@ async function runTests(): Promise<void> {
   });
 
   await runTest("Engine: persist without adapter throws", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
 
     let error: Error | null = null;
     try {
@@ -186,7 +186,7 @@ async function runTests(): Promise<void> {
   });
 
   await runTest("Engine: listSaves returns metadata", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const adapter = new MemoryAdapter();
     engine.useStorage(adapter);
 
@@ -201,7 +201,7 @@ async function runTests(): Promise<void> {
   });
 
   await runTest("Engine: deleteSave removes save", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const adapter = new MemoryAdapter();
     engine.useStorage(adapter);
 
@@ -218,7 +218,7 @@ async function runTests(): Promise<void> {
   console.log("\n── Auto-save ──\n");
 
   await runTest("Engine: enableAutoSave and disableAutoSave", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const adapter = new MemoryAdapter();
     engine.useStorage(adapter);
 
@@ -245,7 +245,7 @@ async function runTests(): Promise<void> {
   console.log("\n── Game State Persistence ──\n");
 
   await runTest("Engine: save and restore actual game state (Chronicle)", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const adapter = new MemoryAdapter();
     engine.useStorage(adapter);
 
@@ -270,7 +270,7 @@ async function runTests(): Promise<void> {
     await engine.persist("game-state-test");
 
     // Resume in a new engine
-    const engine2 = new Engine({ disableWasm: true });
+    const engine2 = new Engine();
     engine2.useStorage(adapter);
     await engine2.resume("game-state-test");
 
@@ -289,7 +289,7 @@ async function runTests(): Promise<void> {
     const dir = "./test-saves-cross";
     const adapter1 = new FilesystemAdapter({ dir });
 
-    const engine1 = new Engine({ disableWasm: true });
+    const engine1 = new Engine();
     engine1.useStorage(adapter1);
 
     engine1.session.change("cross-engine test", (doc: any) => {
@@ -300,7 +300,7 @@ async function runTests(): Promise<void> {
 
     // New engine, new adapter instance, same directory
     const adapter2 = new FilesystemAdapter({ dir });
-    const engine2 = new Engine({ disableWasm: true });
+    const engine2 = new Engine();
     engine2.useStorage(adapter2);
 
     const loaded = await engine2.resume("cross-test");

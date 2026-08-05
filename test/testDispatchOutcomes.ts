@@ -17,8 +17,6 @@
 
 import { DispatchError, Engine } from "../engine/Engine.js";
 import { registerAction, unregisterAction } from "../engine/actions.js";
-import { Token } from "../core/Token.js";
-import { Stack } from "../core/Stack.js";
 
 let testCount = 0;
 let passCount = 0;
@@ -58,14 +56,14 @@ console.log("\n🧪 Testing dispatch outcomes\n");
 
 await test("dispatchChecked returns successful values and void", async () => {
   await withAction("test:dispatchValue", () => 42, async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const outcome = await engine.dispatchChecked("test:dispatchValue");
     assert(outcome.ok, "value action should succeed");
     assertEquals(outcome.result, 42, "value result should be preserved");
   });
 
   await withAction("test:dispatchVoid", () => undefined, async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const outcome = await engine.dispatchChecked("test:dispatchVoid");
     assert(outcome.ok, "void action should succeed");
     assertEquals(outcome.result, undefined, "void result should remain undefined");
@@ -74,7 +72,7 @@ await test("dispatchChecked returns successful values and void", async () => {
 });
 
 await test("dispatchChecked reports unknown actions", async () => {
-  const engine = new Engine({ disableWasm: true });
+  const engine = new Engine();
   const outcome = await engine.dispatchChecked("test:missing");
   assert(!outcome.ok, "unknown action should fail");
   assertEquals(outcome.error.code, "UNKNOWN_ACTION", "unknown action code should be typed");
@@ -83,7 +81,7 @@ await test("dispatchChecked reports unknown actions", async () => {
 
 await test("dispatchChecked reports synchronous handler throws", async () => {
   await withAction("test:throws", () => { throw new Error("sync exploded"); }, async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     const outcome = await engine.dispatchChecked("test:throws");
     assert(!outcome.ok, "throwing action should fail");
     assertEquals(outcome.error.code, "ACTION_HANDLER_ERROR", "throw code should identify handler failure");
@@ -96,7 +94,7 @@ await test("async handlers resolve before recording their result", async () => {
     await Promise.resolve();
     return "resolved";
   }, async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     let emittedResult: unknown;
     engine.on("engine:action", event => {
       emittedResult = event.payload.payload.result;
@@ -117,7 +115,7 @@ await test("async handler rejection has no success effects", async () => {
     await Promise.resolve();
     throw new Error("async exploded");
   }, async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     let actionEvents = 0;
     let policyEvaluations = 0;
     let errorEvents = 0;
@@ -139,7 +137,7 @@ await test("async handler rejection has no success effects", async () => {
 
 await test("synchronous failures have no success effects", async () => {
   await withAction("test:noEffects", () => { throw new Error("failed"); }, async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     let actionEvents = 0;
     let policyEvaluations = 0;
     engine.on("engine:action", () => { actionEvents++; });
@@ -154,7 +152,7 @@ await test("synchronous failures have no success effects", async () => {
 });
 
 await test("legacy dispatch rejects with DispatchError", async () => {
-  const engine = new Engine({ disableWasm: true });
+  const engine = new Engine();
   let rejection: unknown;
   try {
     await engine.dispatch("test:legacyMissing");
@@ -167,109 +165,9 @@ await test("legacy dispatch rejects with DispatchError", async () => {
   assert(typeof rejection.actionId === "string" && rejection.actionId.length > 0, "legacy rejection should expose actionId");
 });
 
-await test("WASM execution errors do not fall back to TypeScript", async () => {
-  const engine = new Engine({ disableWasm: true });
-  engine._wasmDispatcher = {
-    stackPeek: () => { throw new Error("wasm exploded"); },
-  } as any;
-  const initialHistoryLength = engine.history.length;
-
-  const outcome = await engine.dispatchChecked("stack:peek", { count: 1 });
-  assert(!outcome.ok, "WASM throw should fail dispatch");
-  assertEquals(outcome.error.code, "WASM_EXECUTION_ERROR", "WASM failure should have a distinct code");
-  assertEquals(outcome.error.message, "wasm exploded", "WASM failure should not be replaced by TS fallback error");
-  assertEquals(engine.history.length, initialHistoryLength, "WASM failure should not enter history");
-});
-
-await test("schema-incompatible WASM actions route directly to TypeScript", async () => {
-  const engine = new Engine({ disableWasm: true });
-  let wasmCalls = 0;
-  engine._wasmDispatcher = {
-    spacePlace: () => {
-      wasmCalls++;
-      throw new Error("incompatible WASM route used");
-    },
-  } as any;
-
-  const card = new Token({ id: "safe-ts-card", label: "Safe route" });
-  const outcome = await engine.dispatchChecked("space:place", {
-    zone: "table",
-    card,
-    opts: { x: 7, y: 9, faceUp: false },
-  });
-
-  assert(outcome.ok, "valid public space:place payload should succeed");
-  assertEquals(wasmCalls, 0, "incompatible WASM handler must not be attempted");
-  assertEquals(engine.space.zoneCount("table"), 1, "TypeScript handler should place the card");
-  const placement = engine.space.zone("table")[0];
-  assertEquals(placement.x, 7, "TypeScript placement options should be retained");
-  assertEquals(placement.faceUp, false, "TypeScript faceUp option should be retained");
-});
-
-const absentWasmSectionCases: Array<{
-  name: string;
-  type: string;
-  payload: any;
-  wasmMethod: string;
-  setup?: (engine: Engine) => void;
-  verify: (engine: Engine, outcome: any) => void;
-}> = [
-  {
-    name: "stack:reset",
-    type: "stack:reset",
-    payload: {},
-    wasmMethod: "stackReset",
-    setup: (engine) => {
-      engine.stack = new Stack(engine.session as any, [new Token({ id: "ts-reset-card" })]);
-    },
-    verify: (engine, outcome) => {
-      assert(outcome.ok, "stack:reset should succeed through TypeScript");
-      assertEquals(engine.stack?.size, 1, "TypeScript stack should be preserved by reset");
-    },
-  },
-  {
-    name: "game:setMaxTurns",
-    type: "game:setMaxTurns",
-    payload: { maxTurns: 50 },
-    wasmMethod: "gameSetMaxTurns",
-    verify: (engine, outcome) => {
-      assert(outcome.ok, "game:setMaxTurns should succeed through TypeScript");
-      assertEquals((engine.session.state as any).gameLoop.maxTurns, 50, "TypeScript maxTurns should be committed");
-    },
-  },
-  {
-    name: "game:setProperty",
-    type: "game:setProperty",
-    payload: { key: "safeRoute", value: 42 },
-    wasmMethod: "gameSetProperty",
-    verify: (engine, outcome) => {
-      assert(outcome.ok, "game:setProperty should succeed through TypeScript");
-      assertEquals(engine._gameState.safeRoute, 42, "TypeScript game state mutation should be committed");
-    },
-  },
-];
-
-for (const routeCase of absentWasmSectionCases) {
-  await test(`${routeCase.name} bypasses absent WASM capability`, async () => {
-    const engine = new Engine({ disableWasm: true });
-    routeCase.setup?.(engine);
-    let wasmCalls = 0;
-    engine._wasmDispatcher = {
-      [routeCase.wasmMethod]: () => {
-        wasmCalls++;
-        throw new Error(`WASM ${routeCase.name} should not be attempted`);
-      },
-    } as any;
-
-    const outcome = await engine.dispatchChecked(routeCase.type, routeCase.payload);
-    routeCase.verify(engine, outcome);
-    assertEquals(wasmCalls, 0, `${routeCase.name} must select TypeScript before execution`);
-  });
-}
-
 await test("throwing engine:action listeners are post-commit errors", async () => {
   await withAction("test:listenerThrows", () => "committed", async () => {
-    const engine = new Engine({ disableWasm: true });
+    const engine = new Engine();
     let postCommitErrors = 0;
     engine.on("engine:action", () => {
       throw new Error("listener exploded");

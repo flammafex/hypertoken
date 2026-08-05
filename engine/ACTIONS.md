@@ -19,10 +19,10 @@ Complete documentation for all 81 built-in actions in the HyperToken engine.
 | **Rules** | 2 | Rule engine state (markFired, initRules) |
 | **Token** | 5 | [Token Actions](./actions/TOKEN.md) |
 | **Debug** | 1 | Debug helpers (debug:log) |
-| **Batch** | 8 | [Batch Actions](./actions/BATCH.md) — `tokens:*`, TS ActionRegistry parity; WASM-accelerated when the WASM dispatcher is active |
+| **Batch** | 8 | [Batch Actions](./actions/BATCH.md) — `tokens:*`, TS ActionRegistry |
 | **Total (TS ActionRegistry)** | **81** | **100% Complete** |
 
-> Category counts reflect the TS `ActionRegistry` via `listActions()` (81 actions). The 8 `tokens:*` Batch actions are included; they route through the WASM dispatcher when available and fall back to the TS registry otherwise.
+> Category counts reflect the TS `ActionRegistry` via `listActions()` (81 actions). The 8 `tokens:*` Batch actions are included; they route through the TS ActionRegistry like every other action.
 
 ---
 
@@ -62,8 +62,6 @@ Agent management and agent-to-agent interactions.
 
 **Use cases:** Game setup, resource management, trading economies, theft mechanics, agent state
 
-**WASM routing:** the mutating agent actions (create, remove, setActive, setMeta, giveResource, takeResource, addToken, removeToken, transferResource, transferToken, stealResource, stealToken, drawCards, trade, discardCards) route through the WASM dispatcher when active; `agent:get`, `agent:getAll` stay on the TS ActionRegistry fallback (read-only; getAll return shape diverges).
-
 ---
 
 ### 🎮 [Game Actions](./actions/GAME.md) (9)
@@ -80,7 +78,7 @@ High-level game state management and lifecycle.
 - **Semantics:** All writes happen in a single `session.change("game:setState", ...)`. Whole-key mode assigns `doc[key] = value` when `replace` is set or the key doesn't exist yet, else `Object.assign(doc[key], value)`. Field-level mode ensures `doc[key]` exists, then walks each patch path using `if (!cur[seg]) cur[seg] = {}`.
 - **JSON sanitization:** Every value (whole-key `value` and each `patch.value`) is passed through `JSON.parse(JSON.stringify(v))` centrally, stripping `undefined` members that Automerge rejects. Non-serializable values throw `"value must be JSON-serializable"`.
 - **Validation:** Throws clear errors: `"key required"`, `"value or patches required"`, `"use either value or patches, not both"`, `"replace is only valid with value"`, `"patches must be a non-empty array"`, `"each patch needs a non-empty string path"`, `"patch value required"`.
-- **TS-only:** `game:setState` has no WASM counterpart and routes through the ActionRegistry fallback (consistent with `game:setProperty`, `game:mergeState`). Requires the TS Chronicle path (`disableWasm` or the TS fallback).
+- **TS-only:** `game:setState` routes through the TS `ActionRegistry` (consistent with `game:setProperty`, `game:mergeState`).
 
 ```javascript
 // Whole-key write
@@ -111,7 +109,7 @@ Token transformation and relationship management.
 ---
 
 ### 📊 [Batch Actions](./actions/BATCH.md) (8)
-Collection operations and queries. The `tokens:*` actions are implemented in both the WASM dispatcher (`WasmManager`) and the TS `ActionRegistry` — the WASM path is used when active, otherwise the TS handlers provide parity.
+Collection operations and queries. The `tokens:*` actions are implemented in the TS `ActionRegistry` like every other action.
 
 **Actions:** filter, map, forEach, collect, count, find, shuffle, draw
 
@@ -386,4 +384,4 @@ Each category file includes:
 
 **Total: 81 actions in the TS ActionRegistry — 100% complete and documented**
 
-**Note:** Counts reflect the TypeScript `ActionRegistry` via `listActions()` (81 actions), including the 8 `tokens:*` Batch actions. Batch actions are dual-path: they route through the WASM dispatcher when it is active, and fall back to the TS ActionRegistry handlers otherwise. Actions route through dual-path dispatch: WASM Chronicle (incremental field-level ops) or TS ActionRegistry fallback.
+**Note:** Counts reflect the TypeScript `ActionRegistry` via `listActions()` (81 actions), including the 8 `tokens:*` Batch actions. All actions route through the single-path TS `ActionRegistry`, which mutates the Automerge Chronicle via `session.change()`.

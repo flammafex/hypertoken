@@ -8,7 +8,7 @@
  * 2. Reconnect (disconnect mid-game, catch-up)
  * 3. Concurrent-write convergence (both peers write simultaneously)
  * 4. Automerge proxy issue (Object.values() on proxies)
- * 5. Engine.connect() + WASM guard
+ * 5. Engine.connect() + sync
  * 6. StateSyncManager (verify it's dead code)
  */
 import { Engine } from "../engine/Engine.js";
@@ -42,8 +42,8 @@ async function setupEngines(port: number) {
   const server = new UniversalRelayServer({ port, verbose: false });
   await server.start();
 
-  const engineA = new Engine({ disableWasm: true });
-  const engineB = new Engine({ disableWasm: true });
+  const engineA = new Engine();
+  const engineB = new Engine();
 
   return { server, engineA, engineB };
 }
@@ -248,9 +248,9 @@ async function runTests(): Promise<void> {
     const server = new UniversalRelayServer({ port: 9306, verbose: false });
     await server.start();
 
-    const engineA = new Engine({ disableWasm: true });
-    const engineB = new Engine({ disableWasm: true });
-    const engineC = new Engine({ disableWasm: true });
+    const engineA = new Engine();
+    const engineB = new Engine();
+    const engineC = new Engine();
 
     engineA.connect("ws://localhost:9306");
     engineB.connect("ws://localhost:9306");
@@ -337,16 +337,12 @@ async function runTests(): Promise<void> {
   });
 
   // ========================================================================
-  // 5. Engine.connect() + WASM guard
+  // 5. Engine.connect() + sync
   // ========================================================================
-  console.log("\n── Engine.connect() + WASM Guard ──\n");
+  console.log("\n── Engine.connect() + Sync ──\n");
 
-  await runTest("Engine with disableWasm: true can connect and sync", async () => {
+  await runTest("Engine can connect and sync", async () => {
     const { server, engineA, engineB } = await setupEngines(9307);
-
-    // Verify disableWasm engines don't have a WASM dispatcher
-    assert(engineA.wasm.dispatcher === null, "Engine A should not have WASM dispatcher");
-    assert(engineB.wasm.dispatcher === null, "Engine B should not have WASM dispatcher");
 
     engineA.connect("ws://localhost:9307");
     engineB.connect("ws://localhost:9307");
@@ -359,40 +355,14 @@ async function runTests(): Promise<void> {
     const stateB = engineB.session.state as any;
     assert(stateB.syncTest === "works", `B should see syncTest=works, sees ${stateB.syncTest}`);
 
-    engineA.disconnect();
-    engineB.disconnect();
-    server.stop();
-    await sleep(200);
-  });
-
-  await runTest("Engine with WASM enabled can also sync (sync no longer requires disableWasm)", async () => {
-    // WASM sync is now supported — the WasmChronicleAdapter delegates
-    // to the Rust sync methods (automerge::sync::SyncDoc).
-    const server = new UniversalRelayServer({ port: 9309, verbose: false });
-    await server.start();
-
-    const engineA = new Engine(); // WASM auto-initializes
-    const engineB = new Engine(); // WASM auto-initializes
-
-    // Wait for async WASM init
-    await sleep(2000);
-
-    engineA.connect("ws://localhost:9309");
-    engineB.connect("ws://localhost:9309");
-    await sleep(1000);
-
-    // Write and verify sync works with WASM. Use a WASM-routed dispatch
-    // (agent:create) instead of a direct session.change() — the
-    // WasmChronicleAdapter rejects direct change().
+    // Verify dispatch-based sync too
     await engineA.dispatch("agent:create", { name: "p1" });
     await sleep(1500);
 
     const stateA = engineA.session.state as any;
-    const stateB = engineB.session.state as any;
-    assert(stateA.agents?.["p1"], `A should see agent p1 via WASM dispatch, sees ${JSON.stringify(stateA.agents)}`);
-    assert(stateB.agents?.["p1"], `B should see agent p1 via WASM sync, sees ${JSON.stringify(stateB.agents)}`);
-
-    console.log("    WASM sync works — disableWasm: true is no longer required");
+    const stateB2 = engineB.session.state as any;
+    assert(stateA.agents?.["p1"], `A should see agent p1, sees ${JSON.stringify(stateA.agents)}`);
+    assert(stateB2.agents?.["p1"], `B should see agent p1 via sync, sees ${JSON.stringify(stateB2.agents)}`);
 
     engineA.disconnect();
     engineB.disconnect();

@@ -1,6 +1,6 @@
 {
   "name": "hypertoken-monorepo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "bin": {
     "hypertoken": "./dist/cli/index.js"
@@ -25,7 +25,7 @@
   "scripts": {
     "help": "node cli/help.js",
     "build": "tsc && npm run build:examples",
-    "build:examples": "cp -r examples/blackjack/*.js dist/examples/blackjack/ && cp -r examples/blackjack/token-sets dist/examples/blackjack/ && mkdir -p dist/core-rs && cp -r core-rs/pkg dist/core-rs/ && cp examples/cuttle/*.js dist/examples/cuttle/ && cp -r examples/cuttle/web dist/examples/cuttle/",
+    "build:examples": "cp -r examples/blackjack/*.js dist/examples/blackjack/ && cp -r examples/blackjack/token-sets dist/examples/blackjack/ && cp examples/cuttle/*.js dist/examples/cuttle/ && cp -r examples/cuttle/web dist/examples/cuttle/",
     "clean": "rm -rf dist && echo '✓ Build artifacts cleaned'",
     "blackjack": "node dist/examples/blackjack/cli.js --betting",
     "blackjack:server": "npx tsx examples/blackjack/server.js",
@@ -55,20 +55,12 @@
     "test:core-components": "npm run test:crypto && npm run test:random",
     "test:network": "npm run test:sync && npm run test:rule-sync",
     "test": "node test/run-all.js",
-    "test:parity": "node --loader ./test/ts-esm-loader.js test/audit-parity.js",
-    "verify": "tsc --noEmit && npm run test && npm run test:parity",
+    "verify": "tsc --noEmit && npm run test",
     "benchmark": "node --loader ./test/ts-esm-loader.js test/benchmarks.ts",
     "benchmark:memory": "node --expose-gc --loader ./test/ts-esm-loader.js test/benchmarks-memory.ts",
     "benchmark:chronicle": "node --loader ./test/ts-esm-loader.js test/benchmarkChronicle.ts",
     "benchmark:all": "npm run benchmark && npm run benchmark:memory && npm run benchmark:chronicle",
-    "build:rust": "cd core-rs && ./build.sh",
-    "build:rust:dev": "cd core-rs && wasm-pack build --dev --target nodejs --out-dir pkg/nodejs",
-    "build:rust:release": "cd core-rs && wasm-pack build --release --target nodejs --out-dir pkg/nodejs",
-    "test:rust": "cd core-rs && cargo test --lib --target $(rustc -vV | sed -n 's/host: //p')",
-    "test:wasm": "node --loader ./test/ts-esm-loader.js test/testWasmBridge.ts",
-    "test:chronicle-incremental": "node --loader ./test/ts-esm-loader.js test/testChronicleIncremental.ts",
     "test:batch": "node --loader ./test/ts-esm-loader.js test/testBatchActions.ts",
-    "clean:rust": "cd core-rs && cargo clean && rm -rf pkg",
     "test:sync:spike": "node --loader ./test/ts-esm-loader.js test/testSyncSpike.ts",
     "test:cuttle:sync": "node --loader ./test/ts-esm-loader.js test/testCuttleSync.ts",
     "test:cuttle:crypto": "node --loader ./test/ts-esm-loader.js test/testCuttleCrypto.ts",

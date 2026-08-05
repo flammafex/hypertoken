@@ -251,7 +251,7 @@ async function handleSaveGame() {
 
 async function handleResumeGame() {
   try {
-    state.engine = new Engine({ disableWasm: true });
+    state.engine = new Engine();
     state.storageAdapter = new IndexedDBAdapter();
     state.engine.useStorage(state.storageAdapter);
     setupWatershedSync(state.engine);
@@ -449,8 +449,8 @@ async function handleStart(e) {
   elements.btnJoin.textContent = 'Connecting...';
 
   try {
-    // Create engine with WASM disabled for browser compatibility
-    state.engine = new Engine({ disableWasm: true });
+    // Create engine for browser use
+    state.engine = new Engine();
 
     // Set up persistence with IndexedDB
     state.storageAdapter = new IndexedDBAdapter();
