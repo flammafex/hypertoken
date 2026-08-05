@@ -1363,7 +1363,7 @@ Follow the same pattern as stack: clone ObjId, transact, set dirty. Use `crate::
 - `space_create_zone` — Insert new empty list in zones map
 - `space_delete_zone` — Delete key from zones map
 - `space_clear_zone` — Delete all elements from zone list
-- `space_lock_zone` — Store lock state as a `_lock:<zone_name>` boolean key within the `zones` map (since zones are `Map { zone_name: List[Placement] }`, we can add scalar keys alongside list keys without conflict). Pattern: `tx.put(&zones_id, format!("_lock:{}", zone_name), locked)`. This avoids adding a new ROOT-level section. The `read_zones` method already filters by type — it only reads List entries, so the boolean `_lock:*` keys are ignored during zone reads.
+- `space_lock_zone` — Store lock state as a `_lock:<zone_name>` boolean key within the `zones` map (since zones are `Map { zone_name: List[Placement] }`, we can add scalar keys alongside list keys without conflict). Pattern: `tx.put(&zones_id, format!("_lock:{}", zone_name), locked)`. This avoids adding a new ROOT-level section. Note: `read_zones` reads every zones key — the scalar `_lock:*` keys are not filtered out; `doc.length` on the scalar object yields 0, so they surface as zero-length lists in exported state (the TS `Space.zones` getter filters `_lock:*` keys instead). Locks are only enforced by `space_place`/`space_move`/`space_remove`/`space_flip`.
 - `space_shuffle_zone` — Read placements, shuffle, write back
 - `space_transfer_zone` — Move all placements from one zone to another
 - `space_clear` — Delete all zones and recreate empty zones map

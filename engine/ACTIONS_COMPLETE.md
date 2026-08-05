@@ -558,6 +558,16 @@ engine.dispatch("space:lockZone", {
 
 **Returns:** void
 
+**Notes:**
+- The lock persists in the CRDT doc as a `_lock:{zone}` boolean key inside
+  `zones` (TS and Rust paths agree), so it survives persist/resume and syncs
+  between peers via CRDT merge.
+- TS `Space` enforces locks by early-returning on place/move/flip/remove/
+  clearZone/shuffleZone/transferZone; Rust enforces them only on
+  place/move/remove/flip (accepted divergence).
+- The TS `Space.zones` getter filters `_lock:*` keys from zone lists; Rust's
+  exported raw state surfaces them as zero-length lists.
+
 **Use cases:** Freezing game state, preventing cheating
 
 ---
@@ -2081,4 +2091,4 @@ const result = JSON.parse(resultJson);
 
 **Total: 81 actions - 100% complete and documented**
 
-**Note:** All 81 actions live in the TS `ActionRegistry`. 47 of them route through the Rust/WASM core (`WASM_ACTIONS`), with a TypeScript fallback for the rest; `debug:log` is the single Debug-category action. The parity audit (`test/audit-parity.js`) enforces code/docs/WASM agreement.
+**Note:** All 81 actions live in the TS `ActionRegistry`. 42 of them route through the Rust/WASM core (`WASM_ACTIONS`), with a TypeScript fallback for the rest; `debug:log` is the single Debug-category action. The five `token:*` operations were de-listed from `WASM_ACTIONS` because their return shapes/metadata conventions diverge between the two paths. The parity audit (`test/audit-parity.js`) enforces code/docs/WASM agreement.

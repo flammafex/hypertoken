@@ -229,8 +229,10 @@ export class Stack extends Emitter {
    */
   cut(n: number = 0, { topToBottom = true }: { topToBottom?: boolean } = {}): this {
     const len = this.size;
-    if (!Number.isInteger(n) || n <= 0 || n >= len) {
-      throw new Error(`Invalid cut position: ${n}. Must be between 1 and ${len - 1}.`);
+    // Mirror Rust stack_cut: throws IndexOutOfBounds when index > len.
+    // index 0 and index == len are valid no-ops (rotate_left semantics).
+    if (!Number.isInteger(n) || n < 0 || n > len) {
+      throw new Error(`Index out of bounds: ${n}`);
     }
 
     this.session.change("cut stack", (doc) => {
@@ -253,21 +255,25 @@ export class Stack extends Emitter {
   /**
    * Insert a card at a specific index
    * @param card - Card to insert
-   * @param index - Position to insert at (clamped to valid range)
+   * @param index - Position to insert at (valid range 0 to size; index == size appends)
    * @returns this for chaining
-   * @throws Error if card is null/undefined
+   * @throws Error if card is null/undefined or index is out of bounds
    */
   insertAt(card: IToken, index: number): this {
     if (!card) {
       throw new Error("Cannot insert null/undefined card");
     }
 
+    // Mirror Rust stack_insert_at: throws IndexOutOfBounds when index > len.
+    // Valid range is 0..=len (index == len appends).
+    const len = this.size;
+    if (!Number.isInteger(index) || index < 0 || index > len) {
+      throw new Error(`Index out of bounds: ${index}`);
+    }
+
     this.session.change("insert card", (doc) => {
       if (!doc.stack) return;
-      let idx = index;
-      if (idx < 0) idx = 0;
-      if (idx > doc.stack.stack.length) idx = doc.stack.stack.length;
-      doc.stack.stack.splice(idx, 0, sanitizeToken(card));
+      doc.stack.stack.splice(index, 0, sanitizeToken(card));
     });
     this.emit("stack:insert", { payload: { card, index } });
     return this;
@@ -275,25 +281,27 @@ export class Stack extends Emitter {
 
   /**
    * Remove a card at a specific index
-   * @param index - Index of card to remove
-   * @returns Removed token or null if index invalid
-   * @emits stack:invalidIndex if index is out of bounds
+   * @param index - Index of card to remove (valid range 0 to size - 1)
+   * @returns The removed token
+   * @throws Error if index is out of bounds (mirrors Rust stack_remove_at)
    */
-  removeAt(index: number): IToken | null {
-    if (index < 0 || index >= this.size) {
-      this.emit("stack:invalidIndex", { operation: "removeAt", index, size: this.size });
-      return null;
+  removeAt(index: number): IToken {
+    // Mirror Rust stack_remove_at: throws IndexOutOfBounds when index >= len
+    // (Rust does NOT return null on out-of-range remove).
+    const len = this.size;
+    if (!Number.isInteger(index) || index < 0 || index >= len) {
+      throw new Error(`Index out of bounds: ${index}`);
     }
 
     let removed: IToken | null = null;
     this.session.change("remove card at", (doc) => {
       if (!doc.stack) return;
-      if (index < 0 || index >= doc.stack.stack.length) return;
       const [itemProxy] = doc.stack.stack.splice(index, 1);
       removed = clone(itemProxy);
     });
     if (removed) this.emit("stack:remove", { payload: { card: removed, index } });
-    return removed;
+    // Validated index < len above, so doc.stack exists and splice returns an item.
+    return removed!;
   }
 
   /**

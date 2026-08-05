@@ -13,8 +13,7 @@
 // - Parallel zone operations: 2-3x improvement
 // - Combined with Node.js workers: 8-32x total speedup
 
-use rand::Rng;
-use crate::utils::seeded_rng;
+use crate::utils::{batch_seed_hash, Mulberry32, ShuffleRng};
 
 /// Batch shuffle multiple independent decks
 ///
@@ -55,14 +54,16 @@ fn shuffle_single<T>(deck: &mut Vec<T>, seed: Option<&str>) {
         return;
     }
 
-    let mut rng: Box<dyn rand::RngCore> = if let Some(seed_str) = seed {
-        Box::new(seeded_rng(seed_str))
+    // Batch decks use the "{seed}-{idx}" seed-string scheme; feed it through
+    // the TS `batchSeed` hash for exact parity with TypeScript.
+    let mut rng = if let Some(seed_str) = seed {
+        ShuffleRng::Seeded(Mulberry32::new(batch_seed_hash(seed_str)))
     } else {
-        Box::new(rand::thread_rng())
+        ShuffleRng::Unseeded(rand::thread_rng())
     };
 
     for i in (1..len).rev() {
-        let j = rng.gen_range(0..=i);
+        let j = (rng.next() * (i + 1) as f64).floor() as usize;
         deck.swap(i, j);
     }
 }

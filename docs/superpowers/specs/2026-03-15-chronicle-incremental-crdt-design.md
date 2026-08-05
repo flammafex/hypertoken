@@ -249,7 +249,7 @@ The JS-facing WASM-bindgen API on `ActionDispatcher` remains unchanged — `Engi
 
 ### Token and Batch Operations
 
-`token:transform`, `token:attach`, `token:detach`, `token:merge`, `token:split` and all `tokens:*` batch operations are **pure functions** — they take token JSON as input and return transformed token JSON as output. They do not read or write CRDT state. These remain delegated to `TokenOps` and `BatchOps` on the `ActionDispatcher`, unchanged.
+`token:transform`, `token:attach`, `token:detach`, `token:merge`, `token:split` and all `tokens:*` batch operations are **pure functions** — they take token JSON as input and return transformed token JSON as output. They do not read or write CRDT state. The `tokens:*` batch operations remain delegated to `BatchOps` on the `ActionDispatcher`; the five `token:*` operations route through the TypeScript `ActionRegistry` instead (their return shapes and metadata conventions diverge between TS and Rust, so they are de-listed from `WASM_ACTIONS` — same precedent as `agent:get`/`agent:getAll`).
 
 ## TS Integration: WasmChronicleAdapter
 

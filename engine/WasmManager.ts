@@ -27,9 +27,13 @@ export class WasmManager {
     "space:transferZone", "space:clear",
     // Source actions
     "source:draw", "source:shuffle",
-    // Token operations (5)
-    "token:transform", "token:attach", "token:detach",
-    "token:merge", "token:split",
+    // token:transform / attach / detach / merge / split intentionally stay on
+    // the TypeScript path: their return shapes and metadata conventions diverge
+    // between TS and Rust (Rust keeps meta in meta._mergedFrom/_splitFrom/
+    // _attachments, keeps the first token id on merge, and detach returns the
+    // detached token; TS uses top-level fields and last-wins ids). They are
+    // pure functions with marginal WASM benefit — same precedent as agent:get
+    // / agent:getAll staying on the TS path.
     // Agent actions
     "agent:create",
     "agent:remove", "agent:setActive", "agent:setMeta",
@@ -174,12 +178,6 @@ export class WasmManager {
       "agent:stealResource":    (p) => { d.agentStealResource(p.from, p.to, p.resource, p.amount ?? 1); },
       "agent:stealToken":       (p) => { d.agentStealToken(p.from, p.to, p.tokenId); },
       "agent:getAll":           (_) => JSON.parse(d.agentGetAll()),
-      // Token
-      "token:transform": (p) => JSON.parse(d.tokenTransform(JSON.stringify(p.token), JSON.stringify(p.properties ?? {}))),
-      "token:attach":    (p) => JSON.parse(d.tokenAttach(JSON.stringify(p.host), JSON.stringify(p.attachment), p.attachmentType ?? "default")),
-      "token:detach":    (p) => JSON.parse(d.tokenDetach(JSON.stringify(p.host), p.attachmentId)),
-      "token:merge":     (p) => JSON.parse(d.tokenMerge(JSON.stringify(p.tokens), p.properties ? JSON.stringify(p.properties) : undefined, p.keepOriginals ?? false)),
-      "token:split":     (p) => JSON.parse(d.tokenSplit(JSON.stringify(p.token), p.count ?? 2, p.propertiesArray ? JSON.stringify(p.propertiesArray) : undefined)),
       // GameLoop
       "game:loopInit":    (p) => { d.gameLoopInit(p.maxTurns ?? 100); },
       "game:loopStart":   (_) => { d.gameLoopStart(); },

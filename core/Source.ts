@@ -122,14 +122,18 @@ export class Source extends Emitter {
       throw new Error(`Invalid burn count: ${n}. Must be a positive integer.`);
     }
 
+    // Mirror Rust source_burn: throws when count > remaining tokens instead of
+    // clamping. Validated before the change so overdraw leaves state untouched.
+    const available = this.tokens.length;
+    if (n > available) {
+      throw new Error(`Invalid operation: Cannot burn ${n} from source of ${available}`);
+    }
+
     let burned: IToken[] = [];
     this.session.change(`burn ${n} cards from source`, (doc) => {
       if (!doc.source) return;
-      const count = Math.min(n, doc.source.tokens.length);
-      // Automerge proxies reject negative splice indices; compute a
-      // non-negative start (mirrors Stack._drawMany).
-      const startIdx = doc.source.tokens.length - count;
-      const burnedProxy = doc.source.tokens.splice(startIdx, count);
+      const startIdx = doc.source.tokens.length - n;
+      const burnedProxy = doc.source.tokens.splice(startIdx, n);
       burned = clone(burnedProxy);
       doc.source.burned.push(...burned);
     });
@@ -186,15 +190,20 @@ export class Source extends Emitter {
       throw new Error(`Invalid draw count: ${n}. Must be a positive integer.`);
     }
 
+    // Mirror Rust source_draw validation ORDER: the overdraw check happens
+    // BEFORE any draw and BEFORE the reshuffle-policy check. Rust throws on
+    // overdraw even when auto-reshuffle is configured; it never clamps.
+    const available = this.tokens.length;
+    if (n > available) {
+      throw new Error(`Invalid operation: Cannot draw ${n} from source of ${available}`);
+    }
+
     let drawn: IToken[] = [];
     let reshuffled = false;
     this.session.change(`draw ${n} from source`, (doc) => {
       if (!doc.source) return;
-      const count = Math.min(n, doc.source.tokens.length);
-      // Automerge proxies reject negative splice indices; compute a
-      // non-negative start (mirrors Stack._drawMany).
-      const startIdx = doc.source.tokens.length - count;
-      const drawnProxy = doc.source.tokens.splice(startIdx, count);
+      const startIdx = doc.source.tokens.length - n;
+      const drawnProxy = doc.source.tokens.splice(startIdx, n);
       drawn = clone(drawnProxy);
 
       // Check reshuffle policy

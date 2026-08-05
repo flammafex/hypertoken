@@ -32,7 +32,6 @@ export class Space extends Emitter {
 
   name: string;
   spreads: Record<string, SpreadZone[]> = {};
-  private _lockedZones: Set<string> = new Set();
   log: SpaceEvent[] = [];
 
   /**
@@ -59,13 +58,22 @@ export class Space extends Emitter {
   // Helper to sanitize token data for CRDT
 
   get zones(): string[] {
-    return this.session.state.zones ? Object.keys(this.session.state.zones) : [];
+    const zones = this.session.state.zones;
+    if (!zones) return [];
+    return Object.keys(zones).filter(k => !k.startsWith("_lock:"));
   }
 
   toJSON(): any {
+    const zones: Record<string, unknown> = {};
+    const src = this.session.state.zones;
+    if (src) {
+      for (const k of Object.keys(src)) {
+        if (!k.startsWith("_lock:")) zones[k] = src[k];
+      }
+    }
     return {
       name: this.name,
-      zones: this.session.state.zones || {},
+      zones,
       log: this.log
     };
   }
@@ -84,8 +92,14 @@ export class Space extends Emitter {
 
   cards(zoneName?: string): readonly IPlacementCRDT[] {
     if (zoneName) return this.zone(zoneName);
-    if (!this.session.state.zones) return [];
-    return (Object.values(this.session.state.zones) as IPlacementCRDT[][]).flat();
+    const zones = this.session.state.zones;
+    if (!zones) return [];
+    const all: IPlacementCRDT[] = [];
+    for (const k of Object.keys(zones)) {
+      if (k.startsWith("_lock:")) continue;
+      all.push(...(zones[k] as IPlacementCRDT[]));
+    }
+    return all;
   }
 
   findCard(idOrFn: string | ((p: IPlacementCRDT) => boolean)): IPlacementCRDT | null {
@@ -97,7 +111,9 @@ export class Space extends Emitter {
   }
 
   _isLocked(name: string): boolean {
-    return this._lockedZones.has(name);
+    const zones = this.session.state.zones;
+    if (!zones) return false;
+    return (zones as any)["_lock:" + name] === true;
   }
 
   /**
@@ -294,8 +310,10 @@ export class Space extends Emitter {
   }
 
   lockZone(id: string, locked = true): this {
-    if (!this._lockedZones) this._lockedZones = new Set();
-    locked ? this._lockedZones.add(id) : this._lockedZones.delete(id);
+    this.session.change(`lock zone ${id}`, (doc) => {
+      if (!doc.zones) doc.zones = {};
+      (doc.zones as any)["_lock:" + id] = locked;
+    });
     this.emit("zone:locked", { payload: { id, locked } });
     return this;
   }
