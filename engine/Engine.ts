@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * engine/Engine.ts
  */
 import { Emitter } from "../core/events.js";
@@ -19,7 +35,20 @@ import type { MessageCodec, CodecConfig } from "../network/MessageCodec.js";
 import type { ReconnectConfig } from "../network/PeerConnection.js";
 import { HistoryManager } from "./HistoryManager.js";
 import { NetworkManager } from "./NetworkManager.js";
-import { globalProfiler } from "../benchmark/ActionProfiler.js";
+
+/**
+ * Minimal profiler contract consumed by the Engine.
+ *
+ * The Engine depends only on this structural interface so it never needs to
+ * import from `benchmark/` (dev tooling). Consumers may pass the real
+ * `ActionProfiler` (or `globalProfiler`) as the `profiler` option — it is
+ * structurally compatible. When no profiler is provided, dispatch runs with
+ * zero profiling overhead (no closure allocation on the hot path).
+ */
+export interface IActionProfiler {
+  record<T>(type: string, fn: () => T): T;
+  recordAsync<T>(type: string, fn: () => Promise<T>): Promise<T>;
+}
 
 export interface EngineNetworkOptions {
   codec?: MessageCodec | Partial<CodecConfig>;
@@ -34,6 +63,12 @@ export interface EngineOptions {
   autoConnect?: string;
   useWebRTC?: boolean;
   networkOptions?: EngineNetworkOptions;
+  /**
+   * Optional action profiler. When omitted, dispatch runs with zero profiling
+   * overhead. Pass `globalProfiler` (from `benchmark/ActionProfiler.js`) or any
+   * structurally compatible profiler to collect per-action timing.
+   */
+  profiler?: IActionProfiler | null;
 }
 
 export type DispatchErrorCode =
@@ -84,8 +119,11 @@ export class Engine extends Emitter {
 
   private _useWebRTC: boolean;
   private _networkOptions: EngineNetworkOptions;
+  private _profiler: IActionProfiler | null;
+  private _policyDepth = 0;
+  private static readonly MAX_POLICY_DEPTH = 10;
 
-  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, networkOptions = {} }: EngineOptions = {}) {
+  constructor({ stack = null, space = null, source = null, autoConnect, useWebRTC = false, networkOptions = {}, profiler = null }: EngineOptions = {}) {
     super();
 
     this.session = new Chronicle();
@@ -95,6 +133,7 @@ export class Engine extends Emitter {
     this.eventBus = new Emitter();
     this._useWebRTC = useWebRTC;
     this._networkOptions = networkOptions;
+    this._profiler = profiler;
     this._policies = new Map();
     this.debug = false;
 
@@ -114,19 +153,19 @@ export class Engine extends Emitter {
   get history(): Action[] { return this.historyManager.history; }
   set history(v: Action[]) { this.historyManager.restoreHistory(v); }
 
-  get future(): Action[] { return this.historyManager.future; }
-
   get network(): INetworkConnection | undefined { return this.net.network; }
   get sync(): ConsensusCore | undefined { return this.net.sync; }
 
   // ── State getters ──────────────────────────────────────────────────────────
 
   get _gameState(): IGameState {
-    return (this.session.state as any).gameState ?? {};
+    // Materialize: session.state.gameState is a live Automerge proxy.
+    return JSON.parse(JSON.stringify((this.session.state as any).gameState ?? {}));
   }
 
   get _agents(): IEngineAgent[] {
-    return Object.values((this.session.state as any).agents ?? {}) as IEngineAgent[];
+    // Materialize: Object.values on the proxy leaks live proxies.
+    return JSON.parse(JSON.stringify(Object.values((this.session.state as any).agents ?? {}))) as IEngineAgent[];
   }
 
   get _transactions(): ITransaction[] {
@@ -158,6 +197,7 @@ export class Engine extends Emitter {
 
   async shutdown(): Promise<void> {
     this.net.disconnect();
+    this.disableAutoSave();
     this._policies.clear();
     this.historyManager.clear();
     this.emit('engine:shutdown');
@@ -226,10 +266,23 @@ export class Engine extends Emitter {
     }
 
     for (const [, policy] of this._policies) {
+      // Re-entry guard: a policy's effect may dispatch actions, which re-enter
+      // this method and re-evaluate all policies. A policy that dispatches
+      // whenever its condition holds would otherwise recurse synchronously
+      // until stack overflow. Stop evaluating beyond the depth limit.
+      if (this._policyDepth >= Engine.MAX_POLICY_DEPTH) {
+        if (this.debug) {
+          console.warn(`Engine: max policy depth (${Engine.MAX_POLICY_DEPTH}) reached; skipping policy evaluation`);
+        }
+        break;
+      }
+      this._policyDepth++;
       try {
         policy.evaluate(this);
       } catch (err) {
         this._reportPostCommitError(action, "policy", err, policy);
+      } finally {
+        this._policyDepth--;
       }
     }
 
@@ -240,7 +293,12 @@ export class Engine extends Emitter {
     const fn = ActionRegistry[action.type];
     if (fn) {
       try {
-        const result = globalProfiler.record(action.type, () => fn(this, action.payload));
+        // Hot path: when no profiler is configured, call the handler directly
+        // without allocating a closure. Only wrap when profiling is active.
+        const profiler = this._profiler;
+        const result = profiler
+          ? profiler.record(action.type, () => fn(this, action.payload))
+          : fn(this, action.payload);
         if (this._isPromiseLike(result)) {
           return Promise.resolve(result).then(
             resolved => {
@@ -300,9 +358,6 @@ export class Engine extends Emitter {
 
   snapshot(): IEngineSnapshot {
     return {
-      stack: this.stack?.toJSON?.() ?? null,
-      space: this.space.snapshot(),
-      source: this.source?.toJSON?.() ?? null,
       history: this.historyManager.history.map(a => a.toJSON()),
       policies: Array.from(this._policies.keys()),
       crdt: this.session.saveToBase64()
@@ -354,9 +409,22 @@ export class Engine extends Emitter {
     const forkedEngine = new Engine(); // fork uses TS path
     forkedEngine.session = forkedSession as any;
     forkedEngine.space = new Space(forkedSession as any, "main-space");
-    // Copy current state references — Stack/Source are stateless views over the session
-    forkedEngine.stack = this.stack;
-    forkedEngine.source = this.source;
+    // Reconstruct Stack/Source bound to the forked session (autoInit: false so
+    // the forked session's existing stack/source state is preserved rather than
+    // overwritten). Aliasing this.stack/this.source would bind them to the
+    // ORIGINAL session, breaking fork isolation in both directions.
+    const forkedStackState = (forkedSession.state as any)?.stack;
+    if (forkedStackState) {
+      forkedEngine.stack = new Stack(forkedSession as any, [], { autoInit: false });
+    }
+    const forkedSourceState = (forkedSession.state as any)?.source;
+    if (forkedSourceState) {
+      forkedEngine.source = new Source(forkedSession as any, [], { autoInit: false });
+    }
+    // Re-attach the state:changed → state:updated relay to the forked session.
+    // The constructor's relay is bound to the throwaway Chronicle created in
+    // new Engine(), not to forkedSession.
+    forkedSession.on("state:changed", (e: any) => forkedEngine.emit("state:updated", e));
     return forkedEngine;
   }
 
@@ -439,11 +507,18 @@ export class Engine extends Emitter {
    */
   enableAutoSave(intervalMs: number = 30000, name: string = 'autosave'): this {
     if (this._autoSaveTimer) clearInterval(this._autoSaveTimer);
-    this._autoSaveTimer = setInterval(() => {
+    const timer = setInterval(() => {
       this.persist(name).catch(err => {
         if (this.debug) console.warn('[Engine] Auto-save failed:', err.message);
       });
     }, intervalMs);
+    // Don't let the auto-save timer keep a Node.js process alive. `.unref()`
+    // is Node-specific; guard it so browser environments (which return a
+    // number from setInterval) are unaffected.
+    if (typeof timer === 'object' && timer !== null && typeof (timer as any).unref === 'function') {
+      (timer as any).unref();
+    }
+    this._autoSaveTimer = timer;
     return this;
   }
 
@@ -462,7 +537,7 @@ export class Engine extends Emitter {
 
   get state(): IEngineState {
     return {
-      version: "2.0.0-crdt",
+      version: "0.4.0",
       turn: this._gameState.turn ?? null,
       agents: this._agents,
       stack: this.stack,

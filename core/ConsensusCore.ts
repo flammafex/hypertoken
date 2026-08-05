@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * core/ConsensusCore.ts
  * Fixed Event Unwrapping & Echo Loop
  *
@@ -21,6 +37,7 @@ export interface INetworkConnection extends Emitter {
 export class ConsensusCore extends Emitter {
   session: IChronicle;
   network: INetworkConnection;
+  debug: boolean = false;
 
   private _syncStates: Map<string, any> = new Map();
 
@@ -37,13 +54,13 @@ export class ConsensusCore extends Emitter {
 
     this.network.on("net:peer:connected", (evt) => {
       const { peerId } = evt.payload;
-      console.log(`[Sync] Connected to peer: ${peerId}`);
+      if (this.debug) console.log(`[Sync] Connected to peer: ${peerId}`);
       this.addPeer(peerId);
     });
 
     this.network.on("net:peer:disconnected", (evt) => {
       const { peerId } = evt.payload;
-      console.log(`[Sync] Disconnected from peer: ${peerId}`);
+      if (this.debug) console.log(`[Sync] Disconnected from peer: ${peerId}`);
       this.removePeer(peerId);
     });
 
@@ -73,10 +90,10 @@ export class ConsensusCore extends Emitter {
 
   private updatePeer(peerId: string) {
     const syncState = this._syncStates.get(peerId);
-    // Bail only when the peer has no sync entry. A null syncState is valid: the
-    // WASM adapter's initSyncState() returns null by design ("create new sync
-    // state" on first generateSyncMessage call). A truthy guard here silently
-    // broke WASM-enabled sync handshakes.
+    // Bail only when the peer has no sync entry. A null syncState is valid:
+    // initSyncState() returns null by design ("create new sync state" on first
+    // generateSyncMessage call). A truthy guard here silently broke sync
+    // handshakes.
     if (syncState === undefined) return;
 
     const { nextSyncState, message } = this.session.generateSyncMessage(syncState);
@@ -111,20 +128,9 @@ export class ConsensusCore extends Emitter {
 
     try {
       // Delegate sync to session — it applies the message internally and emits state:changed
-      const { nextSyncState, message: responseMessage } = this.session.receiveSyncMessage(syncState, message, peerId);
+      const { nextSyncState } = this.session.receiveSyncMessage(syncState, message, peerId);
 
       this._syncStates.set(peerId, nextSyncState);
-
-      // The session may return an immediate response message (e.g. the WASM
-      // backend generates one inside receive_sync_message and flips in_flight,
-      // which suppresses the follow-up generateSyncMessage below). Send it
-      // straight back to the sender or the changes are lost.
-      if (responseMessage) {
-        this.network.sendToPeer(peerId, {
-          type: "sync",
-          data: this.arrayBufferToBase64(responseMessage)
-        });
-      }
 
       // Reply to sender to acknowledge/converge
       this.updatePeer(peerId);

@@ -90,9 +90,6 @@ export interface ITransaction {
  * Engine snapshot for serialization
  */
 export interface IEngineSnapshot {
-  stack: any | null;
-  space: any;
-  source: any | null;
   history: any[];
   policies: string[];
   crdt: string;

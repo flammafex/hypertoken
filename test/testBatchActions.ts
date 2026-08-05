@@ -1,8 +1,8 @@
 /*
  * test/testBatchActions.ts
  *
- * Tests for the `tokens:*` Batch actions in the TS ActionRegistry (parity with
- * the WASM BatchOps path). These are stateless token-collection utilities:
+ * Tests for the `tokens:*` Batch actions in the TS ActionRegistry. These are
+ * stateless token-collection utilities:
  * 1. tokens:shuffle  — deterministic seeded shuffle of multiple decks
  * 2. tokens:draw     — bottom-draw with per-deck counts
  * 3. tokens:filter   — flag predicates only (kind:/group: are find/count-only)

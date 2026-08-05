@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * core/Stack.ts
  */
 import { Emitter } from "./events.js";
@@ -229,7 +245,7 @@ export class Stack extends Emitter {
    */
   cut(n: number = 0, { topToBottom = true }: { topToBottom?: boolean } = {}): this {
     const len = this.size;
-    // Mirror Rust stack_cut: throws IndexOutOfBounds when index > len.
+    // Throws IndexOutOfBounds when index > len.
     // index 0 and index == len are valid no-ops (rotate_left semantics).
     if (!Number.isInteger(n) || n < 0 || n > len) {
       throw new Error(`Index out of bounds: ${n}`);
@@ -264,7 +280,7 @@ export class Stack extends Emitter {
       throw new Error("Cannot insert null/undefined card");
     }
 
-    // Mirror Rust stack_insert_at: throws IndexOutOfBounds when index > len.
+    // Throws IndexOutOfBounds when index > len.
     // Valid range is 0..=len (index == len appends).
     const len = this.size;
     if (!Number.isInteger(index) || index < 0 || index > len) {
@@ -283,11 +299,11 @@ export class Stack extends Emitter {
    * Remove a card at a specific index
    * @param index - Index of card to remove (valid range 0 to size - 1)
    * @returns The removed token
-   * @throws Error if index is out of bounds (mirrors Rust stack_remove_at)
+   * @throws Error if index is out of bounds
    */
   removeAt(index: number): IToken {
-    // Mirror Rust stack_remove_at: throws IndexOutOfBounds when index >= len
-    // (Rust does NOT return null on out-of-range remove).
+    // Throws IndexOutOfBounds when index >= len; does NOT return null on
+    // out-of-range remove.
     const len = this.size;
     if (!Number.isInteger(index) || index < 0 || index >= len) {
       throw new Error(`Index out of bounds: ${index}`);

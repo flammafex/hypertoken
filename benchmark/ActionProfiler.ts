@@ -4,10 +4,8 @@
  * Phase 3C: Hybrid Integration - Profiling & Planning
  *
  * This profiler measures the execution time of all HyperToken actions
- * to identify bottlenecks and prioritize Rust porting efforts.
+ * to identify bottlenecks and guide TypeScript-side optimization efforts.
  */
-
-import { performance } from 'perf_hooks';
 
 export interface ProfileData {
   actionType: string;
@@ -44,24 +42,43 @@ export class ActionProfiler {
    */
   start(): void {
     this.profiles.clear();
-    this.startTime = performance.now();
+    this.startTime = globalThis.performance.now();
   }
 
   /**
-   * Record action execution
+   * Record action execution.
+   *
+   * Async-aware: if `fn` returns a promise, the full async duration (through
+   * settlement) is measured, not just the synchronous portion up to the first
+   * await. This keeps the Engine's hot path simple while still capturing
+   * correct timings for async handlers.
    */
   record<T>(actionType: string, fn: () => T): T {
     if (!this.enabled) {
       return fn();
     }
 
-    const start = performance.now();
+    const start = globalThis.performance.now();
     try {
-      return fn();
-    } finally {
-      const end = performance.now();
-      const duration = end - start;
-      this.recordTiming(actionType, duration);
+      const result = fn();
+      if (result && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
+        // Async handler — measure through settlement.
+        return (result as unknown as PromiseLike<T>).then(
+          resolved => {
+            this.recordTiming(actionType, globalThis.performance.now() - start);
+            return resolved;
+          },
+          err => {
+            this.recordTiming(actionType, globalThis.performance.now() - start);
+            throw err;
+          },
+        ) as T;
+      }
+      this.recordTiming(actionType, globalThis.performance.now() - start);
+      return result;
+    } catch (err) {
+      this.recordTiming(actionType, globalThis.performance.now() - start);
+      throw err;
     }
   }
 
@@ -73,11 +90,11 @@ export class ActionProfiler {
       return fn();
     }
 
-    const start = performance.now();
+    const start = globalThis.performance.now();
     try {
       return await fn();
     } finally {
-      const end = performance.now();
+      const end = globalThis.performance.now();
       const duration = end - start;
       this.recordTiming(actionType, duration);
     }
@@ -114,8 +131,14 @@ export class ActionProfiler {
    * Generate profiling report
    */
   getReport(): ProfileReport {
-    const endTime = performance.now();
-    const totalTime = endTime - this.startTime;
+    const endTime = globalThis.performance.now();
+    // totalTime is the SUM of all sample durations (action CPU time), not
+    // wall-clock since start(). This keeps "% of Total" and the recommendation
+    // math as percentages of actual action execution time.
+    const totalTime = Array.from(this.profiles.values()).reduce(
+      (sum, p) => sum + p.totalTime,
+      0
+    );
     const totalActions = Array.from(this.profiles.values()).reduce(
       (sum, p) => sum + p.callCount,
       0
@@ -242,7 +265,7 @@ export class ActionProfiler {
       .filter(p => p.callCount > 100)
       .sort((a, b) => b.callCount - a.callCount);
 
-    console.log('🎯 PRIORITY 1: Port to Rust (High Cumulative Impact)');
+    console.log('🎯 PRIORITY 1: Optimize Algorithmic Complexity (High Cumulative Impact)');
     console.log('   Actions consuming >5% of total execution time:');
     console.log('');
     if (highImpact.length > 0) {
@@ -283,12 +306,12 @@ export class ActionProfiler {
     console.log('');
 
     if (highImpact.length > 0) {
-      console.log(`   1. Port ${highImpact.slice(0, 3).map(p => p.actionType).join(', ')} to Rust`);
-      console.log(`      Expected impact: ~${highImpact.slice(0, 3).reduce((sum, p) => sum + (p.totalTime / report.totalTime) * 100, 0).toFixed(1)}% time reduction`);
+      console.log(`   1. Optimize algorithmic complexity of ${highImpact.slice(0, 3).map(p => p.actionType).join(', ')}`);
+      console.log(`      These actions account for ~${highImpact.slice(0, 3).reduce((sum, p) => sum + (p.totalTime / report.totalTime) * 100, 0).toFixed(1)}% of action CPU time`);
     }
 
     if (slowPerCall.length > 0) {
-      console.log(`   2. Optimize algorithmic complexity of slow actions`);
+      console.log(`   2. Reduce per-call overhead of slow actions`);
       console.log(`      Target: Reduce avg time from ${slowPerCall[0].avgTime.toFixed(2)}ms to <5ms`);
     }
 
@@ -340,7 +363,7 @@ export class ActionProfiler {
    */
   reset(): void {
     this.profiles.clear();
-    this.startTime = performance.now();
+    this.startTime = globalThis.performance.now();
   }
 
   /**

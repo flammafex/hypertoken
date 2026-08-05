@@ -9,12 +9,6 @@ yarn.lock
 dist/
 *.tsbuildinfo
 
-# Rust build artifacts
-core-rs/target/
-core-rs/pkg/
-**/*.rs.bk
-Cargo.lock
-
 # Git
 .git/
 .gitignore

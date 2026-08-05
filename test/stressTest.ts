@@ -121,7 +121,7 @@ async function main() {
   console.log(`Deck size: ${DECK_SIZE} tokens`);
   console.log(`Measuring at: ${MEASURE_AT.join(", ")} actions\n`);
 
-  // Create engine with WASM disabled (pure TS path — the common case)
+  // Create engine (pure TS path — the common case)
   const engine = new Engine();
   const deck = makeDeck(DECK_SIZE);
   engine.stack = new Stack(engine.session as any, deck, { seed: 42 });

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 /**
  * core/browser/shims.js
  *
@@ -7,8 +23,8 @@
  * - node:buffer (Buffer for base64 encoding)
  * - node:crypto (randomBytes, createHash, randomUUID)
  * - node:events (EventEmitter — provided by the 'events' npm package)
- * - node:worker_threads (Worker — only used by WASM worker mode, not needed for sync)
- * - node:url / node:path (fileURLToPath, dirname, join — WASM worker mode only)
+ * - node:worker_threads (Worker — not needed for sync)
+ * - node:url / node:path (fileURLToPath, dirname, join — not needed for sync)
  * - ws (WebSocket — browser has native WebSocket)
  *
  * This file provides shims for the Node.js-only APIs. The 'buffer' and
@@ -75,7 +91,7 @@ export function createHash(algorithm) {
 }
 
 // ============================================================================
-// Worker shim — not available in browser (only needed for WASM worker mode)
+// Worker shim — not available in browser
 // ============================================================================
 
 export class Worker {
@@ -85,7 +101,7 @@ export class Worker {
 }
 
 // ============================================================================
-// Path/URL shim — not used in browser (only needed for WASM worker mode)
+// Path/URL shim — not used in browser
 // ============================================================================
 
 export function fileURLToPath() { return ''; }

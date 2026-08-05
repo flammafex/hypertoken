@@ -65,12 +65,3 @@ export function parseTokenSetObject(data) {
   return stack;
 }
 
-/** Fetch + parse a stack JSON file into { name, kind, description, tokens[] } */
-// loaders/tokenSetLoader.js
-export async function loadTokenSetJSON(url, fetchImpl = (typeof fetch !== "undefined" ? fetch : null)) {
-  if (!fetchImpl) throw new Error("No fetch implementation available");
-  const res = await fetchImpl(url);
-  if (!res.ok) throw new Error(`Failed to load token set: ${url}`);
-  return parseTokenSetObject(await res.json());
-}
-

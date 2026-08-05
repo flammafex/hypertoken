@@ -20,13 +20,8 @@ import { Emitter } from "./events.js";
 import { shuffleArray } from "./random.js";
 import { Stack } from "./Stack.js";
 import { Chronicle } from "./Chronicle.js";
-import { IToken, ISourceState } from "./types.js";
+import { IToken, ISourceState, ReshufflePolicy } from "./types.js";
 import { sanitizeToken, clone } from "./serialize.js";
-
-export interface ReshufflePolicy {
-  threshold: number | null;
-  mode: "auto" | "manual";
-}
 
 export interface SourceOptions {
   autoInit?: boolean;
@@ -79,9 +74,9 @@ export class Source extends Emitter {
    * Add multiple stacks to the source in a single transaction.
    *
    * All stackIds and tokens are written in ONE session.change() to avoid the
-   * per-stack Automerge transaction overhead. The tokens list is assigned as a
-   * whole (materialized via clone) rather than incrementally push(...)ed, which
-   * avoids Automerge list amplification when adding a large deck.
+   * per-stack Automerge transaction overhead. Tokens are pushed granularly
+   * (rather than assigned as a whole list) so concurrent edits merge correctly
+   * under Automerge while still batching into a single commit.
    * @throws Error if any stack is null/undefined
    */
   addStacks(stacks: Stack[]): this {
@@ -103,7 +98,14 @@ export class Source extends Emitter {
       for (let i = 0; i < stacks.length; i++) {
         doc.source.stackIds.push(`stack-${startIndex + i}`);
       }
-      doc.source.tokens = [...clone(doc.source.tokens), ...allTokens.map(t => sanitizeToken(t))];
+      // Push each token granularly (rather than replacing the whole tokens
+      // list) so concurrent edits merge correctly under Automerge. A whole-list
+      // assignment creates a new list object at the `tokens` key, which is
+      // last-writer-wins and would silently drop a concurrent peer's draw or
+      // another concurrent addStacks' tokens.
+      for (const t of allTokens) {
+        doc.source.tokens.push(sanitizeToken(t));
+      }
     });
 
     for (let i = 0; i < stacks.length; i++) {
@@ -122,13 +124,22 @@ export class Source extends Emitter {
       throw new Error("Stack not found in Source");
     }
 
+    // Tokens are appended per-stack in order, so the removed stack's tokens
+    // occupy a contiguous range in the concatenated source token list. Compute
+    // that range so we can splice it out granularly (CRDT-safe) rather than
+    // replacing the whole tokens list (which would be last-writer-wins).
+    let tokenStart = 0;
+    for (let i = 0; i < idx; i++) {
+      tokenStart += (this._stacks[i].tokens ?? []).length;
+    }
+    const removedCount = (stack.tokens ?? []).length;
+
     this._stacks.splice(idx, 1);
-    const remainingTokens = this._stacks.flatMap(d => d.tokens ?? []);
 
     this.session.change("remove stack from source", (doc) => {
       if (!doc.source) return;
       doc.source.stackIds.splice(idx, 1);
-      doc.source.tokens = remainingTokens.map(t => sanitizeToken(t));
+      doc.source.tokens.splice(tokenStart, removedCount);
     });
 
     this.emit("source:removeStack", { payload: { stackId: `stack-${idx}` } });
@@ -144,8 +155,8 @@ export class Source extends Emitter {
       throw new Error(`Invalid burn count: ${n}. Must be a positive integer.`);
     }
 
-    // Mirror Rust source_burn: throws when count > remaining tokens instead of
-    // clamping. Validated before the change so overdraw leaves state untouched.
+    // Throws when count > remaining tokens instead of clamping. Validated
+    // before the change so overdraw leaves state untouched.
     const available = this.tokens.length;
     if (n > available) {
       throw new Error(`Invalid operation: Cannot burn ${n} from source of ${available}`);
@@ -212,9 +223,9 @@ export class Source extends Emitter {
       throw new Error(`Invalid draw count: ${n}. Must be a positive integer.`);
     }
 
-    // Mirror Rust source_draw validation ORDER: the overdraw check happens
-    // BEFORE any draw and BEFORE the reshuffle-policy check. Rust throws on
-    // overdraw even when auto-reshuffle is configured; it never clamps.
+    // Validation ORDER: the overdraw check happens BEFORE any draw and BEFORE
+    // the reshuffle-policy check. Overdraw throws even when auto-reshuffle is
+    // configured; it never clamps.
     const available = this.tokens.length;
     if (n > available) {
       throw new Error(`Invalid operation: Cannot draw ${n} from source of ${available}`);
@@ -227,6 +238,9 @@ export class Source extends Emitter {
       const startIdx = doc.source.tokens.length - n;
       const drawnProxy = doc.source.tokens.splice(startIdx, n);
       drawn = clone(drawnProxy);
+      // Return cards in top-first order (first element is the top card),
+      // consistent with Stack._drawMany and tokens:draw.
+      drawn.reverse();
 
       // Check reshuffle policy
       if (doc.source.reshufflePolicy.threshold !== null &&

@@ -32,7 +32,6 @@ const COMMANDS = {
     'test:quick': 'Run core tests only (fast, ~10 sec)',
     'test:unit': 'Run unit tests (core, engine, token, batch)',
     'test:network': 'Run network/sync tests',
-    'test:wasm': 'Run WASM integration tests',
   },
 
   'Benchmarks': {
@@ -40,14 +39,6 @@ const COMMANDS = {
     'benchmark:memory': 'Run memory usage benchmarks',
     'benchmark:chronicle': 'Benchmark CRDT operations',
     'benchmark:all': 'Run all benchmarks',
-  },
-
-  'Rust/WASM': {
-    'build:rust': 'Build Rust core to WASM (run before build)',
-    'build:rust:dev': 'Build WASM in dev mode (faster, larger)',
-    'build:rust:release': 'Build WASM in release mode (optimized)',
-    'test:rust': 'Run Rust unit tests',
-    'clean:rust': 'Clean Rust build artifacts',
   },
 };
 

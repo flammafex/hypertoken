@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import { PeerConnection, PeerConnectionOptions, ReconnectConfig } from "../network/PeerConnection.js";
 import { HybridPeerManager } from "../network/HybridPeerManager.js";
 import { ConsensusCore, INetworkConnection } from "../core/ConsensusCore.js";
@@ -29,7 +45,7 @@ export class NetworkManager {
     };
 
     if (options.useWebRTC) {
-      console.log(`[Engine] Connecting to ${url} with WebRTC support...`);
+      if (engine.debug) console.log(`[Engine] Connecting to ${url} with WebRTC support...`);
       this._network = new HybridPeerManager({
         url,
         autoUpgrade: true,
@@ -38,7 +54,7 @@ export class NetworkManager {
         peerConnectionOptions: peerOptions,
       });
     } else {
-      console.log(`[Engine] Connecting to ${url} (WebSocket only)...`);
+      if (engine.debug) console.log(`[Engine] Connecting to ${url} (WebSocket only)...`);
       this._network = new PeerConnection(url, engine, peerOptions);
     }
 
@@ -52,21 +68,21 @@ export class NetworkManager {
     this._network.on("net:disconnected", (e) => engine.emit("net:disconnected", e));
     this._network.on("net:error", (e) => engine.emit("net:error", e));
     this._network.on("net:reconnecting", (e) => {
-      console.log(`[Engine] Reconnecting... (attempt ${e.payload?.attempt || 1})`);
+      if (engine.debug) console.log(`[Engine] Reconnecting... (attempt ${e.payload?.attempt || 1})`);
       engine.emit("net:reconnecting", e);
     });
     this._network.on("net:reconnected", (e) => {
-      console.log(`[Engine] Reconnected successfully`);
+      if (engine.debug) console.log(`[Engine] Reconnected successfully`);
       engine.emit("net:reconnected", e);
     });
 
     if (options.useWebRTC) {
       this._network.on("rtc:upgraded", (e) => {
-        console.log(`[Engine] WebRTC connection established with peer`);
+        if (engine.debug) console.log(`[Engine] WebRTC connection established with peer`);
         engine.emit("rtc:upgraded", e);
       });
       this._network.on("rtc:downgraded", (e) => {
-        console.log(`[Engine] WebRTC connection lost, using WebSocket`);
+        if (engine.debug) console.log(`[Engine] WebRTC connection lost, using WebSocket`);
         engine.emit("rtc:downgraded", e);
       });
       this._network.on("rtc:connection-failed", (e) => engine.emit("rtc:connection-failed", e));

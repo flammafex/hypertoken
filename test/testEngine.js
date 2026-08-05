@@ -59,7 +59,7 @@ async function runTests() {
     assert(!engine.space.zones.includes("_lock:table"), "_lock:table must not appear in zones()");
     assert(engine.space.zones.includes("table"), "table should appear in zones()");
 
-    // Unlock writes false (mirrors Rust), does not delete the key.
+    // Unlock writes false, does not delete the key.
     engine.dispatch("space:lockZone", { zone: "table", locked: false });
     assert(engine.space._isLocked("table") === false, "zone should be unlocked");
     assert(engine.session.state.zones["_lock:table"] === false, `_lock:table should be false after unlock, got ${engine.session.state.zones["_lock:table"]}`);

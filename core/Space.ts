@@ -1,4 +1,20 @@
 /*
+ * Copyright 2025 The Carpocratian Church of Commonality and Equality, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * core/Space.ts
  */
 import { Emitter } from "./events.js";
@@ -189,11 +205,15 @@ export class Space extends Emitter {
       found = true;
       const [placement] = from.splice(idx, 1);
 
-      if (opts.x !== undefined) placement.x = opts.x;
-      if (opts.y !== undefined) placement.y = opts.y;
+      // Materialize the spliced placement into a plain object before mutating
+      // and re-pushing it. Pushing the Automerge proxy into another zone's list
+      // throws "Cannot create a reference to an existing document object".
+      const plain = JSON.parse(JSON.stringify(placement));
+      if (opts.x !== undefined) plain.x = opts.x;
+      if (opts.y !== undefined) plain.y = opts.y;
 
       if (!doc.zones[toZone]) doc.zones[toZone] = [];
-      doc.zones[toZone].push(placement);
+      doc.zones[toZone].push(plain);
     });
 
     if (!found) {
@@ -329,7 +349,10 @@ export class Space extends Emitter {
       if (!doc.zones[toZone]) doc.zones[toZone] = [];
       
       const items = from.splice(0, from.length);
-      doc.zones[toZone].push(...items);
+      // Materialize each spliced placement into a plain object before pushing.
+      // Pushing the Automerge proxies into another zone's list throws "Cannot
+      // create a reference to an existing document object".
+      doc.zones[toZone].push(...items.map((p: any) => JSON.parse(JSON.stringify(p))));
       count = items.length;
     });
     this.emit("space:transferZone", { fromZone, toZone, count });

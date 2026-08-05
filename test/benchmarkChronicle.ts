@@ -25,7 +25,6 @@
  * 4. Serialization/deserialization
  *
  * Baseline: TypeScript Automerge
- * Target: Rust automerge-rs (7-10x faster)
  */
 
 import { Chronicle } from '../core/Chronicle.js';
@@ -228,11 +227,6 @@ console.log(`State change: ${(changeDuration / changeIterations).toFixed(3)}ms`)
 console.log(`Document merge: ${(mergeDuration / mergeIterations).toFixed(3)}ms`);
 console.log(`Serialization: ${(totalSaveTime / serIterations).toFixed(3)}ms`);
 console.log(`Deserialization: ${(totalLoadTime / serIterations).toFixed(3)}ms`);
-console.log('');
-console.log('Expected with Rust automerge-rs:');
-console.log(`  Merge: ${(mergeDuration / mergeIterations / 7).toFixed(3)}ms (~7x faster)`);
-console.log(`  Serialization: ${(totalSaveTime / serIterations / 10).toFixed(3)}ms (~10x faster)`);
-console.log(`  Deserialization: ${(totalLoadTime / serIterations / 10).toFixed(3)}ms (~10x faster)`);
 console.log('');
 console.log('✅ Benchmark complete!');
 

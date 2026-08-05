@@ -50,6 +50,22 @@ export interface ActionRegistryType {
 }
 
 /*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GUARD HELPERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
+
+function requireStack(engine: Engine): asserts engine is Engine & { stack: NonNullable<Engine["stack"]> } {
+  if (!engine.stack) throw new Error("No stack attached to engine");
+}
+
+function requireSpace(engine: Engine): void {
+  if (!engine.space) throw new Error("No space attached to engine");
+}
+
+function requireSource(engine: Engine): asserts engine is Engine & { source: NonNullable<Engine["source"]> } {
+  if (!engine.source) throw new Error("No source attached to engine");
+}
+
+/*━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   BASE ACTIONS (Original 5)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━*/
 
@@ -59,48 +75,49 @@ export interface ActionRegistryType {
 
 const StackActions: ActionRegistryType = {
   "stack:draw": (engine, { count = 1 } = {}) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     return engine.stack.draw(count);
   },
   "stack:peek": (engine, { count = 1 } = {}) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
-    return engine.stack.tokens.slice(-count).reverse();
+    requireStack(engine);
+    // Materialize: slicing/reversing a live Automerge list proxy leaks proxies.
+    return JSON.parse(JSON.stringify(engine.stack.tokens.slice(-count).reverse()));
   },
   "stack:shuffle": (engine, { seed = null } = {}) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     engine.stack.shuffle(seed ?? undefined);
   },
   "stack:burn": (engine, { count = 1 } = {}) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     return engine.stack.burn(count);
   },
   "stack:reset": (engine) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     engine.stack.reset();
   },
   "stack:cut": (engine, { position = 0 } = {}) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     engine.stack.cut(position);
   },
   "stack:insertAt": (engine, { position = 0, card } = {} as StackInsertAtPayload) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     if (!card) throw new Error("card required");
     engine.stack.insertAt(card, position);
   },
   "stack:removeAt": (engine, { position = 0 } = {}) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     return engine.stack.removeAt(position);
   },
   "stack:swap": (engine, { i, j } = {} as StackSwapPayload) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     engine.stack.swap(i, j);
   },
   "stack:reverse": (engine) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     engine.stack.reverseRange(0, engine.stack.size - 1);
   },
   "stack:discard": (engine, { card } = {} as StackDiscardPayload) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     if (!card) throw new Error("card required");
     return engine.stack.discard(card);
   },
@@ -112,61 +129,61 @@ const StackActions: ActionRegistryType = {
 
 const SpaceActions: ActionRegistryType = {
   "space:place": (engine, { zone, card, opts = {} } = {} as SpacePlacePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     if (!zone) throw new Error("zone required");
     if (!card) throw new Error("card required");
     return engine.space.place(zone, card, opts);
   },
   "space:remove": (engine, { zone, placementId } = {} as SpaceRemovePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.remove(zone, placementId);
   },
   "space:move": (engine, { fromZone, toZone, placementId, x, y } = {} as SpaceMovePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.move(fromZone, toZone, placementId, { x, y });
   },
   "space:flip": (engine, { zone, placementId, faceUp } = {} as SpaceFlipPayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.flip(zone, placementId, faceUp);
   },
   "space:createZone": (engine, { name, label, x, y } = {} as SpaceCreateZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.createZone(name, { label, x, y });
   },
   "space:deleteZone": (engine, { name } = {} as SpaceDeleteZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.deleteZone(name);
   },
   "space:clearZone": (engine, { zone } = {} as SpaceClearZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.clearZone(zone);
   },
   "space:lockZone": (engine, { zone, locked = true } = {} as SpaceLockZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.lockZone(zone, locked);
   },
   "space:shuffleZone": (engine, { zone, seed } = {} as SpaceShuffleZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.shuffleZone(zone, seed);
   },
   "space:fanZone": (engine, { zone, ...opts } = {} as SpaceFanZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.fan(zone, opts);
   },
   "space:spreadZone": (engine, { zone, pattern, angleStep, radius } = {} as SpaceSpreadZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.spreadZone(zone, { pattern, angleStep, radius });
   },
   "space:stackZone": (engine, { zone } = {} as SpaceStackZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.stackZone(zone);
   },
   "space:transferZone": (engine, { fromZone, toZone } = {} as SpaceTransferZonePayload) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     return engine.space.transferZone(fromZone, toZone);
   },
   "space:clear": (engine) => {
-    if (!engine.space) throw new Error("No space attached to engine");
+    requireSpace(engine);
     engine.space.clear();
   },
 };
@@ -177,33 +194,33 @@ const SpaceActions: ActionRegistryType = {
 
 const SourceActions: ActionRegistryType = {
   "source:draw": (engine, { count = 1 } = {}) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     return engine.source.draw(count);
   },
   "source:shuffle": (engine, { seed } = {} as SourceShufflePayload) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     engine.source.shuffle(seed);
   },
   "source:burn": (engine, { count = 1 } = {}) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     return engine.source.burn(count);
   },
   "source:addStack": (engine, { stack } = {} as SourceAddStackPayload) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     if (!stack) throw new Error("stack required");
     engine.source.addStack(stack);
   },
   "source:removeStack": (engine, { stack } = {} as SourceRemoveStackPayload) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     if (!stack) throw new Error("stack required");
     engine.source.removeStack(stack);
   },
   "source:reset": (engine) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     engine.source.reset();
   },
   "source:inspect": (engine) => {
-    if (!engine.source) throw new Error("No source attached to engine");
+    requireSource(engine);
     return engine.source.inspect();
   },
 };
@@ -286,13 +303,16 @@ const AgentActions: ActionRegistryType = {
       const i = doc.agents[name].inventory.findIndex((t: IToken) => t.id === tokenId);
       if (i !== -1) doc.agents[name].inventory.splice(i, 1);
     });
-    return removed;
+    // Materialize: `removed` is a live Automerge proxy from the agent map.
+    return JSON.parse(JSON.stringify(removed));
   },
   "agent:get": (engine, { name } = {} as AgentGetPayload) => {
-    return findAgent(engine, name);
+    // Materialize: findAgent returns a live Automerge proxy graph.
+    return JSON.parse(JSON.stringify(findAgent(engine, name)));
   },
   "agent:getAll": (engine) => {
-    return engine._agents;
+    // Materialize: engine._agents is a proxy graph.
+    return JSON.parse(JSON.stringify(engine._agents));
   },
   "agent:transferResource": (engine, { from, to, resource, amount = 1 } = {} as AgentTransferResourcePayload) => {
     const fromAgent = findAgent(engine, from);
@@ -323,7 +343,7 @@ const AgentActions: ActionRegistryType = {
         const [moved] = doc.agents[from].inventory.splice(i, 1);
         if (!doc.agents[to].inventory) doc.agents[to].inventory = [];
         // Automerge rejects pushing a proxy that still belongs to the document;
-        // materialize a plain copy (Rust re-creates the token in the target).
+        // materialize a plain copy before pushing.
         doc.agents[to].inventory.push(JSON.parse(JSON.stringify(moved)));
       }
       if (!doc.transactions) doc.transactions = [];
@@ -357,7 +377,7 @@ const AgentActions: ActionRegistryType = {
         const [moved] = doc.agents[from].inventory.splice(i, 1);
         if (!doc.agents[to].inventory) doc.agents[to].inventory = [];
         // Automerge rejects pushing a proxy that still belongs to the document;
-        // materialize a plain copy (Rust re-creates the token in the target).
+        // materialize a plain copy before pushing.
         doc.agents[to].inventory.push(JSON.parse(JSON.stringify(moved)));
       }
       if (!doc.transactions) doc.transactions = [];
@@ -404,7 +424,7 @@ const AgentActions: ActionRegistryType = {
       if (!d1.resources) d1.resources = {};
       if (!d2.resources) d2.resources = {};
       // Absolute resource writes from snapshot values, so both offers on the
-      // SAME key net out (order-independent, mirrors the Rust handler).
+      // SAME key net out (order-independent).
       for (const key of keys) {
         const a1Amt = offer1?.resource === key && typeof offer1?.amount === "number" ? offer1.amount : 0;
         const a2Amt = offer2?.resource === key && typeof offer2?.amount === "number" ? offer2.amount : 0;
@@ -433,7 +453,7 @@ const AgentActions: ActionRegistryType = {
     });
   },
   "agent:drawCards": (engine, { name, count = 1 } = {} as AgentDrawCardsPayload) => {
-    if (!engine.stack) throw new Error("No stack attached to engine");
+    requireStack(engine);
     findAgent(engine, name); // validate existence
     const drawn = engine.stack.draw(count);
     const cards = Array.isArray(drawn) ? drawn : drawn ? [drawn] : [];
@@ -454,7 +474,7 @@ const AgentActions: ActionRegistryType = {
     });
   },
   "agent:discardCards": (engine, { name, tokenIds } = {} as AgentDiscardCardsPayload) => {
-    // Check stack presence via session.state (mirrors the Rust handler).
+    // Check stack presence via session.state.
     const snapshot = JSON.parse(JSON.stringify(engine.session.state)) as any;
     if (!snapshot.stack) throw new Error("No stack attached to engine");
     findAgent(engine, name);
@@ -478,7 +498,7 @@ const AgentActions: ActionRegistryType = {
         doc.agents[name].inventory = JSON.parse(JSON.stringify(
           doc.agents[name].inventory.filter((t: IToken) => !discardedIds.has(t.id))
         ));
-        // Directly append to stack discards (single change, mirrors Rust).
+        // Directly append to stack discards (single change).
         if (!doc.stack) return;
         if (!doc.stack.discards) doc.stack.discards = [];
         doc.stack.discards.push(...discarded.map((t: IToken) => JSON.parse(JSON.stringify(t))));
@@ -565,8 +585,8 @@ const GameActions: ActionRegistryType = {
   /**
    * game:setState — generic game-state writer. Lets game code write game-specific
    * top-level state keys (e.g. doc.watershed, doc.cuttle) and nested field-level
-   * writes through engine.dispatch() instead of raw session.change(). TS-only:
-   * no WASM counterpart; routes through the ActionRegistry fallback.
+   * writes through engine.dispatch() instead of raw session.change(). Routes
+   * through the ActionRegistry fallback.
    */
   "game:setState": (engine, { key, value, replace, patches } = {} as GameSetStatePayload) => {
     if (typeof key !== "string" || !key) throw new Error("key required");
@@ -601,16 +621,20 @@ const GameActions: ActionRegistryType = {
           }
           cur[p.path[p.path.length - 1]] = p.value;
         }
-      } else if (replace || !doc[key]) {
+      } else if (replace || !doc[key] || typeof doc[key] !== "object" || Array.isArray(doc[key])) {
+        // Replace when the existing value is missing, a scalar, or an array —
+        // Object.assign on those would throw or corrupt the value.
         doc[key] = sValue;
       } else {
         Object.assign(doc[key], sValue);
       }
     });
-    return (engine.session.state as any)?.[key];
+    // Materialize: session.state[key] is a live Automerge proxy.
+    return JSON.parse(JSON.stringify((engine.session.state as any)?.[key]));
   },
   "game:getState": (engine) => {
-    return engine._gameState;
+    // Materialize: engine._gameState is a live Automerge proxy.
+    return JSON.parse(JSON.stringify(engine._gameState));
   },
 };
 
@@ -620,10 +644,9 @@ const GameActions: ActionRegistryType = {
 
 const GameLoopActions: ActionRegistryType = {
   "game:loopInit": (engine, { maxTurns = 100 } = {} as GameLoopInitPayload) => {
-    // Guard: Infinity cannot be serialized (JSON.stringify → null), and the
-    // WASM backend rejects null for the i32 maxTurns field. Coerce non-finite
-    // values to the handler default so an explicit Infinity payload cannot
-    // break WASM init.
+    // Guard: Infinity cannot be serialized (JSON.stringify → null). Coerce
+    // non-finite values to the handler default so an explicit Infinity payload
+    // cannot break init.
     const safeMaxTurns = Number.isFinite(maxTurns) ? maxTurns : 100;
     engine.session.change("init loop", (doc: any) => {
       doc.gameLoop = {
@@ -813,8 +836,8 @@ const BatchActions: ActionRegistryType = {
   },
   "tokens:filter": (engine, { tokens, predicate = "reversed" } = {}) => {
     if (!Array.isArray(tokens)) throw new Error("tokens required");
-    // Rust parallel_filter only accepts the four flag predicates and errors
-    // on anything else (kind:/group: are find/count-only) — keep that parity.
+    // Only the four flag predicates are accepted; anything else (kind:/group:
+    // are find/count-only) is an error.
     if (!BATCH_FLAG_PREDICATES.has(predicate)) throw new Error(`Unknown predicate: ${predicate}`);
     return tokens.filter(batchPredicate(predicate)!);
   },
